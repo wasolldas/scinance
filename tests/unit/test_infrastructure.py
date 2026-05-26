@@ -289,9 +289,11 @@ class TestLiquidationBuffer:
         for e in events:
             buf.add(e)
 
-        # Last 5 seconds: events at now-4s, now-3s, now-2s, now-1s, now
+        # Last 5 seconds: cutoff = now - 5000ms = ...995000
+        # Events at ...995000, ...996000, ...997000, ...998000, ...999000, ...000000
+        # = 6 events (>= cutoff)
         recent = buf.recent_by_ts(5.0, now_ms=now_ms)
-        assert len(recent) == 5
+        assert len(recent) == 6
         # All timestamps >= cutoff
         cutoff_ms = now_ms - 5000
         for e in recent:
@@ -320,9 +322,10 @@ class TestLiquidationBuffer:
 
         mags = buf.magnitudes_usd(5.0, now_ms=now_ms)
         assert len(mags) == 2
+        # Deque order: 100k added first, 1k added second
         # log10(100_000) = 5.0, log10(1_000) = 3.0
-        assert abs(mags[0] - 3.0) < 1e-10  # 1000 comes first (earlier ts)
-        assert abs(mags[1] - 5.0) < 1e-10
+        assert abs(mags[0] - 5.0) < 1e-10  # 100k was added first
+        assert abs(mags[1] - 3.0) < 1e-10  # 1k was added second
 
     def test_liquidation_buffer_rate_per_second(self) -> None:
         """rate_per_second = count(events) / window_seconds."""
