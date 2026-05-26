@@ -79,7 +79,7 @@ class M5FFD(BaseModule):
         k = 1
         w = 1.0
         while True:
-            w = w * (d - k + 1) / k
+            w = w * -(d - k + 1) / k
             if abs(w) < threshold:
                 break
             weights.append(w)
