@@ -161,6 +161,7 @@ class Strategy3PreSettlement:
         # ----------------------------------------------------------
         # 3. Entry logic (only when not in a trade)
         # ----------------------------------------------------------
+        wait_reason: str = "already_in_trade"
         if not self._in_trade:
             entry_ok, entry_reason = self._check_entry(
                 m22_out, m23_out, m8_out, seconds_to_settlement
@@ -183,6 +184,7 @@ class Strategy3PreSettlement:
                     "modules": modules,
                     "reason": entry_reason,
                 }
+            wait_reason = entry_reason
 
         # ----------------------------------------------------------
         # 4. No action
@@ -193,7 +195,7 @@ class Strategy3PreSettlement:
             "price": price,
             "strategy": "S3",
             "modules": modules,
-            "reason": "no_conditions_met",
+            "reason": wait_reason,
         }
 
     # ------------------------------------------------------------------
