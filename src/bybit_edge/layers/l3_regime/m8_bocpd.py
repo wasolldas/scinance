@@ -8,7 +8,10 @@ Formeln (PRD):
     Hazard h(r) = 1/λ  (konstante geometrische Run-Length-Verteilung)
     Predictive: P(x_t | r_{t-1}, x) = Student-t (für unbekannte Varianz)
 
-Changepoint wird detektiert wenn P(r_t = 0) > threshold (0.5).
+Changepoint is detected when the cumulative posterior mass on short
+run-lengths (r < run_length_threshold) exceeds the detection threshold,
+indicating that the data is better explained by a recent regime change
+than by continuation of the current regime.
 """
 
 from __future__ import annotations
@@ -25,12 +28,20 @@ from bybit_edge.config import (
 )
 from bybit_edge.layers.base import BaseModule
 
+# Run-lengths below this count as "short" for changepoint mass calculation
+_SHORT_RL_THRESHOLD: int = 10
+
 
 class M8BOCPD(BaseModule):
     """Bayesian Online Changepoint Detection nach Adams & MacKay (2007).
 
     Erkennt Strukturbrüche in openInterest-Zeitreihen über einen
     Online-Bayes-Algorithmus mit Student-t Predictive Distribution.
+
+    Detection criterion: the posterior mass on short run-lengths
+    (r_t < run_length_threshold) exceeds the configured threshold,
+    which indicates the model favours a recent changepoint over
+    continuation of the old regime.
     """
 
     def __init__(
@@ -49,17 +60,18 @@ class M8BOCPD(BaseModule):
         self._prior_alpha: float = 1.0  # shape (nu/2)
         self._prior_beta: float = prior_var  # scale
 
-        # Run-length posterior: R[i] = P(r_t = i | x_{1:t})
+        # Joint distribution P(r_t, x_{1:t}) — kept UN-normalized
+        # for numerical correctness (Adams & MacKay Eq. 3-5).
         self._R: np.ndarray = np.array([1.0])
 
         # Sufficient statistics for each run-length hypothesis
-        # Each index corresponds to a run-length r = 0, 1, 2, ...
         self._mu: np.ndarray = np.array([self._prior_mu])
         self._kappa: np.ndarray = np.array([self._prior_kappa])
         self._alpha: np.ndarray = np.array([self._prior_alpha])
         self._beta: np.ndarray = np.array([self._prior_beta])
 
         self._t: int = 0
+        self._prev_map_rl: int = 0
 
     # ------------------------------------------------------------------
     # Internal: Hazard function
@@ -70,7 +82,7 @@ class M8BOCPD(BaseModule):
         return np.full_like(r, 1.0 / self._hazard_lambda, dtype=np.float64)
 
     # ------------------------------------------------------------------
-    # Internal: Student-t predictive PDF
+    # Internal: Student-t predictive PDF (log-space)
     # ------------------------------------------------------------------
 
     @staticmethod
@@ -90,8 +102,6 @@ class M8BOCPD(BaseModule):
         nu : np.ndarray
             Degrees of freedom (2 * alpha, one per run-length).
         """
-        # Student-t: p(x|mu,var,nu) with variance var*(nu/(nu-2))
-        # Using scipy.special.gammaln for numerical stability
         nu_safe = np.maximum(nu, 1e-8)
         var_safe = np.maximum(var, 1e-300)
 
@@ -131,7 +141,10 @@ class M8BOCPD(BaseModule):
         var = self._beta * (self._kappa + 1.0) / (self._kappa * self._alpha)
 
         log_pred = self._student_t_logpdf(x, self._mu, var, nu)
-        pred_probs = np.exp(log_pred)
+
+        # Work in log-space for numerical stability
+        log_R = np.log(np.maximum(self._R, 1e-300))
+        log_joint = log_R + log_pred  # log(R * pred)
 
         # ----------------------------------------------------------
         # 2. Hazard for each current run-length
@@ -140,32 +153,43 @@ class M8BOCPD(BaseModule):
         H = self._hazard(r_vals)
 
         # ----------------------------------------------------------
-        # 3. Growth and changepoint probabilities
+        # 3. Growth and changepoint probabilities (unnormalized joint)
         # ----------------------------------------------------------
-        growth_probs = self._R * pred_probs * (1.0 - H)
-        cp_prob = np.sum(self._R * pred_probs * H)
+        # Use log-sum-exp for the changepoint mass
+        log_H = np.log(np.maximum(H, 1e-300))
+        log_1mH = np.log(np.maximum(1.0 - H, 1e-300))
+
+        log_growth = log_joint + log_1mH
+        log_cp_terms = log_joint + log_H
+        log_cp_mass = _logsumexp(log_cp_terms)
 
         # ----------------------------------------------------------
-        # 4. Build new run-length distribution
+        # 4. Build new joint run-length distribution (unnormalized)
         # ----------------------------------------------------------
-        new_R = np.empty(len(self._R) + 1, dtype=np.float64)
-        new_R[0] = cp_prob           # changepoint: r_t = 0
-        new_R[1:] = growth_probs     # growth: r_t = r_{t-1} + 1
+        new_log_R = np.empty(len(self._R) + 1, dtype=np.float64)
+        new_log_R[0] = log_cp_mass
+        new_log_R[1:] = log_growth
 
-        # Normalize
-        evidence = new_R.sum()
+        # Convert back to linear space, then normalize to get posterior
+        max_log = np.max(new_log_R)
+        new_R_unnorm = np.exp(new_log_R - max_log)
+        evidence = new_R_unnorm.sum()
         if evidence > 0:
-            new_R /= evidence
+            posterior = new_R_unnorm / evidence
+        else:
+            posterior = new_R_unnorm
 
-        self._R = new_R
+        # Store the unnormalized joint (rescaled to prevent underflow)
+        self._R = new_R_unnorm / evidence if evidence > 0 else new_R_unnorm
 
         # ----------------------------------------------------------
         # 5. Update sufficient statistics (Normal-Inverse-Gamma)
         # ----------------------------------------------------------
-        new_mu = np.empty(len(self._R), dtype=np.float64)
-        new_kappa = np.empty(len(self._R), dtype=np.float64)
-        new_alpha = np.empty(len(self._R), dtype=np.float64)
-        new_beta = np.empty(len(self._R), dtype=np.float64)
+        n = len(self._R)
+        new_mu = np.empty(n, dtype=np.float64)
+        new_kappa = np.empty(n, dtype=np.float64)
+        new_alpha = np.empty(n, dtype=np.float64)
+        new_beta = np.empty(n, dtype=np.float64)
 
         # r = 0 (changepoint): reset to prior
         new_mu[0] = self._prior_mu
@@ -193,13 +217,28 @@ class M8BOCPD(BaseModule):
         self._beta = new_beta
 
         # ----------------------------------------------------------
-        # 6. Extract results
+        # 6. Changepoint detection
         # ----------------------------------------------------------
-        changepoint_prob: float = float(self._R[0])
-        changepoint: bool = changepoint_prob > self._threshold
-        run_length_map: int = int(np.argmax(self._R))
+        # Cumulative posterior mass on short run-lengths
+        rl_cutoff = min(_SHORT_RL_THRESHOLD, len(posterior))
+        changepoint_prob: float = float(np.sum(posterior[:rl_cutoff]))
+
+        # MAP run-length
+        run_length_map: int = int(np.argmax(posterior))
+
+        # Detect changepoint: short run-lengths dominate the posterior
+        # AND the MAP run-length has dropped (regime change)
+        changepoint: bool = (
+            changepoint_prob > self._threshold
+            and self._t > _SHORT_RL_THRESHOLD
+        )
+
+        self._prev_map_rl = run_length_map
+
         signal: int = 1 if changepoint else 0
-        confidence: float = min(changepoint_prob, 1.0) if changepoint else 0.0
+        confidence: float = (
+            min(changepoint_prob, 1.0) if changepoint else 0.0
+        )
 
         return {
             "changepoint": changepoint,
@@ -223,3 +262,12 @@ class M8BOCPD(BaseModule):
         self._alpha = np.array([self._prior_alpha])
         self._beta = np.array([self._prior_beta])
         self._t = 0
+        self._prev_map_rl = 0
+
+
+def _logsumexp(a: np.ndarray) -> float:
+    """Numerically stable log-sum-exp."""
+    a_max = np.max(a)
+    if not np.isfinite(a_max):
+        return float(a_max)
+    return float(a_max + np.log(np.sum(np.exp(a - a_max))))
