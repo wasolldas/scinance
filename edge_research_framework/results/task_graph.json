@@ -1,0 +1,775 @@
+{
+  "meta": {
+    "generated_by": "PRD Analyst (Agent 01)",
+    "prd_source": "FINAL_PRD.md",
+    "date": "2026-05-26",
+    "total_methods": 21,
+    "total_infra": 8,
+    "layers": ["L1", "L2", "L3", "L4", "L5"]
+  },
+  "infrastructure": [
+    {
+      "id": "infra.WebSocketCollector",
+      "name": "Bybit V5 WebSocket Collector",
+      "files": ["src/bybit_edge/collector/ws_collector.py"],
+      "depends_on": [],
+      "streams": [
+        "tickers.{symbol}",
+        "publicTrade.{symbol}",
+        "orderbook.50.{symbol}",
+        "orderbook.200.{symbol}",
+        "allLiquidation.{symbol}"
+      ],
+      "required_by": ["M1", "M2", "M3", "M6", "M7", "M8", "M14", "M15", "M22", "M23", "M24", "M25", "M26"],
+      "phase": 0,
+      "estimated_days": 3
+    },
+    {
+      "id": "infra.OrderbookState",
+      "name": "In-Memory Orderbook State Engine",
+      "files": ["src/bybit_edge/state/orderbook_state.py"],
+      "depends_on": ["infra.WebSocketCollector"],
+      "required_by": ["M2", "M3", "M4", "M6", "M14", "M25"],
+      "phase": 0,
+      "estimated_days": 2
+    },
+    {
+      "id": "infra.TickerState",
+      "name": "Ticker State (last/mark/index/funding/OI)",
+      "files": ["src/bybit_edge/state/ticker_state.py"],
+      "depends_on": ["infra.WebSocketCollector"],
+      "required_by": ["M7", "M8", "M9", "M13", "M22", "M23", "M24", "M26"],
+      "phase": 0,
+      "estimated_days": 1
+    },
+    {
+      "id": "infra.TradeBuffer",
+      "name": "Rolling Trade Event Buffer (1k events)",
+      "files": ["src/bybit_edge/state/trade_buffer.py"],
+      "depends_on": ["infra.WebSocketCollector"],
+      "required_by": ["M1", "M2", "M3", "M14", "M25"],
+      "phase": 0,
+      "estimated_days": 1
+    },
+    {
+      "id": "infra.LiquidationBuffer",
+      "name": "Rolling Liquidation Event Buffer (1k events)",
+      "files": ["src/bybit_edge/state/liquidation_buffer.py"],
+      "depends_on": ["infra.WebSocketCollector"],
+      "required_by": ["M14", "M15", "M26"],
+      "phase": 0,
+      "estimated_days": 1
+    },
+    {
+      "id": "infra.Persistence",
+      "name": "DuckDB + Parquet Persistence Layer",
+      "files": ["src/bybit_edge/persistence/db.py"],
+      "depends_on": [],
+      "tech": "DuckDB + Parquet (ZSTD)",
+      "required_by": ["M5", "M9", "M10", "M11", "M12", "M16", "M18", "M19", "M20"],
+      "phase": 0,
+      "estimated_days": 2
+    },
+    {
+      "id": "infra.Backtester",
+      "name": "Walk-Forward Backtesting Engine",
+      "files": ["src/bybit_edge/backtester/engine.py"],
+      "depends_on": ["infra.Persistence"],
+      "features": ["walk_forward", "fee_model", "slippage_model", "event_time_indexing", "combinatorial_purged_cv"],
+      "required_by": ["M2", "M7", "M8", "M9", "M14", "M15", "M16", "M18", "M19", "M20", "M22", "M23", "M24", "M25", "M26"],
+      "phase": 0,
+      "estimated_days": 3
+    },
+    {
+      "id": "infra.FundingScheduler",
+      "name": "Funding Settlement Scheduler (Cron 00/08/16 UTC)",
+      "files": ["src/bybit_edge/scheduler.py"],
+      "depends_on": [],
+      "cron": "00/08/16 UTC",
+      "required_by": ["M22", "M23", "M24"],
+      "phase": 0,
+      "estimated_days": 1
+    }
+  ],
+  "methods": [
+    {
+      "id": "M1",
+      "name": "SpikeWavformer Event-Driven Ingestion",
+      "layer": "L1",
+      "priority_score": 2.0,
+      "phase": 4,
+      "complexity": "HIGH",
+      "category": "Moonshot",
+      "libraries": ["snnTorch", "Norse", "PyWavelets", "PyTorch"],
+      "bybit_endpoints": [
+        "WS tickers.{symbol}",
+        "WS allLiquidation.{symbol}",
+        "WS orderbook.50.{symbol}"
+      ],
+      "depends_on": ["infra.WebSocketCollector", "infra.OrderbookState", "infra.TradeBuffer"],
+      "validation_criteria": {
+        "precision": 0.6,
+        "recall": 0.4,
+        "f1": 0.5,
+        "latency_ms": 50
+      },
+      "windows_compatible": true,
+      "windows_notes": "Requires PyTorch + CUDA via conda. snnTorch is PyTorch-based, no extra issues.",
+      "estimated_days": 25,
+      "formulas": [
+        "V_m(t+dt) = alpha * V_m(t) + sum(w_i * s_i(t)) - V_reset * s_out(t)",
+        "c_{j,k} = sum_n x[n] * psi*_{j,k}[n]",
+        "s_out(t) = 1 if V_m(t) >= V_th else 0"
+      ]
+    },
+    {
+      "id": "M2",
+      "name": "OFI Cont-Kukanov-Stoikov",
+      "layer": "L1",
+      "priority_score": 6.0,
+      "phase": 1,
+      "complexity": "LOW",
+      "category": "Quick Win",
+      "libraries": ["numpy", "pandas", "polars", "numba"],
+      "bybit_endpoints": [
+        "WS orderbook.50.{symbol}"
+      ],
+      "depends_on": ["infra.OrderbookState", "infra.TradeBuffer"],
+      "validation_criteria": {
+        "r2_1s_forecast": 0.05,
+        "sharpe": 1.0,
+        "hit_rate": 0.53
+      },
+      "windows_compatible": true,
+      "windows_notes": "",
+      "estimated_days": 5,
+      "formulas": [
+        "OFI_n = sum(e_n)",
+        "e_n = I(P^b_n >= P^b_{n-1}) * q^b_n - I(P^b_n <= P^b_{n-1}) * q^b_{n-1} - I(P^a_n <= P^a_{n-1}) * q^a_n + I(P^a_n >= P^a_{n-1}) * q^a_{n-1}",
+        "dP_hat_t = beta * OFI_t / lambda(depth)"
+      ]
+    },
+    {
+      "id": "M3",
+      "name": "Iceberg-Detection via Queue-Replenishment",
+      "layer": "L1",
+      "priority_score": 1.3,
+      "phase": 4,
+      "complexity": "HIGH",
+      "category": "Standard",
+      "libraries": ["numpy", "sortedcontainers"],
+      "bybit_endpoints": [
+        "WS orderbook.200.{symbol}",
+        "WS publicTrade.{symbol}"
+      ],
+      "depends_on": ["infra.WebSocketCollector", "infra.OrderbookState", "infra.TradeBuffer"],
+      "validation_criteria": {
+        "bounce_rate": 0.60
+      },
+      "windows_compatible": true,
+      "windows_notes": "",
+      "estimated_days": 7,
+      "formulas": [
+        "IcebergScore_p = (sum I(Size_{p,t+d} >= 0.8 * Size_{p,t})) / N_hits",
+        "Detection: IcebergScore_p > 0.7 AND N_hits > 5"
+      ]
+    },
+    {
+      "id": "M4",
+      "name": "Wavelet-Symlet-Denoising (sym4/sym6/sym8)",
+      "layer": "L2",
+      "priority_score": 4.0,
+      "phase": 2,
+      "complexity": "LOW",
+      "category": "Standard",
+      "libraries": ["PyWavelets"],
+      "bybit_endpoints": [
+        "WS orderbook.50.{symbol}"
+      ],
+      "depends_on": ["infra.OrderbookState"],
+      "validation_criteria": {
+        "r2_improvement_pct": 10,
+        "latency_ms": 1
+      },
+      "windows_compatible": true,
+      "windows_notes": "PyWavelets fully Windows-compatible.",
+      "estimated_days": 6,
+      "formulas": [
+        "W_{j,k} = sum_n x[n] * psi*_{j,k}[n]",
+        "W'_{j,k} = sign(W_{j,k}) * max(|W_{j,k}| - lambda_j, 0)",
+        "lambda_j = sigma_j * sqrt(2 * log(N))"
+      ]
+    },
+    {
+      "id": "M5",
+      "name": "Fraktionale Differenzierung (FFD)",
+      "layer": "L2",
+      "priority_score": 4.0,
+      "phase": 2,
+      "complexity": "LOW",
+      "category": "Standard",
+      "libraries": ["numpy", "statsmodels"],
+      "bybit_endpoints": [
+        "REST /v5/market/kline"
+      ],
+      "depends_on": ["infra.Persistence"],
+      "validation_criteria": {
+        "adf_p_value": 0.05,
+        "sharpe_lift_pct": 10
+      },
+      "windows_compatible": true,
+      "windows_notes": "",
+      "estimated_days": 3,
+      "formulas": [
+        "(1 - B)^d X_t = sum_{k=0}^inf (-1)^k * C(d,k) * X_{t-k}",
+        "C(d,k) = d*(d-1)*...*(d-k+1) / k!",
+        "FFD: Weights truncated at |w_k| < tau (tau ~ 1e-4)"
+      ]
+    },
+    {
+      "id": "M6",
+      "name": "Shannon-Entropie L2-Orderbuch",
+      "layer": "L3",
+      "priority_score": 4.0,
+      "phase": 2,
+      "complexity": "LOW",
+      "category": "Quick Win",
+      "libraries": ["numpy", "polars"],
+      "bybit_endpoints": [
+        "WS orderbook.50.{symbol}"
+      ],
+      "depends_on": ["infra.OrderbookState"],
+      "validation_criteria": {
+        "win_rate_lift_pp": 2
+      },
+      "windows_compatible": true,
+      "windows_notes": "",
+      "estimated_days": 2,
+      "formulas": [
+        "p_i = size_i / sum(size)",
+        "H = -sum(p_i * log2(p_i))",
+        "D(P_bid || P_ask) = sum(p_i * log(p_i / q_i))"
+      ]
+    },
+    {
+      "id": "M7",
+      "name": "Permutation Entropy (Bandt-Pompe)",
+      "layer": "L3",
+      "priority_score": 4.0,
+      "phase": 1,
+      "complexity": "LOW",
+      "category": "Quick Win",
+      "libraries": ["ordpy", "antropy"],
+      "bybit_endpoints": [
+        "WS tickers.{symbol}"
+      ],
+      "depends_on": ["infra.TickerState"],
+      "validation_criteria": {
+        "vol_cluster_correlation": 0.3
+      },
+      "windows_compatible": true,
+      "windows_notes": "",
+      "estimated_days": 2,
+      "formulas": [
+        "PE_m = -sum_pi p(pi) * log(p(pi))",
+        "PE_norm = PE_m / log(m!)"
+      ]
+    },
+    {
+      "id": "M8",
+      "name": "BOCPD auf openInterest",
+      "layer": "L3",
+      "priority_score": 2.0,
+      "phase": 1,
+      "complexity": "MEDIUM",
+      "category": "Quick Win",
+      "libraries": ["bayesian-changepoint-detection", "scipy"],
+      "bybit_endpoints": [
+        "WS tickers.{symbol}",
+        "REST /v5/market/open-interest"
+      ],
+      "depends_on": ["infra.TickerState"],
+      "validation_criteria": {
+        "detection_latency_min": 2,
+        "false_positive_rate_day": 0.10
+      },
+      "windows_compatible": true,
+      "windows_notes": "",
+      "estimated_days": 4,
+      "formulas": [
+        "P(r_t | x_{1:t}) ~ sum P(r_t | r_{t-1}) * P(x_t | r_{t-1}, x) * P(r_{t-1} | x_{1:t-1})",
+        "Hazard h(r) = const (geometric run-length)",
+        "Predictive: P(x_t | r_{t-1}, x) = Student-t"
+      ]
+    },
+    {
+      "id": "M9",
+      "name": "HMM Vola-OFI-Funding (3-state)",
+      "layer": "L3",
+      "priority_score": 2.0,
+      "phase": 2,
+      "complexity": "MEDIUM",
+      "category": "Standard",
+      "libraries": ["hmmlearn", "numpy"],
+      "bybit_endpoints": [
+        "WS tickers.{symbol}",
+        "WS orderbook.50.{symbol}"
+      ],
+      "depends_on": ["infra.TickerState", "M2"],
+      "validation_criteria": {
+        "state_stability": 0.80,
+        "chi2_p_value": 0.01
+      },
+      "windows_compatible": true,
+      "windows_notes": "hmmlearn fully Windows-compatible.",
+      "estimated_days": 7,
+      "formulas": [
+        "alpha_t(z) = P(x_t | z) * sum_{z'} P(z | z') * alpha_{t-1}(z')",
+        "Baum-Welch: Parameter-MLE (transition, emission)",
+        "Viterbi: argmax z_{1:T} P(z_{1:T} | x_{1:T})"
+      ]
+    },
+    {
+      "id": "M10",
+      "name": "MF-DFA Multifractal (Diagnose)",
+      "layer": "L3",
+      "priority_score": 2.0,
+      "phase": 4,
+      "complexity": "MEDIUM",
+      "category": "Standard",
+      "libraries": ["MFDFA", "numpy"],
+      "bybit_endpoints": [
+        "REST /v5/market/kline"
+      ],
+      "depends_on": ["infra.Persistence"],
+      "validation_criteria": {
+        "regime_shift_detection_rate": 0.70,
+        "lead_time_min": 30
+      },
+      "windows_compatible": true,
+      "windows_notes": "",
+      "estimated_days": 5,
+      "formulas": [
+        "F_q(s) = { (1/2N_s) * sum [F^2(v,s)]^{q/2} }^{1/q} ~ s^{h(q)}",
+        "tau(q) = q * h(q) - 1",
+        "delta_h = h(q_min) - h(q_max)"
+      ]
+    },
+    {
+      "id": "M11",
+      "name": "TDA / Persistent Homology",
+      "layer": "L3",
+      "priority_score": 3.0,
+      "phase": 4,
+      "complexity": "MEDIUM",
+      "category": "Standard",
+      "libraries": ["ripser", "gudhi", "persim", "giotto-tda"],
+      "bybit_endpoints": [
+        "REST /v5/market/kline"
+      ],
+      "depends_on": ["infra.Persistence"],
+      "validation_criteria": {
+        "l1_dd_correlation": 0.4,
+        "max_dd_reduction_pct": 20
+      },
+      "windows_compatible": true,
+      "windows_notes": "ripser, gudhi installable via pip on Windows.",
+      "estimated_days": 7,
+      "formulas": [
+        "lambda_k(t) = max_k { min(t - b_i, d_i - t), 0 }",
+        "L1(lambda) = sum_k integral |lambda_k(t)| dt"
+      ]
+    },
+    {
+      "id": "M12",
+      "name": "RQA (Recurrence Quantification Analysis)",
+      "layer": "L3",
+      "priority_score": 2.0,
+      "phase": 4,
+      "complexity": "MEDIUM",
+      "category": "Standard",
+      "libraries": ["pyrqa"],
+      "bybit_endpoints": [
+        "REST /v5/market/kline"
+      ],
+      "depends_on": ["infra.Persistence"],
+      "validation_criteria": {
+        "hit_rate": 0.55
+      },
+      "windows_compatible": false,
+      "windows_notes": "pyrqa requires Java (OpenJDK). Install via 'choco install openjdk' on Windows.",
+      "estimated_days": 5,
+      "formulas": [
+        "R_{ij} = Theta(eps - ||x_i - x_j||)",
+        "DET = sum_{l>=l_min} l*P(l) / sum_l l*P(l)",
+        "LAM = sum_{v>=v_min} v*P(v) / sum_v v*P(v)"
+      ]
+    },
+    {
+      "id": "M13",
+      "name": "Cross-Sectional Ergodicity-Reversion Z-Score",
+      "layer": "L3",
+      "priority_score": 2.0,
+      "phase": 3,
+      "complexity": "MEDIUM",
+      "category": "Standard",
+      "libraries": ["pandas", "polars", "numpy"],
+      "bybit_endpoints": [
+        "WS tickers.{symbol}"
+      ],
+      "depends_on": ["infra.TickerState"],
+      "validation_criteria": {
+        "sharpe": 1.0,
+        "hit_rate": 0.53
+      },
+      "windows_compatible": true,
+      "windows_notes": "",
+      "estimated_days": 7,
+      "formulas": [
+        "E_t[X_i] = (1/W) sum_{s=t-W}^{t} R_{i,s}",
+        "<X>_t = (1/N) sum_{j=1}^{N} R_{j,t}",
+        "z_{i,t} = (E_t[X_i] - <X>_t) / sigma_cross"
+      ]
+    },
+    {
+      "id": "M14",
+      "name": "Hawkes Spektralradius rho(Phi) (6-D Coupled)",
+      "layer": "L4",
+      "priority_score": 3.0,
+      "phase": 2,
+      "complexity": "HIGH",
+      "category": "Moonshot",
+      "libraries": ["tick", "hawkeslib", "numpy", "scipy"],
+      "bybit_endpoints": [
+        "WS publicTrade.{symbol}",
+        "WS orderbook.50.{symbol}",
+        "WS allLiquidation.{symbol}"
+      ],
+      "depends_on": ["infra.OrderbookState", "infra.TradeBuffer", "infra.LiquidationBuffer"],
+      "validation_criteria": {
+        "cascade_detection_rate": 0.80,
+        "lead_time_seconds": 30,
+        "false_positive_per_day": 2
+      },
+      "windows_compatible": false,
+      "windows_notes": "'tick' library is Linux/macOS only. Use hawkeslib as Windows fallback + own scipy MLE fallback.",
+      "estimated_days": 35,
+      "formulas": [
+        "lambda_i(t) = mu_i + sum_j integral phi_{ij}(t-s) dN_j(s)",
+        "phi_{ij}(t) = alpha_{ij} * beta_{ij} * exp(-beta_{ij} * t)",
+        "Phi_bar_{ij} = alpha_{ij}",
+        "rho(Phi) = max |eigenvalue(Phi_bar)|",
+        "n_inf = alpha / beta (single-channel branching ratio)"
+      ]
+    },
+    {
+      "id": "M15",
+      "name": "Gutenberg-Richter b + Omori p,c,k",
+      "layer": "L4",
+      "priority_score": 4.5,
+      "phase": 1,
+      "complexity": "MEDIUM",
+      "category": "Quick Win",
+      "libraries": ["scipy", "numpy"],
+      "bybit_endpoints": [
+        "WS allLiquidation.{symbol}"
+      ],
+      "depends_on": ["infra.LiquidationBuffer"],
+      "validation_criteria": {
+        "b_value_detection_rate": 0.70,
+        "b_value_lead_time_min": 10,
+        "omori_forecast_mse_vs_baseline": "< constant_rate"
+      },
+      "windows_compatible": true,
+      "windows_notes": "",
+      "estimated_days": 7,
+      "formulas": [
+        "log10 N(>=M) = a - b*M",
+        "lambda(t|H_t) = K / (t - t_main + c)^p",
+        "b_hat = log10(e) / (M_bar - M_min)"
+      ]
+    },
+    {
+      "id": "M16",
+      "name": "TFSAX + Smith-Waterman Alignment",
+      "layer": "L4",
+      "priority_score": 2.0,
+      "phase": 3,
+      "complexity": "HIGH",
+      "category": "Moonshot",
+      "libraries": ["saxpy", "tslearn", "Biopython", "parasail"],
+      "bybit_endpoints": [
+        "REST /v5/market/kline"
+      ],
+      "depends_on": ["infra.Persistence"],
+      "validation_criteria": {
+        "hit_rate": 0.56,
+        "sharpe": 1.2
+      },
+      "windows_compatible": true,
+      "windows_notes": "parasail has Windows wheels. Biopython installable via pip.",
+      "estimated_days": 25,
+      "formulas": [
+        "PAA: C_bar_i = (w/n) * sum c_j",
+        "SAX: symbol_i = bin(C_bar_i)",
+        "H(i,j) = max{ 0, H(i-1,j-1)+s(a_i,b_j), H(i-1,j)-d, H(i,j-1)-d }"
+      ]
+    },
+    {
+      "id": "M17",
+      "name": "Renyi-Transfer-Entropy Lead-Lag-Graph",
+      "layer": "L4",
+      "priority_score": 3.0,
+      "phase": 3,
+      "complexity": "MEDIUM",
+      "category": "Standard",
+      "libraries": ["IDTxl", "PyInform"],
+      "bybit_endpoints": [
+        "REST /v5/market/kline"
+      ],
+      "depends_on": ["infra.Persistence"],
+      "validation_criteria": {
+        "alt_return_correlation": 0.3
+      },
+      "windows_compatible": false,
+      "windows_notes": "IDTxl requires Java (JIDT). Use pyinform as lighter Windows alternative.",
+      "estimated_days": 7,
+      "formulas": [
+        "T^q_{Y->X} = (1/(1-q)) * log sum p(x_{n+1}, x_n^(k)) * [sum p(y_n^(l)|x_n^(k)) * p(x_{n+1}|x_n^(k),y_n^(l))^{q-1}] / sum p(x_{n+1}|x_n^(k))^q"
+      ]
+    },
+    {
+      "id": "M18",
+      "name": "PatchTST Funding-Cycle-Forecast",
+      "layer": "L4",
+      "priority_score": 3.0,
+      "phase": 3,
+      "complexity": "MEDIUM",
+      "category": "Standard",
+      "libraries": ["PyTorch", "PatchTST"],
+      "bybit_endpoints": [
+        "REST /v5/market/kline",
+        "REST /v5/market/funding/history"
+      ],
+      "depends_on": ["infra.Persistence", "M5"],
+      "validation_criteria": {
+        "directional_accuracy": 0.55,
+        "sharpe": 1.0
+      },
+      "windows_compatible": true,
+      "windows_notes": "PyTorch + CUDA via conda. Install: conda install pytorch torchvision torchaudio pytorch-cuda=12.4 -c pytorch -c nvidia",
+      "estimated_days": 14,
+      "formulas": [
+        "x_p in R^{P x N}, P=patch_len, N=floor((L-P)/S)+2",
+        "Attn(Q,K,V) = softmax(QK^T / sqrt(d_k)) * V"
+      ]
+    },
+    {
+      "id": "M19",
+      "name": "TimesNet 2D-Periodicity",
+      "layer": "L4",
+      "priority_score": 3.0,
+      "phase": 3,
+      "complexity": "MEDIUM",
+      "category": "Standard",
+      "libraries": ["PyTorch", "TimesNet"],
+      "bybit_endpoints": [
+        "REST /v5/market/kline"
+      ],
+      "depends_on": ["infra.Persistence", "M5"],
+      "validation_criteria": {
+        "outperform_patchtst_8h_mse": true
+      },
+      "windows_compatible": true,
+      "windows_notes": "PyTorch + CUDA via conda.",
+      "estimated_days": 14,
+      "formulas": [
+        "X_{2D} = Reshape_{p_i, f_i}(X_{1D}), p_i = Top-k FFT frequencies",
+        "Output = sum amplitude_i * CNN_i(X_{2D,i})"
+      ]
+    },
+    {
+      "id": "M20",
+      "name": "MOMENT Foundation Model (Zero-Shot)",
+      "layer": "L4",
+      "priority_score": 2.0,
+      "phase": 3,
+      "complexity": "HIGH",
+      "category": "Standard",
+      "libraries": ["transformers", "momentfm", "PyTorch"],
+      "bybit_endpoints": [
+        "REST /v5/market/kline"
+      ],
+      "depends_on": ["infra.Persistence", "M5"],
+      "validation_criteria": {
+        "mase": 1.0,
+        "sharpe": 0.8
+      },
+      "windows_compatible": true,
+      "windows_notes": "PyTorch + CUDA via conda. MOMENT-base (110M params) fits 16GB VRAM. MOMENT-large needs FP16.",
+      "estimated_days": 10,
+      "formulas": [
+        "RevIN: x' = (x - mu) / sigma",
+        "y_hat = y_hat' * sigma + mu"
+      ]
+    },
+    {
+      "id": "M21",
+      "name": "Long/Short-Ratio Smart-Money-Divergenz",
+      "layer": "L4",
+      "priority_score": 4.0,
+      "phase": 3,
+      "complexity": "LOW",
+      "category": "Quick Win",
+      "libraries": ["httpx", "pandas"],
+      "bybit_endpoints": [
+        "REST /v5/market/account-ratio"
+      ],
+      "depends_on": [],
+      "validation_criteria": {
+        "hit_rate": 0.54,
+        "sharpe": 0.8
+      },
+      "windows_compatible": true,
+      "windows_notes": "",
+      "estimated_days": 2,
+      "formulas": [
+        "Divergenz_t = sign(Return_1h) - sign(buyRatio - 0.5)",
+        "Signal: Divergenz < 0 AND |buyRatio - 0.5| > 0.25"
+      ]
+    },
+    {
+      "id": "M22",
+      "name": "Funding-Rate-Clamp Pressure-Release",
+      "layer": "L5",
+      "priority_score": 4.5,
+      "phase": 1,
+      "complexity": "LOW",
+      "category": "Quick Win",
+      "libraries": ["numpy", "pandas"],
+      "bybit_endpoints": [
+        "WS tickers.{symbol}"
+      ],
+      "depends_on": ["infra.TickerState", "infra.FundingScheduler"],
+      "validation_criteria": {
+        "sharpe": 1.5,
+        "hit_rate": 0.56,
+        "max_dd": 0.10
+      },
+      "windows_compatible": true,
+      "windows_notes": "",
+      "estimated_days": 5,
+      "formulas": [
+        "F_t = P_t + clamp(I_t - P_t, -0.05%, +0.05%)",
+        "Pressure_t = (I_t - P_t) - clamp(I_t - P_t, +/-0.05%)",
+        "Signal: |Pressure_t| > 2*sigma(Pressure_24h)"
+      ]
+    },
+    {
+      "id": "M23",
+      "name": "Mark-Index Basis Settlement Convergence",
+      "layer": "L5",
+      "priority_score": 6.0,
+      "phase": 1,
+      "complexity": "LOW",
+      "category": "Quick Win",
+      "libraries": ["numpy"],
+      "bybit_endpoints": [
+        "WS tickers.{symbol}"
+      ],
+      "depends_on": ["infra.TickerState", "infra.FundingScheduler"],
+      "validation_criteria": {
+        "hit_rate": 0.58,
+        "sharpe": 1.5
+      },
+      "windows_compatible": true,
+      "windows_notes": "",
+      "estimated_days": 3,
+      "formulas": [
+        "Basis_t = (markPrice_t - indexPrice_t) / indexPrice_t",
+        "Signal: Basis_t > 0.0008 AND T_settlement - t < 1h -> Short",
+        "Signal: Basis_t < -0.0008 AND T_settlement - t < 1h -> Long"
+      ]
+    },
+    {
+      "id": "M24",
+      "name": "Kalman-Funding-Premium-Decomposition",
+      "layer": "L5",
+      "priority_score": 4.0,
+      "phase": 1,
+      "complexity": "LOW",
+      "category": "Standard",
+      "libraries": ["pykalman", "filterpy"],
+      "bybit_endpoints": [
+        "WS tickers.{symbol}",
+        "REST /v5/market/funding/history"
+      ],
+      "depends_on": ["infra.TickerState", "infra.FundingScheduler"],
+      "validation_criteria": {
+        "sharpe": 1.0
+      },
+      "windows_compatible": true,
+      "windows_notes": "",
+      "estimated_days": 5,
+      "formulas": [
+        "x_t = F * x_{t-1} + w_t, w_t ~ N(0, Q)",
+        "z_t = H * x_t + v_t, v_t ~ N(0, R)",
+        "K_t = P_t H'(H P_t H' + R)^(-1)",
+        "Signal: |sentiment_t| > 2 * sqrt(P_{22,t})"
+      ]
+    },
+    {
+      "id": "M25",
+      "name": "Kyle's Lambda (Adverse Selection)",
+      "layer": "L5",
+      "priority_score": 6.0,
+      "phase": 2,
+      "complexity": "LOW",
+      "category": "Standard",
+      "libraries": ["numpy", "statsmodels"],
+      "bybit_endpoints": [
+        "WS publicTrade.{symbol}",
+        "WS orderbook.50.{symbol}"
+      ],
+      "depends_on": ["infra.OrderbookState", "infra.TradeBuffer"],
+      "validation_criteria": {
+        "loss_reduction_pct": 30
+      },
+      "windows_compatible": true,
+      "windows_notes": "",
+      "estimated_days": 5,
+      "formulas": [
+        "dp_t = lambda * v_t * sign_t + eps_t",
+        "Filter: lambda_5min > Q95(lambda_30d) -> NO Limit Orders"
+      ]
+    },
+    {
+      "id": "M26",
+      "name": "SIR-Kompartiment-Liquidations-Contagion",
+      "layer": "L5",
+      "priority_score": 3.0,
+      "phase": 2,
+      "complexity": "MEDIUM",
+      "category": "Standard",
+      "libraries": ["scipy", "numpy"],
+      "bybit_endpoints": [
+        "WS allLiquidation.{symbol}",
+        "WS tickers.{symbol}"
+      ],
+      "depends_on": ["infra.LiquidationBuffer", "infra.TickerState"],
+      "validation_criteria": {
+        "r0_lead_time_min": 5,
+        "cascade_detection_rate": 0.70
+      },
+      "windows_compatible": true,
+      "windows_notes": "",
+      "estimated_days": 7,
+      "formulas": [
+        "dS/dt = -beta * S * I",
+        "dI/dt = beta * S * I - gamma * I",
+        "dR/dt = gamma * I",
+        "R_0 = beta * S_0 / gamma"
+      ]
+    }
+  ]
+}

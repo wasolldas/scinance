@@ -1,0 +1,180 @@
+{
+  "meta": {
+    "generated_by": "PRD Analyst (Agent 01)",
+    "prd_source": "FINAL_PRD.md",
+    "date": "2026-05-26",
+    "total_components": 8,
+    "phase": 0,
+    "estimated_total_days": 14
+  },
+  "components": [
+    {
+      "id": "infra.WebSocketCollector",
+      "name": "Bybit V5 WebSocket Collector",
+      "description": "Asynchroner WebSocket-Client (asyncio + websockets) mit Auto-Reconnect, Snapshot-Resync, Schema-Versionierung. Konsumiert alle 5 öffentlichen Streams.",
+      "files": [
+        "src/bybit_edge/collector/ws_collector.py",
+        "src/bybit_edge/collector/__init__.py"
+      ],
+      "depends_on": [],
+      "streams": [
+        {
+          "topic": "tickers.{symbol}",
+          "frequency": "100ms",
+          "fields": ["lastPrice", "markPrice", "indexPrice", "fundingRate", "nextFundingTime", "openInterest", "openInterestValue", "bid1Price", "bid1Size", "ask1Price", "ask1Size", "ts"]
+        },
+        {
+          "topic": "publicTrade.{symbol}",
+          "frequency": "event-driven (10-500ms)",
+          "fields": ["T", "p", "v", "S", "BT"]
+        },
+        {
+          "topic": "orderbook.50.{symbol}",
+          "frequency": "~20ms delta",
+          "fields": ["u", "b", "a", "ts"]
+        },
+        {
+          "topic": "orderbook.200.{symbol}",
+          "frequency": "~100ms snapshot",
+          "fields": ["b", "a"]
+        },
+        {
+          "topic": "allLiquidation.{symbol}",
+          "frequency": "500ms event-driven",
+          "fields": ["T", "s", "S", "v", "p"]
+        }
+      ],
+      "required_by": ["M1", "M2", "M3", "M6", "M7", "M8", "M14", "M15", "M22", "M23", "M24", "M25", "M26"],
+      "libraries": ["websockets", "asyncio", "orjson"],
+      "reconnect_strategy": "exponential_backoff",
+      "resync_endpoints": [
+        "REST /v5/market/orderbook",
+        "REST /v5/market/recent-trade"
+      ],
+      "estimated_days": 3
+    },
+    {
+      "id": "infra.OrderbookState",
+      "name": "In-Memory Orderbook State Engine",
+      "description": "Pflegt Top-50-Level-Sorted-Arrays (Bid/Ask) aus Delta-Updates. Berechnet Imbalance-Stream, Mid-Price, Spread. Pub/Sub-Ausgabe für alle abhängigen Module.",
+      "files": [
+        "src/bybit_edge/state/orderbook_state.py",
+        "src/bybit_edge/state/__init__.py"
+      ],
+      "depends_on": ["infra.WebSocketCollector"],
+      "required_by": ["M2", "M3", "M4", "M6", "M14", "M25"],
+      "derived_streams": ["imbalance_stream", "mid_price", "spread", "best_bid_ask"],
+      "levels": 50,
+      "estimated_days": 2
+    },
+    {
+      "id": "infra.TickerState",
+      "name": "Ticker State (Composite)",
+      "description": "In-Memory-State für Ticker-Felder: lastPrice, markPrice, indexPrice, fundingRate, nextFundingTime, openInterest. Berechnet Basis, Premium, Funding-Pressure.",
+      "files": [
+        "src/bybit_edge/state/ticker_state.py",
+        "src/bybit_edge/state/__init__.py"
+      ],
+      "depends_on": ["infra.WebSocketCollector"],
+      "required_by": ["M7", "M8", "M9", "M13", "M22", "M23", "M24", "M26"],
+      "derived_fields": ["basis", "premium_index", "funding_pressure", "oi_delta"],
+      "estimated_days": 1
+    },
+    {
+      "id": "infra.TradeBuffer",
+      "name": "Rolling Trade Event Buffer",
+      "description": "Ringpuffer für die letzten 1000 publicTrade-Events mit Vorzeichen (sign via tick-rule). Eingabe für OFI, Kyle's Lambda, Hawkes-Trade-Channels.",
+      "files": [
+        "src/bybit_edge/state/trade_buffer.py",
+        "src/bybit_edge/state/__init__.py"
+      ],
+      "depends_on": ["infra.WebSocketCollector"],
+      "required_by": ["M1", "M2", "M3", "M14", "M25"],
+      "buffer_size": 1000,
+      "backfill_endpoint": "REST /v5/market/recent-trade",
+      "estimated_days": 1
+    },
+    {
+      "id": "infra.LiquidationBuffer",
+      "name": "Rolling Liquidation Event Buffer",
+      "description": "Ringpuffer für die letzten 1000 allLiquidation-Events. Berechnet Magnitude M = log10(v_USD), aggregiert auf 1-s-Buckets für GR/Omori.",
+      "files": [
+        "src/bybit_edge/state/liquidation_buffer.py",
+        "src/bybit_edge/state/__init__.py"
+      ],
+      "depends_on": ["infra.WebSocketCollector"],
+      "required_by": ["M14", "M15", "M26"],
+      "buffer_size": 1000,
+      "bucket_seconds": 1,
+      "estimated_days": 1
+    },
+    {
+      "id": "infra.Persistence",
+      "name": "DuckDB + Parquet Persistence Layer",
+      "description": "Zweistufiges Speichermodell: Hot-Tier (DuckDB, rolling 30 Tage) + Cold-Tier (Parquet ZSTD-komprimiert, lifetime). Automatischer Rollover Hot→Cold.",
+      "files": [
+        "src/bybit_edge/persistence/db.py",
+        "src/bybit_edge/persistence/__init__.py"
+      ],
+      "depends_on": [],
+      "required_by": ["M5", "M9", "M10", "M11", "M12", "M16", "M18", "M19", "M20"],
+      "tech": {
+        "hot": "DuckDB",
+        "cold": "Parquet (ZSTD)",
+        "hot_retention_days": 30,
+        "estimated_storage_per_symbol_day_mb": {
+          "tickers": 150,
+          "trades": 200,
+          "orderbook_50": 500,
+          "liquidations": 5
+        }
+      },
+      "libraries": ["duckdb", "pyarrow"],
+      "estimated_days": 2
+    },
+    {
+      "id": "infra.Backtester",
+      "name": "Walk-Forward Backtesting Engine",
+      "description": "Event-Time-basierte Backtesting-Engine mit Walk-Forward-Splitter, Fee-Model (Taker 0.055%, Maker 0.02%), Slippage-Model (2 bps default), Combinatorial Purged CV.",
+      "files": [
+        "src/bybit_edge/backtester/engine.py",
+        "src/bybit_edge/backtester/__init__.py"
+      ],
+      "depends_on": ["infra.Persistence"],
+      "required_by": ["M2", "M7", "M8", "M9", "M14", "M15", "M16", "M18", "M19", "M20", "M22", "M23", "M24", "M25", "M26"],
+      "features": {
+        "walk_forward": {
+          "train_days": 30,
+          "test_days": 7,
+          "embargo_minutes": 30
+        },
+        "fee_model": {
+          "taker": 0.00055,
+          "maker": 0.0002
+        },
+        "slippage_model": {
+          "default_bps": 2.0
+        },
+        "event_time_indexing": true,
+        "combinatorial_purged_cv": true,
+        "random_seed": 42,
+        "holdout_fraction": 0.30
+      },
+      "estimated_days": 3
+    },
+    {
+      "id": "infra.FundingScheduler",
+      "name": "Funding Settlement Scheduler",
+      "description": "Cron-artiger Scheduler für Bybit-Funding-Settlements (00:00/08:00/16:00 UTC). Triggert Pre-Settlement-Window-Alerts für M22, M23, M24. Konfigurierbar für unterschiedliche Funding-Frequenzen pro Symbol.",
+      "files": [
+        "src/bybit_edge/scheduler.py"
+      ],
+      "depends_on": [],
+      "required_by": ["M22", "M23", "M24"],
+      "cron_utc": [0, 8, 16],
+      "configurable_per_symbol": true,
+      "alert_windows_minutes": [30, 60],
+      "estimated_days": 1
+    }
+  ]
+}
