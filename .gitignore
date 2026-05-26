@@ -6,3 +6,4 @@ data/
 *.parquet
 logs/
 .pytest_cache/
+*.egg-info/
