@@ -15,6 +15,10 @@ import os
 from pathlib import Path
 from typing import Final
 
+from dotenv import load_dotenv
+
+load_dotenv()
+
 # ═══════════════════════════════════════════════════════════════════
 # BYBIT API
 # ═══════════════════════════════════════════════════════════════════
