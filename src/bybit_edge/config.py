@@ -21,31 +21,43 @@ from typing import Final
 BYBIT_API_KEY: str = os.getenv("BYBIT_API_KEY", "")
 BYBIT_API_SECRET: str = os.getenv("BYBIT_API_SECRET", "")
 BYBIT_TESTNET: bool = os.getenv("BYBIT_TESTNET", "true").lower() == "true"
+BYBIT_DEMO: bool = os.getenv("BYBIT_DEMO", "false").lower() == "true"
 
 BYBIT_WS_PUBLIC_LIVE: Final[str] = "wss://stream.bybit.com/v5/public/linear"
 BYBIT_WS_PUBLIC_TESTNET: Final[str] = (
     "wss://stream-testnet.bybit.com/v5/public/linear"
 )
+BYBIT_WS_PUBLIC_DEMO: Final[str] = (
+    "wss://stream-demo.bybit.com/v5/public/linear"
+)
 BYBIT_WS_PRIVATE_LIVE: Final[str] = "wss://stream.bybit.com/v5/private"
 BYBIT_WS_PRIVATE_TESTNET: Final[str] = (
     "wss://stream-testnet.bybit.com/v5/private"
 )
+BYBIT_WS_PRIVATE_DEMO: Final[str] = "wss://stream-demo.bybit.com/v5/private"
 BYBIT_REST_LIVE: Final[str] = "https://api.bybit.com"
 BYBIT_REST_TESTNET: Final[str] = "https://api-testnet.bybit.com"
+BYBIT_REST_DEMO: Final[str] = "https://api-demo.bybit.com"
 
 
 def ws_public_url() -> str:
-    """Gibt die aktive WS-URL zurück (Testnet oder Live)."""
+    """Gibt die aktive WS-URL zurück (Demo > Testnet > Live)."""
+    if BYBIT_DEMO:
+        return BYBIT_WS_PUBLIC_DEMO
     return BYBIT_WS_PUBLIC_TESTNET if BYBIT_TESTNET else BYBIT_WS_PUBLIC_LIVE
 
 
 def ws_private_url() -> str:
     """Gibt die aktive private WS-URL zurück."""
+    if BYBIT_DEMO:
+        return BYBIT_WS_PRIVATE_DEMO
     return BYBIT_WS_PRIVATE_TESTNET if BYBIT_TESTNET else BYBIT_WS_PRIVATE_LIVE
 
 
 def rest_base_url() -> str:
     """Gibt die aktive REST-Base-URL zurück."""
+    if BYBIT_DEMO:
+        return BYBIT_REST_DEMO
     return BYBIT_REST_TESTNET if BYBIT_TESTNET else BYBIT_REST_LIVE
 
 
