@@ -15,9 +15,11 @@ Sicherheit:
 from __future__ import annotations
 
 import asyncio
+import csv
 import logging
 import time
 from collections import deque
+from pathlib import Path
 from typing import Any, Optional
 
 import numpy as np
@@ -26,6 +28,7 @@ from bybit_edge.collector.ws_collector import BybitWSCollector, WSMessage
 from bybit_edge.config import (
     BYBIT_DEMO,
     BYBIT_TESTNET,
+    DATA_DIR,
     EXECUTION_ENABLED,
     EXECUTION_LEVERAGE,
     EXECUTION_ORDER_USD,
@@ -69,7 +72,27 @@ class LiveRunner:
         self._running = False
         self._msg_count = 0
 
+        # Trade-Journal (CSV) für spätere Strategie-Auswertung
+        self._journal_path: Path = DATA_DIR / "trades_journal.csv"
+        self._journal_fields = [
+            "ts_iso", "ts_unix", "symbol", "strategy_id", "action",
+            "side", "qty", "price", "confidence", "ret_code", "order_id",
+        ]
+
         self._register_handlers()
+
+    def _journal(self, row: dict[str, Any]) -> None:
+        """Hängt eine Order-Zeile an das Trade-Journal an (CSV)."""
+        try:
+            self._journal_path.parent.mkdir(parents=True, exist_ok=True)
+            write_header = not self._journal_path.exists()
+            with self._journal_path.open("a", newline="", encoding="utf-8") as f:
+                writer = csv.DictWriter(f, fieldnames=self._journal_fields)
+                if write_header:
+                    writer.writeheader()
+                writer.writerow({k: row.get(k, "") for k in self._journal_fields})
+        except Exception:
+            logger.exception("Trade-Journal konnte nicht geschrieben werden")
 
     # ------------------------------------------------------------------
     # Handler-Registrierung
@@ -207,12 +230,38 @@ class LiveRunner:
                 logger.warning("  -> qty zu klein (Notional %s USD), übersprungen.", EXECUTION_ORDER_USD)
                 return
             result = await self.executor.place_market_order(target_side, qty)
+            self._journal({
+                "ts_iso": time.strftime("%Y-%m-%d %H:%M:%S"),
+                "ts_unix": time.time(),
+                "symbol": self.symbol,
+                "strategy_id": strat,
+                "action": action,
+                "side": target_side,
+                "qty": qty,
+                "price": price,
+                "confidence": conf,
+                "ret_code": result.get("retCode"),
+                "order_id": result.get("result", {}).get("orderId", ""),
+            })
             if result.get("retCode") == 0:
                 self._position_side = target_side
 
         elif action == "exit":
             if self._position_side:
-                await self.executor.close_position()
+                result = await self.executor.close_position()
+                self._journal({
+                    "ts_iso": time.strftime("%Y-%m-%d %H:%M:%S"),
+                    "ts_unix": time.time(),
+                    "symbol": self.symbol,
+                    "strategy_id": strat,
+                    "action": "exit",
+                    "side": "",
+                    "qty": "",
+                    "price": price,
+                    "confidence": conf,
+                    "ret_code": result.get("retCode"),
+                    "order_id": result.get("result", {}).get("orderId", ""),
+                })
                 self._position_side = ""
 
     # ------------------------------------------------------------------

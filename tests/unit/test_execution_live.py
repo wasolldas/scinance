@@ -211,6 +211,30 @@ class TestLiveRunnerDecision:
         assert r._position_side == ""
 
     @pytest.mark.asyncio
+    async def test_long_writes_journal(self, monkeypatch, tmp_path):
+        monkeypatch.setattr("bybit_edge.live_runner.EXECUTION_ENABLED", True)
+        monkeypatch.setattr("bybit_edge.live_runner.EXECUTION_ORDER_USD", 100.0)
+        r = LiveRunner("BTCUSDT")
+        r._journal_path = tmp_path / "journal.csv"
+        r._on_ticker(_ticker_msg())
+        ex = AsyncMock()
+        ex.round_qty = lambda q: 0.002
+        ex.place_market_order = AsyncMock(
+            return_value={"retCode": 0, "result": {"orderId": "abc123"}}
+        )
+        ex.close_position = AsyncMock(return_value={"retCode": 0})
+        r.executor = ex
+        await r._act_on_decision(
+            {"action": "long", "direction": 1, "strategy_id": "S3",
+             "position_size_pct": 0.1, "confidence": 0.6}
+        )
+        assert r._journal_path.exists()
+        content = r._journal_path.read_text(encoding="utf-8")
+        assert "S3" in content
+        assert "abc123" in content
+        assert "Buy" in content
+
+    @pytest.mark.asyncio
     async def test_act_hold_same_side(self, monkeypatch):
         monkeypatch.setattr("bybit_edge.live_runner.EXECUTION_ENABLED", True)
         r = LiveRunner("BTCUSDT")

@@ -52,11 +52,12 @@ echo Was moechtest du tun?
 echo.
 echo   1 = Tests laufen lassen (pytest)
 echo   2 = System starten (Collector + Pipeline)
-echo   3 = Quick-Check (alle Module importieren)
-echo   4 = Python Shell (interaktiv)
-echo   5 = Beenden
+echo   3 = Monitor (Position + PnL + Equity)
+echo   4 = Quick-Check (alle Module importieren)
+echo   5 = Python Shell (interaktiv)
+echo   6 = Beenden
 echo.
-set /p choice="Auswahl [1-5]: "
+set /p choice="Auswahl [1-6]: "
 
 if "%choice%"=="1" (
     echo.
@@ -75,18 +76,24 @@ if "%choice%"=="2" (
 )
 if "%choice%"=="3" (
     echo.
+    echo --- Monitor (Ctrl+C zum Zurueck) ---
+    python -m bybit_edge.monitor --interval 10
+    goto menu
+)
+if "%choice%"=="4" (
+    echo.
     echo --- Quick-Check ---
     python -c "from bybit_edge.pipeline import Pipeline; from bybit_edge.strategies import Strategy3PreSettlement; from bybit_edge.decision_aggregator import DecisionAggregator; print('Alle Module OK!')"
     echo.
     goto menu
 )
-if "%choice%"=="4" (
+if "%choice%"=="5" (
     echo.
     echo --- Python Shell (exit() zum Zurueck) ---
     python
     goto menu
 )
-if "%choice%"=="5" (
+if "%choice%"=="6" (
     exit /b 0
 )
 
