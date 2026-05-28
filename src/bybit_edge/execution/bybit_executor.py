@@ -51,8 +51,9 @@ class BybitExecutor:
         allow_live: bool = False,
     ) -> None:
         self.symbol = symbol
-        self._api_key = api_key
-        self._api_secret = api_secret
+        # Whitespace/Zeilenumbrüche aus .env-Eingabe entfernen
+        self._api_key = api_key.strip()
+        self._api_secret = api_secret.strip()
         self._base = rest_base_url()
         self._recv_window = str(BYBIT_RECV_WINDOW_MS)
         self._allow_live = allow_live
@@ -248,6 +249,12 @@ class BybitExecutor:
         self._safety_check()
         params = {"accountType": "UNIFIED"}
         body = await self._get(REST_WALLET_BALANCE, params)
+        if body.get("retCode") != 0:
+            logger.warning(
+                "wallet-balance Fehler %s: %s",
+                body.get("retCode"), body.get("retMsg"),
+            )
+            return 0.0
         lst = body.get("result", {}).get("list", [])
         if lst:
             return float(lst[0].get("totalEquity", 0) or 0)

@@ -45,9 +45,14 @@ BYBIT_REST_DEMO: Final[str] = "https://api-demo.bybit.com"
 
 
 def ws_public_url() -> str:
-    """Gibt die aktive WS-URL zurück (Demo > Testnet > Live)."""
+    """Gibt die aktive Public-WS-URL zurück.
+
+    WICHTIG: Bybit Demo Trading hat KEINEN eigenen Public-Stream.
+    Public-Marktdaten kommen im Demo-Modus vom Mainnet. Nur REST-Trading
+    und der Private-Stream nutzen die Demo-Endpoints.
+    """
     if BYBIT_DEMO:
-        return BYBIT_WS_PUBLIC_DEMO
+        return BYBIT_WS_PUBLIC_LIVE
     return BYBIT_WS_PUBLIC_TESTNET if BYBIT_TESTNET else BYBIT_WS_PUBLIC_LIVE
 
 
@@ -59,7 +64,11 @@ def ws_private_url() -> str:
 
 
 def rest_base_url() -> str:
-    """Gibt die aktive REST-Base-URL zurück."""
+    """Gibt die aktive REST-Base-URL zurück.
+
+    Public-Markt-REST (orderbook/recent-trade-Resync) funktioniert auch
+    auf der Demo-Base. Signiertes Trading läuft über die Demo-Base.
+    """
     if BYBIT_DEMO:
         return BYBIT_REST_DEMO
     return BYBIT_REST_TESTNET if BYBIT_TESTNET else BYBIT_REST_LIVE
