@@ -188,23 +188,44 @@ def strat_momentum(window: int = 20, band: float = 0.001) -> Callable:
     return strategy_fn
 
 
-def strat_funding_reversion(window_min: int = 30, thr: float = 0.0003) -> Callable:
-    """S3-Proxy: extremes Funding vor Settlement -> Mean-Reversion-Trade.
+def strat_funding_reversion(hold_bars: int = 12, train_quantile: float = 0.8) -> Callable:
+    """Post-Settlement Funding-Reversion (lookahead-frei).
 
-    Hinweis: Dies testet die Funding-MAGNITUDE-Reversion, nicht das volle
-    M22-Clamp-Pressure (dessen Premium-Index historisch nicht verfügbar ist).
+    Kalibriert die Funding-Schwelle aus den TRAININGS-Daten (Quantil).
+    Beim Settlement-Übergang: war das gerade abgerechnete Funding extrem,
+    wird eine Reversion-Position eröffnet und ``hold_bars`` Bars gehalten.
+
+    Hinweis: Dies testet Funding-MAGNITUDE-Reversion auf Basis des bereits
+    abgerechneten Funding (kein Premium-Index, kein Lookahead). Es ist eine
+    konservative Annäherung an M22 — das volle Clamp-Pressure braucht den
+    Live-Premium-Index, der historisch nicht verfügbar ist.
     """
     def strategy_fn(train_df: pl.DataFrame) -> Callable:
+        fr = train_df["funding_rate"].abs()
+        thr = float(fr.quantile(train_quantile)) if len(fr) else 0.0001
+        if not thr or thr <= 0:
+            thr = 0.0001
+        state = {"prev_stt": None, "hold": 0, "in_pos": False}
+
         def signal_fn(row: dict) -> Optional[dict]:
+            stt = float(row.get("seconds_to_settlement", 0.0))
             f = float(row.get("funding_rate", 0.0))
-            stt = float(row.get("seconds_to_settlement", 9e9))
-            in_window = 0 < stt < window_min * 60
-            if in_window and abs(f) > thr:
-                # Positives Funding -> Longs zahlen -> Perp tendenziell überhitzt
-                # -> Short-Reversion; negatives Funding -> Long-Reversion.
+            prev = state["prev_stt"]
+            state["prev_stt"] = stt
+
+            if state["in_pos"]:
+                state["hold"] -= 1
+                if state["hold"] <= 0:
+                    state["in_pos"] = False
+                    return {"action": "close"}
+                return None
+
+            # Settlement-Übergang: seconds_to_settlement springt nach oben
+            if prev is not None and stt > prev + 1.0 and abs(f) > thr:
+                state["in_pos"] = True
+                state["hold"] = hold_bars
+                # Positives Funding -> Longs zahlen -> überhitzt -> Short-Reversion
                 return {"side": "Short" if f > 0 else "Long", "qty": 1.0}
-            if not in_window:
-                return {"action": "close"}
             return None
         return signal_fn
     return strategy_fn
