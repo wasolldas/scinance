@@ -417,6 +417,26 @@ LOG_DATE_FORMAT: Final[str] = "%Y-%m-%d %H:%M:%S"
 RANDOM_SEED: Final[int] = 42
 
 # ═══════════════════════════════════════════════════════════════════
+# EXECUTION (Live-Runner + Order-Ausführung)
+# ═══════════════════════════════════════════════════════════════════
+# Master-Schalter: wenn False, werden NIEMALS Orders gesendet (nur geloggt).
+EXECUTION_ENABLED: bool = os.getenv("EXECUTION_ENABLED", "false").lower() == "true"
+# Notional pro Paper-Trade in USD (Order-Größe = NOTIONAL / Preis).
+EXECUTION_ORDER_USD: float = float(os.getenv("EXECUTION_ORDER_USD", "100.0"))
+# Hebel für das Symbol (wird einmalig gesetzt).
+EXECUTION_LEVERAGE: int = int(os.getenv("EXECUTION_LEVERAGE", "1"))
+# Pipeline-Throttle: minimaler Abstand zwischen zwei Pipeline-Läufen (Sekunden).
+PIPELINE_INTERVAL_SECONDS: float = float(os.getenv("PIPELINE_INTERVAL_SECONDS", "1.0"))
+# REST recv_window (ms) für signierte Requests.
+BYBIT_RECV_WINDOW_MS: int = int(os.getenv("BYBIT_RECV_WINDOW_MS", "5000"))
+# Signierte REST-Endpoints (Trade/Account).
+REST_ORDER_CREATE: Final[str] = "/v5/order/create"
+REST_POSITION_LIST: Final[str] = "/v5/position/list"
+REST_WALLET_BALANCE: Final[str] = "/v5/account/wallet-balance"
+REST_SET_LEVERAGE: Final[str] = "/v5/position/set-leverage"
+REST_INSTRUMENTS: Final[str] = "/v5/market/instruments-info"
+
+# ═══════════════════════════════════════════════════════════════════
 # WS RECONNECT (PRD Abschnitt 9.2)
 # ═══════════════════════════════════════════════════════════════════
 WS_RECONNECT_DELAY_SECONDS: Final[float] = 1.0

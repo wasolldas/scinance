@@ -1,0 +1,286 @@
+"""
+Live-Runner — verbindet WebSocket-Collector, State-Engines, Pipeline und
+Executor zu einem lauffähigen System.
+
+Datenfluss::
+
+    Bybit WS  ->  State-Engines  ->  (alle PIPELINE_INTERVAL_SECONDS)
+              ->  Pipeline.process_ticker  ->  Decision  ->  Executor
+
+Sicherheit:
+    - Orders werden nur gesendet wenn EXECUTION_ENABLED=true.
+    - Im LIVE-Modus (weder Demo noch Testnet) verweigert der Executor Orders.
+    - Ohne Execution läuft alles read-only und loggt nur die Entscheidungen.
+"""
+from __future__ import annotations
+
+import asyncio
+import logging
+import time
+from collections import deque
+from typing import Any, Optional
+
+import numpy as np
+
+from bybit_edge.collector.ws_collector import BybitWSCollector, WSMessage
+from bybit_edge.config import (
+    BYBIT_DEMO,
+    BYBIT_TESTNET,
+    EXECUTION_ENABLED,
+    EXECUTION_LEVERAGE,
+    EXECUTION_ORDER_USD,
+    PIPELINE_INTERVAL_SECONDS,
+    PRIMARY_SYMBOL,
+)
+from bybit_edge.execution.bybit_executor import BybitExecutor
+from bybit_edge.pipeline import Pipeline
+from bybit_edge.state.liquidation_buffer import LiquidationBuffer, LiquidationEvent
+from bybit_edge.state.orderbook_state import OrderbookState
+from bybit_edge.state.ticker_state import TickerSnapshot
+from bybit_edge.state.trade_buffer import TradeBuffer, TradeEvent
+
+logger = logging.getLogger(__name__)
+
+
+class LiveRunner:
+    """Orchestriert Datenerfassung, Pipeline und Order-Ausführung."""
+
+    def __init__(self, symbol: str = PRIMARY_SYMBOL) -> None:
+        self.symbol = symbol
+
+        # State-Engines
+        self.orderbook = OrderbookState(symbol)
+        self.liq_buffer = LiquidationBuffer(maxlen=2000)
+        self.trade_buffer = TradeBuffer(maxlen=2000)
+        self.price_history: deque[float] = deque(maxlen=512)
+
+        # Roher Ticker-Merge-State (Bybit sendet Deltas)
+        self._raw_ticker: dict[str, Any] = {"symbol": symbol}
+        self.ticker: Optional[TickerSnapshot] = None
+
+        # Pipeline + Collector + Executor
+        self.pipeline = Pipeline(symbol)
+        self.collector = BybitWSCollector(symbol)
+        self.executor: Optional[BybitExecutor] = None
+
+        # Positions-Tracking ("", "Buy", "Sell")
+        self._position_side: str = ""
+        self._last_pipeline_ts: float = 0.0
+        self._running = False
+        self._msg_count = 0
+
+        self._register_handlers()
+
+    # ------------------------------------------------------------------
+    # Handler-Registrierung
+    # ------------------------------------------------------------------
+
+    def _register_handlers(self) -> None:
+        self.collector.add_handler("tickers", self._on_ticker)
+        self.collector.add_handler("orderbook50", self._on_orderbook)
+        self.collector.add_handler("trades", self._on_trade)
+        self.collector.add_handler("liquidation", self._on_liquidation)
+
+    def _on_ticker(self, msg: WSMessage) -> None:
+        # Delta-Merge: nur vorhandene Felder überschreiben
+        self._raw_ticker.update(msg.data)
+        self._raw_ticker["symbol"] = self.symbol
+        self.ticker = TickerSnapshot.from_ws(self._raw_ticker, recv_ts=msg.recv_ts)
+        self._msg_count += 1
+
+    def _on_orderbook(self, msg: WSMessage) -> None:
+        if msg.msg_type == "snapshot":
+            self.orderbook.apply_snapshot(msg.data)
+        else:
+            self.orderbook.apply_delta(msg.data)
+
+    def _on_trade(self, msg: WSMessage) -> None:
+        evt = TradeEvent.from_ws(msg.data)
+        self.trade_buffer.add(evt)
+        if evt.price > 0:
+            self.price_history.append(evt.price)
+
+    def _on_liquidation(self, msg: WSMessage) -> None:
+        evt = LiquidationEvent.from_ws(msg.data)
+        self.liq_buffer.add(evt)
+        logger.info(
+            "LIQUIDATION: %s %.4f @ %.2f (%.0f USD)",
+            evt.side, evt.volume, evt.price, evt.usd_value,
+        )
+
+    # ------------------------------------------------------------------
+    # Pipeline-Eingabe bauen
+    # ------------------------------------------------------------------
+
+    def _build_ticker_data(self) -> Optional[dict[str, Any]]:
+        if self.ticker is None or self.ticker.last_price <= 0:
+            return None
+
+        snap = self.ticker
+        (bid_p, bid_s), (ask_p, ask_s) = self.orderbook.top_n_arrays(20)
+
+        # seconds_to_settlement absichern (next_funding_time kann 0/fehlen)
+        if snap.next_funding_time > 0:
+            seconds_to_settlement = max(snap.seconds_to_funding, 0.0)
+        else:
+            seconds_to_settlement = 3600.0
+
+        # Liquidations-Events der letzten Stunde als Dicts
+        liq_events = [
+            {"timestamp_ms": e.timestamp_ms, "usd_value": e.usd_value, "side": e.side}
+            for e in self.liq_buffer.recent_by_ts(3600.0)
+        ]
+
+        # Trades für Kyle's Lambda
+        trade_events = self.trade_buffer.recent_events(100)
+        trades = [
+            {
+                "price": t.price,
+                "volume": t.volume,
+                "side": t.side,
+                "timestamp_ms": t.timestamp_ms,
+            }
+            for t in trade_events
+        ]
+
+        # Event-Zeiten (Sekunden) für Hawkes
+        ts_ms = self.trade_buffer.recent_timestamps(200)
+        event_times = ts_ms / 1000.0 if ts_ms.size else np.array([], dtype=np.float64)
+
+        price_series = np.array(self.price_history, dtype=np.float64)
+
+        return {
+            "ts": time.time(),
+            "last_price": snap.last_price,
+            "mark_price": snap.mark_price or snap.last_price,
+            "index_price": snap.index_price or snap.last_price,
+            "premium_index": snap.premium_index,
+            "funding_rate": snap.funding_rate,
+            "open_interest": snap.open_interest,
+            "seconds_to_settlement": seconds_to_settlement,
+            "bid_sizes": bid_s if bid_s.size else np.ones(20),
+            "ask_sizes": ask_s if ask_s.size else np.ones(20),
+            "best_bid": self.orderbook.best_bid,
+            "best_ask": self.orderbook.best_ask,
+            "liq_events": liq_events,
+            "event_times": event_times,
+            "trades": trades,
+            "price_series": price_series,
+        }
+
+    # ------------------------------------------------------------------
+    # Entscheidung ausführen
+    # ------------------------------------------------------------------
+
+    async def _act_on_decision(self, decision: dict[str, Any]) -> None:
+        action = decision.get("action", "wait")
+        strat = decision.get("strategy_id", "?")
+        size_pct = decision.get("position_size_pct", 0.0)
+        conf = decision.get("confidence", 0.0)
+
+        logger.info(
+            "SIGNAL [%s] action=%s dir=%s size=%.4f conf=%.3f",
+            strat, action, decision.get("direction", 0), size_pct, conf,
+        )
+
+        if not EXECUTION_ENABLED or self.executor is None:
+            logger.info("  -> (read-only, keine Order gesendet)")
+            return
+
+        price = self.ticker.last_price if self.ticker else 0.0
+        if price <= 0:
+            return
+
+        if action in ("long", "short"):
+            target_side = "Buy" if action == "long" else "Sell"
+            if self._position_side == target_side:
+                logger.info("  -> Position bereits %s, halte.", target_side)
+                return
+            # Gegenposition schließen
+            if self._position_side:
+                await self.executor.close_position()
+                self._position_side = ""
+            # Order-Größe aus Notional
+            raw_qty = EXECUTION_ORDER_USD / price
+            qty = self.executor.round_qty(raw_qty)
+            if qty <= 0:
+                logger.warning("  -> qty zu klein (Notional %s USD), übersprungen.", EXECUTION_ORDER_USD)
+                return
+            result = await self.executor.place_market_order(target_side, qty)
+            if result.get("retCode") == 0:
+                self._position_side = target_side
+
+        elif action == "exit":
+            if self._position_side:
+                await self.executor.close_position()
+                self._position_side = ""
+
+    # ------------------------------------------------------------------
+    # Hauptschleife
+    # ------------------------------------------------------------------
+
+    async def _pipeline_loop(self) -> None:
+        while self._running:
+            await asyncio.sleep(PIPELINE_INTERVAL_SECONDS)
+            try:
+                ticker_data = self._build_ticker_data()
+                if ticker_data is None:
+                    continue
+                decision = await self.pipeline.process_ticker(ticker_data)
+                if decision is not None:
+                    await self._act_on_decision(decision)
+            except Exception:
+                logger.exception("Fehler im Pipeline-Loop")
+
+    async def _heartbeat_loop(self) -> None:
+        while self._running:
+            await asyncio.sleep(30.0)
+            mid = self.orderbook.mid_price
+            px = self.ticker.last_price if self.ticker else 0.0
+            logger.info(
+                "HEARTBEAT: msgs=%d last=%.2f mid=%.2f trades=%d liqs=%d pos=%s",
+                self._msg_count, px, mid,
+                len(self.trade_buffer), len(self.liq_buffer),
+                self._position_side or "flat",
+            )
+
+    async def run(self) -> None:
+        """Startet Collector, Pipeline-Loop und (optional) Executor."""
+        mode = "DEMO" if BYBIT_DEMO else "TESTNET" if BYBIT_TESTNET else "LIVE"
+        logger.info("LiveRunner startet — Symbol=%s Modus=%s Execution=%s",
+                    self.symbol, mode, EXECUTION_ENABLED)
+
+        self._running = True
+
+        if EXECUTION_ENABLED:
+            self.executor = BybitExecutor(self.symbol)
+            await self.executor.load_instrument()
+            try:
+                await self.executor.set_leverage(EXECUTION_LEVERAGE)
+                equity = await self.executor.get_equity()
+                logger.info("Account-Equity: %.2f USDT", equity)
+                pos = await self.executor.get_position()
+                self._position_side = pos["side"]
+                if pos["size"] > 0:
+                    logger.info("Bestehende Position: %s %.4f", pos["side"], pos["size"])
+            except Exception:
+                logger.exception("Executor-Init fehlgeschlagen — laufe read-only weiter.")
+
+        tasks = [
+            asyncio.create_task(self.collector.connect()),
+            asyncio.create_task(self._pipeline_loop()),
+            asyncio.create_task(self._heartbeat_loop()),
+        ]
+        try:
+            await asyncio.gather(*tasks)
+        except asyncio.CancelledError:
+            pass
+        finally:
+            await self.stop()
+
+    async def stop(self) -> None:
+        self._running = False
+        await self.collector.disconnect()
+        if self.executor is not None:
+            await self.executor.close()
+        logger.info("LiveRunner gestoppt.")

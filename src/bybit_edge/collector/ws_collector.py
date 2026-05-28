@@ -60,6 +60,7 @@ class WSMessage:
     data: dict
     recv_ts: float           # time.time() at reception — event-time anchor
     schema_version: int = 1
+    msg_type: str = ""       # Bybit envelope "type": "snapshot" | "delta" | ""
 
 
 class BybitWSCollector:
@@ -198,6 +199,7 @@ class BybitWSCollector:
         """Route a parsed payload to the correct queue + handlers."""
         topic: str = payload.get("topic", "")
         raw_data = payload.get("data", {})
+        msg_type: str = str(payload.get("type", ""))
 
         # Determine stream name from topic
         stream_name: Optional[str] = None
@@ -223,6 +225,7 @@ class BybitWSCollector:
                 symbol=self.symbol,
                 data=entry,
                 recv_ts=recv_ts,
+                msg_type=msg_type,
             )
 
             # Enqueue — drop oldest if full (non-blocking)
@@ -273,6 +276,7 @@ class BybitWSCollector:
                             symbol=self.symbol,
                             data=result,
                             recv_ts=recv_ts,
+                            msg_type="snapshot",
                         )
                         for handler in self._handlers.get("orderbook50", []):
                             try:

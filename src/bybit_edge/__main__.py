@@ -84,25 +84,23 @@ async def _shutdown(loop: asyncio.AbstractEventLoop, sig: signal.Signals) -> Non
 async def main() -> None:
     """Hauptschleife des Bybit Edge Systems.
 
-    Startet den WebSocket-Collector und alle aktiven Layer.
-    Wird durch signal handler beendet.
+    Startet den LiveRunner: WebSocket-Collector -> State-Engines ->
+    Pipeline -> Decision -> (optional) Executor.
     """
     logger = logging.getLogger("bybit_edge.main")
     logger.info("Bybit Edge System startet...")
     logger.info("Random Seed: %d", RANDOM_SEED)
     logger.info("Log Level: %s", LOG_LEVEL)
 
-    # Placeholder fuer den vollstaendigen Pipeline-Start.
-    # Wird durch den Infra-Builder (Agent 02) mit dem echten
-    # Collector + State + Layer-Stack ersetzt.
-    logger.info("System bereit. Warte auf Pipeline-Komponenten...")
+    from bybit_edge.config import PRIMARY_SYMBOL
+    from bybit_edge.live_runner import LiveRunner
 
-    # Endlos-Loop bis Signal
+    runner = LiveRunner(PRIMARY_SYMBOL)
     try:
-        while True:
-            await asyncio.sleep(1.0)
+        await runner.run()
     except asyncio.CancelledError:
         logger.info("Main-Loop cancelled — beende.")
+        await runner.stop()
 
 
 def run() -> NoReturn:
