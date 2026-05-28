@@ -25,11 +25,20 @@ class LiquidationEvent:
 
     @classmethod
     def from_ws(cls, data: dict) -> "LiquidationEvent":
-        """Construct from Bybit V5 ``allLiquidation`` WS payload."""
-        price = float(data.get("price", 0))
-        volume = float(data.get("size", data.get("qty", 0)))
+        """Construct from Bybit V5 ``allLiquidation`` WS payload.
+
+        Der ``allLiquidation.{symbol}``-Stream nutzt Kurz-Keys
+        (``T``, ``s``, ``S``, ``v``, ``p``). Der ältere
+        ``liquidation``-Stream nutzt Langnamen
+        (``updatedTime``, ``symbol``, ``side``, ``size``, ``price``).
+        Beide Formate werden unterstützt.
+        """
+        price = float(data.get("price", data.get("p", 0)) or 0)
+        volume = float(
+            data.get("size", data.get("qty", data.get("v", 0))) or 0
+        )
         return cls(
-            timestamp_ms=int(data.get("updatedTime", data.get("T", 0))),
+            timestamp_ms=int(data.get("updatedTime", data.get("T", 0)) or 0),
             symbol=str(data.get("symbol", data.get("s", ""))),
             side=str(data.get("side", data.get("S", ""))),
             volume=volume,
