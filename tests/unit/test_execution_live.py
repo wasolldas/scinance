@@ -163,6 +163,51 @@ class TestLiveRunnerPipelineInput:
         assert data["seconds_to_settlement"] == 3600.0  # next_funding_time=0 -> Default
 
 
+class TestLiveRunnerPersistence:
+    def test_buffers_fill_when_persist_active(self):
+        r = LiveRunner("BTCUSDT")
+        # Persist simulieren (kein echtes DuckDB nötig fürs Puffern)
+        r.persist = object()  # truthy Platzhalter
+        r._on_ticker(_ticker_msg())
+        r._on_trade(WSMessage("trades", "BTCUSDT",
+                              {"T": 1, "p": "50000", "v": "0.5", "S": "Buy"}, 1.0))
+        r._on_liquidation(WSMessage("liquidation", "BTCUSDT",
+                                    {"T": 1, "s": "BTCUSDT", "S": "Sell",
+                                     "v": "1.0", "p": "49000"}, 1.0))
+        assert len(r._buf_tickers) == 1
+        assert len(r._buf_trades) == 1
+        assert len(r._buf_liqs) == 1
+
+    def test_no_buffering_without_persist(self):
+        r = LiveRunner("BTCUSDT")
+        assert r.persist is None
+        r._on_ticker(_ticker_msg())
+        r._on_trade(WSMessage("trades", "BTCUSDT",
+                              {"T": 1, "p": "50000", "v": "0.5", "S": "Buy"}, 1.0))
+        assert len(r._buf_tickers) == 0
+        assert len(r._buf_trades) == 0
+
+    def test_flush_writes_to_duckdb(self):
+        from bybit_edge.persistence.db import PersistenceLayer
+        r = LiveRunner("BTCUSDT")
+        r.persist = PersistenceLayer(db_path=__import__("pathlib").Path(":memory:"))
+        r._on_ticker(_ticker_msg())
+        r._on_trade(WSMessage("trades", "BTCUSDT",
+                              {"T": 1, "p": "50000", "v": "0.5", "S": "Buy"}, 1.0))
+        r._on_liquidation(WSMessage("liquidation", "BTCUSDT",
+                                    {"T": 1, "s": "BTCUSDT", "S": "Sell",
+                                     "v": "1.0", "p": "49000"}, 1.0))
+        r._flush_persist()
+        counts = r.persist.row_counts()
+        assert counts["tickers"] == 1
+        assert counts["trades"] == 1
+        assert counts["liquidations"] == 1
+        # Puffer nach Flush geleert
+        assert r._buf_tickers == []
+        assert r._persisted == 3
+        r.persist.close()
+
+
 class TestLiveRunnerDecision:
     @pytest.mark.asyncio
     async def test_act_read_only_no_executor(self):

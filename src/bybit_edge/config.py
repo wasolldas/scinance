@@ -436,6 +436,10 @@ EXECUTION_ORDER_USD: float = float(os.getenv("EXECUTION_ORDER_USD", "100.0"))
 EXECUTION_LEVERAGE: int = int(os.getenv("EXECUTION_LEVERAGE", "1"))
 # Pipeline-Throttle: minimaler Abstand zwischen zwei Pipeline-Läufen (Sekunden).
 PIPELINE_INTERVAL_SECONDS: float = float(os.getenv("PIPELINE_INTERVAL_SECONDS", "1.0"))
+# Daten-Persistenz: schreibt Live-Ticks (Ticker/Trades/Liquidationen) in DuckDB,
+# damit später Microstructure-Strategien (S1/S2) backtestbar werden.
+PERSIST_ENABLED: bool = os.getenv("PERSIST_ENABLED", "false").lower() == "true"
+PERSIST_FLUSH_SECONDS: float = float(os.getenv("PERSIST_FLUSH_SECONDS", "5.0"))
 # REST recv_window (ms) für signierte Requests.
 BYBIT_RECV_WINDOW_MS: int = int(os.getenv("BYBIT_RECV_WINDOW_MS", "5000"))
 # Signierte REST-Endpoints (Trade/Account).

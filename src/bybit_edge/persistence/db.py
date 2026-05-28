@@ -209,6 +209,66 @@ class PersistenceLayer:
         )
 
     # ------------------------------------------------------------------
+    # Batch writers (efficient bulk ingestion for the live runner)
+    # ------------------------------------------------------------------
+
+    def write_tickers_batch(self, snaps: list) -> int:
+        """Bulk-insert a list of ``TickerSnapshot`` objects. Returns count."""
+        if not snaps:
+            return 0
+        rows = [
+            [
+                s.ts, s.symbol, s.last_price, s.mark_price, s.index_price,
+                s.funding_rate, s.next_funding_time, s.open_interest,
+                s.open_interest_value, s.bid1_price, s.bid1_size,
+                s.ask1_price, s.ask1_size, s.recv_ts,
+            ]
+            for s in snaps
+        ]
+        self.conn.executemany(
+            "INSERT INTO tickers VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            rows,
+        )
+        return len(rows)
+
+    def write_trades_batch(self, evts: list, symbol: str = "") -> int:
+        """Bulk-insert a list of ``TradeEvent`` objects. Returns count."""
+        if not evts:
+            return 0
+        rows = [
+            [
+                e.timestamp_ms, symbol, e.price, e.volume, e.side,
+                e.is_block, getattr(e, "recv_ts", 0.0),
+            ]
+            for e in evts
+        ]
+        self.conn.executemany(
+            "INSERT INTO trades VALUES (?, ?, ?, ?, ?, ?, ?)", rows
+        )
+        return len(rows)
+
+    def write_liquidations_batch(self, evts: list) -> int:
+        """Bulk-insert a list of ``LiquidationEvent`` objects. Returns count."""
+        if not evts:
+            return 0
+        rows = [
+            [e.timestamp_ms, e.symbol, e.side, e.volume, e.price, e.usd_value]
+            for e in evts
+        ]
+        self.conn.executemany(
+            "INSERT INTO liquidations VALUES (?, ?, ?, ?, ?, ?)", rows
+        )
+        return len(rows)
+
+    def row_counts(self) -> dict[str, int]:
+        """Return current row counts per table (for monitoring)."""
+        out: dict[str, int] = {}
+        for table in ("tickers", "trades", "liquidations", "kline_1min"):
+            r = self.conn.execute(f"SELECT COUNT(*) FROM {table}").fetchone()
+            out[table] = r[0] if r else 0
+        return out
+
+    # ------------------------------------------------------------------
     # Readers
     # ------------------------------------------------------------------
 

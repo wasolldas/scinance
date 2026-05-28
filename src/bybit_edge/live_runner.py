@@ -32,10 +32,13 @@ from bybit_edge.config import (
     EXECUTION_ENABLED,
     EXECUTION_LEVERAGE,
     EXECUTION_ORDER_USD,
+    PERSIST_ENABLED,
+    PERSIST_FLUSH_SECONDS,
     PIPELINE_INTERVAL_SECONDS,
     PRIMARY_SYMBOL,
 )
 from bybit_edge.execution.bybit_executor import BybitExecutor
+from bybit_edge.persistence.db import PersistenceLayer
 from bybit_edge.pipeline import Pipeline
 from bybit_edge.state.liquidation_buffer import LiquidationBuffer, LiquidationEvent
 from bybit_edge.state.orderbook_state import OrderbookState
@@ -65,6 +68,13 @@ class LiveRunner:
         self.pipeline = Pipeline(symbol)
         self.collector = BybitWSCollector(symbol)
         self.executor: Optional[BybitExecutor] = None
+
+        # Persistenz (optional): Puffer + DuckDB-Schicht
+        self.persist: Optional[PersistenceLayer] = None
+        self._buf_tickers: list[TickerSnapshot] = []
+        self._buf_trades: list[TradeEvent] = []
+        self._buf_liqs: list[LiquidationEvent] = []
+        self._persisted = 0
 
         # Positions-Tracking ("", "Buy", "Sell")
         self._position_side: str = ""
@@ -110,6 +120,8 @@ class LiveRunner:
         self._raw_ticker["symbol"] = self.symbol
         self.ticker = TickerSnapshot.from_ws(self._raw_ticker, recv_ts=msg.recv_ts)
         self._msg_count += 1
+        if self.persist is not None and self.ticker.last_price > 0:
+            self._buf_tickers.append(self.ticker)
 
     def _on_orderbook(self, msg: WSMessage) -> None:
         if msg.msg_type == "snapshot":
@@ -122,10 +134,14 @@ class LiveRunner:
         self.trade_buffer.add(evt)
         if evt.price > 0:
             self.price_history.append(evt.price)
+        if self.persist is not None:
+            self._buf_trades.append(evt)
 
     def _on_liquidation(self, msg: WSMessage) -> None:
         evt = LiquidationEvent.from_ws(msg.data)
         self.liq_buffer.add(evt)
+        if self.persist is not None:
+            self._buf_liqs.append(evt)
         logger.info(
             "LIQUIDATION: %s %.4f @ %.2f (%.0f USD)",
             evt.side, evt.volume, evt.price, evt.usd_value,
@@ -281,16 +297,37 @@ class LiveRunner:
             except Exception:
                 logger.exception("Fehler im Pipeline-Loop")
 
+    def _flush_persist(self) -> None:
+        """Schreibt die gepufferten Ticks gebündelt in DuckDB."""
+        if self.persist is None:
+            return
+        t, tr, lq = self._buf_tickers, self._buf_trades, self._buf_liqs
+        self._buf_tickers, self._buf_trades, self._buf_liqs = [], [], []
+        try:
+            n = 0
+            n += self.persist.write_tickers_batch(t)
+            n += self.persist.write_trades_batch(tr, symbol=self.symbol)
+            n += self.persist.write_liquidations_batch(lq)
+            self._persisted += n
+        except Exception:
+            logger.exception("Persist-Flush fehlgeschlagen")
+
+    async def _persist_loop(self) -> None:
+        while self._running:
+            await asyncio.sleep(PERSIST_FLUSH_SECONDS)
+            self._flush_persist()
+
     async def _heartbeat_loop(self) -> None:
         while self._running:
             await asyncio.sleep(30.0)
             mid = self.orderbook.mid_price
             px = self.ticker.last_price if self.ticker else 0.0
+            extra = f" persisted={self._persisted}" if self.persist is not None else ""
             logger.info(
-                "HEARTBEAT: msgs=%d last=%.2f mid=%.2f trades=%d liqs=%d pos=%s",
+                "HEARTBEAT: msgs=%d last=%.2f mid=%.2f trades=%d liqs=%d pos=%s%s",
                 self._msg_count, px, mid,
                 len(self.trade_buffer), len(self.liq_buffer),
-                self._position_side or "flat",
+                self._position_side or "flat", extra,
             )
 
     async def run(self) -> None:
@@ -300,6 +337,14 @@ class LiveRunner:
                     self.symbol, mode, EXECUTION_ENABLED)
 
         self._running = True
+
+        if PERSIST_ENABLED:
+            try:
+                self.persist = PersistenceLayer()
+                logger.info("Persistenz aktiv -> DuckDB (Tickers/Trades/Liquidationen)")
+            except Exception:
+                logger.exception("Persistenz-Init fehlgeschlagen — laufe ohne weiter.")
+                self.persist = None
 
         if EXECUTION_ENABLED:
             self.executor = BybitExecutor(self.symbol)
@@ -320,6 +365,8 @@ class LiveRunner:
             asyncio.create_task(self._pipeline_loop()),
             asyncio.create_task(self._heartbeat_loop()),
         ]
+        if self.persist is not None:
+            tasks.append(asyncio.create_task(self._persist_loop()))
         try:
             await asyncio.gather(*tasks)
         except asyncio.CancelledError:
@@ -332,4 +379,13 @@ class LiveRunner:
         await self.collector.disconnect()
         if self.executor is not None:
             await self.executor.close()
+        if self.persist is not None:
+            self._flush_persist()  # finaler Flush der Restpuffer
+            try:
+                counts = self.persist.row_counts()
+                logger.info("Persistenz-Stand: %s", counts)
+            except Exception:
+                pass
+            self.persist.close()
+            self.persist = None
         logger.info("LiveRunner gestoppt.")
