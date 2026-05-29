@@ -167,9 +167,9 @@ class Strategy3PreSettlement:
                 m22_out, m23_out, m8_out, seconds_to_settlement
             )
             if entry_ok:
-                # Direction from M22: negative pressure -> Long (+1),
-                # positive pressure -> Short (-1)
-                direction: int = 1 if pressure < 0 else -1
+                # Direction from M22 (PRD 7.3/M22): positive pressure
+                # (negative Premium) -> Long (+1); negative pressure -> Short (-1)
+                direction: int = self._direction_from_pressure(pressure)
                 self._in_trade = True
                 self._entry_price = price
                 self._entry_direction = direction
@@ -199,6 +199,20 @@ class Strategy3PreSettlement:
         }
 
     # ------------------------------------------------------------------
+    # Internal: Direction
+    # ------------------------------------------------------------------
+
+    @staticmethod
+    def _direction_from_pressure(pressure: float) -> int:
+        """Map funding pressure to the mean-reversion trade direction.
+
+        PRD 7.3 / M22: positive pressure stems from a negative Premium
+        (perp underpriced) -> Long-reversion (+1); negative pressure from a
+        positive Premium (perp overpriced) -> Short-reversion (-1).
+        """
+        return 1 if pressure > 0 else -1
+
+    # ------------------------------------------------------------------
     # Internal: Entry conditions
     # ------------------------------------------------------------------
 
@@ -226,10 +240,22 @@ class Strategy3PreSettlement:
         if not pressure_extreme:
             return False, "pressure_below_q90"
 
-        # Condition 3: Mark-Index-Basis * sign(Pressure) > 0 (same direction)
+        # Condition 3: Basis must confirm the intended mean-reversion direction
+        # (PRD 7.3 "gleiche Richtung"). The intended trade direction equals
+        # sign(Pressure) (PRD M22, see _direction_from_pressure):
+        #   Pressure > 0 (negative Premium, perp underpriced) -> Long  (+1)
+        #   Pressure < 0 (positive Premium, perp overpriced)   -> Short (-1)
+        # "Gleiche Richtung" means the basis must CONFIRM that reversion:
+        # a Long requires a negative basis (perp below index), a Short a
+        # positive basis. Hence basis and the trade direction have OPPOSITE
+        # signs -> basis * direction < 0. Because Pressure is the clamp
+        # residual of (I - P), sign(Pressure) is always opposite to sign(basis)
+        # by construction, so the literal "basis * sign(Pressure) > 0" gate was
+        # never satisfiable (PRD-bug). This is the economically correct gate.
         if pressure == 0.0:
             return False, "pressure_zero"
-        basis_aligned: bool = basis * np.sign(pressure) > 0
+        direction: int = self._direction_from_pressure(pressure)
+        basis_aligned: bool = basis * direction < 0
         if not basis_aligned:
             return False, "basis_wrong_direction"
 

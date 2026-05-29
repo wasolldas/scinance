@@ -134,20 +134,22 @@ class TestStrategy3PreSettlement:
         strat = Strategy3PreSettlement()
         _warm_up_strategy(strat, n_samples=200, premium_index=0.0003)
 
-        # premium_index=0.01 → P=0.01, I=0.0003
-        # diff = I-P = -0.0097, clamped = -0.0005, pressure = -0.0092 (negative)
-        # For alignment: sign(pressure)=-1, so basis must be negative → mark < index
+        # premium_index=0.01 (positive Premium) → P=0.01, I=0.0003
+        # diff = I-P = -0.0097, clamped = -0.0005, pressure = -0.0092 (negativ)
+        # PRD 7.3/M22: negative pressure (positive Premium) → Short-Reversion.
+        # "Gleiche Richtung": ein Short braucht eine POSITIVE Basis (Perp über
+        # Index) → mark > index. (basis * direction < 0, direction = -1.)
         result = _trigger_entry(
             strat,
-            extreme_premium=0.01,  # very extreme → high negative pressure
-            mark_price=49950.0,    # below index → negative basis → aligned
+            extreme_premium=0.01,  # positive Premium → negative Pressure → Short
+            mark_price=50050.0,    # above index → positive basis → aligned
             index_price=50000.0,
             seconds_to_settlement=900.0,  # 15 min
         )
         assert result["action"] == "enter"
-        assert result["direction"] in (1, -1)
+        assert result["direction"] == -1  # Short (positive Premium)
         assert result["strategy"] == "S3"
-        assert result["price"] == 49950.0
+        assert result["price"] == 50050.0
         assert "M22" in result["modules"]
         assert "M23" in result["modules"]
         assert "M24" in result["modules"]
@@ -174,16 +176,22 @@ class TestStrategy3PreSettlement:
     # ----- 4. Basis Wrong Direction -----
 
     def test_no_entry_basis_wrong_direction(self) -> None:
-        """Pressure negative but basis positive -> wait (directions must match)."""
+        """Basis confirms the WRONG direction -> wait (PRD 7.3 gleiche Richtung).
+
+        premium_index=0.01 (positive Premium) → pressure<0 → Short (direction
+        -1). A Short is only aligned with a POSITIVE basis; here we feed a
+        NEGATIVE basis (mark < index) so the gate must reject it. (Previously
+        this test asserted the inverted alignment, cementing the bug.)
+        """
         strat = Strategy3PreSettlement()
         # Warm up with low pressure so the extreme tick stands out
         _warm_up_strategy(strat, n_samples=200, premium_index=0.0003)
 
-        # premium_index=0.01 → pressure = -0.0092 (negative)
-        # For MISALIGNMENT: sign(pressure)=-1, but basis POSITIVE → mark > index
+        # premium_index=0.01 → pressure = -0.0092 (negative) → direction = -1
+        # MISALIGNMENT: a Short needs positive basis, but here basis NEGATIVE
         ticker = _make_ticker(
             premium_index=0.01,
-            mark_price=50050.0,  # above index → positive basis
+            mark_price=49950.0,  # below index → negative basis → misaligned
             index_price=50000.0,
         )
         result = strat.on_ticker(
@@ -211,13 +219,13 @@ class TestStrategy3PreSettlement:
 
         strat.m8.compute = mock_bocpd_compute  # type: ignore[assignment]
 
-        # premium_index=0.01 → negative pressure
-        # mark < index → negative basis → ALIGNED (passes basis check)
+        # premium_index=0.01 → negative pressure → Short (direction -1)
+        # mark > index → positive basis → ALIGNED for a Short (passes gate)
         # So we reach the BOCPD condition, which should block entry
         result = _trigger_entry(
             strat,
             extreme_premium=0.01,
-            mark_price=49950.0,   # below index → negative basis → aligned
+            mark_price=50050.0,   # above index → positive basis → aligned
             index_price=50000.0,
             seconds_to_settlement=900.0,
             open_interest=5000.0,
@@ -228,24 +236,23 @@ class TestStrategy3PreSettlement:
     # ----- 6. Direction: Long -----
 
     def test_entry_direction_long(self) -> None:
-        """Negative pressure -> direction = +1 (Long)."""
+        """Positive pressure (negative Premium) -> direction = +1 (Long).
+
+        Corrected per PRD 7.3/M22 (S.682): "aufgestaute Negative-Premium-
+        Pressure ... Reversion kommt" → Long. Negative Premium ⇒ diff=(I-P)>0
+        ⇒ Pressure > 0. A Long is aligned with a NEGATIVE basis (perp below
+        index): basis * direction < 0 with direction = +1.
+        """
         strat = Strategy3PreSettlement()
         # Warm up with small positive premium (low pressure)
         _warm_up_strategy(strat, n_samples=200, premium_index=0.0003)
 
-        # Very negative premium_index → diff = I - P becomes large positive
-        # But with the clamp, the pressure = diff - clamped can be positive
-        # Actually: I = 0.0003, P = -0.01 → diff = 0.0003 - (-0.01) = 0.0103
-        # clamped = clip(0.0103, -0.0005, 0.0005) = 0.0005
-        # pressure = 0.0103 - 0.0005 = 0.0098 (positive)
-        # For NEGATIVE pressure we need P > I by a large margin:
-        # I = 0.0003, P = 0.01 → diff = 0.0003 - 0.01 = -0.0097
-        # clamped = clip(-0.0097, -0.0005, 0.0005) = -0.0005
-        # pressure = -0.0097 - (-0.0005) = -0.0092 → NEGATIVE → Long
-        # For basis alignment: pressure < 0 → basis must also be < 0 → mark < index
+        # I = 0.0003, P = -0.01 → diff = 0.0103, clamped = 0.0005
+        # pressure = 0.0098 → POSITIVE → Long
+        # Basis negative (mark < index) → aligned for a Long
         ticker = _make_ticker(
-            premium_index=0.01,  # large positive P
-            mark_price=49950.0,  # below index → negative basis
+            premium_index=-0.01,  # large negative Premium → positive pressure
+            mark_price=49950.0,   # below index → negative basis → aligned
             index_price=50000.0,
         )
         result = strat.on_ticker(
@@ -253,28 +260,28 @@ class TestStrategy3PreSettlement:
             seconds_to_settlement=900.0,
             open_interest=1100.0,
         )
-        # With P = 0.01: pressure = (I - P) - clamp(I-P) = (0.0003 - 0.01) - (-0.0005)
-        # = -0.0097 + 0.0005 = -0.0092 → negative → Long
-        # Basis = (49950 - 50000) / 50000 = -0.001 → negative
-        # sign(pressure) = -1, basis * sign(pressure) = -0.001 * -1 = 0.001 > 0 ✓
         assert result["action"] == "enter"
         assert result["direction"] == 1  # Long
 
     # ----- 7. Direction: Short -----
 
     def test_entry_direction_short(self) -> None:
-        """Positive pressure -> direction = -1 (Short)."""
+        """Negative pressure (positive Premium) -> direction = -1 (Short).
+
+        Corrected per PRD 7.3/M22: positive Premium (perp overpriced, Longs
+        zu wenig gezahlt) → Short-Reversion. Positive Premium ⇒ diff=(I-P)<0
+        ⇒ Pressure < 0. A Short is aligned with a POSITIVE basis: basis *
+        direction < 0 with direction = -1.
+        """
         strat = Strategy3PreSettlement()
         _warm_up_strategy(strat, n_samples=200, premium_index=0.0003)
 
-        # Negative premium → diff = I - P becomes large positive
-        # I = 0.0003, P = -0.01 → diff = 0.0103
-        # clamped = 0.0005
-        # pressure = 0.0103 - 0.0005 = 0.0098 → POSITIVE → Short
-        # For alignment: pressure > 0 → basis must be > 0 → mark > index
+        # I = 0.0003, P = 0.01 → diff = -0.0097, clamped = -0.0005
+        # pressure = -0.0092 → NEGATIVE → Short
+        # Basis positive (mark > index) → aligned for a Short
         ticker = _make_ticker(
-            premium_index=-0.01,  # large negative P
-            mark_price=50050.0,   # above index → positive basis
+            premium_index=0.01,   # large positive Premium → negative pressure
+            mark_price=50050.0,   # above index → positive basis → aligned
             index_price=50000.0,
         )
         result = strat.on_ticker(
@@ -292,11 +299,12 @@ class TestStrategy3PreSettlement:
         strat = Strategy3PreSettlement()
         _warm_up_strategy(strat, n_samples=200, premium_index=0.0003)
 
-        # Enter trade
+        # Enter trade — negative Premium → positive pressure → Long;
+        # aligned with a negative basis (mark < index). (PRD 7.3)
         entry = _trigger_entry(
             strat,
             extreme_premium=-0.01,
-            mark_price=50050.0,
+            mark_price=49950.0,
             index_price=50000.0,
             seconds_to_settlement=900.0,
         )
@@ -305,7 +313,7 @@ class TestStrategy3PreSettlement:
 
         # Now simulate: settlement has passed by > 10 minutes
         # seconds_to_settlement = -(10*60 + 1) = -601
-        ticker = _make_ticker(premium_index=-0.01, mark_price=50050.0)
+        ticker = _make_ticker(premium_index=-0.01, mark_price=49950.0)
         result = strat.on_ticker(
             ticker,
             seconds_to_settlement=-601.0,  # 10min01s past settlement
@@ -322,11 +330,12 @@ class TestStrategy3PreSettlement:
         strat = Strategy3PreSettlement()
         _warm_up_strategy(strat, n_samples=200, premium_index=0.0003)
 
-        # Enter trade
+        # Enter trade — negative Premium → positive pressure → Long;
+        # aligned with negative basis (mark < index). (PRD 7.3)
         entry = _trigger_entry(
             strat,
             extreme_premium=-0.01,
-            mark_price=50050.0,
+            mark_price=49950.0,
             index_price=50000.0,
             seconds_to_settlement=900.0,
         )
@@ -354,11 +363,11 @@ class TestStrategy3PreSettlement:
         strat = Strategy3PreSettlement()
         _warm_up_strategy(strat, n_samples=200, premium_index=0.0003)
 
-        # First entry
+        # First entry — negative Premium → Long, negative basis (aligned)
         entry1 = _trigger_entry(
             strat,
             extreme_premium=-0.01,
-            mark_price=50050.0,
+            mark_price=49950.0,
             index_price=50000.0,
             seconds_to_settlement=900.0,
         )
@@ -369,7 +378,7 @@ class TestStrategy3PreSettlement:
         entry2 = _trigger_entry(
             strat,
             extreme_premium=-0.01,
-            mark_price=50055.0,
+            mark_price=49945.0,
             index_price=50000.0,
             seconds_to_settlement=800.0,
         )
@@ -384,18 +393,18 @@ class TestStrategy3PreSettlement:
         strat = Strategy3PreSettlement()
         _warm_up_strategy(strat, n_samples=200, premium_index=0.0003)
 
-        # Enter
+        # Enter — negative Premium → Long, negative basis (aligned, PRD 7.3)
         entry = _trigger_entry(
             strat,
             extreme_premium=-0.01,
-            mark_price=50050.0,
+            mark_price=49950.0,
             index_price=50000.0,
             seconds_to_settlement=900.0,
         )
         assert entry["action"] == "enter"
 
         # Exit via settlement timeout
-        ticker = _make_ticker(premium_index=-0.01, mark_price=50050.0)
+        ticker = _make_ticker(premium_index=-0.01, mark_price=49950.0)
         exit_result = strat.on_ticker(
             ticker,
             seconds_to_settlement=-700.0,
@@ -417,7 +426,7 @@ class TestStrategy3PreSettlement:
 
         # Phase 1: Not yet in window -> wait
         result = strat.on_ticker(
-            _make_ticker(premium_index=-0.01, mark_price=50050.0),
+            _make_ticker(premium_index=-0.01, mark_price=49950.0),
             seconds_to_settlement=2000.0,  # > 30 min
             open_interest=1100.0,
         )
@@ -425,10 +434,11 @@ class TestStrategy3PreSettlement:
         assert not strat.in_trade
 
         # Phase 2: Enter window with extreme conditions -> enter
+        # negative Premium → positive pressure → Long; negative basis aligned.
         entry = _trigger_entry(
             strat,
             extreme_premium=-0.01,
-            mark_price=50050.0,
+            mark_price=49950.0,
             index_price=50000.0,
             seconds_to_settlement=900.0,
         )
@@ -439,7 +449,7 @@ class TestStrategy3PreSettlement:
         # Phase 3: Still in trade, pressure still extreme, before settlement -> hold
         # (seconds_to_settlement still positive, pressure NOT dissipated)
         hold_result = strat.on_ticker(
-            _make_ticker(premium_index=-0.01, mark_price=50060.0),
+            _make_ticker(premium_index=-0.01, mark_price=49940.0),
             seconds_to_settlement=300.0,  # 5 min to settlement, pressure still extreme
             open_interest=1100.0,
         )
@@ -449,7 +459,7 @@ class TestStrategy3PreSettlement:
 
         # Phase 4: Past settlement by > 10 min -> exit
         exit_result = strat.on_ticker(
-            _make_ticker(premium_index=-0.01, mark_price=50070.0),
+            _make_ticker(premium_index=-0.01, mark_price=49930.0),
             seconds_to_settlement=-700.0,  # 11.67 min past settlement
             open_interest=1100.0,
         )
@@ -469,7 +479,7 @@ class TestStrategy3PreSettlement:
         reentry = _trigger_entry(
             strat,
             extreme_premium=-0.01,
-            mark_price=50050.0,
+            mark_price=49950.0,
             index_price=50000.0,
             seconds_to_settlement=900.0,
             open_interest=1300.0,
@@ -498,11 +508,11 @@ class TestStrategy3PreSettlement:
         strat = Strategy3PreSettlement()
         _warm_up_strategy(strat, n_samples=200, premium_index=0.0003)
 
-        # Enter a trade
+        # Enter a trade — negative Premium → Long, negative basis (aligned)
         _trigger_entry(
             strat,
             extreme_premium=-0.01,
-            mark_price=50050.0,
+            mark_price=49950.0,
             index_price=50000.0,
             seconds_to_settlement=900.0,
         )
@@ -525,3 +535,117 @@ class TestStrategy3PreSettlement:
         result = strat.on_ticker(ticker, seconds_to_settlement=900.0, open_interest=1000.0)
         assert result["action"] == "wait"
         assert result["modules"]["M23"]["basis"] == 0.0
+
+
+# ═══════════════════════════════════════════════════════════════════
+# Regression — REALISTIC coupling (premium_index == basis).
+#
+# In production (live_runner / replay_backtester) premium_index is
+# *derived* from mark/index exactly like M23's basis — they are the
+# SAME number (see TickerSnapshot.basis / .premium_index). The helpers
+# above decouple them, which masked the bug. These tests feed the
+# realistic, coupled ticker.
+#
+# Bug (PRD 7.3): with premium_index == basis the pressure overflow from
+# M22 always has the OPPOSITE sign to the basis (because pressure is the
+# clamp residual of (I - P)). Hence the literal gate
+# ``basis * sign(pressure) > 0`` is NEVER satisfiable -> S3 never enters
+# (empirically 0 trades in the replay backtester). The economically
+# correct gate (PRD 7.3 "gleiche Richtung") requires that the basis
+# CONFIRMS the intended mean-reversion trade direction:
+#   - negative basis (perp underpriced) -> Long-reversion  (PRD 4 M22:
+#     "aufgestaute Negative-Premium-Pressure ... Reversion kommt")
+#   - positive basis (perp overpriced)  -> Short-reversion
+# ═══════════════════════════════════════════════════════════════════
+
+def _coupled_ticker(
+    *,
+    basis: float,
+    index_price: float = 50_000.0,
+    last_price: float | None = None,
+) -> dict[str, Any]:
+    """Build a *realistic* ticker where premium_index == basis.
+
+    Mirrors production: premium_index is derived from mark/index, the
+    identical value M23 computes as basis.
+    """
+    mark_price = index_price * (1.0 + basis)
+    if last_price is None:
+        last_price = mark_price
+    return {
+        "last_price": last_price,
+        "mark_price": mark_price,
+        "index_price": index_price,
+        "funding_rate": 0.0001,
+        "premium_index": basis,  # == (mark - index) / index
+    }
+
+
+def _warm_up_coupled(strat: Strategy3PreSettlement, n_samples: int = 200) -> None:
+    """Warm Q90 history with small, realistic coupled basis values."""
+    for i in range(n_samples):
+        strat.on_ticker(
+            _coupled_ticker(basis=0.0003),
+            seconds_to_settlement=3600.0,
+            open_interest=1000.0 + i * 0.1,
+        )
+
+
+class TestStrategy3RealisticCoupling:
+    """S3 must be able to enter on realistic (premium_index == basis) ticks."""
+
+    def test_extreme_negative_basis_enters_long(self) -> None:
+        """Strongly negative basis (perp underpriced) -> Long reversion.
+
+        PRD 4 M22: negative premium overflows the clamp -> reversion up.
+        With the buggy gate this returned ``basis_wrong_direction`` and the
+        strategy never entered.
+        """
+        strat = Strategy3PreSettlement()
+        _warm_up_coupled(strat)
+
+        # basis = -0.01 (perp 1% below index) -> P = -0.01
+        # diff = I - P = 0.0003 - (-0.01) = 0.0103 ; clamp = +0.0005
+        # pressure = 0.0103 - 0.0005 = +0.0098 (positive)
+        result = strat.on_ticker(
+            _coupled_ticker(basis=-0.01),
+            seconds_to_settlement=900.0,
+            open_interest=1100.0,
+        )
+        assert result["action"] == "enter", result["reason"]
+        assert result["direction"] == 1  # Long
+
+    def test_extreme_positive_basis_enters_short(self) -> None:
+        """Strongly positive basis (perp overpriced) -> Short reversion."""
+        strat = Strategy3PreSettlement()
+        _warm_up_coupled(strat)
+
+        # basis = +0.01 (perp 1% above index) -> P = +0.01
+        # diff = I - P = -0.0097 ; clamp = -0.0005 ; pressure = -0.0092 (neg)
+        result = strat.on_ticker(
+            _coupled_ticker(basis=0.01),
+            seconds_to_settlement=900.0,
+            open_interest=1100.0,
+        )
+        assert result["action"] == "enter", result["reason"]
+        assert result["direction"] == -1  # Short
+
+    def test_alignment_gate_is_satisfiable(self) -> None:
+        """For BOTH extreme signs of realistic basis the gate must pass.
+
+        This is the direct proof of the bug: under the old gate
+        (basis * sign(pressure) > 0) NEITHER extreme could ever align,
+        so this assertion failed for the current code.
+        """
+        for basis in (-0.01, 0.01):
+            strat = Strategy3PreSettlement()
+            _warm_up_coupled(strat)
+            result = strat.on_ticker(
+                _coupled_ticker(basis=basis),
+                seconds_to_settlement=900.0,
+                open_interest=1100.0,
+            )
+            assert result["reason"] != "basis_wrong_direction", (
+                f"alignment gate unsatisfiable for realistic basis={basis}"
+            )
+            assert result["action"] == "enter"

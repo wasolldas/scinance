@@ -5,7 +5,8 @@ Testet:
 - Analytisch berechnete Pressure-Werte
 - Signal-Erzeugung innerhalb/außerhalb des Settlement-Windows
 - Division-by-Zero-Sicherheit bei sigma == 0
-- Signal-Richtung (negative Pressure → Long, positive → Short)
+- Signal-Richtung (PRD 7.3/M22: positive Pressure/negative Premium → Long,
+  negative Pressure/positive Premium → Short)
 - Reset löscht History
 """
 
@@ -173,12 +174,18 @@ class TestSignalDirection:
             )
         return mod
 
-    def test_negative_pressure_gives_long(self) -> None:
-        """Negativer Pressure (P >> I) → Long-Signal (+1)."""
+    def test_negative_pressure_gives_short(self) -> None:
+        """Negativer Pressure (positive Premium, P >> I) → Short-Signal (-1).
+
+        Korrigiert gegen PRD 7.3/M22 (S.682): positive Premium (Perp
+        überbewertet, Longs zu wenig gezahlt) → Short-Reversion. Bei
+        positiver Premium ist diff=(I-P)<0 → Pressure<0. Der frühere Test
+        zementierte die ökonomisch invertierte Richtung (negative Pressure
+        → Long).
+        """
         mod = self._build_module_with_history()
 
-        # P_t = 0.01 → diff = I - P = 0.0003 - 0.01 < 0
-        # pressure = diff - clamp(diff) < 0 (negativ)
+        # P_t = 0.01 (positive Premium) → diff = I - P < 0 → pressure < 0
         result = mod.compute(
             _make_ticker(0.01),
             seconds_to_settlement=900.0,
@@ -186,13 +193,18 @@ class TestSignalDirection:
 
         assert result["pressure"] < 0
         if result["signal"] != 0:
-            assert result["signal"] == 1  # Long
+            assert result["signal"] == -1  # Short
 
-    def test_positive_pressure_gives_short(self) -> None:
-        """Positiver Pressure (P << I) → Short-Signal (-1)."""
+    def test_positive_pressure_gives_long(self) -> None:
+        """Positiver Pressure (negative Premium, P << I) → Long-Signal (+1).
+
+        Korrigiert gegen PRD 7.3/M22 (S.682): "aufgestaute Negative-Premium-
+        Pressure ... Reversion kommt" → Long. Bei negativer Premium ist
+        diff=(I-P)>0 → Pressure>0.
+        """
         mod = self._build_module_with_history()
 
-        # P_t = -0.01 → diff = I - P = 0.0003 - (-0.01) = 0.0103
+        # P_t = -0.01 (negative Premium) → diff = I - P = 0.0103
         # clamp(0.0103, -0.0005, 0.0005) = 0.0005
         # pressure = 0.0103 - 0.0005 = 0.0098 > 0
         result = mod.compute(
@@ -202,7 +214,7 @@ class TestSignalDirection:
 
         assert result["pressure"] > 0
         if result["signal"] != 0:
-            assert result["signal"] == -1  # Short
+            assert result["signal"] == 1  # Long
 
 
 class TestReset:

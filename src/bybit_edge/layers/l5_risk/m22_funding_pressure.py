@@ -6,8 +6,15 @@ Formeln (PRD):
     Pressure_t = (I_t - P_t) - clamp(I_t - P_t, ±0.05%)
     Signal: |Pressure_t| > 2σ(Pressure_24h) AND T_settlement - t < 30 min
 
-Negative Pressure → Long (Shorts haben "zu wenig" gezahlt → Reversion).
-Positive Pressure → Short (Longs haben "zu wenig" gezahlt → Reversion).
+Richtung (PRD 7.3 / M22, S.682): "Long-Mean-Reversion-Trade ... wenn
+aufgestaute Negative-Premium-Pressure die Clamp-Grenze überschritten hatte
+(Shorts haben zu wenig gezahlt → Reversion kommt)."
+
+Negative Premium (P < 0 → Perp unterbewertet) → Long-Reversion nach oben.
+Da Pressure der Clamp-Rest von (I - P) ist, gilt bei negativer Premium
+diff = I - P > 0 → Pressure > 0. Also:
+    Pressure > 0  → Long  (+1)   (negative Premium, Shorts zu wenig gezahlt)
+    Pressure < 0  → Short (-1)   (positive Premium, Longs zu wenig gezahlt)
 """
 
 from __future__ import annotations
@@ -103,9 +110,9 @@ class M22FundingPressure(BaseModule):
 
         signal: int = 0
         if in_window and pressure_extreme:
-            # Negative Pressure → Long (Short-Reversion)
-            # Positive Pressure → Short (Long-Reversion)
-            signal = 1 if pressure < 0 else -1
+            # PRD 7.3/M22: negative Premium (P<0) → diff=(I-P)>0 → Pressure>0
+            # → Long-Reversion (+1); positive Premium → Pressure<0 → Short (-1).
+            signal = 1 if pressure > 0 else -1
 
         # Confidence: skaliert mit abs(zscore), gedeckelt bei 1.0
         confidence: float = min(abs(pressure_zscore) / 4.0, 1.0) if signal != 0 else 0.0
