@@ -32,10 +32,11 @@ echo   3 = Monitor (Position + PnL + Equity)
 echo   4 = Backtest (Strategie-Vergleich auf Historie)
 echo   5 = Quick-Check (alle Module importieren)
 echo   6 = Python Shell (interaktiv)
-echo   7 = Beenden
+echo   7 = Dashboard (Streamlit)
+echo   8 = Beenden
 echo.
 set "choice="
-set /p choice="Auswahl [1-7]: "
+set /p choice="Auswahl [1-8]: "
 
 if "%choice%"=="1" goto opt_tests
 if "%choice%"=="2" goto opt_system
@@ -43,7 +44,8 @@ if "%choice%"=="3" goto opt_monitor
 if "%choice%"=="4" goto opt_backtest
 if "%choice%"=="5" goto opt_quickcheck
 if "%choice%"=="6" goto opt_pyshell
-if "%choice%"=="7" goto opt_end
+if "%choice%"=="7" goto opt_dashboard
+if "%choice%"=="8" goto opt_end
 echo Ungueltige Auswahl.
 echo.
 goto menu
@@ -95,6 +97,14 @@ goto menu
 echo.
 echo --- Python Shell (exit() zum Zurueck) ---
 python
+goto menu
+
+:opt_dashboard
+echo.
+echo --- Dashboard (Streamlit, Ctrl+C zum Zurueck) ---
+echo URL: http://localhost:8501
+python scripts/dashboard.py
+echo.
 goto menu
 
 :opt_end

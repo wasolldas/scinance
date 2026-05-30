@@ -117,6 +117,36 @@ class PersistenceLayer:
             )
         """)
 
+        # ------------------------------------------------------------------
+        # REST-Backfill-Tabellen (PRD Abschnitt 3)
+        # ------------------------------------------------------------------
+        self.conn.execute("""
+            CREATE TABLE IF NOT EXISTS open_interest (
+                ts BIGINT NOT NULL,
+                symbol VARCHAR NOT NULL,
+                open_interest DOUBLE,
+                interval_tag VARCHAR
+            )
+        """)
+
+        self.conn.execute("""
+            CREATE TABLE IF NOT EXISTS long_short_ratio (
+                ts BIGINT NOT NULL,
+                symbol VARCHAR NOT NULL,
+                buy_ratio DOUBLE,
+                sell_ratio DOUBLE,
+                period_tag VARCHAR
+            )
+        """)
+
+        self.conn.execute("""
+            CREATE TABLE IF NOT EXISTS funding_history (
+                ts BIGINT NOT NULL,
+                symbol VARCHAR NOT NULL,
+                funding_rate DOUBLE
+            )
+        """)
+
         # L2 orderbook snapshots — one row per (snapshot, side, level).
         # With depth=20 this yields 40 rows per snapshot. The flat layout makes
         # ingestion and per-level analytics straightforward.
@@ -149,6 +179,18 @@ class PersistenceLayer:
             self.conn.execute(
                 "CREATE INDEX IF NOT EXISTS idx_ob_snap_sym_ts "
                 "ON orderbook_snapshots(symbol, ts)"
+            )
+            self.conn.execute(
+                "CREATE INDEX IF NOT EXISTS idx_oi_sym_ts "
+                "ON open_interest(symbol, ts)"
+            )
+            self.conn.execute(
+                "CREATE INDEX IF NOT EXISTS idx_ls_sym_ts "
+                "ON long_short_ratio(symbol, ts)"
+            )
+            self.conn.execute(
+                "CREATE INDEX IF NOT EXISTS idx_funding_sym_ts "
+                "ON funding_history(symbol, ts)"
             )
         except duckdb.CatalogException:
             pass  # indices already exist
@@ -448,10 +490,146 @@ class PersistenceLayer:
         for table in (
             "tickers", "trades", "liquidations", "kline_1min",
             "orderbook_snapshots",
+            "open_interest", "long_short_ratio", "funding_history",
         ):
             r = self.conn.execute(f"SELECT COUNT(*) FROM {table}").fetchone()
             out[table] = r[0] if r else 0
         return out
+
+    # ------------------------------------------------------------------
+    # Batch writers for REST-backfill tables
+    # ------------------------------------------------------------------
+
+    def write_open_interest_batch(self, rows: list[dict]) -> int:
+        """Bulk-insert ``open_interest`` rows.
+
+        Each dict requires keys ``ts``, ``symbol``, ``open_interest``,
+        ``interval_tag``. Returns the number of inserted rows.
+        """
+        if not rows:
+            return 0
+        payload = [
+            [
+                int(r["ts"]),
+                str(r["symbol"]),
+                float(r["open_interest"]),
+                str(r.get("interval_tag", "")),
+            ]
+            for r in rows
+        ]
+        self.conn.executemany(
+            "INSERT INTO open_interest VALUES (?, ?, ?, ?)", payload
+        )
+        return len(payload)
+
+    def write_long_short_ratio_batch(self, rows: list[dict]) -> int:
+        """Bulk-insert ``long_short_ratio`` rows.
+
+        Each dict requires keys ``ts``, ``symbol``, ``buy_ratio``,
+        ``sell_ratio``, ``period_tag``. Returns the number of inserted rows.
+        """
+        if not rows:
+            return 0
+        payload = [
+            [
+                int(r["ts"]),
+                str(r["symbol"]),
+                float(r["buy_ratio"]),
+                float(r["sell_ratio"]),
+                str(r.get("period_tag", "")),
+            ]
+            for r in rows
+        ]
+        self.conn.executemany(
+            "INSERT INTO long_short_ratio VALUES (?, ?, ?, ?, ?)", payload
+        )
+        return len(payload)
+
+    def write_funding_history_batch(self, rows: list[dict]) -> int:
+        """Bulk-insert ``funding_history`` rows.
+
+        Each dict requires keys ``ts``, ``symbol``, ``funding_rate``. Returns
+        the number of inserted rows.
+        """
+        if not rows:
+            return 0
+        payload = [
+            [int(r["ts"]), str(r["symbol"]), float(r["funding_rate"])]
+            for r in rows
+        ]
+        self.conn.executemany(
+            "INSERT INTO funding_history VALUES (?, ?, ?)", payload
+        )
+        return len(payload)
+
+    def write_klines_batch(self, rows: list[dict]) -> int:
+        """Bulk-insert ``kline_1min`` rows from a list of dicts.
+
+        Each dict requires keys ``ts``, ``symbol``, ``open``, ``high``,
+        ``low``, ``close``, ``volume``, ``turnover``. Returns the number of
+        inserted rows.
+        """
+        if not rows:
+            return 0
+        payload = [
+            [
+                int(r["ts"]),
+                str(r["symbol"]),
+                float(r["open"]),
+                float(r["high"]),
+                float(r["low"]),
+                float(r["close"]),
+                float(r["volume"]),
+                float(r["turnover"]),
+            ]
+            for r in rows
+        ]
+        self.conn.executemany(
+            "INSERT INTO kline_1min VALUES (?, ?, ?, ?, ?, ?, ?, ?)", payload
+        )
+        return len(payload)
+
+    # ------------------------------------------------------------------
+    # Idempotency helpers (count rows by symbol/interval)
+    # ------------------------------------------------------------------
+
+    def count_klines(self, symbol: str, interval: str = "1") -> int:
+        """Return number of kline_1min rows for ``symbol``.
+
+        ``interval`` is accepted for API symmetry — the kline table is a
+        single time series; callers running multi-interval backfills should
+        partition their data accordingly.
+        """
+        _ = interval
+        r = self.conn.execute(
+            "SELECT COUNT(*) FROM kline_1min WHERE symbol = ?", [symbol]
+        ).fetchone()
+        return int(r[0]) if r else 0
+
+    def count_funding(self, symbol: str) -> int:
+        """Return number of ``funding_history`` rows for ``symbol``."""
+        r = self.conn.execute(
+            "SELECT COUNT(*) FROM funding_history WHERE symbol = ?", [symbol]
+        ).fetchone()
+        return int(r[0]) if r else 0
+
+    def count_open_interest(self, symbol: str, interval_tag: str) -> int:
+        """Return number of ``open_interest`` rows for ``(symbol, interval_tag)``."""
+        r = self.conn.execute(
+            "SELECT COUNT(*) FROM open_interest "
+            "WHERE symbol = ? AND interval_tag = ?",
+            [symbol, interval_tag],
+        ).fetchone()
+        return int(r[0]) if r else 0
+
+    def count_long_short(self, symbol: str, period_tag: str) -> int:
+        """Return number of ``long_short_ratio`` rows for ``(symbol, period_tag)``."""
+        r = self.conn.execute(
+            "SELECT COUNT(*) FROM long_short_ratio "
+            "WHERE symbol = ? AND period_tag = ?",
+            [symbol, period_tag],
+        ).fetchone()
+        return int(r[0]) if r else 0
 
     # ------------------------------------------------------------------
     # Readers
@@ -590,6 +768,7 @@ class PersistenceLayer:
         for table in (
             "tickers", "trades", "liquidations", "kline_1min",
             "orderbook_snapshots",
+            "open_interest", "long_short_ratio", "funding_history",
         ):
             count_row = self.conn.execute(
                 f"SELECT COUNT(*) FROM {table} WHERE ts < ?", [cutoff_ms]

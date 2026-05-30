@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import asyncio
 import csv
+import json
 import logging
 import time
 from collections import deque
@@ -29,6 +30,7 @@ from bybit_edge.config import (
     BYBIT_DEMO,
     BYBIT_TESTNET,
     DATA_DIR,
+    ENABLE_HEARTBEAT_FILE,
     EXECUTION_ENABLED,
     EXECUTION_LEVERAGE,
     EXECUTION_ORDER_USD,
@@ -375,6 +377,38 @@ class LiveRunner:
                 len(self.trade_buffer), len(self.liq_buffer),
                 self._position_side or "flat", extra,
             )
+
+            if ENABLE_HEARTBEAT_FILE:
+                self._write_heartbeat_file(px=px, mid=mid)
+
+    def _write_heartbeat_file(self, px: float, mid: float) -> None:
+        """Schreibt JSON-Heartbeat in DATA_DIR/dashboard_state.json.
+
+        Wird vom Streamlit-Dashboard im Tab "Pipeline-Stats" gelesen.
+        Fehler werden geloggt, aber niemals weitergereicht.
+        """
+        mode = "DEMO" if BYBIT_DEMO else "TESTNET" if BYBIT_TESTNET else "LIVE"
+        payload = {
+            "ts": time.time(),
+            "symbol": self.symbol,
+            "msgs": int(self._msg_count),
+            "last_price": float(px),
+            "mid_price": float(mid),
+            "trade_buffer_len": len(self.trade_buffer),
+            "liq_buffer_len": len(self.liq_buffer),
+            "persisted": int(self._persisted),
+            "position_side": self._position_side or "",
+            "mode": mode,
+        }
+        try:
+            path = DATA_DIR / "dashboard_state.json"
+            path.parent.mkdir(parents=True, exist_ok=True)
+            tmp = path.with_suffix(".json.tmp")
+            with tmp.open("w", encoding="utf-8") as f:
+                json.dump(payload, f)
+            tmp.replace(path)
+        except Exception:
+            logger.exception("Heartbeat-File konnte nicht geschrieben werden.")
 
     async def run(self) -> None:
         """Startet Collector, Pipeline-Loop und (optional) Executor."""

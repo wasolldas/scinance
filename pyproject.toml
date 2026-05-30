@@ -46,6 +46,11 @@ dev = [
     "ruff>=0.4",
     "mypy>=1.10",
 ]
+dashboard = [
+    "streamlit>=1.31",
+    "plotly>=5.18",
+    "streamlit-autorefresh>=1.0",
+]
 
 [tool.setuptools.packages.find]
 where = ["src"]

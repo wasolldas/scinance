@@ -471,6 +471,11 @@ PERSIST_ORDERBOOK_DEPTH: int = int(os.getenv("PERSIST_ORDERBOOK_DEPTH", "20"))
 PERSIST_ORDERBOOK_SNAPSHOT_SECONDS: float = float(
     os.getenv("PERSIST_ORDERBOOK_SNAPSHOT_SECONDS", "1.0")
 )
+# Optionaler JSON-Heartbeat-Export für das Streamlit-Dashboard.
+# Default OFF, ändert das Verhalten bestehender Tests nicht.
+ENABLE_HEARTBEAT_FILE: bool = (
+    os.getenv("ENABLE_HEARTBEAT_FILE", "false").lower() == "true"
+)
 # REST recv_window (ms) für signierte Requests.
 BYBIT_RECV_WINDOW_MS: int = int(os.getenv("BYBIT_RECV_WINDOW_MS", "5000"))
 # Signierte REST-Endpoints (Trade/Account).

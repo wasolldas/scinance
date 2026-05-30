@@ -1,0 +1,274 @@
+"""Tests für die Dashboard-Daten-Schicht (``bybit_edge.dashboard.data``).
+
+Streamlit darf NICHT importiert werden — die Datenfunktionen sind bewusst
+ohne UI-Deps gehalten. Wir nutzen ausschließlich Pandas und eine In-Memory-
+DuckDB.
+"""
+from __future__ import annotations
+
+import json
+from pathlib import Path
+
+import duckdb
+import pandas as pd
+import pytest
+
+from bybit_edge.dashboard.data import (
+    JOURNAL_COLUMNS,
+    load_account_status,
+    load_heartbeat_file,
+    load_journal,
+    load_recent_liquidations,
+    load_row_counts,
+    ms_to_iso,
+)
+
+
+# --------------------------------------------------------------------------
+# Trade-Journal CSV
+# --------------------------------------------------------------------------
+
+def test_load_journal_returns_dataframe(tmp_path: Path) -> None:
+    path = tmp_path / "trades_journal.csv"
+    df = pd.DataFrame(
+        [
+            {
+                "ts_iso": "2026-05-30T12:00:00Z", "ts_unix": 1748606400,
+                "symbol": "BTCUSDT", "strategy_id": "S3", "action": "OPEN",
+                "side": "Buy", "qty": 0.001, "price": 70000.0,
+                "confidence": 0.8, "ret_code": 0, "order_id": "abc",
+            },
+            {
+                "ts_iso": "2026-05-30T12:01:00Z", "ts_unix": 1748606460,
+                "symbol": "BTCUSDT", "strategy_id": "S2", "action": "CLOSE",
+                "side": "Sell", "qty": 0.001, "price": 70010.0,
+                "confidence": 0.6, "ret_code": 0, "order_id": "def",
+            },
+        ]
+    )
+    df.to_csv(path, index=False)
+
+    out = load_journal(path, n=50)
+    assert isinstance(out, pd.DataFrame)
+    assert len(out) == 2
+    # Sortiert nach ts_unix desc — neuester Trade zuerst
+    assert int(out.iloc[0]["ts_unix"]) == 1748606460
+    # Erwartete Spalten vorhanden
+    for col in JOURNAL_COLUMNS:
+        assert col in out.columns
+
+
+def test_load_journal_handles_missing_file(tmp_path: Path) -> None:
+    path = tmp_path / "does_not_exist.csv"
+    out = load_journal(path, n=50)
+    assert isinstance(out, pd.DataFrame)
+    assert out.empty
+    for col in JOURNAL_COLUMNS:
+        assert col in out.columns
+
+
+def test_load_journal_respects_n_limit(tmp_path: Path) -> None:
+    path = tmp_path / "trades_journal.csv"
+    rows = [
+        {
+            "ts_iso": f"2026-05-30T12:{i:02d}:00Z", "ts_unix": 1748606400 + i,
+            "symbol": "BTCUSDT", "strategy_id": "S3", "action": "OPEN",
+            "side": "Buy", "qty": 0.001, "price": 70000.0 + i,
+            "confidence": 0.5, "ret_code": 0, "order_id": f"id{i}",
+        }
+        for i in range(10)
+    ]
+    pd.DataFrame(rows).to_csv(path, index=False)
+    out = load_journal(path, n=3)
+    assert len(out) == 3
+    # Erste Zeile = höchster ts_unix = i=9
+    assert int(out.iloc[0]["ts_unix"]) == 1748606400 + 9
+
+
+# --------------------------------------------------------------------------
+# DuckDB-Reads
+# --------------------------------------------------------------------------
+
+def _make_duckdb_with_liquidations(n: int = 5, symbol: str = "BTCUSDT"):
+    conn = duckdb.connect(":memory:")
+    conn.execute(
+        """
+        CREATE TABLE liquidations (
+            ts BIGINT NOT NULL,
+            symbol VARCHAR NOT NULL,
+            side VARCHAR,
+            volume DOUBLE,
+            price DOUBLE,
+            usd_value DOUBLE
+        )
+        """
+    )
+    base_ts = 1_700_000_000_000
+    for i in range(n):
+        conn.execute(
+            "INSERT INTO liquidations VALUES (?, ?, ?, ?, ?, ?)",
+            [base_ts + i * 1000, symbol, "Buy" if i % 2 == 0 else "Sell",
+             1.0 + i, 70000.0 + i, 70000.0 * (1.0 + i)],
+        )
+    return conn
+
+
+def test_load_recent_liquidations() -> None:
+    conn = _make_duckdb_with_liquidations(n=5)
+    try:
+        out = load_recent_liquidations(conn, "BTCUSDT", n=30)
+        assert isinstance(out, list)
+        assert len(out) == 5
+        # Sortiert ts DESC
+        ts_list = [r["ts"] for r in out]
+        assert ts_list == sorted(ts_list, reverse=True)
+        # Felder vorhanden
+        assert {"ts", "side", "volume", "price", "usd_value"}.issubset(out[0].keys())
+        # Limit respektiert
+        limited = load_recent_liquidations(conn, "BTCUSDT", n=2)
+        assert len(limited) == 2
+        # Anderes Symbol → leer
+        assert load_recent_liquidations(conn, "ETHUSDT", n=10) == []
+    finally:
+        conn.close()
+
+
+def test_load_recent_liquidations_none_persist() -> None:
+    assert load_recent_liquidations(None, "BTCUSDT", n=10) == []
+
+
+def test_load_row_counts_includes_all_tables() -> None:
+    """``load_row_counts`` muss alle bekannten Tabellen liefern, selbst wenn
+    eine fehlt (Fallback-Pfad → Wert 0)."""
+    conn = duckdb.connect(":memory:")
+    # Wir bauen NUR drei Tabellen — für die restlichen liefert der Fallback 0
+    conn.execute("CREATE TABLE tickers (ts BIGINT, symbol VARCHAR)")
+    conn.execute("CREATE TABLE trades (ts BIGINT, symbol VARCHAR)")
+    conn.execute("CREATE TABLE liquidations (ts BIGINT, symbol VARCHAR)")
+    # Restliche Tabellen müssen ebenfalls existieren, sonst meldet der
+    # Fallback 0. Wir legen sie minimal an.
+    for t in ("kline_1min", "orderbook_snapshots",
+              "open_interest", "long_short_ratio", "funding_history"):
+        conn.execute(f"CREATE TABLE {t} (ts BIGINT, symbol VARCHAR)")
+    conn.execute("INSERT INTO trades VALUES (1, 'BTCUSDT')")
+    conn.execute("INSERT INTO trades VALUES (2, 'BTCUSDT')")
+    try:
+        counts = load_row_counts(conn)
+        assert "tickers" in counts
+        assert "trades" in counts
+        assert "liquidations" in counts
+        assert "orderbook_snapshots" in counts
+        assert counts["trades"] == 2
+        assert counts["tickers"] == 0
+    finally:
+        conn.close()
+
+
+def test_load_row_counts_uses_persist_method() -> None:
+    """Wenn das übergebene Objekt eine ``row_counts()``-Methode hat, wird sie
+    bevorzugt verwendet."""
+
+    class FakePersist:
+        def row_counts(self) -> dict[str, int]:
+            return {"tickers": 7, "trades": 3}
+
+    counts = load_row_counts(FakePersist())
+    assert counts == {"tickers": 7, "trades": 3}
+
+
+# --------------------------------------------------------------------------
+# Heartbeat-File
+# --------------------------------------------------------------------------
+
+def test_load_heartbeat_file_valid_json(tmp_path: Path) -> None:
+    path = tmp_path / "dashboard_state.json"
+    payload = {
+        "ts": 1748606400.0,
+        "symbol": "BTCUSDT",
+        "msgs": 42,
+        "last_price": 70000.5,
+        "mid_price": 70000.7,
+        "trade_buffer_len": 10,
+        "liq_buffer_len": 1,
+        "persisted": 100,
+        "position_side": "",
+        "mode": "DEMO",
+    }
+    path.write_text(json.dumps(payload), encoding="utf-8")
+    out = load_heartbeat_file(path)
+    assert out is not None
+    assert out["symbol"] == "BTCUSDT"
+    assert out["msgs"] == 42
+    assert out["mode"] == "DEMO"
+
+
+def test_load_heartbeat_file_missing_returns_none(tmp_path: Path) -> None:
+    out = load_heartbeat_file(tmp_path / "no_such.json")
+    assert out is None
+
+
+def test_load_heartbeat_file_invalid_json_returns_none(tmp_path: Path) -> None:
+    path = tmp_path / "bad.json"
+    path.write_text("not valid json{{", encoding="utf-8")
+    out = load_heartbeat_file(path)
+    assert out is None
+
+
+# --------------------------------------------------------------------------
+# Account-Status (async wrapper, hier mit Stub-Executor)
+# --------------------------------------------------------------------------
+
+class _StubExecutor:
+    def __init__(self, equity: float = 1234.56) -> None:
+        self._equity = equity
+
+    async def get_equity(self) -> float:
+        return self._equity
+
+    async def get_position(self) -> dict:
+        return {
+            "size": 0.01, "side": "Buy",
+            "avg_price": 70000.0, "unrealised_pnl": 1.23,
+        }
+
+
+def test_load_account_status_with_stub_executor() -> None:
+    out = load_account_status(_StubExecutor(equity=999.99))
+    assert out["connected"] is True
+    assert out["equity"] == pytest.approx(999.99)
+    assert out["position"]["side"] == "Buy"
+    assert out["position"]["size"] == pytest.approx(0.01)
+
+
+def test_load_account_status_with_none() -> None:
+    out = load_account_status(None)
+    assert out["connected"] is False
+    assert out["equity"] == 0.0
+    assert "Executor" in out["error"]
+
+
+def test_load_account_status_handles_executor_error() -> None:
+    class _BadExecutor:
+        async def get_equity(self) -> float:
+            raise RuntimeError("Kein API-Key/Secret gesetzt")
+
+        async def get_position(self) -> dict:
+            return {}
+
+    out = load_account_status(_BadExecutor())
+    assert out["connected"] is False
+    assert "API-Key" in out["error"]
+
+
+# --------------------------------------------------------------------------
+# Hilfsfunktionen
+# --------------------------------------------------------------------------
+
+def test_ms_to_iso_handles_none() -> None:
+    assert ms_to_iso(None) == ""
+
+
+def test_ms_to_iso_formats_timestamp() -> None:
+    # 2024-01-01T00:00:00Z entspricht 1704067200000 ms
+    s = ms_to_iso(1704067200000)
+    assert s.startswith("2024-01-01")
