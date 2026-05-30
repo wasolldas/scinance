@@ -56,7 +56,12 @@ logger = logging.getLogger(__name__)
 class LiveRunner:
     """Orchestriert Datenerfassung, Pipeline und Order-Ausführung."""
 
-    def __init__(self, symbol: str = PRIMARY_SYMBOL) -> None:
+    def __init__(
+        self,
+        symbol: str = PRIMARY_SYMBOL,
+        shared_persist: Optional[PersistenceLayer] = None,
+        execution_override: Optional[bool] = None,
+    ) -> None:
         self.symbol = symbol
 
         # State-Engines
@@ -73,6 +78,14 @@ class LiveRunner:
         self.pipeline = Pipeline(symbol)
         self.collector = BybitWSCollector(symbol)
         self.executor: Optional[BybitExecutor] = None
+
+        # Optional vom MultiSymbolRunner injizierte Persistenz-Schicht.
+        # Falls gesetzt, übernimmt sie KEINE Ownership (kein close in stop()).
+        self._shared_persist: Optional[PersistenceLayer] = shared_persist
+        self._owns_persist: bool = shared_persist is None
+        # Execution-Override: True = erzwingen, False = unterdrücken,
+        # None = Default-Verhalten (EXECUTION_ENABLED-Config greift).
+        self._execution_override: Optional[bool] = execution_override
 
         # Persistenz (optional): Puffer + DuckDB-Schicht
         self.persist: Optional[PersistenceLayer] = None
@@ -257,7 +270,7 @@ class LiveRunner:
             strat, action, decision.get("direction", 0), size_pct, conf,
         )
 
-        if not EXECUTION_ENABLED or self.executor is None:
+        if not self._execution_active() or self.executor is None:
             logger.info("  -> (read-only, keine Order gesendet)")
             return
 
@@ -410,15 +423,26 @@ class LiveRunner:
         except Exception:
             logger.exception("Heartbeat-File konnte nicht geschrieben werden.")
 
+    def _execution_active(self) -> bool:
+        """Effektive Execution-Entscheidung: Override schlägt Config-Default."""
+        if self._execution_override is None:
+            return bool(EXECUTION_ENABLED)
+        return bool(self._execution_override)
+
     async def run(self) -> None:
         """Startet Collector, Pipeline-Loop und (optional) Executor."""
         mode = "DEMO" if BYBIT_DEMO else "TESTNET" if BYBIT_TESTNET else "LIVE"
+        exec_active = self._execution_active()
         logger.info("LiveRunner startet — Symbol=%s Modus=%s Execution=%s",
-                    self.symbol, mode, EXECUTION_ENABLED)
+                    self.symbol, mode, exec_active)
 
         self._running = True
 
-        if PERSIST_ENABLED:
+        if self._shared_persist is not None:
+            # Geteilte Persistenz vom MultiSymbolRunner: nicht selbst öffnen,
+            # nicht selbst schließen.
+            self.persist = self._shared_persist
+        elif PERSIST_ENABLED:
             try:
                 self.persist = PersistenceLayer()
                 logger.info("Persistenz aktiv -> DuckDB (Tickers/Trades/Liquidationen)")
@@ -426,7 +450,7 @@ class LiveRunner:
                 logger.exception("Persistenz-Init fehlgeschlagen — laufe ohne weiter.")
                 self.persist = None
 
-        if EXECUTION_ENABLED:
+        if exec_active:
             self.executor = BybitExecutor(self.symbol)
             await self.executor.load_instrument()
             try:
@@ -461,11 +485,14 @@ class LiveRunner:
             await self.executor.close()
         if self.persist is not None:
             self._flush_persist()  # finaler Flush der Restpuffer
-            try:
-                counts = self.persist.row_counts()
-                logger.info("Persistenz-Stand: %s", counts)
-            except Exception:
-                pass
-            self.persist.close()
+            if self._owns_persist:
+                try:
+                    counts = self.persist.row_counts()
+                    logger.info("Persistenz-Stand: %s", counts)
+                except Exception:
+                    pass
+                self.persist.close()
+            # Geteilte Verbindung: Referenz lokal lösen, aber NICHT schließen
+            # (anderer Runner / MultiSymbolRunner besitzt sie).
             self.persist = None
         logger.info("LiveRunner gestoppt.")

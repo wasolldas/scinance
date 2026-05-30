@@ -23,7 +23,12 @@ import json
 from pathlib import Path
 from typing import Any
 
-from bybit_edge.config import DB_PATH
+from bybit_edge.config import (
+    DB_PATH,
+    WF_EMBARGO_MINUTES,
+    WF_TEST_DAYS,
+    WF_TRAIN_DAYS,
+)
 from bybit_edge.replay_backtester import ReplayBacktester
 
 
@@ -41,12 +46,47 @@ def main() -> None:
         default=1.0,
         help="Pipeline-Throttle in Sekunden (wie im LiveRunner)",
     )
+    parser.add_argument(
+        "--walkforward",
+        action="store_true",
+        help=(
+            "Walk-Forward-Modus: Train (Warmup, Trades verworfen) -> Embargo "
+            "-> Test (Trades gezaehlt) pro Fold. Misst Out-of-Sample-Robustheit."
+        ),
+    )
+    parser.add_argument(
+        "--train-days",
+        type=int,
+        default=WF_TRAIN_DAYS,
+        help=f"Walk-Forward Trainings-Fenster in Tagen (Default: {WF_TRAIN_DAYS})",
+    )
+    parser.add_argument(
+        "--test-days",
+        type=int,
+        default=WF_TEST_DAYS,
+        help=f"Walk-Forward Test-Fenster in Tagen (Default: {WF_TEST_DAYS})",
+    )
+    parser.add_argument(
+        "--embargo-minutes",
+        type=int,
+        default=WF_EMBARGO_MINUTES,
+        help=(
+            f"Embargo zwischen Train- und Test-Slice in Minuten "
+            f"(Default: {WF_EMBARGO_MINUTES})"
+        ),
+    )
     args = parser.parse_args()
 
     db_path = Path(args.db) if args.db else DB_PATH
 
+    mode_label = "WALK-FORWARD REPLAY-BACKTEST" if args.walkforward else "REPLAY-BACKTEST"
     print("=" * 75)
-    print(f"  REPLAY-BACKTEST — {args.symbol} — interval={args.interval}s")
+    print(f"  {mode_label} — {args.symbol} — interval={args.interval}s")
+    if args.walkforward:
+        print(
+            f"  Fold: train={args.train_days}d / embargo={args.embargo_minutes}min"
+            f" / test={args.test_days}d (sliding by test_days)"
+        )
     print(f"  DuckDB: {db_path}")
     print("=" * 75)
 
@@ -59,6 +99,7 @@ def main() -> None:
         return
 
     bt = ReplayBacktester(symbol=args.symbol, db_path=db_path)
+    n_folds: int = 0
     try:
         n_events = bt.load_events()
         print(f"  Geladene Events: {n_events}")
@@ -69,7 +110,17 @@ def main() -> None:
             )
             return
 
-        results = bt.run(pipeline_interval_seconds=args.interval)
+        if args.walkforward:
+            results = bt.run_walkforward(
+                pipeline_interval_seconds=args.interval,
+                train_days=args.train_days,
+                test_days=args.test_days,
+                embargo_minutes=args.embargo_minutes,
+            )
+            n_folds = bt.last_walkforward_folds
+            print(f"  Folds executed: {n_folds}")
+        else:
+            results = bt.run(pipeline_interval_seconds=args.interval)
     finally:
         bt.close()
 
@@ -100,14 +151,17 @@ def main() -> None:
             f"  {note}"
         )
 
+    out_name = (
+        "walkforward_results.json" if args.walkforward else "replay_backtest_results.json"
+    )
     out = (
         Path(__file__).resolve().parent.parent
         / "edge_research_framework"
         / "results"
-        / "replay_backtest_results.json"
+        / out_name
     )
     out.parent.mkdir(parents=True, exist_ok=True)
-    payload = {
+    payload: dict[str, Any] = {
         "symbol": args.symbol,
         "interval_seconds": args.interval,
         "n_events": n_events,
@@ -122,6 +176,16 @@ def main() -> None:
             ),
         },
     }
+    if args.walkforward:
+        payload["mode"] = "walkforward"
+        payload["walkforward"] = {
+            "train_days": args.train_days,
+            "test_days": args.test_days,
+            "embargo_minutes": args.embargo_minutes,
+            "n_folds_executed": n_folds,
+        }
+    else:
+        payload["mode"] = "single_pass"
     out.write_text(json.dumps(payload, indent=2), encoding="utf-8")
     print(f"\nErgebnisse gespeichert: {out}")
     print(

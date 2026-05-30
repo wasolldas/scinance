@@ -486,6 +486,33 @@ REST_SET_LEVERAGE: Final[str] = "/v5/position/set-leverage"
 REST_INSTRUMENTS: Final[str] = "/v5/market/instruments-info"
 
 # ═══════════════════════════════════════════════════════════════════
+# MULTI-SYMBOL RUNNER (parallele Datensammlung mehrerer Symbole)
+# ═══════════════════════════════════════════════════════════════════
+# Master-Schalter: aktiviert MultiSymbolRunner statt single-symbol LiveRunner.
+MULTI_SYMBOL_RUNNER_ENABLED: bool = (
+    os.getenv("MULTI_SYMBOL_RUNNER_ENABLED", "false").lower() == "true"
+)
+
+
+def _parse_multi_symbols(raw: str) -> list[str]:
+    """Parsed komma-getrennte Symbol-Liste, leerer Input -> Universe-Default."""
+    if not raw.strip():
+        return list(MULTI_SYMBOL_UNIVERSE)
+    out: list[str] = []
+    seen: set[str] = set()
+    for tok in raw.split(","):
+        sym = tok.strip().upper()
+        if sym and sym not in seen:
+            seen.add(sym)
+            out.append(sym)
+    return out
+
+
+MULTI_SYMBOLS: list[str] = _parse_multi_symbols(os.getenv("MULTI_SYMBOLS", ""))
+# Symbol, für das im Multi-Modus Order-Execution erlaubt ist (Default: Primary).
+MULTI_EXECUTION_SYMBOL: str = os.getenv("MULTI_EXECUTION_SYMBOL", PRIMARY_SYMBOL)
+
+# ═══════════════════════════════════════════════════════════════════
 # WS RECONNECT (PRD Abschnitt 9.2)
 # ═══════════════════════════════════════════════════════════════════
 WS_RECONNECT_DELAY_SECONDS: Final[float] = 1.0

@@ -92,15 +92,32 @@ async def main() -> None:
     logger.info("Random Seed: %d", RANDOM_SEED)
     logger.info("Log Level: %s", LOG_LEVEL)
 
-    from bybit_edge.config import PRIMARY_SYMBOL
-    from bybit_edge.live_runner import LiveRunner
+    from bybit_edge.config import (
+        MULTI_EXECUTION_SYMBOL,
+        MULTI_SYMBOL_RUNNER_ENABLED,
+        MULTI_SYMBOLS,
+        PRIMARY_SYMBOL,
+    )
 
-    runner = LiveRunner(PRIMARY_SYMBOL)
-    try:
-        await runner.run()
-    except asyncio.CancelledError:
-        logger.info("Main-Loop cancelled — beende.")
-        await runner.stop()
+    if MULTI_SYMBOL_RUNNER_ENABLED:
+        from bybit_edge.multi_runner import MultiSymbolRunner
+
+        logger.info("MULTI_SYMBOL_RUNNER_ENABLED=true → starte MultiSymbolRunner.")
+        runner = MultiSymbolRunner(MULTI_SYMBOLS, MULTI_EXECUTION_SYMBOL)
+        try:
+            await runner.run()
+        except asyncio.CancelledError:
+            logger.info("Main-Loop cancelled — beende.")
+            await runner.stop()
+    else:
+        from bybit_edge.live_runner import LiveRunner
+
+        runner = LiveRunner(PRIMARY_SYMBOL)
+        try:
+            await runner.run()
+        except asyncio.CancelledError:
+            logger.info("Main-Loop cancelled — beende.")
+            await runner.stop()
 
 
 def run() -> NoReturn:

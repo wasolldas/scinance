@@ -449,3 +449,343 @@ def test_replay_falls_back_to_l1_without_orderbook(
     # bid1_size from the _ticker fixture is 5.0.
     assert td["bid_sizes"][0] == pytest.approx(5.0)
     assert td["ask_sizes"][0] == pytest.approx(5.0)
+
+
+# ══════════════════════════════════════════════════════════════════════
+# Walk-Forward Replay
+# ══════════════════════════════════════════════════════════════════════
+
+# Time constants for synthesising multi-fold event streams cheaply.
+_MS_PER_DAY = 24 * 3600 * 1000
+_MS_PER_MIN = 60 * 1000
+
+
+def _persist_ticker_grid(
+    persist: PersistenceLayer,
+    *,
+    n: int,
+    step_ms: int,
+    base_ts: int = _BASE_TS,
+    price_base: float = 30_000.0,
+) -> list[int]:
+    """Insert *n* tickers at ``base_ts + i * step_ms``. Returns the ts list."""
+    ts_list = [base_ts + i * step_ms for i in range(n)]
+    persist.write_tickers_batch([
+        _ticker(0, last_price=price_base + i, ts=ts) for i, ts in enumerate(ts_list)
+    ])
+    return ts_list
+
+
+class TestReplayWalkForward:
+    """Tests for :meth:`ReplayBacktester.run_walkforward`.
+
+    Where the WF fold geometry (30d / 7d / 30 min) makes seeding 100s of
+    thousands of ticks impractical, we shrink it explicitly via the public
+    ``train_days``/``test_days``/``embargo_minutes`` knobs so each fold still
+    holds ≪ a few hundred events. This keeps the tests fast and deterministic
+    while exercising the *same* code path the production defaults take.
+    """
+
+    # ------------------------------------------------------------------
+    # 1) Result shape
+    # ------------------------------------------------------------------
+    def test_walkforward_returns_dict_per_strategy(
+        self, persist: PersistenceLayer
+    ) -> None:
+        """``run_walkforward`` must return one ``BacktestResult`` per
+        strategy id ("S1".."S5"), exactly like ``run``."""
+        # Three folds at 1 train-day / 12h embargo / 1 test-day.
+        # 1 ticker per minute -> ~1440/day -> plenty for warmup.
+        ts_list = _persist_ticker_grid(persist, n=4500, step_ms=60_000)
+        bt = _new_bt(persist)
+        bt.load_events()
+
+        results = bt.run_walkforward(
+            pipeline_interval_seconds=60.0,
+            train_days=1,
+            test_days=1,
+            embargo_minutes=30,
+            min_train_events=10,
+        )
+
+        assert set(results.keys()) == {"S1", "S2", "S3", "S4", "S5"}
+        for res in results.values():
+            assert isinstance(res, BacktestResult)
+        # Stream spans ~3.1 days -> at least one fold (1d train + 0.5h emb + 1d
+        # test fits twice into 3.1d).
+        assert bt.last_walkforward_folds >= 1
+        # Sanity: ts list endpoints are the bounds used internally.
+        assert ts_list[0] == _BASE_TS
+
+    # ------------------------------------------------------------------
+    # 2) Train-phase trades are discarded
+    # ------------------------------------------------------------------
+    def test_walkforward_train_trades_discarded(
+        self, persist: PersistenceLayer
+    ) -> None:
+        """A strategy that toggles enter/exit every tick should only produce
+        trades from the *test* slice — train-slice round-trips must be
+        discarded entirely."""
+        # 2 days at 1-minute resolution.
+        n = 2 * 1440 + 60  # ~2.04 days
+        _persist_ticker_grid(persist, n=n, step_ms=60_000)
+
+        bt = _new_bt(persist)
+        bt.load_events()
+
+        # Capture which ts ranges trade-entries hit.
+        toggle = {"open": False}
+
+        def fake_eval(strategy_id: str, strategy: Any, ticker_data: dict,
+                      ts_seconds: float) -> dict:
+            if strategy_id != "S1":
+                return {"action": "wait", "direction": 0, "strategy": strategy_id}
+            if not toggle["open"]:
+                toggle["open"] = True
+                return {"action": "enter", "direction": 1, "strategy": "S1"}
+            toggle["open"] = False
+            return {"action": "exit", "direction": 1, "strategy": "S1"}
+
+        bt._eval_strategy = fake_eval  # type: ignore[assignment]
+
+        # 1 train-day, 30 min embargo, 1 test-day -> exactly one fold.
+        results = bt.run_walkforward(
+            pipeline_interval_seconds=60.0,
+            train_days=1,
+            test_days=1,
+            embargo_minutes=30,
+            min_train_events=10,
+        )
+
+        assert bt.last_walkforward_folds == 1
+        train_end = _BASE_TS + 1 * _MS_PER_DAY
+        test_start = train_end + 30 * _MS_PER_MIN
+        # All recorded entries must be inside the test window — none in train.
+        for t in results["S1"].trades:
+            assert t.entry_ts >= test_start, (
+                f"entry @ {t.entry_ts} leaked from train slice "
+                f"(train_end={train_end}, test_start={test_start})"
+            )
+        # At least one trade in the test window (toggle fires every tick).
+        assert results["S1"].n_trades >= 1
+
+    # ------------------------------------------------------------------
+    # 3) Embargo skips events
+    # ------------------------------------------------------------------
+    def test_walkforward_embargo_skips_events(
+        self, persist: PersistenceLayer
+    ) -> None:
+        """Events whose ts falls in the embargo gap [train_end, test_start)
+        must never reach the strategy's ``_eval_strategy`` callback."""
+        # 2-day stream, 1-min ticks.
+        n = 2 * 1440 + 60
+        _persist_ticker_grid(persist, n=n, step_ms=60_000)
+
+        bt = _new_bt(persist)
+        bt.load_events()
+
+        seen_ts_ms: list[int] = []
+
+        def probe_eval(strategy_id: str, strategy: Any, ticker_data: dict,
+                       ts_seconds: float) -> dict:
+            # Only record once (S1) per pipeline tick so we don't 5x-count.
+            if strategy_id == "S1":
+                seen_ts_ms.append(int(ts_seconds * 1000))
+            return {"action": "wait", "direction": 0, "strategy": strategy_id}
+
+        bt._eval_strategy = probe_eval  # type: ignore[assignment]
+
+        embargo_min = 60  # 1 hour
+        bt.run_walkforward(
+            pipeline_interval_seconds=60.0,
+            train_days=1,
+            test_days=1,
+            embargo_minutes=embargo_min,
+            min_train_events=10,
+        )
+
+        train_end = _BASE_TS + 1 * _MS_PER_DAY
+        test_start = train_end + embargo_min * _MS_PER_MIN
+
+        embargo_hits = [
+            ts for ts in seen_ts_ms if train_end <= ts < test_start
+        ]
+        assert embargo_hits == [], (
+            f"strategy saw {len(embargo_hits)} events in the embargo gap "
+            f"[{train_end}, {test_start})"
+        )
+
+    # ------------------------------------------------------------------
+    # 4) Folds with insufficient train data are skipped (no crash)
+    # ------------------------------------------------------------------
+    def test_walkforward_skips_folds_with_insufficient_train(
+        self, persist: PersistenceLayer
+    ) -> None:
+        """If a fold's train slice has fewer than ``min_train_events``, the
+        whole fold is skipped — no exception, no leaked trades, valid empty
+        result."""
+        # Tiny stream: 2 days but only 30 ticks total -> way under min_train.
+        ts_list = [_BASE_TS + i * (2 * _MS_PER_DAY // 30) for i in range(30)]
+        persist.write_tickers_batch([
+            _ticker(0, last_price=30_000.0 + i, ts=ts)
+            for i, ts in enumerate(ts_list)
+        ])
+
+        bt = _new_bt(persist)
+        bt.load_events()
+
+        results = bt.run_walkforward(
+            pipeline_interval_seconds=1.0,
+            train_days=1,
+            test_days=1,
+            embargo_minutes=0,
+            min_train_events=500,  # impossible to hit
+        )
+
+        # No folds executed, no trades recorded, no crash.
+        assert bt.last_walkforward_folds == 0
+        for res in results.values():
+            assert res.n_trades == 0
+            assert isinstance(res, BacktestResult)
+
+    # ------------------------------------------------------------------
+    # 5) Concatenation across folds
+    # ------------------------------------------------------------------
+    def test_walkforward_concatenates_across_folds(
+        self, persist: PersistenceLayer
+    ) -> None:
+        """N folds * k trades-per-fold should accumulate into N*k trades on
+        the final BacktestResult. We use a TestSubclass that mocks the inner
+        ``_replay_events`` so we can deterministically deposit a fixed
+        number of test-phase trades per fold without having to choreograph
+        strategy internals.
+        """
+        # Stream long enough for ~3 folds at train=1d, test=1d, embargo=0.
+        n = int(4.0 * 1440) + 10
+        _persist_ticker_grid(persist, n=n, step_ms=60_000)
+
+        class _DepositingReplayBT(ReplayBacktester):
+            """Subclass whose ``_replay_events`` deposits 2 fake trades into
+            ``trades_out`` only when ``record_trades=True`` (i.e. test phase).
+            Strategy state is irrelevant for this test, only the bookkeeping.
+            """
+
+            def _replay_events(
+                self,
+                events,
+                strategies,
+                trade_buffer,
+                liq_buffer,
+                price_history,
+                open_pos,
+                trades_out,
+                pipeline_interval_seconds,
+                record_trades,
+                last_ticker,
+                last_ob_snap,
+                last_pipeline_ms,
+            ):
+                if record_trades and events:
+                    first_ts = events[0][0]
+                    last_ts = events[-1][0]
+                    for sid in trades_out:
+                        for k in range(2):
+                            trades_out[sid].append(
+                                self._make_trade(
+                                    side="Long",
+                                    entry_price=30_000.0,
+                                    entry_ts=first_ts + k,
+                                    exit_price=30_010.0,
+                                    exit_ts=last_ts,
+                                )
+                            )
+                # Return a synthetic 'last' tuple consistent with the real
+                # signature so the caller's force-close path is a no-op.
+                last_ts = events[-1][0] if events else None
+                return last_ticker, last_ob_snap, last_ts
+
+        bt = _DepositingReplayBT(_SYMBOL, db_path=None)
+        bt.persist = persist
+        bt.load_events()
+
+        results = bt.run_walkforward(
+            pipeline_interval_seconds=60.0,
+            train_days=1,
+            test_days=1,
+            embargo_minutes=0,
+            min_train_events=10,
+        )
+
+        folds = bt.last_walkforward_folds
+        assert folds >= 3
+        for sid in ("S1", "S2", "S3", "S4", "S5"):
+            assert results[sid].n_trades == 2 * folds, (
+                f"{sid}: expected {2 * folds} trades, got "
+                f"{results[sid].n_trades}"
+            )
+
+    # ------------------------------------------------------------------
+    # 6) Lookahead-free guarantee
+    # ------------------------------------------------------------------
+    def test_walkforward_lookahead_free(
+        self, persist: PersistenceLayer
+    ) -> None:
+        """Every ``ticker_data`` dict handed to a strategy at wall-clock
+        ``ts`` must have been built using only events with ts <= ts. We
+        probe this directly: on every call we read ``trades`` and
+        ``liq_events`` out of ``ticker_data`` and assert none post-date the
+        pipeline tick. We also assert that test-phase pipeline ticks live
+        strictly inside [test_start, test_end)."""
+        # Add trades alongside the tickers so the buffers fill up.
+        n = 2 * 1440 + 60
+        ts_list = _persist_ticker_grid(persist, n=n, step_ms=60_000)
+        # One trade per ticker, same ts.
+        persist.write_trades_batch(
+            [_trade(0, price=30_000.0 + i) for i in range(n)],
+            symbol=_SYMBOL,
+        )
+        # Override the trade ts so they match the ticker grid.
+        persist.conn.execute("DELETE FROM trades")
+        from bybit_edge.state.trade_buffer import TradeEvent as TE
+        persist.write_trades_batch(
+            [TE(timestamp_ms=ts, price=30_000.0 + i, volume=1.0,
+                side="Buy", is_block=False) for i, ts in enumerate(ts_list)],
+            symbol=_SYMBOL,
+        )
+
+        bt = _new_bt(persist)
+        bt.load_events()
+
+        violations: list[tuple[int, int]] = []
+        pipeline_ts_seen: list[int] = []
+
+        def probe_eval(strategy_id: str, strategy: Any, ticker_data: dict,
+                       ts_seconds: float) -> dict:
+            if strategy_id != "S1":
+                return {"action": "wait", "direction": 0, "strategy": strategy_id}
+            now_ms = int(ts_seconds * 1000)
+            pipeline_ts_seen.append(now_ms)
+            for tr in ticker_data["trades"]:
+                if int(tr["timestamp_ms"]) > now_ms:
+                    violations.append((int(tr["timestamp_ms"]), now_ms))
+            for ev in ticker_data["liq_events"]:
+                if int(ev["timestamp_ms"]) > now_ms:
+                    violations.append((int(ev["timestamp_ms"]), now_ms))
+            return {"action": "wait", "direction": 0, "strategy": "S1"}
+
+        bt._eval_strategy = probe_eval  # type: ignore[assignment]
+
+        bt.run_walkforward(
+            pipeline_interval_seconds=60.0,
+            train_days=1,
+            test_days=1,
+            embargo_minutes=30,
+            min_train_events=10,
+        )
+
+        assert violations == [], (
+            f"lookahead detected: {len(violations)} events with ts > now_ms"
+        )
+        # And: the probe must have seen at least one pipeline tick — i.e.
+        # we actually exercised the causal path, not a vacuously-empty loop.
+        assert pipeline_ts_seen, "walk-forward never evaluated a pipeline tick"

@@ -302,6 +302,27 @@ class TestLiveRunnerPersistence:
         r.persist.close()
 
 
+    @pytest.mark.asyncio
+    async def test_shared_persist_not_closed_in_stop(self):
+        """LiveRunner mit shared_persist darf die geteilte DuckDB-Instanz nicht schließen."""
+        from bybit_edge.persistence.db import PersistenceLayer
+        import pathlib
+
+        shared = PersistenceLayer(db_path=pathlib.Path(":memory:"))
+        r = LiveRunner("BTCUSDT", shared_persist=shared)
+        # Simuliere, dass run() die Schicht gemountet hat.
+        r.persist = shared
+        assert r._owns_persist is False
+
+        await r.stop()
+        # Die geteilte Schicht muss weiter benutzbar sein — und der Runner
+        # darf sie nicht geschlossen haben.
+        counts = shared.row_counts()
+        assert isinstance(counts, dict)
+        assert r.persist is None
+        shared.close()
+
+
 class TestLiveRunnerDecision:
     @pytest.mark.asyncio
     async def test_act_read_only_no_executor(self):

@@ -42,6 +42,11 @@ from typing import Any, Optional
 import numpy as np
 
 from bybit_edge.backtester.engine import BacktestEngine, BacktestResult, Trade
+from bybit_edge.config import (
+    WF_EMBARGO_MINUTES,
+    WF_TEST_DAYS,
+    WF_TRAIN_DAYS,
+)
 from bybit_edge.persistence.db import PersistenceLayer
 from bybit_edge.state.liquidation_buffer import LiquidationBuffer, LiquidationEvent
 from bybit_edge.state.trade_buffer import TradeBuffer, TradeEvent
@@ -105,6 +110,9 @@ class ReplayBacktester:
         self._data_limited: set[str] = set(_DATA_LIMITED)
         # Whether the loaded window contains L2 orderbook snapshots.
         self._has_orderbook: bool = False
+        # Number of folds executed by the last ``run_walkforward`` call.
+        # 0 until a walk-forward run has been completed.
+        self.last_walkforward_folds: int = 0
 
     # ------------------------------------------------------------------
     # Event loading
@@ -531,15 +539,7 @@ class ReplayBacktester:
         dict[str, BacktestResult]
             One result per strategy id ("S1".."S5").
         """
-        interval_ms: int = max(int(pipeline_interval_seconds * 1000), 1)
-
-        strategies: dict[str, Any] = {
-            "S1": Strategy1CascadeDetector(),
-            "S2": Strategy2EntropyMomentum(),
-            "S3": Strategy3PreSettlement(),
-            "S4": Strategy4PatternEnsemble(),
-            "S5": Strategy5CrossSectional(),
-        }
+        strategies: dict[str, Any] = self._build_strategies()
         for strat in strategies.values():
             strat.reset()
 
@@ -552,15 +552,104 @@ class ReplayBacktester:
         liq_buffer = LiquidationBuffer(maxlen=2000)
         price_history: deque[float] = deque(maxlen=_PRICE_HISTORY_MAXLEN)
 
-        last_ticker: Optional[dict[str, Any]] = None
-        # Tracks the most-recent persisted L2 snapshot whose ts <= the current
-        # event ts. The merged stream's kind_order guarantees this is updated
-        # strictly causally (an OB snapshot at ts=T is consumed only after all
-        # other events at ts==T have already been ingested).
-        last_ob_snap: Optional[dict[str, Any]] = None
-        last_pipeline_ms: int = -interval_ms  # ensures first ticker fires
+        last_ticker, last_ob_snap, last_ts_ms = self._replay_events(
+            events=self._events,
+            strategies=strategies,
+            trade_buffer=trade_buffer,
+            liq_buffer=liq_buffer,
+            price_history=price_history,
+            open_pos=open_pos,
+            trades_out=trades_out,
+            pipeline_interval_seconds=pipeline_interval_seconds,
+            record_trades=True,
+            last_ticker=None,
+            last_ob_snap=None,
+            last_pipeline_ms=None,
+        )
 
-        for ts_ms, kind, payload in self._events:
+        # Force-close any open positions at the last observed price.
+        final_price = (
+            float(last_ticker["last_price"]) if last_ticker else 0.0
+        )
+        final_ts_ms = last_ts_ms if last_ts_ms is not None else 0
+        for sid in strategies:
+            pos = open_pos[sid]
+            if pos is not None and final_price > 0:
+                trades_out[sid].append(
+                    self._make_trade(
+                        side=pos["side"],
+                        entry_price=pos["entry_price"],
+                        entry_ts=pos["entry_ts"],
+                        exit_price=final_price,
+                        exit_ts=final_ts_ms,
+                    )
+                )
+                open_pos[sid] = None
+
+        return {
+            sid: self.engine.compute_metrics(trades_out[sid]) for sid in strategies
+        }
+
+    # ------------------------------------------------------------------
+    # Internal replay primitive — shared by run() and run_walkforward()
+    # ------------------------------------------------------------------
+
+    @staticmethod
+    def _build_strategies() -> dict[str, Any]:
+        """Construct one fresh instance per strategy id (mirrors live runner)."""
+        return {
+            "S1": Strategy1CascadeDetector(),
+            "S2": Strategy2EntropyMomentum(),
+            "S3": Strategy3PreSettlement(),
+            "S4": Strategy4PatternEnsemble(),
+            "S5": Strategy5CrossSectional(),
+        }
+
+    def _replay_events(
+        self,
+        events: list[tuple[int, str, dict[str, Any]]],
+        strategies: dict[str, Any],
+        trade_buffer: TradeBuffer,
+        liq_buffer: LiquidationBuffer,
+        price_history: deque[float],
+        open_pos: dict[str, Optional[dict[str, Any]]],
+        trades_out: dict[str, list[Trade]],
+        pipeline_interval_seconds: float,
+        record_trades: bool,
+        last_ticker: Optional[dict[str, Any]],
+        last_ob_snap: Optional[dict[str, Any]],
+        last_pipeline_ms: Optional[int],
+    ) -> tuple[Optional[dict[str, Any]], Optional[dict[str, Any]], Optional[int]]:
+        """Drive the causal replay loop over *events*.
+
+        This is the single source of truth for the chronological replay logic
+        — both :meth:`run` and :meth:`run_walkforward` use it. Behaviour is
+        identical to the single-pass loop in the original ``run``:
+
+        * Trades / liquidations / OB snapshots are ingested into the matching
+          buffer immediately.
+        * Tickers throttle the pipeline by ``pipeline_interval_seconds`` and
+          drive ``_build_ticker_data`` + ``_eval_strategy`` per strategy.
+
+        ``record_trades`` controls whether ``_apply_signal`` is allowed to
+        push round-trip :class:`Trade` objects into ``trades_out``. When
+        ``False`` (train / warmup phase) any closing signal still clears the
+        per-strategy open position but the resulting trade is discarded —
+        keeping the strategy state in sync without polluting fold results.
+
+        Returns the (last_ticker, last_ob_snap, last_ts_ms) seen, so that the
+        caller can pick up where the slice left off or force-close residual
+        positions at the end of the run.
+        """
+        interval_ms: int = max(int(pipeline_interval_seconds * 1000), 1)
+        if last_pipeline_ms is None:
+            last_pipeline_ms = -interval_ms  # ensures first ticker fires
+
+        last_ts_ms: Optional[int] = (
+            events[-1][0] if events else None
+        )
+
+        for ts_ms, kind, payload in events:
             # --- Ingest event into the appropriate causal buffer ---
             if kind == "trade":
                 evt = TradeEvent(
@@ -625,29 +714,227 @@ class ReplayBacktester:
                     ts_ms=ts_ms,
                     open_pos=open_pos,
                     trades_out=trades_out,
+                    record_trades=record_trades,
                 )
 
-        # Force-close any open positions at the last observed price.
-        final_price = (
-            float(last_ticker["last_price"]) if last_ticker else 0.0
-        )
-        final_ts_ms = self._events[-1][0] if self._events else 0
-        for sid in strategies:
-            pos = open_pos[sid]
-            if pos is not None and final_price > 0:
-                trades_out[sid].append(
-                    self._make_trade(
-                        side=pos["side"],
-                        entry_price=pos["entry_price"],
-                        entry_ts=pos["entry_ts"],
-                        exit_price=final_price,
-                        exit_ts=final_ts_ms,
-                    )
-                )
+        return last_ticker, last_ob_snap, last_ts_ms
+
+    # ------------------------------------------------------------------
+    # Walk-forward replay
+    # ------------------------------------------------------------------
+
+    def run_walkforward(
+        self,
+        pipeline_interval_seconds: float = 1.0,
+        train_days: int = WF_TRAIN_DAYS,
+        test_days: int = WF_TEST_DAYS,
+        embargo_minutes: int = WF_EMBARGO_MINUTES,
+        min_train_events: int = 100,
+    ) -> dict[str, BacktestResult]:
+        """Replay events in walk-forward folds: train (warmup, trades discarded)
+        → embargo → test (trades counted). Slides by ``test_days``. Concatenates
+        test-fold trades per strategy and returns one :class:`BacktestResult`
+        per strategy.
+
+        Layout per fold::
+
+            |--- train_days ---|-- embargo --|--- test_days ---|
+            ^                  ^             ^                 ^
+            train_start     train_end    test_start         test_end
+
+        Then the window advances by ``test_days``.
+
+        Parameters
+        ----------
+        pipeline_interval_seconds
+            Pipeline throttle (matches LiveRunner).
+        train_days, test_days, embargo_minutes
+            Fold geometry; defaults come from :mod:`bybit_edge.config`.
+        min_train_events
+            Folds with fewer events in their *train* slice are skipped (too
+            little data to warm a strategy up meaningfully).
+
+        Returns
+        -------
+        dict[str, BacktestResult]
+            One result per strategy id, computed on the concatenation of all
+            test-fold trades. The ``n_folds_executed`` count is exposed via
+            :attr:`last_walkforward_folds` for the CLI.
+        """
+        ms_per_day = 24 * 3600 * 1000
+        ms_per_min = 60 * 1000
+        train_ms = int(train_days) * ms_per_day
+        test_ms = int(test_days) * ms_per_day
+        embargo_ms = int(embargo_minutes) * ms_per_min
+
+        events = self._events
+        if not events:
+            self.last_walkforward_folds = 0
+            empty_strats = self._build_strategies()
+            return {
+                sid: self.engine.compute_metrics([]) for sid in empty_strats
+            }
+
+        first_ts = events[0][0]
+        last_ts = events[-1][0]
+
+        # Pre-bucket events by fold boundaries via simple linear sweep — the
+        # event list is already sorted ascending by ts.
+        cursor = first_ts
+        test_trades_acc: dict[str, list[Trade]] = {
+            sid: [] for sid in self._build_strategies()
+        }
+        folds_executed = 0
+
+        # Index pointer to avoid O(N^2) repeated scans.
+        idx = 0
+        n_events = len(events)
+
+        while True:
+            train_start = cursor
+            train_end = train_start + train_ms
+            test_start = train_end + embargo_ms
+            test_end = test_start + test_ms
+
+            if test_end > last_ts:
+                # No more full folds fit in the data window.
+                break
+
+            # Advance idx past any events strictly before train_start (sliding
+            # windows can overlap when test_ms < train_ms; we re-scan from
+            # ``idx_train_start`` so previous-fold events are not consumed).
+            idx_train_start = idx
+            while (
+                idx_train_start < n_events
+                and events[idx_train_start][0] < train_start
+            ):
+                idx_train_start += 1
+
+            # Slice train events: [train_start, train_end).
+            idx_train_end = idx_train_start
+            while (
+                idx_train_end < n_events
+                and events[idx_train_end][0] < train_end
+            ):
+                idx_train_end += 1
+
+            # Slice test events: [test_start, test_end).
+            idx_test_start = idx_train_end
+            while (
+                idx_test_start < n_events
+                and events[idx_test_start][0] < test_start
+            ):
+                idx_test_start += 1
+            idx_test_end = idx_test_start
+            while (
+                idx_test_end < n_events
+                and events[idx_test_end][0] < test_end
+            ):
+                idx_test_end += 1
+
+            train_events = events[idx_train_start:idx_train_end]
+            test_events = events[idx_test_start:idx_test_end]
+
+            # Advance the outer cursor (sliding by test_days) regardless of
+            # whether the fold is admissible, so we don't loop forever.
+            cursor += test_ms
+
+            if len(train_events) < min_train_events:
+                # Not enough warmup data — skip this fold cleanly.
+                idx = idx_train_start
+                continue
+            if not test_events:
+                idx = idx_train_start
+                continue
+
+            # --- Fresh strategy instances + buffers per fold ---
+            strategies = self._build_strategies()
+            for strat in strategies.values():
+                strat.reset()
+
+            trade_buffer = TradeBuffer(maxlen=2000)
+            liq_buffer = LiquidationBuffer(maxlen=2000)
+            price_history: deque[float] = deque(maxlen=_PRICE_HISTORY_MAXLEN)
+            open_pos: dict[str, Optional[dict[str, Any]]] = {
+                sid: None for sid in strategies
+            }
+            train_trades_sink: dict[str, list[Trade]] = {
+                sid: [] for sid in strategies
+            }
+
+            # 1) TRAIN phase — warm strategies; discard any trades.
+            last_ticker, last_ob_snap, _ = self._replay_events(
+                events=train_events,
+                strategies=strategies,
+                trade_buffer=trade_buffer,
+                liq_buffer=liq_buffer,
+                price_history=price_history,
+                open_pos=open_pos,
+                trades_out=train_trades_sink,
+                pipeline_interval_seconds=pipeline_interval_seconds,
+                record_trades=False,
+                last_ticker=None,
+                last_ob_snap=None,
+                last_pipeline_ms=None,
+            )
+            # Clear any open positions accumulated during train so that the
+            # test phase starts flat — the strategy *state* is what we want
+            # to keep, not the in-flight position.
+            for sid in strategies:
                 open_pos[sid] = None
 
+            # 2) EMBARGO — events in [train_end, test_start) are NOT replayed.
+            # Strategy state stays exactly as it was at end-of-train.
+
+            # 3) TEST phase — count trades into the fold accumulator.
+            test_trades_fold: dict[str, list[Trade]] = {
+                sid: [] for sid in strategies
+            }
+            last_ticker, last_ob_snap, last_ts_ms = self._replay_events(
+                events=test_events,
+                strategies=strategies,
+                trade_buffer=trade_buffer,
+                liq_buffer=liq_buffer,
+                price_history=price_history,
+                open_pos=open_pos,
+                trades_out=test_trades_fold,
+                pipeline_interval_seconds=pipeline_interval_seconds,
+                record_trades=True,
+                last_ticker=last_ticker,
+                last_ob_snap=last_ob_snap,
+                last_pipeline_ms=None,
+            )
+
+            # Force-close any positions still open at end-of-test.
+            final_price = (
+                float(last_ticker["last_price"]) if last_ticker else 0.0
+            )
+            final_ts_ms = last_ts_ms if last_ts_ms is not None else test_end
+            for sid in strategies:
+                pos = open_pos[sid]
+                if pos is not None and final_price > 0:
+                    test_trades_fold[sid].append(
+                        self._make_trade(
+                            side=pos["side"],
+                            entry_price=pos["entry_price"],
+                            entry_ts=pos["entry_ts"],
+                            exit_price=final_price,
+                            exit_ts=final_ts_ms,
+                        )
+                    )
+                    open_pos[sid] = None
+
+            # Concatenate this fold's test trades.
+            for sid, trades in test_trades_fold.items():
+                test_trades_acc[sid].extend(trades)
+
+            folds_executed += 1
+            idx = idx_train_start
+
+        self.last_walkforward_folds = folds_executed
         return {
-            sid: self.engine.compute_metrics(trades_out[sid]) for sid in strategies
+            sid: self.engine.compute_metrics(test_trades_acc[sid])
+            for sid in test_trades_acc
         }
 
     # ------------------------------------------------------------------
@@ -662,8 +949,16 @@ class ReplayBacktester:
         ts_ms: int,
         open_pos: dict[str, Optional[dict[str, Any]]],
         trades_out: dict[str, list[Trade]],
+        record_trades: bool = True,
     ) -> None:
-        """Update the per-strategy position from a strategy signal."""
+        """Update the per-strategy position from a strategy signal.
+
+        When ``record_trades`` is ``False`` (used for the walk-forward train /
+        warmup phase) the bookkeeping still happens — positions open and close
+        so the strategy state stays consistent — but the resulting round-trip
+        :class:`Trade` is discarded instead of being appended to
+        ``trades_out``.
+        """
         action: str = signal.get("action", "wait")
         direction: int = int(signal.get("direction", 0))
         pos = open_pos[strategy_id]
@@ -676,15 +971,16 @@ class ReplayBacktester:
                 "entry_ts": ts_ms,
             }
         elif action == "exit" and pos is not None:
-            trades_out[strategy_id].append(
-                self._make_trade(
-                    side=pos["side"],
-                    entry_price=pos["entry_price"],
-                    entry_ts=pos["entry_ts"],
-                    exit_price=price,
-                    exit_ts=ts_ms,
+            if record_trades:
+                trades_out[strategy_id].append(
+                    self._make_trade(
+                        side=pos["side"],
+                        entry_price=pos["entry_price"],
+                        entry_ts=pos["entry_ts"],
+                        exit_price=price,
+                        exit_ts=ts_ms,
+                    )
                 )
-            )
             open_pos[strategy_id] = None
 
     def _make_trade(
