@@ -117,6 +117,21 @@ class PersistenceLayer:
             )
         """)
 
+        # L2 orderbook snapshots — one row per (snapshot, side, level).
+        # With depth=20 this yields 40 rows per snapshot. The flat layout makes
+        # ingestion and per-level analytics straightforward.
+        self.conn.execute("""
+            CREATE TABLE IF NOT EXISTS orderbook_snapshots (
+                ts BIGINT NOT NULL,
+                symbol VARCHAR NOT NULL,
+                side VARCHAR NOT NULL,
+                level INTEGER NOT NULL,
+                price DOUBLE,
+                size DOUBLE,
+                recv_ts DOUBLE
+            )
+        """)
+
         # Indices for efficient time-range queries
         try:
             self.conn.execute(
@@ -130,6 +145,10 @@ class PersistenceLayer:
             )
             self.conn.execute(
                 "CREATE INDEX IF NOT EXISTS idx_kline_ts_sym ON kline_1min(ts, symbol)"
+            )
+            self.conn.execute(
+                "CREATE INDEX IF NOT EXISTS idx_ob_snap_sym_ts "
+                "ON orderbook_snapshots(symbol, ts)"
             )
         except duckdb.CatalogException:
             pass  # indices already exist
@@ -260,10 +279,176 @@ class PersistenceLayer:
         )
         return len(rows)
 
+    def write_orderbook_snapshot(
+        self,
+        ts: int,
+        symbol: str,
+        bid_prices: np.ndarray,
+        bid_sizes: np.ndarray,
+        ask_prices: np.ndarray,
+        ask_sizes: np.ndarray,
+        recv_ts: float,
+        depth: int = 20,
+    ) -> int:
+        """Insert one full L2 snapshot (depth × 2 sides) into DuckDB.
+
+        Bids are stored with levels 0..len(bids)-1 in descending-price order
+        (best bid first). Asks analogously in ascending-price order.
+
+        Returns
+        -------
+        int
+            Number of rows inserted (= ``len(bids) + len(asks)`` after cap).
+        """
+        bp = np.asarray(bid_prices, dtype=np.float64)[:depth]
+        bs = np.asarray(bid_sizes, dtype=np.float64)[:depth]
+        ap = np.asarray(ask_prices, dtype=np.float64)[:depth]
+        as_ = np.asarray(ask_sizes, dtype=np.float64)[:depth]
+
+        rows: list[list[object]] = []
+        n_bid = min(bp.size, bs.size)
+        for i in range(n_bid):
+            rows.append([
+                int(ts), str(symbol), "bid", int(i),
+                float(bp[i]), float(bs[i]), float(recv_ts),
+            ])
+        n_ask = min(ap.size, as_.size)
+        for i in range(n_ask):
+            rows.append([
+                int(ts), str(symbol), "ask", int(i),
+                float(ap[i]), float(as_[i]), float(recv_ts),
+            ])
+        if not rows:
+            return 0
+        self.conn.executemany(
+            "INSERT INTO orderbook_snapshots VALUES (?, ?, ?, ?, ?, ?, ?)",
+            rows,
+        )
+        return len(rows)
+
+    def write_orderbook_snapshots_batch(self, snaps: list[dict]) -> int:
+        """Bulk-insert L2 snapshots. Each ``dict`` requires keys ``ts``,
+        ``symbol``, ``bid_prices``, ``bid_sizes``, ``ask_prices``,
+        ``ask_sizes``, ``recv_ts`` and optional ``depth`` (default 20).
+
+        Returns the number of *rows* inserted (not snapshots).
+        """
+        if not snaps:
+            return 0
+        rows: list[list[object]] = []
+        for snap in snaps:
+            ts = int(snap["ts"])
+            symbol = str(snap["symbol"])
+            recv_ts = float(snap.get("recv_ts", 0.0))
+            depth = int(snap.get("depth", 20))
+            bp = np.asarray(snap["bid_prices"], dtype=np.float64)[:depth]
+            bs = np.asarray(snap["bid_sizes"], dtype=np.float64)[:depth]
+            ap = np.asarray(snap["ask_prices"], dtype=np.float64)[:depth]
+            as_ = np.asarray(snap["ask_sizes"], dtype=np.float64)[:depth]
+            n_bid = min(bp.size, bs.size)
+            for i in range(n_bid):
+                rows.append([
+                    ts, symbol, "bid", int(i),
+                    float(bp[i]), float(bs[i]), recv_ts,
+                ])
+            n_ask = min(ap.size, as_.size)
+            for i in range(n_ask):
+                rows.append([
+                    ts, symbol, "ask", int(i),
+                    float(ap[i]), float(as_[i]), recv_ts,
+                ])
+        if not rows:
+            return 0
+        self.conn.executemany(
+            "INSERT INTO orderbook_snapshots VALUES (?, ?, ?, ?, ?, ?, ?)",
+            rows,
+        )
+        return len(rows)
+
+    def query_orderbook_snapshots(
+        self,
+        symbol: str,
+        start_ts: int,
+        end_ts: int,
+        depth: int = 20,
+    ) -> list[dict]:
+        """Reconstruct full L2 snapshots from the row-per-level layout.
+
+        Returns a list of dicts ``{ts, bid_prices, bid_sizes, ask_prices,
+        ask_sizes, recv_ts}``, sorted strictly ascending by ``ts``. Each
+        side's arrays are truncated to ``depth`` (level < depth) and ordered
+        by ``level`` so index 0 is the best price on each side.
+        """
+        rows = self.conn.execute(
+            """
+            SELECT ts, side, level, price, size, recv_ts
+            FROM orderbook_snapshots
+            WHERE symbol = ? AND ts >= ? AND ts <= ? AND level < ?
+            ORDER BY ts, side, level
+            """,
+            [symbol, start_ts, end_ts, depth],
+        ).fetchall()
+
+        # Group rows by ts. Because the SQL is ORDER BY ts, sequential
+        # accumulation suffices to preserve chronological order.
+        out: list[dict] = []
+        cur_ts: Optional[int] = None
+        cur_bid_p: list[tuple[int, float]] = []
+        cur_bid_s: list[tuple[int, float]] = []
+        cur_ask_p: list[tuple[int, float]] = []
+        cur_ask_s: list[tuple[int, float]] = []
+        cur_recv: float = 0.0
+
+        def _emit() -> None:
+            cur_bid_p.sort(key=lambda t: t[0])
+            cur_bid_s.sort(key=lambda t: t[0])
+            cur_ask_p.sort(key=lambda t: t[0])
+            cur_ask_s.sort(key=lambda t: t[0])
+            out.append({
+                "ts": int(cur_ts) if cur_ts is not None else 0,
+                "symbol": symbol,
+                "bid_prices": np.array([p for _, p in cur_bid_p], dtype=np.float64),
+                "bid_sizes": np.array([s for _, s in cur_bid_s], dtype=np.float64),
+                "ask_prices": np.array([p for _, p in cur_ask_p], dtype=np.float64),
+                "ask_sizes": np.array([s for _, s in cur_ask_s], dtype=np.float64),
+                "recv_ts": float(cur_recv),
+            })
+
+        for r in rows:
+            ts_i = int(r[0])
+            side = str(r[1])
+            level = int(r[2])
+            price = float(r[3] or 0.0)
+            size = float(r[4] or 0.0)
+            recv_ts = float(r[5] or 0.0)
+            if cur_ts is None:
+                cur_ts = ts_i
+            if ts_i != cur_ts:
+                _emit()
+                cur_bid_p, cur_bid_s = [], []
+                cur_ask_p, cur_ask_s = [], []
+                cur_ts = ts_i
+                cur_recv = 0.0
+            if side == "bid":
+                cur_bid_p.append((level, price))
+                cur_bid_s.append((level, size))
+            else:
+                cur_ask_p.append((level, price))
+                cur_ask_s.append((level, size))
+            cur_recv = recv_ts
+
+        if cur_ts is not None:
+            _emit()
+
+        return out
+
     def row_counts(self) -> dict[str, int]:
         """Return current row counts per table (for monitoring)."""
         out: dict[str, int] = {}
-        for table in ("tickers", "trades", "liquidations", "kline_1min"):
+        for table in (
+            "tickers", "trades", "liquidations", "kline_1min",
+            "orderbook_snapshots",
+        ):
             r = self.conn.execute(f"SELECT COUNT(*) FROM {table}").fetchone()
             out[table] = r[0] if r else 0
         return out
@@ -402,7 +587,10 @@ class PersistenceLayer:
 
         date_tag = cutoff_dt.strftime("%Y%m%d")
 
-        for table in ("tickers", "trades", "liquidations", "kline_1min"):
+        for table in (
+            "tickers", "trades", "liquidations", "kline_1min",
+            "orderbook_snapshots",
+        ):
             count_row = self.conn.execute(
                 f"SELECT COUNT(*) FROM {table} WHERE ts < ?", [cutoff_ms]
             ).fetchone()

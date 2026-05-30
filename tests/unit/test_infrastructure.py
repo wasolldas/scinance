@@ -724,3 +724,121 @@ class TestPersistence:
             db._init_schema()  # should not raise
         finally:
             db.close()
+
+
+# =====================================================================
+# PersistenceLayer — L2 orderbook snapshots
+# =====================================================================
+
+class TestPersistenceOrderbook:
+    """Round-trip tests for the L2 ``orderbook_snapshots`` table."""
+
+    def test_write_and_read_orderbook_snapshot(self) -> None:
+        """Single snapshot round-trip preserves prices and sizes exactly."""
+        db = PersistenceLayer(db_path=Path(":memory:"))
+        try:
+            ts = 1_700_000_000_000
+            bid_prices = np.array([50000.0, 49999.5, 49999.0], dtype=np.float64)
+            bid_sizes = np.array([1.2, 0.8, 2.5], dtype=np.float64)
+            ask_prices = np.array([50001.0, 50001.5, 50002.0], dtype=np.float64)
+            ask_sizes = np.array([0.9, 1.7, 3.3], dtype=np.float64)
+            n_rows = db.write_orderbook_snapshot(
+                ts=ts,
+                symbol="BTCUSDT",
+                bid_prices=bid_prices,
+                bid_sizes=bid_sizes,
+                ask_prices=ask_prices,
+                ask_sizes=ask_sizes,
+                recv_ts=1_700_000_000.123,
+                depth=20,
+            )
+            assert n_rows == 6  # 3 bids + 3 asks
+
+            out = db.query_orderbook_snapshots(
+                "BTCUSDT", ts - 1, ts + 1, depth=20
+            )
+            assert len(out) == 1
+            rec = out[0]
+            assert rec["ts"] == ts
+            np.testing.assert_array_almost_equal(rec["bid_prices"], bid_prices)
+            np.testing.assert_array_almost_equal(rec["bid_sizes"], bid_sizes)
+            np.testing.assert_array_almost_equal(rec["ask_prices"], ask_prices)
+            np.testing.assert_array_almost_equal(rec["ask_sizes"], ask_sizes)
+            assert abs(rec["recv_ts"] - 1_700_000_000.123) < 1e-6
+        finally:
+            db.close()
+
+    def test_orderbook_snapshots_chronological(self) -> None:
+        """Three snapshots with different ts are returned sorted ascending."""
+        db = PersistenceLayer(db_path=Path(":memory:"))
+        try:
+            bids_p = np.array([100.0], dtype=np.float64)
+            bids_s = np.array([1.0], dtype=np.float64)
+            asks_p = np.array([101.0], dtype=np.float64)
+            asks_s = np.array([1.0], dtype=np.float64)
+            # Insert deliberately out of order.
+            for ts in (3000, 1000, 2000):
+                db.write_orderbook_snapshot(
+                    ts=ts,
+                    symbol="BTCUSDT",
+                    bid_prices=bids_p,
+                    bid_sizes=bids_s,
+                    ask_prices=asks_p,
+                    ask_sizes=asks_s,
+                    recv_ts=ts / 1000.0,
+                )
+
+            out = db.query_orderbook_snapshots("BTCUSDT", 0, 10_000, depth=20)
+            assert [r["ts"] for r in out] == [1000, 2000, 3000]
+        finally:
+            db.close()
+
+    def test_orderbook_batch_writer(self) -> None:
+        """Batch write of 5 dicts produces 5 recoverable snapshots."""
+        db = PersistenceLayer(db_path=Path(":memory:"))
+        try:
+            snaps = []
+            for i in range(5):
+                snaps.append({
+                    "ts": 1_000 + i,
+                    "symbol": "BTCUSDT",
+                    "bid_prices": np.array([100.0 - i * 0.1], dtype=np.float64),
+                    "bid_sizes": np.array([1.0 + i], dtype=np.float64),
+                    "ask_prices": np.array([101.0 + i * 0.1], dtype=np.float64),
+                    "ask_sizes": np.array([1.0 + i], dtype=np.float64),
+                    "recv_ts": float(i),
+                    "depth": 20,
+                })
+            n_rows = db.write_orderbook_snapshots_batch(snaps)
+            assert n_rows == 5 * 2  # 1 bid + 1 ask per snapshot
+
+            out = db.query_orderbook_snapshots("BTCUSDT", 0, 10_000, depth=20)
+            assert len(out) == 5
+            for i, rec in enumerate(out):
+                assert rec["ts"] == 1_000 + i
+                assert rec["bid_sizes"][0] == pytest.approx(1.0 + i)
+                assert rec["ask_sizes"][0] == pytest.approx(1.0 + i)
+        finally:
+            db.close()
+
+    def test_row_counts_includes_orderbook(self) -> None:
+        """row_counts surfaces the new orderbook_snapshots table."""
+        db = PersistenceLayer(db_path=Path(":memory:"))
+        try:
+            counts0 = db.row_counts()
+            assert "orderbook_snapshots" in counts0
+            assert counts0["orderbook_snapshots"] == 0
+
+            db.write_orderbook_snapshot(
+                ts=1234,
+                symbol="BTCUSDT",
+                bid_prices=np.array([100.0, 99.0], dtype=np.float64),
+                bid_sizes=np.array([1.0, 2.0], dtype=np.float64),
+                ask_prices=np.array([101.0, 102.0], dtype=np.float64),
+                ask_sizes=np.array([1.0, 2.0], dtype=np.float64),
+                recv_ts=1.234,
+            )
+            counts1 = db.row_counts()
+            assert counts1["orderbook_snapshots"] == 4  # 2 bids + 2 asks
+        finally:
+            db.close()

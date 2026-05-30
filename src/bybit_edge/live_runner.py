@@ -34,6 +34,9 @@ from bybit_edge.config import (
     EXECUTION_ORDER_USD,
     PERSIST_ENABLED,
     PERSIST_FLUSH_SECONDS,
+    PERSIST_ORDERBOOK,
+    PERSIST_ORDERBOOK_DEPTH,
+    PERSIST_ORDERBOOK_SNAPSHOT_SECONDS,
     PIPELINE_INTERVAL_SECONDS,
     PRIMARY_SYMBOL,
 )
@@ -74,7 +77,11 @@ class LiveRunner:
         self._buf_tickers: list[TickerSnapshot] = []
         self._buf_trades: list[TradeEvent] = []
         self._buf_liqs: list[LiquidationEvent] = []
+        # L2-Orderbook-Snapshots (Opt-in via PERSIST_ORDERBOOK).
+        self._buf_orderbook_snaps: list[dict[str, Any]] = []
+        self._last_ob_snap_ts: float = 0.0
         self._persisted = 0
+        self._ob_snaps_persisted = 0
 
         # Positions-Tracking ("", "Buy", "Sell")
         self._position_side: str = ""
@@ -128,6 +135,32 @@ class LiveRunner:
             self.orderbook.apply_snapshot(msg.data)
         else:
             self.orderbook.apply_delta(msg.data)
+        # Optionale L2-Persistenz: erst nach apply_*, damit die Snapshot-Tiefe
+        # konsistent ist. Strikt opt-in (PERSIST_ORDERBOOK=false → kein I/O,
+        # kein Buffer-Wachstum). Wir throttlen via PERSIST_ORDERBOOK_SNAPSHOT_
+        # SECONDS, sodass aus den ~20-ms-Deltas ~1 Snapshot/s wird (PRD-Schätzung
+        # 500 MB/Tag pro Symbol für volle Deltas → ~5-15 MB/Tag pro Symbol mit
+        # Snapshot-Modus + ZSTD-Parquet-Archivierung).
+        if self.persist is None or not PERSIST_ORDERBOOK:
+            return
+        recv_ts = float(msg.recv_ts)
+        if (recv_ts - self._last_ob_snap_ts) < PERSIST_ORDERBOOK_SNAPSHOT_SECONDS:
+            return
+        depth = int(PERSIST_ORDERBOOK_DEPTH)
+        (bid_p, bid_s), (ask_p, ask_s) = self.orderbook.top_n_arrays(depth)
+        if bid_p.size == 0 and ask_p.size == 0:
+            return
+        self._last_ob_snap_ts = recv_ts
+        self._buf_orderbook_snaps.append({
+            "ts": int(recv_ts * 1000),
+            "symbol": self.symbol,
+            "bid_prices": bid_p,
+            "bid_sizes": bid_s,
+            "ask_prices": ask_p,
+            "ask_sizes": ask_s,
+            "recv_ts": recv_ts,
+            "depth": depth,
+        })
 
     def _on_trade(self, msg: WSMessage) -> None:
         evt = TradeEvent.from_ws(msg.data)
@@ -302,13 +335,19 @@ class LiveRunner:
         if self.persist is None:
             return
         t, tr, lq = self._buf_tickers, self._buf_trades, self._buf_liqs
+        ob = self._buf_orderbook_snaps
         self._buf_tickers, self._buf_trades, self._buf_liqs = [], [], []
+        self._buf_orderbook_snaps = []
         try:
             n = 0
             n += self.persist.write_tickers_batch(t)
             n += self.persist.write_trades_batch(tr, symbol=self.symbol)
             n += self.persist.write_liquidations_batch(lq)
             self._persisted += n
+            if ob:
+                # write_orderbook_snapshots_batch returns row count (depth*2 per snap).
+                self.persist.write_orderbook_snapshots_batch(ob)
+                self._ob_snaps_persisted += len(ob)
         except Exception:
             logger.exception("Persist-Flush fehlgeschlagen")
 
@@ -322,7 +361,14 @@ class LiveRunner:
             await asyncio.sleep(30.0)
             mid = self.orderbook.mid_price
             px = self.ticker.last_price if self.ticker else 0.0
-            extra = f" persisted={self._persisted}" if self.persist is not None else ""
+            if self.persist is not None:
+                ob_pending = len(self._buf_orderbook_snaps)
+                extra = (
+                    f" persisted={self._persisted}"
+                    f" ob={self._ob_snaps_persisted + ob_pending}"
+                )
+            else:
+                extra = ""
             logger.info(
                 "HEARTBEAT: msgs=%d last=%.2f mid=%.2f trades=%d liqs=%d pos=%s%s",
                 self._msg_count, px, mid,

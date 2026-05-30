@@ -19,9 +19,13 @@ Strikte Kausalität (kein Lookahead):
     Pipeline (siehe ``live_runner._build_ticker_data``) erwartet.
 
 Ehrliche Einordnung der Daten-Limits:
-    * Persistiert wird nur Top-of-Book (bid1/ask1) — keine volle L2-Tiefe.
-      Damit ist M6 Shannon-Entropie (L2) nicht sinnvoll testbar und S2
-      (Entropie-Momentum) liefert mangels echter Tiefe i.d.R. 0 Trades.
+    * Top-of-Book (bid1/ask1) ist immer persistiert. Wenn der LiveRunner
+      zusätzlich mit ``PERSIST_ORDERBOOK=true`` lief, sind in DuckDB auch
+      L2-Snapshots (Top-N Levels) gespeichert. In diesem Fall werden M6
+      Shannon-L2-Entropie und damit S2 (Entropie-Momentum) auf den
+      tatsächlich gesehenen Tiefenprofilen ausgewertet. Ohne L2-Persistenz
+      fällt ``_build_ticker_data`` auf den 1-Level-Fallback zurück (S2 wird
+      mangels Tiefe i.d.R. keinen Entropy-Collapse triggern).
     * S4 (Pattern-Ensemble) braucht Foundation-Modelle + lange Preisserien,
       S5 (Cross-Sectional) braucht Multi-Symbol-Panels — beides ist aus den
       Single-Symbol-Tickdaten nicht abbildbar. Beide sind ``datenlimitiert``.
@@ -64,6 +68,10 @@ _PRICE_HISTORY_MAXLEN: int = 512
 
 # Strategies that cannot be validated with the persisted single-symbol /
 # top-of-book data set. Flagged ``datenlimitiert`` in the result metadata.
+# Note: S2 becomes testable as soon as L2 ``orderbook_snapshots`` are present
+# in the database — :meth:`ReplayBacktester.load_events` then surfaces depth
+# arrays in the merged stream and removes S2 from the data-limited set on the
+# fly (see ``self._data_limited``).
 _DATA_LIMITED: frozenset[str] = frozenset({"S2", "S4", "S5"})
 
 
@@ -84,11 +92,19 @@ class ReplayBacktester:
         self.persist: Optional[PersistenceLayer] = None
 
         # Merged, chronologically sorted event stream.
-        # Each item: (ts_ms, kind, payload) where kind in {"ticker","trade","liq"}.
+        # Each item: (ts_ms, kind, payload) where
+        # kind in {"ticker", "trade", "liq", "ob"}. "ob" carries a full L2
+        # snapshot reconstructed from the ``orderbook_snapshots`` table.
         self._events: list[tuple[int, str, dict[str, Any]]] = []
 
         # Backtest engine for fee/slippage-aware metrics.
         self.engine: BacktestEngine = BacktestEngine()
+
+        # Mutable copy of the data-limited set. Becomes a strict subset
+        # (S2 removed) when L2 snapshots are present in the loaded window.
+        self._data_limited: set[str] = set(_DATA_LIMITED)
+        # Whether the loaded window contains L2 orderbook snapshots.
+        self._has_orderbook: bool = False
 
     # ------------------------------------------------------------------
     # Event loading
@@ -122,6 +138,11 @@ class ReplayBacktester:
 
         lo = start_ts if start_ts is not None else 0
         hi = end_ts if end_ts is not None else 2**63 - 1
+
+        # Reset depth-availability flags before re-querying — keeps load_events
+        # idempotent across multiple calls.
+        self._has_orderbook = False
+        self._data_limited = set(_DATA_LIMITED)
 
         events: list[tuple[int, str, dict[str, Any]]] = []
 
@@ -204,10 +225,38 @@ class ReplayBacktester:
                 },
             ))
 
+        # Optional L2 orderbook snapshots (opt-in via PERSIST_ORDERBOOK in the
+        # LiveRunner). Reconstructed as one ``ob`` event per persisted snapshot
+        # with full top-N bid/ask price+size arrays.
+        ob_snaps = persist.query_orderbook_snapshots(
+            self.symbol, lo, hi, depth=20
+        )
+        self._has_orderbook = bool(ob_snaps)
+        if self._has_orderbook:
+            # S2 (Entropy-Momentum) needs depth>1 to compute Shannon-L2 entropy
+            # meaningfully. With persisted L2 snapshots present it is no longer
+            # data-limited; remove it from the per-instance set.
+            self._data_limited.discard("S2")
+        for snap in ob_snaps:
+            events.append((
+                int(snap["ts"]),
+                "ob",
+                {
+                    "ts": int(snap["ts"]),
+                    "bid_prices": np.asarray(snap["bid_prices"], dtype=np.float64),
+                    "bid_sizes": np.asarray(snap["bid_sizes"], dtype=np.float64),
+                    "ask_prices": np.asarray(snap["ask_prices"], dtype=np.float64),
+                    "ask_sizes": np.asarray(snap["ask_sizes"], dtype=np.float64),
+                    "recv_ts": float(snap["recv_ts"]),
+                },
+            ))
+
         # Stable chronological sort. Tie-break by a fixed kind order so that
-        # at equal ts we deterministically ingest market data (ticker/trade/
-        # liq) before re-evaluating — never a future event before a past one.
-        kind_order = {"ticker": 0, "trade": 1, "liq": 2}
+        # at equal ts we deterministically ingest market data first (ticker,
+        # trade, liq, ob) — never a future event before a past one. The OB
+        # snapshot lands last among equal-ts events so that the depth profile
+        # observed at ts==T reflects state after all other market events at T.
+        kind_order = {"ticker": 0, "trade": 1, "liq": 2, "ob": 3}
         events.sort(key=lambda e: (e[0], kind_order[e[1]]))
 
         self._events = events
@@ -237,12 +286,15 @@ class ReplayBacktester:
         liq_buffer: LiquidationBuffer,
         price_history: deque[float],
         now_ms: int,
+        ob_snap: Optional[dict[str, Any]] = None,
     ) -> dict[str, Any]:
         """Build a ``ticker_data`` dict in the exact format the pipeline uses.
 
         Only data already ingested up to *now_ms* is used — strictly causal.
-        Order-book depth is reconstructed as top-of-book (bid1/ask1) because
-        full L2 depth is not persisted.
+        When ``ob_snap`` is provided (the latest persisted L2 snapshot with
+        ts <= now_ms) the depth profile arrays are taken from it; otherwise
+        the order-book depth is reconstructed as a 1-level fallback from
+        ``bid1``/``ask1``.
         """
         last_price: float = snap["last_price"]
         mark_price: float = snap["mark_price"] or last_price
@@ -253,25 +305,76 @@ class ReplayBacktester:
         ask1_price: float = snap["ask1_price"]
         ask1_size: float = snap["ask1_size"]
 
-        # Top-of-book size arrays. The pipeline/strategies treat these as the
-        # depth profile; with only L1 persisted they are single-element arrays.
-        bid_sizes: np.ndarray = (
-            np.array([bid1_size], dtype=np.float64)
-            if bid1_size > 0
-            else np.ones(1, dtype=np.float64)
+        # Depth profile arrays. Prefer the persisted L2 snapshot (full top-N
+        # bid/ask sizes) when present, otherwise fall back to a 1-level array
+        # synthesised from bid1/ask1.
+        use_ob = ob_snap is not None
+        bid_sizes_from_ob = (
+            use_ob
+            and isinstance(ob_snap.get("bid_sizes"), np.ndarray)
+            and ob_snap["bid_sizes"].size > 0
         )
-        ask_sizes: np.ndarray = (
-            np.array([ask1_size], dtype=np.float64)
-            if ask1_size > 0
-            else np.ones(1, dtype=np.float64)
+        ask_sizes_from_ob = (
+            use_ob
+            and isinstance(ob_snap.get("ask_sizes"), np.ndarray)
+            and ob_snap["ask_sizes"].size > 0
+        )
+        bid_prices_from_ob = (
+            use_ob
+            and isinstance(ob_snap.get("bid_prices"), np.ndarray)
+            and ob_snap["bid_prices"].size > 0
+        )
+        ask_prices_from_ob = (
+            use_ob
+            and isinstance(ob_snap.get("ask_prices"), np.ndarray)
+            and ob_snap["ask_prices"].size > 0
         )
 
-        best_bid: tuple[float, float] = (
-            (bid1_price, bid1_size) if bid1_price > 0 else (last_price - 1.0, 1.0)
-        )
-        best_ask: tuple[float, float] = (
-            (ask1_price, ask1_size) if ask1_price > 0 else (last_price + 1.0, 1.0)
-        )
+        if bid_sizes_from_ob:
+            bid_sizes: np.ndarray = np.asarray(
+                ob_snap["bid_sizes"], dtype=np.float64
+            )
+        else:
+            bid_sizes = (
+                np.array([bid1_size], dtype=np.float64)
+                if bid1_size > 0
+                else np.ones(1, dtype=np.float64)
+            )
+
+        if ask_sizes_from_ob:
+            ask_sizes: np.ndarray = np.asarray(
+                ob_snap["ask_sizes"], dtype=np.float64
+            )
+        else:
+            ask_sizes = (
+                np.array([ask1_size], dtype=np.float64)
+                if ask1_size > 0
+                else np.ones(1, dtype=np.float64)
+            )
+
+        if bid_prices_from_ob and bid_sizes_from_ob:
+            best_bid: tuple[float, float] = (
+                float(ob_snap["bid_prices"][0]),
+                float(ob_snap["bid_sizes"][0]),
+            )
+        else:
+            best_bid = (
+                (bid1_price, bid1_size)
+                if bid1_price > 0
+                else (last_price - 1.0, 1.0)
+            )
+
+        if ask_prices_from_ob and ask_sizes_from_ob:
+            best_ask: tuple[float, float] = (
+                float(ob_snap["ask_prices"][0]),
+                float(ob_snap["ask_sizes"][0]),
+            )
+        else:
+            best_ask = (
+                (ask1_price, ask1_size)
+                if ask1_price > 0
+                else (last_price + 1.0, 1.0)
+            )
 
         # premium_index follows the TickerSnapshot.basis definition.
         premium_index: float = (
@@ -450,6 +553,11 @@ class ReplayBacktester:
         price_history: deque[float] = deque(maxlen=_PRICE_HISTORY_MAXLEN)
 
         last_ticker: Optional[dict[str, Any]] = None
+        # Tracks the most-recent persisted L2 snapshot whose ts <= the current
+        # event ts. The merged stream's kind_order guarantees this is updated
+        # strictly causally (an OB snapshot at ts=T is consumed only after all
+        # other events at ts==T have already been ingested).
+        last_ob_snap: Optional[dict[str, Any]] = None
         last_pipeline_ms: int = -interval_ms  # ensures first ticker fires
 
         for ts_ms, kind, payload in self._events:
@@ -480,6 +588,13 @@ class ReplayBacktester:
                 )
                 continue
 
+            if kind == "ob":
+                # Persisted L2 snapshot — stash it for the next pipeline tick.
+                # Strictly causal: ts of this OB is <= the next ticker's ts
+                # (events are sorted by ts ascending).
+                last_ob_snap = payload
+                continue
+
             # kind == "ticker"
             last_ticker = payload
             if payload["last_price"] <= 0:
@@ -496,6 +611,7 @@ class ReplayBacktester:
                 liq_buffer=liq_buffer,
                 price_history=price_history,
                 now_ms=ts_ms,
+                ob_snap=last_ob_snap,
             )
             ts_seconds = ts_ms / 1000.0
             price = float(ticker_data["last_price"])
@@ -616,8 +732,27 @@ class ReplayBacktester:
 
     @staticmethod
     def is_data_limited(strategy_id: str) -> bool:
-        """Whether a strategy cannot be validated with the persisted data set."""
+        """Whether a strategy is *statically* data-limited (S2/S4/S5).
+
+        This is the conservative default and reflects the assumption that no
+        L2 orderbook snapshots are persisted. For the actual runtime status
+        (which can promote S2 to "real testbar" once L2 snapshots are loaded),
+        prefer :meth:`is_data_limited_runtime` on a loaded instance.
+        """
         return strategy_id in _DATA_LIMITED
+
+    def is_data_limited_runtime(self, strategy_id: str) -> bool:
+        """Per-instance data-limited check.
+
+        After :meth:`load_events` has run, S2 is considered *not* data-limited
+        if the loaded window contained at least one L2 orderbook snapshot.
+        """
+        return strategy_id in self._data_limited
+
+    @property
+    def has_orderbook(self) -> bool:
+        """Whether the currently-loaded event stream contains L2 snapshots."""
+        return self._has_orderbook
 
     def close(self) -> None:
         """Close the underlying persistence handle (if open)."""

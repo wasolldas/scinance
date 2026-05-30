@@ -284,3 +284,168 @@ def test_is_data_limited_flags() -> None:
     assert ReplayBacktester.is_data_limited("S5") is True
     assert ReplayBacktester.is_data_limited("S1") is False
     assert ReplayBacktester.is_data_limited("S3") is False
+
+
+def test_replay_uses_persisted_orderbook(persist: PersistenceLayer) -> None:
+    """When L2 snapshots are persisted, ``_build_ticker_data`` must surface
+    those depth arrays (not the 1-element bid1/ask1 fallback) and M6 must
+    score the resulting profile to the value expected for the snapshot.
+
+    Construction:
+        * Uniform top-5 size profile on each side → Shannon entropy ≈ log2(5).
+        * The replay loop sees the OB snapshot first (ts=T0), then a later
+          ticker at ts=T1 with no fresh OB → the cached snapshot is reused.
+    """
+    from bybit_edge.layers.l3_regime.m6_entropy import M6ShannonEntropy
+
+    n_levels = 5
+    base_bid_price = 29_999.0
+    base_ask_price = 30_001.0
+    uniform_size = 1.0
+
+    bid_prices = np.array(
+        [base_bid_price - i for i in range(n_levels)], dtype=np.float64
+    )
+    bid_sizes = np.full(n_levels, uniform_size, dtype=np.float64)
+    ask_prices = np.array(
+        [base_ask_price + i for i in range(n_levels)], dtype=np.float64
+    )
+    ask_sizes = np.full(n_levels, uniform_size, dtype=np.float64)
+
+    # Persist a single ticker @ts=BASE+5000 and an OB snapshot @ts=BASE+3000
+    # (strictly before the ticker; OB is consumed first because it has higher
+    # kind_order rank on equal ts and earlier-than-ticker on lesser ts).
+    persist.write_tickers_batch([_ticker(5, last_price=30_000.0)])
+    persist.write_orderbook_snapshots_batch([{
+        "ts": _BASE_TS + 3000,
+        "symbol": _SYMBOL,
+        "bid_prices": bid_prices,
+        "bid_sizes": bid_sizes,
+        "ask_prices": ask_prices,
+        "ask_sizes": ask_sizes,
+        "recv_ts": (_BASE_TS + 3000) / 1000.0,
+        "depth": 20,
+    }])
+
+    bt = _new_bt(persist)
+    n = bt.load_events()
+    assert n == 2  # 1 ticker + 1 ob snapshot
+
+    # Intercept the ticker_data that is handed to the strategies.
+    captured: dict[str, Any] = {}
+
+    def fake_eval(strategy_id: str, strategy: Any, ticker_data: dict,
+                  ts_seconds: float) -> dict:
+        captured.setdefault("ticker_data", ticker_data)
+        return {"action": "wait", "direction": 0, "strategy": strategy_id}
+
+    bt._eval_strategy = fake_eval  # type: ignore[assignment]
+    bt.run(pipeline_interval_seconds=1.0)
+
+    td = captured["ticker_data"]
+    # 1. Data origin: arrays come from the persisted OB snapshot, not the
+    #    1-element bid1/ask1 fallback.
+    assert td["bid_sizes"].size == n_levels
+    assert td["ask_sizes"].size == n_levels
+    np.testing.assert_array_almost_equal(td["bid_sizes"], bid_sizes)
+    np.testing.assert_array_almost_equal(td["ask_sizes"], ask_sizes)
+    # best_bid/best_ask also come from the OB top level.
+    assert td["best_bid"][0] == pytest.approx(base_bid_price)
+    assert td["best_ask"][0] == pytest.approx(base_ask_price)
+
+    # 2. M6 Shannon entropy on a uniform 5-level distribution = log2(5).
+    m6 = M6ShannonEntropy()
+    res = m6.compute(td["bid_sizes"], td["ask_sizes"])
+    expected_h = float(np.log2(n_levels))
+    assert res["h_bid"] == pytest.approx(expected_h, abs=1e-9)
+    assert res["h_ask"] == pytest.approx(expected_h, abs=1e-9)
+
+
+def test_has_orderbook_and_runtime_data_limited(
+    persist: PersistenceLayer,
+) -> None:
+    """``has_orderbook`` flips True once L2 snapshots are loaded and S2 is
+    no longer reported as data-limited via ``is_data_limited_runtime``."""
+    # Before any load → flags default to False / S2 still limited.
+    bt = _new_bt(persist)
+    assert bt.has_orderbook is False
+    assert bt.is_data_limited_runtime("S2") is True
+
+    bid_prices = np.array([29_999.0, 29_998.0], dtype=np.float64)
+    bid_sizes = np.array([1.0, 2.0], dtype=np.float64)
+    ask_prices = np.array([30_001.0, 30_002.0], dtype=np.float64)
+    ask_sizes = np.array([1.0, 2.0], dtype=np.float64)
+    persist.write_tickers_batch([_ticker(0)])
+    persist.write_orderbook_snapshots_batch([{
+        "ts": _BASE_TS,
+        "symbol": _SYMBOL,
+        "bid_prices": bid_prices,
+        "bid_sizes": bid_sizes,
+        "ask_prices": ask_prices,
+        "ask_sizes": ask_sizes,
+        "recv_ts": _BASE_TS / 1000.0,
+        "depth": 20,
+    }])
+    bt.load_events()
+    assert bt.has_orderbook is True
+    # Per-instance flag flips; static class flag is unchanged (conservative).
+    assert bt.is_data_limited_runtime("S2") is False
+    assert ReplayBacktester.is_data_limited("S2") is True
+    # S4/S5 stay limited even with L2 data.
+    assert bt.is_data_limited_runtime("S4") is True
+    assert bt.is_data_limited_runtime("S5") is True
+
+
+def test_load_events_is_idempotent_for_ob_flag(
+    persist: PersistenceLayer,
+) -> None:
+    """Re-loading after the OB rows have been deleted resets the flag."""
+    persist.write_tickers_batch([_ticker(0)])
+    persist.write_orderbook_snapshots_batch([{
+        "ts": _BASE_TS,
+        "symbol": _SYMBOL,
+        "bid_prices": np.array([100.0], dtype=np.float64),
+        "bid_sizes": np.array([1.0], dtype=np.float64),
+        "ask_prices": np.array([101.0], dtype=np.float64),
+        "ask_sizes": np.array([1.0], dtype=np.float64),
+        "recv_ts": _BASE_TS / 1000.0,
+        "depth": 20,
+    }])
+    bt = _new_bt(persist)
+    bt.load_events()
+    assert bt.has_orderbook is True
+
+    # Wipe OB rows and reload — flag must reset.
+    persist.conn.execute("DELETE FROM orderbook_snapshots")
+    bt.load_events()
+    assert bt.has_orderbook is False
+    assert bt.is_data_limited_runtime("S2") is True
+
+
+def test_replay_falls_back_to_l1_without_orderbook(
+    persist: PersistenceLayer,
+) -> None:
+    """Without any persisted L2 snapshots, the depth arrays in
+    ``_build_ticker_data`` are the 1-element bid1/ask1 fallback (legacy
+    behaviour unchanged)."""
+    persist.write_tickers_batch([_ticker(0, last_price=30_000.0)])
+
+    bt = _new_bt(persist)
+    bt.load_events()
+
+    captured: dict[str, Any] = {}
+
+    def fake_eval(strategy_id: str, strategy: Any, ticker_data: dict,
+                  ts_seconds: float) -> dict:
+        captured.setdefault("ticker_data", ticker_data)
+        return {"action": "wait", "direction": 0, "strategy": strategy_id}
+
+    bt._eval_strategy = fake_eval  # type: ignore[assignment]
+    bt.run(pipeline_interval_seconds=1.0)
+
+    td = captured["ticker_data"]
+    assert td["bid_sizes"].size == 1
+    assert td["ask_sizes"].size == 1
+    # bid1_size from the _ticker fixture is 5.0.
+    assert td["bid_sizes"][0] == pytest.approx(5.0)
+    assert td["ask_sizes"][0] == pytest.approx(5.0)

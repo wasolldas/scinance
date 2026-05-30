@@ -207,6 +207,100 @@ class TestLiveRunnerPersistence:
         assert r._persisted == 3
         r.persist.close()
 
+    def test_orderbook_persistence_optin_off_no_buffer(self, monkeypatch):
+        """PERSIST_ORDERBOOK=false → kein OB-Puffer trotz aktiver Persistenz."""
+        monkeypatch.setattr("bybit_edge.live_runner.PERSIST_ORDERBOOK", False)
+        r = LiveRunner("BTCUSDT")
+        # Persistenz aktiv simulieren (Buffer-Pfad sonst nicht erreichbar).
+        r.persist = object()  # truthy
+        snap = WSMessage(
+            "orderbook50", "BTCUSDT",
+            {"b": [["49999", "2.0"], ["49998", "1.5"]],
+             "a": [["50001", "1.5"], ["50002", "0.8"]],
+             "u": 1},
+            1.0, msg_type="snapshot",
+        )
+        r._on_orderbook(snap)
+        for i in range(5):
+            delta = WSMessage(
+                "orderbook50", "BTCUSDT",
+                {"b": [["49999", str(2.0 + i * 0.1)]], "a": [], "u": 2 + i},
+                1.0 + (i + 1) * 0.5, msg_type="delta",
+            )
+            r._on_orderbook(delta)
+        assert r._buf_orderbook_snaps == []
+        assert r._last_ob_snap_ts == 0.0
+
+    def test_orderbook_persistence_optin_on_buffers_and_flushes(
+        self, monkeypatch
+    ):
+        """PERSIST_ORDERBOOK=true: respektiert Throttle + Flush → DuckDB."""
+        from bybit_edge.persistence.db import PersistenceLayer
+        import pathlib
+
+        monkeypatch.setattr("bybit_edge.live_runner.PERSIST_ORDERBOOK", True)
+        monkeypatch.setattr("bybit_edge.live_runner.PERSIST_ORDERBOOK_DEPTH", 20)
+        monkeypatch.setattr(
+            "bybit_edge.live_runner.PERSIST_ORDERBOOK_SNAPSHOT_SECONDS", 1.0
+        )
+
+        r = LiveRunner("BTCUSDT")
+        r.persist = PersistenceLayer(db_path=pathlib.Path(":memory:"))
+
+        # t=1.0: snapshot creates the book → first OB snapshot persisted.
+        snap = WSMessage(
+            "orderbook50", "BTCUSDT",
+            {"b": [["49999", "2.0"], ["49998", "1.5"], ["49997", "1.0"]],
+             "a": [["50001", "1.5"], ["50002", "0.8"], ["50003", "0.6"]],
+             "u": 1},
+            1.0, msg_type="snapshot",
+        )
+        r._on_orderbook(snap)
+
+        # t=1.05: delta well inside the 1-s throttle window — must be skipped.
+        delta_throttled = WSMessage(
+            "orderbook50", "BTCUSDT",
+            {"b": [["49999", "2.5"]], "a": [], "u": 2},
+            1.05, msg_type="delta",
+        )
+        r._on_orderbook(delta_throttled)
+
+        # t=2.20: > 1 s past the last snapshot → must be captured.
+        delta_ok = WSMessage(
+            "orderbook50", "BTCUSDT",
+            {"b": [["49999", "2.6"]], "a": [], "u": 3},
+            2.20, msg_type="delta",
+        )
+        r._on_orderbook(delta_ok)
+
+        assert len(r._buf_orderbook_snaps) == 2
+
+        # Flush → DuckDB.
+        r._flush_persist()
+        assert r._buf_orderbook_snaps == []
+        assert r._ob_snaps_persisted == 2
+
+        counts = r.persist.row_counts()
+        # 3 bids + 3 asks per snapshot × 2 snapshots = 12 rows.
+        assert counts["orderbook_snapshots"] == 12
+
+        # Verify the chronological ordering of stored snapshots.
+        recs = r.persist.query_orderbook_snapshots(
+            "BTCUSDT", 0, 10_000_000_000_000, depth=20
+        )
+        assert len(recs) == 2
+        assert recs[0]["ts"] == 1000  # int(1.0 * 1000)
+        assert recs[1]["ts"] == 2200  # int(2.20 * 1000)
+        # Bids are sorted descending in the book → first level is the best bid.
+        np.testing.assert_array_almost_equal(
+            recs[0]["bid_prices"][:3],
+            np.array([49999.0, 49998.0, 49997.0]),
+        )
+        # Size update at t=2.20 must be reflected.
+        assert recs[1]["bid_sizes"][0] == pytest.approx(2.6)
+
+        r.persist.close()
+
 
 class TestLiveRunnerDecision:
     @pytest.mark.asyncio

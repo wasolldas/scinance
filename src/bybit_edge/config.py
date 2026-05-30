@@ -461,6 +461,16 @@ PIPELINE_INTERVAL_SECONDS: float = float(os.getenv("PIPELINE_INTERVAL_SECONDS", 
 # damit später Microstructure-Strategien (S1/S2) backtestbar werden.
 PERSIST_ENABLED: bool = os.getenv("PERSIST_ENABLED", "false").lower() == "true"
 PERSIST_FLUSH_SECONDS: float = float(os.getenv("PERSIST_FLUSH_SECONDS", "5.0"))
+# Optionale L2-Orderbook-Persistenz (Opt-in, ergänzend zu PERSIST_ENABLED).
+# Default OFF, da PRD Abschnitt 3 für orderbook.50-Deltas ~500 MB/Tag pro Symbol
+# schätzt. Im Snapshot-Modus mit 1-s-Intervall sinkt das auf ~5-15 MB/Tag pro
+# Symbol (40 Zeilen pro Snapshot × 86400 Snapshots × ~50 B/Zeile ≈ 170 MB/Tag
+# unkomprimiert, deutlich weniger nach Parquet+ZSTD).
+PERSIST_ORDERBOOK: bool = os.getenv("PERSIST_ORDERBOOK", "false").lower() == "true"
+PERSIST_ORDERBOOK_DEPTH: int = int(os.getenv("PERSIST_ORDERBOOK_DEPTH", "20"))
+PERSIST_ORDERBOOK_SNAPSHOT_SECONDS: float = float(
+    os.getenv("PERSIST_ORDERBOOK_SNAPSHOT_SECONDS", "1.0")
+)
 # REST recv_window (ms) für signierte Requests.
 BYBIT_RECV_WINDOW_MS: int = int(os.getenv("BYBIT_RECV_WINDOW_MS", "5000"))
 # Signierte REST-Endpoints (Trade/Account).
