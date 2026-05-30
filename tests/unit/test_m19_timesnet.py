@@ -131,3 +131,39 @@ class TestReset:
 
         assert model._fitted is False
         assert len(model._weights) == 0
+
+
+# ══════════════════════════════════════════════════════════════════════
+# Zusätzliche PyTorch-Tests
+# ══════════════════════════════════════════════════════════════════════
+
+
+torch = pytest.importorskip("torch")
+
+
+class TestPyTorchForwardPassShape:
+    """Forward-Pass durch das PyTorch-Modell liefert (B, forecast_horizon)."""
+
+    def test_pytorch_forward_pass_shape(self) -> None:
+        model = M19TimesNet(top_k=2, lookback=64, forecast_horizon=8, channels=4)
+        x = torch.randn(3, 64)
+        out = model._model(x)
+        assert out.shape == (3, 8)
+
+
+class TestSaveLoadRoundtrip:
+    """save() + load() reproduzieren den Forward-Output."""
+
+    def test_save_load_roundtrip(self, tmp_path) -> None:
+        model = M19TimesNet(top_k=2, lookback=64, forecast_horizon=4, channels=4)
+        model._fitted = True
+        x = np.sin(np.linspace(0, 4 * np.pi, 64))
+        a = model.compute(x)["forecast"]
+
+        ckpt = tmp_path / "m19.pt"
+        model.save(str(ckpt))
+
+        model2 = M19TimesNet(top_k=2, lookback=64, forecast_horizon=4, channels=4)
+        assert model2.load(str(ckpt)) is True
+        b = model2.compute(x)["forecast"]
+        np.testing.assert_allclose(a, b, atol=1e-6)

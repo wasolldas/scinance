@@ -31,6 +31,13 @@ gpu = [
     "torch>=2.3",
     "torchvision>=0.18",
     "torchaudio>=2.3",
+    "snntorch>=0.9",
+    "PyWavelets>=1.5",
+]
+foundation = [
+    "momentfm",
+    "transformers>=4.40",
+    "peft>=0.10",
 ]
 dev = [
     "pytest>=8.0",

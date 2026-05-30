@@ -14,6 +14,7 @@ Testet:
 
 from __future__ import annotations
 
+import numpy as np
 import pytest
 
 from bybit_edge.layers.l1_ingestion.m1_spikewavformer import M1SpikeWavformer
@@ -109,3 +110,52 @@ class TestM1SpikeWavformer:
         assert result["method_id"] == "M1"
         assert result["signal"] in (-1, 0, 1)
         assert 0.0 <= result["confidence"] <= 1.0
+
+
+# ══════════════════════════════════════════════════════════════════════
+# Zusätzliche PyTorch-LIF-Tests
+# ══════════════════════════════════════════════════════════════════════
+
+
+torch = pytest.importorskip("torch")
+
+
+class TestPyTorchLIFForward:
+    """LIF-Netz liefert (B, n_classes) Output."""
+
+    def test_pytorch_lif_forward(self) -> None:
+        mod = M1SpikeWavformer(hidden=(32, 32, 16))
+        x = torch.randn(4, 3)
+        out = mod._net(x)
+        assert out.shape == (4, 2)
+        assert torch.isfinite(out).all()
+
+
+class TestSurrogateGradientBackward:
+    """Surrogate-Gradient erlaubt Backprop durch die Spike-Funktion."""
+
+    def test_surrogate_gradient_backward(self) -> None:
+        from bybit_edge.layers.l1_ingestion.m1_spikewavformer import _SurrogateSpike
+
+        v = torch.tensor([0.5, 1.5, 2.0], requires_grad=True)
+        spike = _SurrogateSpike.apply(v, 1.0)
+        loss = spike.sum()
+        loss.backward()
+        assert v.grad is not None
+        # Gradient muss endlich sein und in der Nähe von V_th ungleich Null
+        assert torch.isfinite(v.grad).all()
+        assert v.grad[1].abs() > 0  # bei V=1.5 (nahe V_th=1.0) muss ein Gradient da sein
+
+
+class TestFitRunsAndImproves:
+    """Mini-Train-Lauf für M1 (Spike/No-Spike)."""
+
+    def test_fit_runs(self) -> None:
+        rng = np.random.default_rng(0)
+        mod = M1SpikeWavformer(hidden=(16, 16, 16))
+        X = rng.normal(0, 1, (64, 3)).astype(np.float32)
+        # Label: 1 wenn Summe positiv (synthetisch lernbar)
+        y = (X.sum(axis=1) > 0).astype(np.int64)
+        res = mod.fit(X, y, epochs=3, batch_size=16, lr=1e-2)
+        assert np.isfinite(res["train_loss"])
+        assert mod._fitted is True

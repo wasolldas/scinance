@@ -135,8 +135,29 @@ SLIPPAGE_DEFAULT_BPS: Final[float] = 2.0  # 2 bps
 DATA_DIR: Path = Path(os.getenv("BYBIT_DATA_DIR", "data"))
 DB_PATH: Path = DATA_DIR / "bybit_edge.duckdb"
 PARQUET_DIR: Path = DATA_DIR / "parquet"
+MODELS_DIR: Path = DATA_DIR / "models"
 HOT_RETENTION_DAYS: Final[int] = 30  # Rolling Hot-Window
 PARQUET_COMPRESSION: Final[str] = "zstd"
+
+# ═══════════════════════════════════════════════════════════════════
+# TRAINIERTE MODELL-CHECKPOINTS (PyTorch-State-Dicts)
+# ═══════════════════════════════════════════════════════════════════
+# Vorlage: data/models/{module}_{symbol}_{interval}.pt
+M1_WEIGHTS_PATH: Path = MODELS_DIR / "m1_spikewav.pt"
+M18_WEIGHTS_PATH: Path = MODELS_DIR / "m18_patchtst.pt"
+M19_WEIGHTS_PATH: Path = MODELS_DIR / "m19_timesnet.pt"
+M20_WEIGHTS_PATH: Path = MODELS_DIR / "m20_moment.pt"
+
+# ═══════════════════════════════════════════════════════════════════
+# TRAINING DEFAULTS (PyTorch — RTX 5060 Ti, 16 GB VRAM)
+# ═══════════════════════════════════════════════════════════════════
+TRAIN_DEFAULT_LR: Final[float] = 1e-3
+TRAIN_DEFAULT_EPOCHS: Final[int] = 20
+TRAIN_DEFAULT_BATCH_SIZE: Final[int] = 32
+TRAIN_DEFAULT_LOOKBACK: Final[int] = 128
+TRAIN_DEFAULT_HORIZON: Final[int] = 12  # 12 × 5min = 1 h
+TRAIN_VAL_FRACTION: Final[float] = 0.2
+TRAIN_BACKFILL_MONTHS_DEFAULT: Final[int] = 6
 
 # ═══════════════════════════════════════════════════════════════════
 # M2: OFI Cont-Kukanov-Stoikov (PRD M2)

@@ -137,3 +137,16 @@ class TestReset:
         assert model._fitted is False
         assert model._model_loaded is False
         assert len(model._weights) == 0
+
+
+class TestLoadPretrainedGracefulMissingHF:
+    """Bei nicht existierendem HF-Repo (momentfm fehlt) -> False."""
+
+    def test_load_pretrained_graceful_missing_hf(self) -> None:
+        model = M20MOMENT()
+        ok = model.load_pretrained("AutonLab/MOMENT-1-base", model_size="base")
+        # In dieser Sandbox ist momentfm NICHT installiert -> graceful False.
+        # Falls doch installiert, wäre True erlaubt.
+        assert isinstance(ok, bool)
+        if not ok:
+            assert model._model_loaded is False

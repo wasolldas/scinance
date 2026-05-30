@@ -168,3 +168,74 @@ class TestReset:
         # Weights re-initialised (deterministic seed → same as fresh)
         fresh = M18PatchTST()
         np.testing.assert_array_equal(model._weights["head_W"], fresh._weights["head_W"])
+
+
+# ══════════════════════════════════════════════════════════════════════
+# Zusätzliche Tests für die PyTorch-Implementierung
+# ══════════════════════════════════════════════════════════════════════
+
+
+torch = pytest.importorskip("torch")
+
+
+class TestPyTorchForwardPassShape:
+    """Forward-Pass durch das PyTorch-Modell liefert (B, forecast_horizon)."""
+
+    def test_pytorch_forward_pass_shape(self) -> None:
+        model = M18PatchTST(
+            patch_length=8, stride=4, d_model=16, n_heads=2,
+            lookback=64, forecast_horizon=8,
+        )
+        x = torch.randn(4, 64)
+        out = model._model(x)
+        assert out.shape == (4, 8)
+
+
+class TestSaveLoadRoundtrip:
+    """save() + load() liefern identischen Forward-Output."""
+
+    def test_save_load_roundtrip(self, tmp_path) -> None:
+        model = M18PatchTST(
+            patch_length=8, stride=4, d_model=16, n_heads=2,
+            lookback=64, forecast_horizon=4,
+        )
+        model._fitted = True
+        x = np.linspace(100, 110, 64)
+        out_a = model.compute(x)["forecast"]
+
+        ckpt = tmp_path / "m18.pt"
+        model.save(str(ckpt))
+
+        model2 = M18PatchTST(
+            patch_length=8, stride=4, d_model=16, n_heads=2,
+            lookback=64, forecast_horizon=4,
+        )
+        ok = model2.load(str(ckpt))
+        assert ok is True
+        out_b = model2.compute(x)["forecast"]
+        np.testing.assert_allclose(out_a, out_b, atol=1e-6)
+
+
+class TestFitReducesTrainLoss:
+    """Train-MSE sinkt über die Epochen auf einem winzigen Datensatz."""
+
+    def test_fit_reduces_train_loss(self) -> None:
+        rng = np.random.default_rng(0)
+        model = M18PatchTST(
+            patch_length=4, stride=2, d_model=16, n_heads=2,
+            n_layers=1, lookback=32, forecast_horizon=4,
+        )
+        # Lerne eine simple Sin-Periode
+        n_samples = 80
+        X = np.stack([
+            np.sin(np.linspace(0, 4 * np.pi, 32) + rng.normal(0, 0.05))
+            for _ in range(n_samples)
+        ])
+        Y = np.stack([
+            np.sin(np.linspace(4 * np.pi, 5 * np.pi, 4) + rng.normal(0, 0.05))
+            for _ in range(n_samples)
+        ])
+        res = model.fit(X.astype(np.float32), Y.astype(np.float32),
+                        epochs=4, batch_size=16, lr=1e-2)
+        hist = res["history"]
+        assert hist[-1] < hist[0] + 1e-6, f"Loss did not improve: {hist}"
