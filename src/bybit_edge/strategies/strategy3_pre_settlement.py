@@ -45,17 +45,35 @@ _PRESSURE_Q_MAXLEN: int = 50_000
 # Minimum samples before we can compute a meaningful Q90
 _MIN_SAMPLES_FOR_QUANTILE: int = 100
 
-# Exit window: seconds after settlement to wait before exiting
-_EXIT_SECONDS_POST_SETTLEMENT: float = (
-    PRESSURE_EXIT_MINUTES_POST_SETTLEMENT * 60.0
-)
 
-# Entry window: seconds before settlement
-_ENTRY_WINDOW_SECONDS: float = PRESSURE_ENTRY_WINDOW_MINUTES * 60.0
+# Live-config accessors. These were previously cached as module-level
+# constants (``_EXIT_SECONDS_POST_SETTLEMENT``, ``_ENTRY_WINDOW_SECONDS``,
+# ``_EXIT_BAND_LOW`` / ``_EXIT_BAND_HIGH``) computed once at import time.
+# Re-reading them on every call lets :class:`bybit_edge.tuning.ParameterContext`
+# tune the underlying config values without forcing a module reload. The
+# overhead is one attribute lookup per call — negligible vs. the work the
+# strategy already performs and bit-identical to the cached behaviour when
+# no override is active.
+def _entry_window_seconds() -> float:
+    return PRESSURE_ENTRY_WINDOW_MINUTES * 60.0
 
-# Exit funding band (absolute)
-_EXIT_BAND_LOW: float = S3_EXIT_FUNDING_BAND[0]
-_EXIT_BAND_HIGH: float = S3_EXIT_FUNDING_BAND[1]
+
+def _exit_seconds_post_settlement() -> float:
+    return PRESSURE_EXIT_MINUTES_POST_SETTLEMENT * 60.0
+
+
+def _exit_band() -> tuple[float, float]:
+    return S3_EXIT_FUNDING_BAND[0], S3_EXIT_FUNDING_BAND[1]
+
+
+# Back-compat module constants. Kept for downstream callers / tests that
+# imported these symbols directly. The live strategy code reads via the
+# accessors above; these eagerly-evaluated copies reflect the defaults at
+# import time and are NOT used inside the class itself.
+_ENTRY_WINDOW_SECONDS: float = _entry_window_seconds()
+_EXIT_SECONDS_POST_SETTLEMENT: float = _exit_seconds_post_settlement()
+_EXIT_BAND_LOW: float = _exit_band()[0]
+_EXIT_BAND_HIGH: float = _exit_band()[1]
 
 
 class Strategy3PreSettlement:
@@ -231,7 +249,7 @@ class Strategy3PreSettlement:
         basis: float = m23_out["basis"]
 
         # Condition 1: T_settlement - t < 30 min (and > 0)
-        in_window: bool = 0 < seconds_to_settlement < _ENTRY_WINDOW_SECONDS
+        in_window: bool = 0 < seconds_to_settlement < _entry_window_seconds()
         if not in_window:
             return False, "outside_settlement_window"
 
@@ -294,15 +312,17 @@ class Strategy3PreSettlement:
         # point by more than EXIT_SECONDS.
         # seconds_to_settlement < 0 means we are past settlement.
         # The magnitude tells us how far past.
-        if seconds_to_settlement < -_EXIT_SECONDS_POST_SETTLEMENT:
+        exit_secs = _exit_seconds_post_settlement()
+        if seconds_to_settlement < -exit_secs:
             return "settlement_plus_10min"
 
         # Also detect via stored settlement timestamp as fallback
-        if self._settlement_ts > 0 and now > self._settlement_ts + _EXIT_SECONDS_POST_SETTLEMENT:
+        if self._settlement_ts > 0 and now > self._settlement_ts + exit_secs:
             return "settlement_plus_10min_ts"
 
         # Exit condition 2: Funding pressure dissipated back into [-0.01%, +0.01%]
-        if _EXIT_BAND_LOW <= pressure <= _EXIT_BAND_HIGH:
+        band_low, band_high = _exit_band()
+        if band_low <= pressure <= band_high:
             return "pressure_dissipated"
 
         return None

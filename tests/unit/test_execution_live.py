@@ -408,3 +408,131 @@ class TestLiveRunnerDecision:
              "position_size_pct": 0.1, "confidence": 0.6}
         )
         ex.place_market_order.assert_not_awaited()  # bereits Buy -> halten
+
+    @pytest.mark.asyncio
+    async def test_risk_block_skips_order(self, monkeypatch, tmp_path):
+        """Wenn das Risiko-Budget ``check_entry_allowed`` → False meldet,
+        wird keine Order gesendet und ein risk_block-Journaleintrag geschrieben."""
+        from bybit_edge.risk import RiskBudget
+        monkeypatch.setattr("bybit_edge.live_runner.EXECUTION_ENABLED", True)
+        monkeypatch.setattr("bybit_edge.live_runner.EXECUTION_ORDER_USD", 100.0)
+        r = LiveRunner("BTCUSDT")
+        r._journal_path = tmp_path / "journal.csv"
+        r._on_ticker(_ticker_msg())
+        ex = AsyncMock()
+        ex.round_qty = lambda q: 0.002
+        ex.place_market_order = AsyncMock(return_value={"retCode": 0})
+        ex.close_position = AsyncMock(return_value={"retCode": 0})
+        r.executor = ex
+
+        # Risiko-Budget mit erzwungenem Daily-Loss-Block.
+        rb = RiskBudget(
+            daily_loss_pct=-0.03,
+            max_dd_pct=-0.15,
+            vol_scaling_enabled=False,
+            vol_target_bps=50.0,
+            state_path=tmp_path / "risk_state.json",
+        )
+        rb.load(current_equity=1000.0)
+        rb.on_equity_update(equity=900.0)  # 10% Verlust → daily_loss
+        assert rb.state.blocked_reason == "daily_loss"
+        r.risk_budget = rb
+
+        await r._act_on_decision(
+            {"action": "long", "direction": 1, "strategy_id": "S3",
+             "position_size_pct": 0.1, "confidence": 0.6}
+        )
+        ex.place_market_order.assert_not_awaited()
+        assert r._position_side == ""
+        # Journaleintrag mit action=risk_block, ret_code=-1
+        content = r._journal_path.read_text(encoding="utf-8")
+        assert "risk_block" in content
+        assert "-1" in content
+
+    @pytest.mark.asyncio
+    async def test_force_close_triggers_close_position(self, monkeypatch, tmp_path):
+        """should_force_close() → True ⇒ offene Position wird geschlossen,
+        kein neuer Entry."""
+        from bybit_edge.risk import RiskBudget
+        monkeypatch.setattr("bybit_edge.live_runner.EXECUTION_ENABLED", True)
+        monkeypatch.setattr("bybit_edge.live_runner.EXECUTION_ORDER_USD", 100.0)
+        r = LiveRunner("BTCUSDT")
+        r._journal_path = tmp_path / "journal.csv"
+        r._on_ticker(_ticker_msg())
+        # Position auf Gegenseite, damit der "halte"-Early-Return nicht greift.
+        r._position_side = "Sell"
+        ex = AsyncMock()
+        ex.round_qty = lambda q: 0.002
+        ex.place_market_order = AsyncMock(return_value={"retCode": 0})
+        ex.close_position = AsyncMock(return_value={"retCode": 0})
+        r.executor = ex
+
+        rb = RiskBudget(
+            daily_loss_pct=-0.50,
+            max_dd_pct=-0.15,
+            vol_scaling_enabled=False,
+            vol_target_bps=50.0,
+            state_path=tmp_path / "risk_state.json",
+        )
+        rb.load(current_equity=1000.0)
+        rb.on_equity_update(equity=2000.0)  # peak
+        rb.on_equity_update(equity=1600.0)  # -20% vom peak → max_drawdown
+        assert rb.should_force_close() is True
+        r.risk_budget = rb
+
+        await r._act_on_decision(
+            {"action": "long", "direction": 1, "strategy_id": "S3",
+             "position_size_pct": 0.1, "confidence": 0.6}
+        )
+        ex.close_position.assert_awaited_once()
+        ex.place_market_order.assert_not_awaited()
+        assert r._position_side == ""
+
+    @pytest.mark.asyncio
+    async def test_vol_scaling_changes_qty(self, monkeypatch, tmp_path):
+        """``adjust_qty`` wird VOR ``round_qty`` aufgerufen und beeinflusst die
+        finale Order-Größe."""
+        from bybit_edge.risk import RiskBudget
+        monkeypatch.setattr("bybit_edge.live_runner.EXECUTION_ENABLED", True)
+        monkeypatch.setattr("bybit_edge.live_runner.EXECUTION_ORDER_USD", 100.0)
+        r = LiveRunner("BTCUSDT")
+        r._journal_path = tmp_path / "journal.csv"
+        r._on_ticker(_ticker_msg())
+
+        # Erfasse, welche raw_qty bei round_qty ankommt.
+        received: list[float] = []
+
+        def fake_round(q):
+            received.append(q)
+            return 0.002
+
+        ex = AsyncMock()
+        ex.round_qty = fake_round
+        ex.place_market_order = AsyncMock(return_value={"retCode": 0})
+        ex.close_position = AsyncMock(return_value={"retCode": 0})
+        r.executor = ex
+
+        # Vol-Scaling aktiv mit klarem Scaling-Faktor (high target → 2x cap).
+        rb = RiskBudget(
+            daily_loss_pct=-0.50,
+            max_dd_pct=-0.50,
+            vol_scaling_enabled=True,
+            vol_target_bps=10_000.0,  # absurd hoch → scale -> _VOL_SCALE_MAX
+            state_path=tmp_path / "risk_state.json",
+        )
+        rb.load(current_equity=1000.0)
+        r.risk_budget = rb
+        # Sehr ruhige Preise (kleine returns) → realisierte Vol gering →
+        # scale geht gegen MAX (2.0).
+        for px in np.linspace(50000.0, 50001.0, 50):
+            r.price_history.append(float(px))
+
+        await r._act_on_decision(
+            {"action": "long", "direction": 1, "strategy_id": "S3",
+             "position_size_pct": 0.1, "confidence": 0.6}
+        )
+        # raw_qty (ohne scaling) wäre 100 / 50000 = 0.002.
+        # Scaling Cap 2.0 → erwartete raw_qty ≈ 0.004.
+        assert received, "round_qty wurde nicht aufgerufen"
+        assert received[0] == pytest.approx(0.004, rel=1e-6)
+        ex.place_market_order.assert_awaited_once()

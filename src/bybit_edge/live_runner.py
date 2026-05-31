@@ -41,10 +41,20 @@ from bybit_edge.config import (
     PERSIST_ORDERBOOK_SNAPSHOT_SECONDS,
     PIPELINE_INTERVAL_SECONDS,
     PRIMARY_SYMBOL,
+    RISK_BUDGET_ENABLED,
+    RISK_BUDGET_RESET,
+    RISK_DAILY_LOSS_PCT,
+    RISK_EQUITY_POLL_SECONDS,
+    RISK_MAX_DRAWDOWN_PCT,
+    RISK_STATE_PATH,
+    RISK_VOL_LOOKBACK_BARS,
+    RISK_VOL_SCALING_ENABLED,
+    RISK_VOL_TARGET_BPS,
 )
 from bybit_edge.execution.bybit_executor import BybitExecutor
 from bybit_edge.persistence.db import PersistenceLayer
 from bybit_edge.pipeline import Pipeline
+from bybit_edge.risk import RiskBudget
 from bybit_edge.state.liquidation_buffer import LiquidationBuffer, LiquidationEvent
 from bybit_edge.state.orderbook_state import OrderbookState
 from bybit_edge.state.ticker_state import TickerSnapshot
@@ -78,6 +88,19 @@ class LiveRunner:
         self.pipeline = Pipeline(symbol)
         self.collector = BybitWSCollector(symbol)
         self.executor: Optional[BybitExecutor] = None
+
+        # Risiko-Budget (opt-in via RISK_BUDGET_ENABLED).
+        self.risk_budget: Optional[RiskBudget] = None
+        if RISK_BUDGET_ENABLED:
+            self.risk_budget = RiskBudget(
+                daily_loss_pct=RISK_DAILY_LOSS_PCT,
+                max_dd_pct=RISK_MAX_DRAWDOWN_PCT,
+                vol_scaling_enabled=RISK_VOL_SCALING_ENABLED,
+                vol_target_bps=RISK_VOL_TARGET_BPS,
+                state_path=RISK_STATE_PATH,
+                vol_lookback_bars=RISK_VOL_LOOKBACK_BARS,
+                logger=logger,
+            )
 
         # Optional vom MultiSymbolRunner injizierte Persistenz-Schicht.
         # Falls gesetzt, übernimmt sie KEINE Ownership (kein close in stop()).
@@ -283,16 +306,67 @@ class LiveRunner:
             if self._position_side == target_side:
                 logger.info("  -> Position bereits %s, halte.", target_side)
                 return
+
+            # Risiko-Budget: Max-DD -> Position schließen, kein neuer Entry.
+            if self.risk_budget is not None and self.risk_budget.should_force_close():
+                if self._position_side:
+                    logger.warning(
+                        "RISK FORCE-CLOSE: max drawdown — schließe %s.",
+                        self._position_side,
+                    )
+                    await self.executor.close_position()
+                    self._position_side = ""
+                self._journal({
+                    "ts_iso": time.strftime("%Y-%m-%d %H:%M:%S"),
+                    "ts_unix": time.time(),
+                    "symbol": self.symbol,
+                    "strategy_id": strat,
+                    "action": "risk_block",
+                    "side": target_side,
+                    "qty": "",
+                    "price": price,
+                    "confidence": conf,
+                    "ret_code": -1,
+                    "order_id": "",
+                })
+                return
+
             # Gegenposition schließen
             if self._position_side:
                 await self.executor.close_position()
                 self._position_side = ""
             # Order-Größe aus Notional
             raw_qty = EXECUTION_ORDER_USD / price
+            # Vol-Scaling (opt-in) vor dem qty-Rounding anwenden.
+            if self.risk_budget is not None:
+                raw_qty = self.risk_budget.adjust_qty(
+                    raw_qty, list(self.price_history)
+                )
             qty = self.executor.round_qty(raw_qty)
             if qty <= 0:
                 logger.warning("  -> qty zu klein (Notional %s USD), übersprungen.", EXECUTION_ORDER_USD)
                 return
+
+            # Risiko-Budget: Entry-Check (Daily-Loss / Max-DD).
+            if self.risk_budget is not None:
+                allowed, reason = self.risk_budget.check_entry_allowed(qty)
+                if not allowed:
+                    logger.warning("RISK BLOCK: %s — Order übersprungen.", reason)
+                    self._journal({
+                        "ts_iso": time.strftime("%Y-%m-%d %H:%M:%S"),
+                        "ts_unix": time.time(),
+                        "symbol": self.symbol,
+                        "strategy_id": strat,
+                        "action": "risk_block",
+                        "side": target_side,
+                        "qty": qty,
+                        "price": price,
+                        "confidence": conf,
+                        "ret_code": -1,
+                        "order_id": reason,
+                    })
+                    return
+
             result = await self.executor.place_market_order(target_side, qty)
             self._journal({
                 "ts_iso": time.strftime("%Y-%m-%d %H:%M:%S"),
@@ -370,6 +444,21 @@ class LiveRunner:
         while self._running:
             await asyncio.sleep(PERSIST_FLUSH_SECONDS)
             self._flush_persist()
+
+    async def _risk_loop(self) -> None:
+        """Periodisch Equity abfragen und Risiko-Budget aktualisieren."""
+        if self.risk_budget is None or self.executor is None:
+            return
+        while self._running:
+            await asyncio.sleep(RISK_EQUITY_POLL_SECONDS)
+            try:
+                equity = await self.executor.get_equity()
+                if equity > 0:
+                    # Recovery-Check zuerst, damit ein neuer Tag die Sperre löst.
+                    self.risk_budget.reset_if_recovered(equity)
+                    self.risk_budget.on_equity_update(equity)
+            except Exception:
+                logger.exception("Fehler im Risk-Loop")
 
     async def _heartbeat_loop(self) -> None:
         while self._running:
@@ -461,6 +550,11 @@ class LiveRunner:
                 self._position_side = pos["side"]
                 if pos["size"] > 0:
                     logger.info("Bestehende Position: %s %.4f", pos["side"], pos["size"])
+                if self.risk_budget is not None:
+                    self.risk_budget.load(equity)
+                    if RISK_BUDGET_RESET:
+                        self.risk_budget.manual_reset(equity)
+                    self.risk_budget.on_equity_update(equity)
             except Exception:
                 logger.exception("Executor-Init fehlgeschlagen — laufe read-only weiter.")
 
@@ -471,6 +565,8 @@ class LiveRunner:
         ]
         if self.persist is not None:
             tasks.append(asyncio.create_task(self._persist_loop()))
+        if self.risk_budget is not None and exec_active:
+            tasks.append(asyncio.create_task(self._risk_loop()))
         try:
             await asyncio.gather(*tasks)
         except asyncio.CancelledError:
@@ -483,6 +579,8 @@ class LiveRunner:
         await self.collector.disconnect()
         if self.executor is not None:
             await self.executor.close()
+        if self.risk_budget is not None:
+            self.risk_budget.save()
         if self.persist is not None:
             self._flush_persist()  # finaler Flush der Restpuffer
             if self._owns_persist:

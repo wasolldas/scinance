@@ -36,6 +36,7 @@ from __future__ import annotations
 
 import logging
 from collections import deque
+from contextlib import nullcontext
 from pathlib import Path
 from typing import Any, Optional
 
@@ -730,6 +731,7 @@ class ReplayBacktester:
         test_days: int = WF_TEST_DAYS,
         embargo_minutes: int = WF_EMBARGO_MINUTES,
         min_train_events: int = 100,
+        param_overrides: Optional[dict[str, Any]] = None,
     ) -> dict[str, BacktestResult]:
         """Replay events in walk-forward folds: train (warmup, trades discarded)
         → embargo → test (trades counted). Slides by ``test_days``. Concatenates
@@ -753,6 +755,14 @@ class ReplayBacktester:
         min_train_events
             Folds with fewer events in their *train* slice are skipped (too
             little data to warm a strategy up meaningfully).
+        param_overrides
+            Optional ``{config_attribute_name: value}`` mapping applied via
+            :class:`bybit_edge.tuning.ParameterContext` for the entire
+            walk-forward sweep. Strategy instances are constructed *inside*
+            the context (once per fold) so they pick up the overridden
+            values; the context is torn down on return so subsequent calls
+            see the originals. When ``None`` (default) behaviour is
+            bit-identical to the pre-tuning implementation.
 
         Returns
         -------
@@ -760,6 +770,38 @@ class ReplayBacktester:
             One result per strategy id, computed on the concatenation of all
             test-fold trades. The ``n_folds_executed`` count is exposed via
             :attr:`last_walkforward_folds` for the CLI.
+        """
+        # ParameterContext is only imported when actually needed — keeps the
+        # backtester import-light and free of any tuning-only dependencies.
+        if param_overrides:
+            from bybit_edge.tuning.params import ParameterContext
+            ctx: Any = ParameterContext(param_overrides)
+        else:
+            ctx = nullcontext()
+
+        with ctx:
+            return self._run_walkforward_inner(
+                pipeline_interval_seconds=pipeline_interval_seconds,
+                train_days=train_days,
+                test_days=test_days,
+                embargo_minutes=embargo_minutes,
+                min_train_events=min_train_events,
+            )
+
+    def _run_walkforward_inner(
+        self,
+        pipeline_interval_seconds: float,
+        train_days: int,
+        test_days: int,
+        embargo_minutes: int,
+        min_train_events: int,
+    ) -> dict[str, BacktestResult]:
+        """Body of :meth:`run_walkforward` — executes the fold sweep.
+
+        Extracted so that :meth:`run_walkforward` can optionally enter a
+        :class:`bybit_edge.tuning.ParameterContext` around the entire sweep
+        without altering the per-fold logic. When called directly (e.g.
+        from tests) it preserves the pre-tuning behaviour exactly.
         """
         ms_per_day = 24 * 3600 * 1000
         ms_per_min = 60 * 1000

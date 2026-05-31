@@ -486,6 +486,40 @@ REST_SET_LEVERAGE: Final[str] = "/v5/position/set-leverage"
 REST_INSTRUMENTS: Final[str] = "/v5/market/instruments-info"
 
 # ═══════════════════════════════════════════════════════════════════
+# RISK BUDGET (Live-Risiko-Schicht, opt-in)
+# ═══════════════════════════════════════════════════════════════════
+# Master-Schalter: aktiviert die Live-Risiko-Schicht (Max-DD, Daily-Loss,
+# Vol-Scaling) im LiveRunner. Default OFF → bestehendes Verhalten unverändert.
+RISK_BUDGET_ENABLED: bool = (
+    os.getenv("RISK_BUDGET_ENABLED", "false").lower() == "true"
+)
+# Daily-Loss-Limit (negative Fraktion, z. B. -0.03 = -3 %).
+RISK_DAILY_LOSS_PCT: float = float(os.getenv("RISK_DAILY_LOSS_PCT", "-0.03"))
+# Max-Drawdown vom Peak (negative Fraktion, z. B. -0.15 = -15 %).
+RISK_MAX_DRAWDOWN_PCT: float = float(os.getenv("RISK_MAX_DRAWDOWN_PCT", "-0.15"))
+# Opt-in Vol-Scaling der Order-Größe basierend auf realisierter Vol.
+RISK_VOL_SCALING_ENABLED: bool = (
+    os.getenv("RISK_VOL_SCALING_ENABLED", "false").lower() == "true"
+)
+# Ziel-Vol-Beitrag in Basispunkten — bei höherer realisierter Vol wird
+# die Order-Größe verkleinert.
+RISK_VOL_TARGET_BPS: float = float(os.getenv("RISK_VOL_TARGET_BPS", "50.0"))
+# Anzahl der jüngsten Preis-Bars für die Realized-Vol-Schätzung.
+RISK_VOL_LOOKBACK_BARS: int = int(os.getenv("RISK_VOL_LOOKBACK_BARS", "60"))
+# Persistenter Zustand des Risiko-Budgets (JSON).
+RISK_STATE_PATH: Path = Path(
+    os.getenv("RISK_STATE_PATH", str(DATA_DIR / "risk_state.json"))
+)
+# Einmal-Reset-Knopf: setzt blocked_reason zurück (manuell aktivieren).
+RISK_BUDGET_RESET: bool = (
+    os.getenv("RISK_BUDGET_RESET", "false").lower() == "true"
+)
+# Intervall (Sekunden) zwischen periodischen Equity-Updates im LiveRunner.
+RISK_EQUITY_POLL_SECONDS: float = float(
+    os.getenv("RISK_EQUITY_POLL_SECONDS", "30.0")
+)
+
+# ═══════════════════════════════════════════════════════════════════
 # MULTI-SYMBOL RUNNER (parallele Datensammlung mehrerer Symbole)
 # ═══════════════════════════════════════════════════════════════════
 # Master-Schalter: aktiviert MultiSymbolRunner statt single-symbol LiveRunner.

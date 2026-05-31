@@ -51,6 +51,9 @@ dashboard = [
     "plotly>=5.18",
     "streamlit-autorefresh>=1.0",
 ]
+tuning = [
+    "optuna>=3.5",
+]
 
 [tool.setuptools.packages.find]
 where = ["src"]
