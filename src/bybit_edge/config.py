@@ -101,7 +101,7 @@ MULTI_SYMBOL_UNIVERSE: list[str] = [
     "AVAXUSDT",
     "ADAUSDT",
     "LINKUSDT",
-    "MATICUSDT",
+    "POLUSDT",  # ehemals MATICUSDT (Bybit-Rename 09/2024)
 ]
 
 # ═══════════════════════════════════════════════════════════════════
