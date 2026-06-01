@@ -36,7 +36,9 @@ gpu = [
 ]
 foundation = [
     "momentfm",
-    "transformers>=4.40",
+    # transformers>=4.46 unterstützt numpy 2.x (wichtig für Python 3.13:
+    # numpy 1.26 hat keine Wheels für 3.13, würde Source-Build erzwingen).
+    "transformers>=4.46",
     "peft>=0.10",
 ]
 dev = [
