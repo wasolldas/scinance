@@ -6,6 +6,7 @@ DuckDB.
 """
 from __future__ import annotations
 
+import asyncio
 import json
 from pathlib import Path
 
@@ -259,6 +260,131 @@ def test_load_account_status_handles_executor_error() -> None:
     out = load_account_status(_BadExecutor())
     assert out["connected"] is False
     assert "API-Key" in out["error"]
+
+
+# --------------------------------------------------------------------------
+# Regression: "Event loop is closed" beim Streamlit-Auto-Refresh
+# --------------------------------------------------------------------------
+#
+# Bug: Streamlit cachte ``BybitExecutor`` via ``@st.cache_resource`` über
+# Reruns hinweg. ``load_account_status`` rief intern ``asyncio.run(...)`` auf;
+# der erste Aufruf erzeugte einen ``aiohttp.ClientSession`` gebunden an Loop
+# L1, danach wurde L1 geschlossen. Beim nächsten Refresh lief ``asyncio.run``
+# in Loop L2, traf aber auf die alte L1-gebundene Session → RuntimeError
+# "Event loop is closed".
+#
+# Der Fix muss garantieren: bei einem ``BybitExecutor`` als Argument wird die
+# loop-gebundene Session NICHT über ``asyncio.run``-Iterationen hinweg
+# wiederverwendet — pro Aufruf wird ein frischer Executor + Session im selben
+# Loop erstellt und sauber geschlossen.
+
+
+class _FakeBybitExecutor:
+    """Emuliert das Loop-Binding-Verhalten von ``aiohttp.ClientSession``.
+
+    Beim ersten Async-Call merkt sich die Instanz den aktuellen Event-Loop.
+    Wird sie in einem späteren Aufruf aus einem anderen Loop heraus genutzt,
+    wirft sie ``RuntimeError("Event loop is closed")`` — exakt der Live-Fehler.
+    """
+
+    instances: list["_FakeBybitExecutor"] = []
+
+    def __init__(self, symbol: str = "BTCUSDT", *_a, **_kw) -> None:
+        self.symbol = symbol
+        self._bound_loop: asyncio.AbstractEventLoop | None = None
+        self.closed = False
+        _FakeBybitExecutor.instances.append(self)
+
+    def _check_loop(self) -> None:
+        current = asyncio.get_event_loop()
+        if self._bound_loop is None:
+            self._bound_loop = current
+            return
+        if self._bound_loop is not current or self._bound_loop.is_closed():
+            raise RuntimeError("Event loop is closed")
+
+    async def get_equity(self) -> float:
+        self._check_loop()
+        return 1234.56
+
+    async def get_position(self) -> dict:
+        self._check_loop()
+        return {
+            "size": 0.0, "side": "",
+            "avg_price": 0.0, "unrealised_pnl": 0.0,
+        }
+
+    async def close(self) -> None:
+        self.closed = True
+
+
+def test_load_account_status_multiple_refreshes_no_loop_error(monkeypatch) -> None:
+    """Simuliert mehrere Streamlit-Reruns (jeweils neues ``asyncio.run``).
+
+    RED vor dem Fix: Wenn die App den gecachten Executor (loop-gebunden an
+    den ersten Run) wiederverwendet, schlägt der zweite Refresh mit
+    "Event loop is closed" fehl → ``connected=False`` und Error im Result.
+
+    GREEN nach dem Fix: ``load_account_status`` erstellt pro Aufruf einen
+    frischen ``BybitExecutor`` im aktuellen Loop, sodass alle 3 Refreshes
+    sauber durchlaufen.
+    """
+    _FakeBybitExecutor.instances.clear()
+    monkeypatch.setattr(
+        "bybit_edge.dashboard.data.BybitExecutor", _FakeBybitExecutor
+    )
+
+    # Erster (cached) Executor — wie ihn ``@st.cache_resource`` in der App
+    # liefern würde. Den binden wir bewusst an einen *vorherigen* Loop.
+    cached = _FakeBybitExecutor("BTCUSDT")
+    prev_loop = asyncio.new_event_loop()
+    try:
+        prev_loop.run_until_complete(cached.get_equity())
+    finally:
+        prev_loop.close()
+    # Jetzt ist ``cached._bound_loop`` geschlossen — würde direkter Reuse
+    # in einer neuen ``asyncio.run``-Iteration den Live-Bug auslösen.
+
+    results = []
+    for _ in range(3):
+        out = load_account_status(cached)
+        results.append(out)
+
+    for out in results:
+        assert out["connected"] is True, f"Refresh schlug fehl: {out['error']}"
+        assert out["equity"] == pytest.approx(1234.56)
+        assert "Event loop is closed" not in out.get("error", "")
+
+    # Pro Refresh wurde ein frischer Executor erzeugt und geschlossen.
+    # (cached ist Instanz 0; danach mindestens 3 frische Instanzen.)
+    fresh = _FakeBybitExecutor.instances[1:]
+    assert len(fresh) >= 3
+    assert all(inst.closed for inst in fresh)
+
+
+def test_load_account_status_closes_fresh_executor_on_error(monkeypatch) -> None:
+    """Auch bei Fehlern (z. B. fehlendem API-Key) muss die frische
+    Executor-Session geschlossen werden, damit keine offenen aiohttp-
+    Sessions zurückbleiben."""
+
+    class _ExplodingExec(_FakeBybitExecutor):
+        async def get_equity(self) -> float:
+            raise RuntimeError("boom")
+
+    _FakeBybitExecutor.instances.clear()
+    monkeypatch.setattr(
+        "bybit_edge.dashboard.data.BybitExecutor", _ExplodingExec
+    )
+
+    cached = _FakeBybitExecutor("BTCUSDT")
+    out = load_account_status(cached)
+
+    assert out["connected"] is False
+    assert "boom" in out["error"]
+    # Frische Instanz wurde trotz Fehler geschlossen
+    fresh = [i for i in _FakeBybitExecutor.instances if i is not cached]
+    assert len(fresh) >= 1
+    assert all(inst.closed for inst in fresh)
 
 
 # --------------------------------------------------------------------------

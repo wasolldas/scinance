@@ -316,6 +316,14 @@ def load_table_time_range(
 # Account-Status (Executor REST)
 # --------------------------------------------------------------------------
 
+# Lazy import, damit Tests ``bybit_edge.dashboard.data.BybitExecutor`` per
+# ``monkeypatch.setattr`` ersetzen können (Regression: "Event loop is closed").
+try:
+    from bybit_edge.execution.bybit_executor import BybitExecutor
+except Exception:  # pragma: no cover — Executor sollte importierbar sein
+    BybitExecutor = None  # type: ignore[assignment]
+
+
 async def _fetch_account_status(executor: Any) -> dict[str, Any]:
     equity = await executor.get_equity()
     pos = await executor.get_position()
@@ -332,11 +340,43 @@ async def _fetch_account_status(executor: Any) -> dict[str, Any]:
     }
 
 
+async def _fetch_account_status_fresh(symbol: str) -> dict[str, Any]:
+    """Erzeugt pro Aufruf einen FRISCHEN ``BybitExecutor`` im aktuellen Loop.
+
+    Bug-Fix: ``aiohttp.ClientSession`` bindet sich an den Event-Loop, in dem
+    sie erzeugt wurde. Streamlit ruft ``asyncio.run(...)`` pro Auto-Refresh
+    neu auf — würde derselbe Executor (mit Session aus Loop L1) im neuen Loop
+    L2 wiederverwendet, fliegt ``RuntimeError("Event loop is closed")``.
+    Lösung: pro Refresh ein frischer Executor, der im selben ``asyncio.run``
+    erzeugt UND geschlossen wird.
+    """
+    fresh = BybitExecutor(symbol)
+    try:
+        return await _fetch_account_status(fresh)
+    finally:
+        # ``close()`` muss idempotent/defensiv sein — wir wollen die UI
+        # niemals wegen Cleanup-Fehlern crashen.
+        try:
+            await fresh.close()
+        except Exception:  # noqa: BLE001
+            logger.debug("Executor.close() im Refresh-Pfad fehlgeschlagen", exc_info=True)
+
+
 def load_account_status(executor: Any) -> dict[str, Any]:
     """Synchrone Wrapper für ``get_equity`` + ``get_position`` des Executors.
 
     Im Dashboard wird das pro Refresh in einem frischen Event-Loop ausgeführt,
     damit Streamlits Sync-Rendering nicht blockiert wird.
+
+    Wenn ``executor`` eine echte ``BybitExecutor``-Instanz ist, wird sie
+    NICHT direkt verwendet — stattdessen wird pro Aufruf eine frische
+    Instanz im aktuellen Event-Loop erzeugt und am Ende geschlossen. So
+    wird das "Event loop is closed"-Problem vermieden, das durch
+    ``@st.cache_resource``-gecachte Executoren über Streamlit-Reruns hinweg
+    entsteht (``aiohttp.ClientSession`` ist loop-gebunden).
+
+    Stub-Executoren (Tests) ohne Bezug zu ``aiohttp`` werden weiterhin
+    direkt verwendet, damit die bestehende API stabil bleibt.
 
     Returns
     -------
@@ -352,7 +392,15 @@ def load_account_status(executor: Any) -> dict[str, Any]:
             "position": {"size": 0.0, "side": "", "avg_price": 0.0, "unrealised_pnl": 0.0},
             "error": "kein Executor",
         }
+    # Echte BybitExecutor-artige Instanzen (haben ``symbol``): NIE direkt
+    # nutzen (loop-gebundene aiohttp-Session). Stattdessen pro Aufruf eine
+    # frische Instanz im aktuellen ``asyncio.run``-Loop bauen.
+    # Stub-Executoren ohne ``symbol`` (Tests) werden direkt verwendet.
+    symbol = getattr(executor, "symbol", None)
+    use_fresh = symbol is not None and BybitExecutor is not None
     try:
+        if use_fresh:
+            return asyncio.run(_fetch_account_status_fresh(str(symbol)))
         return asyncio.run(_fetch_account_status(executor))
     except Exception as exc:  # noqa: BLE001 — UI darf nicht crashen
         logger.warning("Account-Status fehlgeschlagen: %s", exc)

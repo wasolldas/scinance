@@ -92,8 +92,18 @@ def _open_duckdb_readonly(db_path: Path) -> Optional[duckdb.DuckDBPyConnection]:
         return None
 
 
-@st.cache_resource(show_spinner=False)
 def _get_executor(symbol: str) -> Optional[BybitExecutor]:
+    """Erzeugt pro Aufruf einen frischen ``BybitExecutor``.
+
+    KEIN ``@st.cache_resource`` mehr: Streamlit baut bei jedem Auto-Refresh
+    einen neuen Event-Loop (``asyncio.run``); eine über Reruns gecachte
+    ``BybitExecutor``-Instanz würde die loop-gebundene ``aiohttp.ClientSession``
+    aus dem alten (geschlossenen) Loop wiederverwenden und mit
+    "Event loop is closed" crashen. Der eigentliche REST-Call läuft ohnehin
+    in ``load_account_status`` mit einer frischen Executor-Instanz; dieser
+    Wrapper liefert nur ein Platzhalter-Objekt (mit ``symbol``-Attribut),
+    damit ``load_account_status`` weiß, dass ein API-Call gemacht werden soll.
+    """
     try:
         return BybitExecutor(symbol)
     except Exception:  # noqa: BLE001

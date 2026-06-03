@@ -75,8 +75,12 @@ class BybitExecutor:
 
     async def close(self) -> None:
         if self._session is not None:
-            await self._session.close()
-            self._session = None
+            try:
+                await self._session.close()
+            except Exception:  # noqa: BLE001 — defensive: idempotent close
+                logger.debug("ClientSession.close() raised", exc_info=True)
+            finally:
+                self._session = None
 
     def _ensure_session(self) -> aiohttp.ClientSession:
         if self._session is None:
