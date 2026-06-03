@@ -136,6 +136,10 @@ DATA_DIR: Path = Path(os.getenv("BYBIT_DATA_DIR", "data"))
 DB_PATH: Path = DATA_DIR / "bybit_edge.duckdb"
 PARQUET_DIR: Path = DATA_DIR / "parquet"
 MODELS_DIR: Path = DATA_DIR / "models"
+# Dashboard-Snapshots (Parquet) — vom LiveRunner periodisch geschrieben,
+# vom read-only Streamlit-Dashboard gelesen. Vermeidet DuckDB-Multi-Process-
+# Lock-Konflikte (DuckDB unterstützt nur Single-Process-Zugriff).
+DASHBOARD_SNAPSHOT_DIR: Path = DATA_DIR / "dashboard"
 HOT_RETENTION_DAYS: Final[int] = 30  # Rolling Hot-Window
 PARQUET_COMPRESSION: Final[str] = "zstd"
 

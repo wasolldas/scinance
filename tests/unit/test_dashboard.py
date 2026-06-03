@@ -16,6 +16,7 @@ import pytest
 from bybit_edge.dashboard.data import (
     JOURNAL_COLUMNS,
     load_account_status,
+    load_coverage,
     load_heartbeat_file,
     load_journal,
     load_recent_liquidations,
@@ -272,3 +273,160 @@ def test_ms_to_iso_formats_timestamp() -> None:
     # 2024-01-01T00:00:00Z entspricht 1704067200000 ms
     s = ms_to_iso(1704067200000)
     assert s.startswith("2024-01-01")
+
+
+# --------------------------------------------------------------------------
+# Parquet-Snapshots (Bugfix: DuckDB-Lock-Konflikt mit LiveRunner)
+# --------------------------------------------------------------------------
+
+def test_load_row_counts_from_parquet_snapshot(tmp_path: Path) -> None:
+    """Wenn ``row_counts.parquet`` existiert, wird es bevorzugt gelesen."""
+    df = pd.DataFrame(
+        [
+            {"table_name": "tickers", "row_count": 42, "exported_at": "2026-06-03"},
+            {"table_name": "trades", "row_count": 17, "exported_at": "2026-06-03"},
+        ]
+    )
+    df.to_parquet(tmp_path / "row_counts.parquet")
+
+    out = load_row_counts(persist=None, snapshot_dir=tmp_path)
+    assert out == {"tickers": 42, "trades": 17}
+
+
+def test_load_row_counts_falls_back_to_duckdb(tmp_path: Path) -> None:
+    """Existiert KEIN Snapshot, wird der DuckDB-Pfad genutzt."""
+    conn = duckdb.connect(":memory:")
+    for t in ("tickers", "trades", "liquidations", "kline_1min",
+              "orderbook_snapshots", "open_interest",
+              "long_short_ratio", "funding_history"):
+        conn.execute(f"CREATE TABLE {t} (ts BIGINT, symbol VARCHAR)")
+    conn.execute("INSERT INTO trades VALUES (1, 'BTCUSDT')")
+    try:
+        out = load_row_counts(persist=conn, snapshot_dir=tmp_path)
+        assert out["trades"] == 1
+        assert out["tickers"] == 0
+        # Sanity: kein Snapshot wurde versehentlich geschrieben
+        assert not (tmp_path / "row_counts.parquet").exists()
+    finally:
+        conn.close()
+
+
+def test_load_recent_liquidations_from_parquet(tmp_path: Path) -> None:
+    df = pd.DataFrame(
+        [
+            {"ts": 1_700_000_002_000, "symbol": "BTCUSDT", "side": "Buy",
+             "volume": 1.5, "price": 70000.0, "usd_value": 105000.0},
+            {"ts": 1_700_000_001_000, "symbol": "BTCUSDT", "side": "Sell",
+             "volume": 0.5, "price": 69990.0, "usd_value": 34995.0},
+            {"ts": 1_700_000_003_000, "symbol": "ETHUSDT", "side": "Buy",
+             "volume": 10.0, "price": 3000.0, "usd_value": 30000.0},
+        ]
+    )
+    df.to_parquet(tmp_path / "liquidations_recent.parquet")
+
+    # Symbol-Filter respektieren
+    out = load_recent_liquidations(persist=None, symbol="BTCUSDT", n=10,
+                                   snapshot_dir=tmp_path)
+    assert len(out) == 2
+    # Sortiert ts DESC
+    ts_list = [r["ts"] for r in out]
+    assert ts_list == sorted(ts_list, reverse=True)
+    assert out[0]["side"] == "Buy"
+    assert out[0]["price"] == pytest.approx(70000.0)
+
+    # Limit
+    limited = load_recent_liquidations(persist=None, symbol="BTCUSDT", n=1,
+                                       snapshot_dir=tmp_path)
+    assert len(limited) == 1
+
+    # Alle Symbole
+    all_out = load_recent_liquidations(persist=None, symbol=None, n=10,
+                                       snapshot_dir=tmp_path)
+    assert len(all_out) == 3
+
+
+def test_load_coverage_returns_per_table_stats(tmp_path: Path) -> None:
+    df = pd.DataFrame(
+        [
+            {"table_name": "tickers", "min_ts": 1_700_000_000_000,
+             "max_ts": 1_700_003_600_000, "row_count": 100},
+            {"table_name": "trades", "min_ts": None, "max_ts": None,
+             "row_count": 0},
+        ]
+    )
+    df.to_parquet(tmp_path / "coverage.parquet")
+
+    out = load_coverage(persist=None, snapshot_dir=tmp_path)
+    assert "tickers" in out
+    assert out["tickers"]["count"] == 100
+    # 3600 seconds = 1 hour
+    assert out["tickers"]["hours"] == pytest.approx(1.0)
+    assert out["trades"]["count"] == 0
+    assert out["trades"]["hours"] == pytest.approx(0.0)
+    assert out["trades"]["min_ts"] is None
+
+
+def test_load_coverage_falls_back_to_duckdb(tmp_path: Path) -> None:
+    conn = duckdb.connect(":memory:")
+    conn.execute(
+        "CREATE TABLE tickers (ts BIGINT, symbol VARCHAR)"
+    )
+    conn.execute("INSERT INTO tickers VALUES (1700000000000, 'BTCUSDT')")
+    conn.execute("INSERT INTO tickers VALUES (1700003600000, 'BTCUSDT')")
+    try:
+        out = load_coverage(persist=conn, snapshot_dir=tmp_path)
+        assert "tickers" in out
+        assert out["tickers"]["count"] == 2
+        assert out["tickers"]["hours"] == pytest.approx(1.0)
+    finally:
+        conn.close()
+
+
+# --------------------------------------------------------------------------
+# LiveRunner Dashboard-Snapshot-Export
+# --------------------------------------------------------------------------
+
+def test_liverunner_exports_dashboard_snapshots_on_flush(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Beim Flush exportiert der LiveRunner row_counts/liquidations/coverage
+    als Parquet — damit das Dashboard ohne DuckDB-Lock-Konflikt liest.
+    """
+    from bybit_edge import live_runner as lr_mod
+    from bybit_edge.persistence.db import PersistenceLayer
+    from bybit_edge.state.liquidation_buffer import LiquidationEvent
+
+    # In-Memory-Persistenz + Snapshot-Dir auf tmp_path umlenken
+    monkeypatch.setattr(lr_mod, "DASHBOARD_SNAPSHOT_DIR", tmp_path)
+
+    runner = lr_mod.LiveRunner(symbol="BTCUSDT")
+    runner.persist = PersistenceLayer(db_path=Path(":memory:"))
+    try:
+        # Ein paar Liquidationen ins DuckDB schreiben
+        evt = LiquidationEvent(
+            timestamp_ms=1_700_000_000_000,
+            symbol="BTCUSDT",
+            side="Buy",
+            volume=1.0,
+            price=70_000.0,
+            usd_value=70_000.0,
+        )
+        runner._buf_liqs = [evt]
+
+        runner._flush_persist()
+
+        # Snapshots müssen existieren
+        for name in ("row_counts.parquet", "liquidations_recent.parquet",
+                     "coverage.parquet"):
+            assert (tmp_path / name).exists(), f"Snapshot fehlt: {name}"
+
+        # Inhalt grob prüfen
+        rc = pd.read_parquet(tmp_path / "row_counts.parquet")
+        rc_map = dict(zip(rc["table_name"], rc["row_count"]))
+        assert rc_map.get("liquidations", 0) == 1
+
+        liq = pd.read_parquet(tmp_path / "liquidations_recent.parquet")
+        assert len(liq) == 1
+        assert liq.iloc[0]["symbol"] == "BTCUSDT"
+    finally:
+        runner.persist.close()

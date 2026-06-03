@@ -29,6 +29,7 @@ from bybit_edge.collector.ws_collector import BybitWSCollector, WSMessage
 from bybit_edge.config import (
     BYBIT_DEMO,
     BYBIT_TESTNET,
+    DASHBOARD_SNAPSHOT_DIR,
     DATA_DIR,
     ENABLE_HEARTBEAT_FILE,
     EXECUTION_ENABLED,
@@ -439,6 +440,96 @@ class LiveRunner:
                 self._ob_snaps_persisted += len(ob)
         except Exception:
             logger.exception("Persist-Flush fehlgeschlagen")
+        # Dashboard-Snapshots im Anschluss schreiben — strikt getrennt vom
+        # Hauptflush, damit ein Snapshot-Fehler die DuckDB-Writes nicht
+        # zerstört. DuckDB hält ein Lock auf die DB-Datei; das Dashboard
+        # kann daher NICHT parallel read-only verbinden. Stattdessen liest
+        # es diese Parquet-Snapshots.
+        self._export_dashboard_snapshots()
+
+    def _export_dashboard_snapshots(self) -> None:
+        """Exportiert kompakte Dashboard-Snapshots als Parquet.
+
+        Nutzt die bestehende ``self.persist.conn`` (kein zweiter Connect,
+        kein Lock-Konflikt) und schreibt drei Dateien nach
+        ``DASHBOARD_SNAPSHOT_DIR``:
+
+        - ``row_counts.parquet`` — eine Zeile pro Tabelle (table_name, count, exported_at)
+        - ``liquidations_recent.parquet`` — letzte 200 Liquidationen (alle Symbole)
+        - ``coverage.parquet`` — min_ts/max_ts/count pro Tabelle
+
+        Fehler werden geloggt, aber NIE weitergereicht — ein temporäres
+        File-Lock unter Windows darf den Persist-Flush nicht abreissen.
+        """
+        if self.persist is None:
+            return
+        conn = getattr(self.persist, "conn", None)
+        if conn is None:
+            return
+        try:
+            DASHBOARD_SNAPSHOT_DIR.mkdir(parents=True, exist_ok=True)
+        except Exception:
+            logger.exception("Snapshot-Verzeichnis konnte nicht erstellt werden.")
+            return
+
+        tables = (
+            "tickers", "trades", "liquidations", "kline_1min",
+            "orderbook_snapshots",
+            "open_interest", "long_short_ratio", "funding_history",
+        )
+
+        # 1) row_counts.parquet
+        try:
+            union_parts = [
+                f"SELECT '{tbl}' AS table_name, "
+                f"COUNT(*)::BIGINT AS row_count, "
+                f"CURRENT_TIMESTAMP AS exported_at "
+                f"FROM {tbl}"
+                for tbl in tables
+            ]
+            select_sql = " UNION ALL ".join(union_parts)
+            out_path = DASHBOARD_SNAPSHOT_DIR / "row_counts.parquet"
+            conn.execute(
+                f"COPY ({select_sql}) TO '{out_path.as_posix()}' (FORMAT PARQUET)"
+            )
+        except Exception:
+            logger.warning("Snapshot row_counts.parquet konnte nicht geschrieben werden.",
+                           exc_info=True)
+
+        # 2) liquidations_recent.parquet — letzte 200 Liquidationen
+        try:
+            out_path = DASHBOARD_SNAPSHOT_DIR / "liquidations_recent.parquet"
+            conn.execute(
+                f"""
+                COPY (
+                    SELECT ts, symbol, side, volume, price, usd_value
+                    FROM liquidations
+                    ORDER BY ts DESC
+                    LIMIT 200
+                ) TO '{out_path.as_posix()}' (FORMAT PARQUET)
+                """
+            )
+        except Exception:
+            logger.warning("Snapshot liquidations_recent.parquet konnte nicht geschrieben werden.",
+                           exc_info=True)
+
+        # 3) coverage.parquet — min_ts/max_ts/count pro Tabelle
+        try:
+            cov_parts = [
+                f"SELECT '{tbl}' AS table_name, "
+                f"MIN(ts) AS min_ts, MAX(ts) AS max_ts, "
+                f"COUNT(*)::BIGINT AS row_count "
+                f"FROM {tbl}"
+                for tbl in tables
+            ]
+            cov_sql = " UNION ALL ".join(cov_parts)
+            out_path = DASHBOARD_SNAPSHOT_DIR / "coverage.parquet"
+            conn.execute(
+                f"COPY ({cov_sql}) TO '{out_path.as_posix()}' (FORMAT PARQUET)"
+            )
+        except Exception:
+            logger.warning("Snapshot coverage.parquet konnte nicht geschrieben werden.",
+                           exc_info=True)
 
     async def _persist_loop(self) -> None:
         while self._running:

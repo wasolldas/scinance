@@ -43,6 +43,7 @@ except ImportError:  # pragma: no cover
 from bybit_edge.config import (
     BYBIT_DEMO,
     BYBIT_TESTNET,
+    DASHBOARD_SNAPSHOT_DIR,
     DATA_DIR,
     DB_PATH,
     PRIMARY_SYMBOL,
@@ -50,11 +51,11 @@ from bybit_edge.config import (
 from bybit_edge.dashboard.data import (
     JOURNAL_COLUMNS,
     load_account_status,
+    load_coverage,
     load_heartbeat_file,
     load_journal,
     load_recent_liquidations,
     load_row_counts,
-    load_table_time_range,
     ms_to_iso,
 )
 from bybit_edge.execution.bybit_executor import BybitExecutor
@@ -179,7 +180,7 @@ def _equity_chart(history: list[tuple[float, float]]) -> None:
     if _HAS_PLOTLY:
         fig = px.line(df, x="time", y="equity", title="Account-Equity")
         fig.update_layout(margin=dict(l=10, r=10, t=40, b=10), height=380)
-        st.plotly_chart(fig, use_container_width=True)
+        st.plotly_chart(fig, width="stretch")
     else:
         st.line_chart(df.set_index("time")["equity"])
 
@@ -202,16 +203,30 @@ def _render_journal_tab(journal_path: Path) -> None:
     cols = ["ts_iso", "strategy_id", "action", "side", "qty", "price",
             "confidence", "status", "order_id"]
     cols = [c for c in cols if c in df.columns]
-    st.dataframe(df[cols], use_container_width=True, height=520)
+    st.dataframe(df[cols], width="stretch", height=520)
+
+
+def _snapshots_available() -> bool:
+    """True wenn mindestens eine Dashboard-Snapshot-Datei existiert."""
+    base = Path(DASHBOARD_SNAPSHOT_DIR)
+    return any(
+        (base / name).exists()
+        for name in ("row_counts.parquet", "liquidations_recent.parquet", "coverage.parquet")
+    )
 
 
 def _render_liquidations_tab(conn: Optional[duckdb.DuckDBPyConnection], symbol: str) -> None:
-    if conn is None:
-        st.info("DuckDB nicht verfügbar — bitte LiveRunner mit PERSIST_ENABLED=true starten.")
-        return
+    # Bevorzugt Snapshot-Read (kein DuckDB-Lock-Konflikt); Fallback auf conn.
     rows = load_recent_liquidations(conn, symbol, n=30)
     if not rows:
-        st.info("Keine Liquidationen in DuckDB für dieses Symbol.")
+        if not _snapshots_available() and conn is None:
+            st.info(
+                "Snapshots werden in Kürze verfügbar. Starte den LiveRunner mit "
+                "`PERSIST_ENABLED=true`; der erste Export erfolgt nach "
+                "~PERSIST_FLUSH_SECONDS."
+            )
+        else:
+            st.info("Keine Liquidationen für dieses Symbol.")
         return
     df = pd.DataFrame(rows)
     df["time"] = pd.to_datetime(df["ts"], unit="ms", utc=True)
@@ -219,7 +234,7 @@ def _render_liquidations_tab(conn: Optional[duckdb.DuckDBPyConnection], symbol: 
         fig = px.bar(df, x="time", y="usd_value", color="side",
                      title="Liquidations (USD)")
         fig.update_layout(margin=dict(l=10, r=10, t=40, b=10), height=320)
-        st.plotly_chart(fig, use_container_width=True)
+        st.plotly_chart(fig, width="stretch")
     else:
         st.bar_chart(df.set_index("time")["usd_value"])
 
@@ -230,18 +245,27 @@ def _render_liquidations_tab(conn: Optional[duckdb.DuckDBPyConnection], symbol: 
 
     st.dataframe(
         df[["time", "side", "volume", "price", "usd_value"]],
-        use_container_width=True, height=320,
+        width="stretch", height=320,
     )
 
 
 def _render_persistence_tab(conn: Optional[duckdb.DuckDBPyConnection]) -> None:
-    if conn is None:
-        st.warning(
-            "Keine DuckDB-Datei gefunden. Erst Daten sammeln mit "
-            "`PERSIST_ENABLED=true`, dann diesen Tab neu laden."
-        )
-        return
     counts = load_row_counts(conn)
+    coverage = load_coverage(conn)
+    if not counts and not coverage:
+        if not _snapshots_available() and conn is None:
+            st.info(
+                "Snapshots werden in Kürze verfügbar. Starte den LiveRunner mit "
+                "`PERSIST_ENABLED=true`; der erste Export erfolgt nach "
+                "~PERSIST_FLUSH_SECONDS."
+            )
+        else:
+            st.warning(
+                "Keine DuckDB-Daten gefunden. Erst Daten sammeln mit "
+                "`PERSIST_ENABLED=true`, dann diesen Tab neu laden."
+            )
+        return
+
     if counts:
         df = pd.DataFrame(
             {"table": list(counts.keys()), "rows": list(counts.values())}
@@ -249,7 +273,7 @@ def _render_persistence_tab(conn: Optional[duckdb.DuckDBPyConnection]) -> None:
         if _HAS_PLOTLY:
             fig = px.bar(df, x="table", y="rows", title="Persisted Rows pro Tabelle")
             fig.update_layout(margin=dict(l=10, r=10, t=40, b=10), height=320)
-            st.plotly_chart(fig, use_container_width=True)
+            st.plotly_chart(fig, width="stretch")
         else:
             st.bar_chart(df.set_index("table")["rows"])
 
@@ -257,23 +281,19 @@ def _render_persistence_tab(conn: Optional[duckdb.DuckDBPyConnection]) -> None:
     st.metric("DuckDB-Dateigröße", f"{size_bytes / 1024 / 1024:,.1f} MB")
 
     range_rows: list[dict] = []
-    for table in ("tickers", "trades", "liquidations", "kline_1min",
-                  "orderbook_snapshots"):
-        tr = load_table_time_range(conn, table)
-        if tr is None:
+    for table, stats in coverage.items():
+        if stats.get("min_ts") is None or stats.get("max_ts") is None:
             continue
-        start_ms, end_ms = tr
-        hours = (end_ms - start_ms) / 1000 / 3600 if end_ms > start_ms else 0
         range_rows.append(
             {
                 "table": table,
-                "earliest": ms_to_iso(start_ms),
-                "latest": ms_to_iso(end_ms),
-                "hours": round(hours, 2),
+                "earliest": ms_to_iso(stats["min_ts"]),
+                "latest": ms_to_iso(stats["max_ts"]),
+                "hours": round(float(stats.get("hours", 0.0)), 2),
             }
         )
     if range_rows:
-        st.dataframe(pd.DataFrame(range_rows), use_container_width=True)
+        st.dataframe(pd.DataFrame(range_rows), width="stretch")
 
 
 def _render_pipeline_tab() -> None:
@@ -361,8 +381,14 @@ def main() -> None:  # pragma: no cover — UI-only
             if len(st.session_state.equity_history) > 8640:
                 st.session_state.equity_history = st.session_state.equity_history[-8640:]
 
-    conn = _open_duckdb_readonly(DB_PATH)
-    counts = load_row_counts(conn) if conn is not None else {}
+    # Snapshots bevorzugen — vermeidet DuckDB-Lock-Konflikt mit dem LiveRunner.
+    # Fallback auf direkten read-only Connect ist nur sinnvoll, wenn KEIN
+    # Snapshot existiert (z.B. LiveRunner ist nie gelaufen).
+    if _snapshots_available():
+        conn = None
+    else:
+        conn = _open_duckdb_readonly(DB_PATH)
+    counts = load_row_counts(conn)
     journal_df = load_journal(JOURNAL_PATH, n=50)
     trades_today = _trades_today_count(journal_df)
 
