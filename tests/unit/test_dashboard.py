@@ -722,3 +722,135 @@ def test_load_journal_aggregated_empty_csv(tmp_path: Path) -> None:
     p = tmp_path / "empty.csv"
     pd.DataFrame(columns=JOURNAL_COLUMNS).to_csv(p, index=False)
     assert load_journal_aggregated(p) == {}
+
+
+# --------------------------------------------------------------------------
+# Multi-Symbol Replay-Aggregat (replay_all_results.json)
+# --------------------------------------------------------------------------
+
+def _multi_symbol_payload() -> dict:
+    return {
+        "mode": "single_pass",
+        "symbols": ["BTCUSDT", "SOLUSDT"],
+        "skipped_symbols": [],
+        "generated_at": "2026-06-04T12:00:00Z",
+        "interval_seconds": 1.0,
+        "per_strategy_aggregate": {
+            "S1": {
+                "total_trades": 30,
+                "weighted_sharpe": 1.4,
+                "mean_win_rate": 0.55,
+                "worst_max_dd": 0.10,
+                "total_return": 0.15,
+                "best_symbol": "SOLUSDT",
+                "data_limited_symbols": [],
+            },
+            "S3": {
+                "total_trades": 4,
+                "weighted_sharpe": 0.50,
+                "mean_win_rate": 0.5,
+                "worst_max_dd": 0.02,
+                "total_return": 0.01,
+                "best_symbol": "BTCUSDT",
+                "data_limited_symbols": ["BTCUSDT", "SOLUSDT"],
+            },
+        },
+        "per_symbol": {
+            "BTCUSDT": {
+                "S1": {"sharpe": 1.0, "win_rate": 0.4, "max_drawdown": 0.05,
+                       "total_return": 0.05, "n_trades": 10,
+                       "data_limited": False, "status": "OK"},
+                "S3": {"sharpe": 0.5, "win_rate": 0.5, "max_drawdown": 0.02,
+                       "total_return": 0.01, "n_trades": 4,
+                       "data_limited": False, "status": "data-limited"},
+            },
+            "SOLUSDT": {
+                "S1": {"sharpe": 1.6, "win_rate": 0.6, "max_drawdown": 0.10,
+                       "total_return": 0.10, "n_trades": 20,
+                       "data_limited": False, "status": "OK"},
+                "S3": {"sharpe": 0.0, "win_rate": 0.0, "max_drawdown": 0.0,
+                       "total_return": 0.0, "n_trades": 0,
+                       "data_limited": False, "status": "no-trades"},
+            },
+        },
+    }
+
+
+def test_load_replay_results_prefers_replay_all(tmp_path: Path) -> None:
+    """All three JSON files present → replay_all wins."""
+    (tmp_path / "replay_all_results.json").write_text(
+        json.dumps(_multi_symbol_payload()), encoding="utf-8"
+    )
+    (tmp_path / "walkforward_results.json").write_text(
+        json.dumps(_wf_payload()), encoding="utf-8"
+    )
+    (tmp_path / "replay_backtest_results.json").write_text(
+        json.dumps(_single_pass_payload()), encoding="utf-8"
+    )
+
+    out = load_replay_results(results_dir=tmp_path)
+    assert out is not None
+    assert out["source"] == "multi_symbol"
+    assert out["path"].endswith("replay_all_results.json")
+
+
+def test_load_replay_results_supports_aggregate_schema(tmp_path: Path) -> None:
+    """Multi-symbol schema is normalised into the dashboard-friendly shape."""
+    (tmp_path / "replay_all_results.json").write_text(
+        json.dumps(_multi_symbol_payload()), encoding="utf-8"
+    )
+    out = load_replay_results(results_dir=tmp_path)
+    assert out is not None
+
+    # Aggregate + per-symbol keys both present
+    assert "per_strategy_aggregate" in out
+    assert "per_symbol" in out
+    assert set(out["per_symbol"].keys()) == {"BTCUSDT", "SOLUSDT"}
+
+    # Per-strategy is the aggregate flattened into the existing dashboard shape
+    assert set(out["per_strategy"].keys()) == {"S1", "S3"}
+    s1 = out["per_strategy"]["S1"]
+    assert s1["sharpe"] == pytest.approx(1.4)
+    assert s1["win_rate"] == pytest.approx(0.55)
+    assert s1["max_drawdown"] == pytest.approx(0.10)
+    assert s1["n_trades"] == 30
+    # S3 aggregate has data_limited_symbols + total_trades < required → flagged
+    s3 = out["per_strategy"]["S3"]
+    assert s3["n_trades"] == 4
+    # Multi-symbol meta exposed
+    assert out["symbols"] == ["BTCUSDT", "SOLUSDT"]
+    assert out["skipped_symbols"] == []
+
+
+def test_load_replay_results_multi_symbol_per_symbol_typed(tmp_path: Path) -> None:
+    """``per_symbol`` rows expose floats / ints (no string leakage from JSON)."""
+    (tmp_path / "replay_all_results.json").write_text(
+        json.dumps(_multi_symbol_payload()), encoding="utf-8"
+    )
+    out = load_replay_results(results_dir=tmp_path)
+    assert out is not None
+    sol_s1 = out["per_symbol"]["SOLUSDT"]["S1"]
+    assert isinstance(sol_s1["sharpe"], float)
+    assert isinstance(sol_s1["n_trades"], int)
+    assert sol_s1["status"] == "OK"
+    btc_s3 = out["per_symbol"]["BTCUSDT"]["S3"]
+    assert btc_s3["status"] == "data-limited"
+
+
+def test_top_n_symbol_strategy_ranks_by_sharpe(tmp_path: Path) -> None:
+    """Top-N helper filters on min_trades and sorts descending by sharpe."""
+    from bybit_edge.dashboard.data import top_n_symbol_strategy
+    per_symbol = {
+        "AAA": {
+            "S1": {"sharpe": 2.0, "n_trades": 10},
+            "S3": {"sharpe": 3.0, "n_trades": 3},  # filtered: n<5
+        },
+        "BBB": {
+            "S1": {"sharpe": 1.0, "n_trades": 20},
+        },
+    }
+    top = top_n_symbol_strategy(per_symbol, n=3, min_trades=5)
+    assert [(t["symbol"], t["strategy"]) for t in top] == [("AAA", "S1"), ("BBB", "S1")]
+    # filtering on min_trades
+    top_all = top_n_symbol_strategy(per_symbol, n=3, min_trades=1)
+    assert any(t["strategy"] == "S3" for t in top_all)

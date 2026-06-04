@@ -456,6 +456,7 @@ def ms_to_iso(ts_ms: int | float | None) -> str:
 # --------------------------------------------------------------------------
 
 _DEFAULT_REPLAY_RESULTS_DIR = Path("edge_research_framework/results")
+_REPLAY_ALL_FILENAME = "replay_all_results.json"
 _WALKFORWARD_FILENAME = "walkforward_results.json"
 _SINGLE_PASS_FILENAME = "replay_backtest_results.json"
 
@@ -551,10 +552,14 @@ def load_replay_results(
         zurückgegeben (kein Crash).
     """
     base = Path(results_dir) if results_dir is not None else _DEFAULT_REPLAY_RESULTS_DIR
+    multi = base / _REPLAY_ALL_FILENAME
     wf = base / _WALKFORWARD_FILENAME
     sp = base / _SINGLE_PASS_FILENAME
 
-    if wf.exists():
+    if multi.exists():
+        target = multi
+        source = "multi_symbol"
+    elif wf.exists():
         target = wf
         source = "walkforward"
     elif sp.exists():
@@ -574,7 +579,6 @@ def load_replay_results(
         logger.warning("Replay-JSON %s hat unerwarteten Top-Level-Typ", target)
         return None
 
-    per_strategy = _normalise_replay_payload(payload)
     try:
         mtime = target.stat().st_mtime
         timestamp = (
@@ -582,6 +586,41 @@ def load_replay_results(
         )
     except Exception:
         timestamp = ""
+
+    # Multi-symbol payload has a dedicated schema (per_strategy_aggregate +
+    # per_symbol). Normalise it into the same ``per_strategy`` dict the
+    # dashboard already understands while *additionally* exposing the
+    # multi-symbol-only keys.
+    if source == "multi_symbol":
+        per_strategy = _normalise_aggregate_payload(payload)
+        per_symbol = _normalise_per_symbol_payload(payload)
+        symbols = payload.get("symbols") or []
+        if isinstance(symbols, list):
+            symbols_str = ",".join(str(s) for s in symbols)
+        else:
+            symbols_str = str(symbols)
+        return {
+            "source": source,
+            "timestamp": timestamp,
+            "path": str(target),
+            "symbol": symbols_str,
+            "symbols": list(symbols) if isinstance(symbols, list) else [],
+            "n_events": 0,
+            "mode": str(payload.get("mode", "") or ""),
+            "walkforward": (
+                payload.get("walkforward")
+                if str(payload.get("mode", "")) == "walkforward"
+                else None
+            ),
+            "per_strategy": per_strategy,
+            "per_strategy_aggregate": (
+                payload.get("per_strategy_aggregate") or {}
+            ),
+            "per_symbol": per_symbol,
+            "skipped_symbols": list(payload.get("skipped_symbols") or []),
+        }
+
+    per_strategy = _normalise_replay_payload(payload)
 
     return {
         "source": source,
@@ -592,6 +631,100 @@ def load_replay_results(
         "walkforward": payload.get("walkforward") if source == "walkforward" else None,
         "per_strategy": per_strategy,
     }
+
+
+def _normalise_aggregate_payload(
+    payload: dict[str, Any],
+) -> dict[str, dict[str, Any]]:
+    """Map ``per_strategy_aggregate`` rows onto the per-strategy KPI shape.
+
+    The aggregate JSON stores fields like ``weighted_sharpe`` and
+    ``mean_win_rate`` — the dashboard expects ``sharpe`` / ``win_rate``. We
+    translate them here so the existing KPI / bar-chart code in the
+    Strategie-Performance tab works without further changes.
+    """
+    agg = payload.get("per_strategy_aggregate") or {}
+    if not isinstance(agg, dict):
+        return {}
+    out: dict[str, dict[str, Any]] = {}
+    for sid, row in agg.items():
+        if not isinstance(row, dict):
+            continue
+        n_trades = int(row.get("total_trades", 0) or 0)
+        data_limited_syms = row.get("data_limited_symbols") or []
+        data_limited = (
+            isinstance(data_limited_syms, list)
+            and len(data_limited_syms) > 0
+            and n_trades == 0
+        )
+        out[str(sid)] = {
+            "sharpe": float(row.get("weighted_sharpe", 0.0) or 0.0),
+            "win_rate": float(row.get("mean_win_rate", 0.0) or 0.0),
+            "max_drawdown": float(row.get("worst_max_dd", 0.0) or 0.0),
+            "total_return": float(row.get("total_return", 0.0) or 0.0),
+            "n_trades": n_trades,
+            "data_limited": bool(data_limited),
+            "best_symbol": row.get("best_symbol"),
+            "data_limited_symbols": list(data_limited_syms)
+            if isinstance(data_limited_syms, list)
+            else [],
+        }
+    return out
+
+
+def _normalise_per_symbol_payload(
+    payload: dict[str, Any],
+) -> dict[str, dict[str, dict[str, Any]]]:
+    """Return the ``per_symbol`` block as plain dicts with stable float types."""
+    raw = payload.get("per_symbol") or {}
+    if not isinstance(raw, dict):
+        return {}
+    out: dict[str, dict[str, dict[str, Any]]] = {}
+    for sym, sym_res in raw.items():
+        if not isinstance(sym_res, dict):
+            continue
+        per_strat: dict[str, dict[str, Any]] = {}
+        for sid, row in sym_res.items():
+            if not isinstance(row, dict):
+                continue
+            per_strat[str(sid)] = {
+                "sharpe": float(row.get("sharpe", 0.0) or 0.0),
+                "win_rate": float(row.get("win_rate", 0.0) or 0.0),
+                "max_drawdown": float(row.get("max_drawdown", 0.0) or 0.0),
+                "total_return": float(row.get("total_return", 0.0) or 0.0),
+                "n_trades": int(row.get("n_trades", 0) or 0),
+                "data_limited": bool(row.get("data_limited", False)),
+                "status": str(row.get("status", "") or ""),
+            }
+        out[str(sym)] = per_strat
+    return out
+
+
+def top_n_symbol_strategy(
+    per_symbol: dict[str, dict[str, dict[str, Any]]],
+    n: int = 3,
+    min_trades: int = 5,
+) -> list[dict[str, Any]]:
+    """Return the top-N (symbol, strategy) pairs by Sharpe, gated on ``min_trades``.
+
+    Used by the dashboard's Strategie-Performance tab to surface the highlight
+    card ("Bester Edge: Symbol X / Strategie Y / Sharpe Z") and as a small
+    helper for tests that want to assert on this ranking.
+    """
+    triples: list[dict[str, Any]] = []
+    for sym, sym_res in per_symbol.items():
+        for sid, m in sym_res.items():
+            nt = int(m.get("n_trades", 0) or 0)
+            if nt < min_trades:
+                continue
+            triples.append({
+                "symbol": str(sym),
+                "strategy": str(sid),
+                "sharpe": float(m.get("sharpe", 0.0) or 0.0),
+                "n_trades": nt,
+            })
+    triples.sort(key=lambda r: r["sharpe"], reverse=True)
+    return triples[: int(n)]
 
 
 # --------------------------------------------------------------------------

@@ -59,6 +59,7 @@ from bybit_edge.dashboard.data import (
     load_replay_results,
     load_row_counts,
     ms_to_iso,
+    top_n_symbol_strategy,
 )
 from bybit_edge.execution.bybit_executor import BybitExecutor
 
@@ -362,13 +363,36 @@ def _render_strategy_performance_tab(journal_path: Path) -> None:
     if replay is None or not replay.get("per_strategy"):
         st.info(
             "Noch kein Replay durchgeführt — führe "
-            "`python scripts/replay_backtest.py --symbol BTCUSDT --walkforward` "
-            "aus. Single-Pass: `python scripts/replay_backtest.py --symbol BTCUSDT`."
+            "`python scripts/replay_all.py --auto --walkforward` "
+            "aus (Multi-Symbol) oder den Single-Symbol-Treiber "
+            "`python scripts/replay_backtest.py --symbol BTCUSDT`."
         )
     else:
         per_strat: dict[str, dict] = replay["per_strategy"]
         src = replay["source"]
-        label = "Walk-Forward OOS-Replay" if src == "walkforward" else "Single-Pass-Replay"
+        if src == "multi_symbol":
+            label = "Multi-Symbol-Aggregat (replay_all)"
+        elif src == "walkforward":
+            label = "Walk-Forward OOS-Replay"
+        else:
+            label = "Single-Pass-Replay"
+
+        # Top-3 Highlight-Karte: bester (Symbol, Strategie, Sharpe).
+        per_symbol = replay.get("per_symbol") or {}
+        if isinstance(per_symbol, dict) and per_symbol:
+            top = top_n_symbol_strategy(per_symbol, n=3, min_trades=5)
+            if top:
+                best = top[0]
+                st.success(
+                    f"**Bester Edge:** {best['symbol']} / {best['strategy']} · "
+                    f"Sharpe = {best['sharpe']:.2f} · Trades = {best['n_trades']}"
+                )
+            else:
+                st.warning(
+                    "Noch keine Symbol/Strategie-Kombi mit ≥ 5 Trades — alles "
+                    "data-limited. Mehr Live-Daten sammeln."
+                )
+
         st.caption(
             f"Quelle: **{label}** — `{replay['path']}` · Datei-Stand: "
             f"{replay.get('timestamp', '?')} · Symbol: "
@@ -464,6 +488,45 @@ def _render_strategy_performance_tab(journal_path: Path) -> None:
                 }
             )
         st.dataframe(pd.DataFrame(detail_rows), width="stretch")
+
+        # --- Pro-Symbol Detail (nur Multi-Symbol-Modus) -----------------
+        per_symbol_block = replay.get("per_symbol") or {}
+        if isinstance(per_symbol_block, dict) and per_symbol_block:
+            st.markdown("##### Pro Symbol")
+            ps_rows = []
+            for sym in sorted(per_symbol_block.keys()):
+                strat_map = per_symbol_block[sym] or {}
+                for sid in sorted(strat_map.keys()):
+                    m = strat_map[sid]
+                    ps_rows.append(
+                        {
+                            "Symbol": sym,
+                            "Strategie": sid,
+                            "Sharpe": round(float(m.get("sharpe", 0.0)), 3),
+                            "WinRate": round(float(m.get("win_rate", 0.0)), 3),
+                            "MaxDD": round(float(m.get("max_drawdown", 0.0)), 4),
+                            "Trades": int(m.get("n_trades", 0)),
+                            "Status": str(
+                                m.get("status")
+                                or _replay_status(
+                                    int(m.get("n_trades", 0)),
+                                    bool(m.get("data_limited", False)),
+                                )
+                            ),
+                        }
+                    )
+            ps_df = pd.DataFrame(ps_rows)
+            if not ps_df.empty:
+                ps_df = ps_df.sort_values(
+                    ["Sharpe", "Trades"], ascending=[False, False], kind="stable"
+                ).reset_index(drop=True)
+            st.dataframe(ps_df, width="stretch")
+
+            if replay.get("skipped_symbols"):
+                st.caption(
+                    "Skipped (keine Events / zu wenig Daten): "
+                    + ", ".join(replay["skipped_symbols"])
+                )
 
     st.markdown("---")
     st.markdown("#### Sektion B — Live-Trade-Aggregat (`trades_journal.csv`)")
