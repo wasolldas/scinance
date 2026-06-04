@@ -261,6 +261,22 @@ class TestTickerState:
         assert snap.last_price == 50050.0
         assert snap.recv_ts == 1700000000.0
 
+    def test_ticker_from_ws_uses_exchange_ts(self) -> None:
+        """An explicit envelope exchange_ts overrides the (absent) data ts."""
+        data = {"symbol": "BTCUSDT", "lastPrice": "50000"}  # no "ts" field
+        snap = TickerSnapshot.from_ws(data, exchange_ts=1700000000123)
+        assert snap.ts == 1700000000123
+
+    def test_ticker_from_ws_falls_back_to_data_ts(self) -> None:
+        """Without exchange_ts the legacy data["ts"] meaning is preserved."""
+        snap = TickerSnapshot.from_ws({"symbol": "BTCUSDT", "ts": "999"})
+        assert snap.ts == 999
+
+    def test_ticker_from_ws_exchange_ts_zero_falls_back(self) -> None:
+        """exchange_ts=0 is treated as absent → fall back to data["ts"]."""
+        snap = TickerSnapshot.from_ws({"symbol": "BTCUSDT", "ts": "42"}, exchange_ts=0)
+        assert snap.ts == 42
+
 
 # =====================================================================
 # LiquidationBuffer

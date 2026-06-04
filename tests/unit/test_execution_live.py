@@ -14,7 +14,7 @@ import duckdb
 import numpy as np
 import pytest
 
-from bybit_edge.collector.ws_collector import WSMessage
+from bybit_edge.collector.ws_collector import BybitWSCollector, WSMessage
 from bybit_edge.execution.bybit_executor import BybitExecutor
 from bybit_edge.live_runner import LiveRunner
 
@@ -108,6 +108,25 @@ class TestLiveRunnerHandlers:
         r._on_ticker(WSMessage("tickers", "BTCUSDT", {"fundingRate": "0.0005"}, 2.0))
         assert r.ticker.last_price == 50000.0
         assert r.ticker.funding_rate == 0.0005
+
+    def test_on_ticker_uses_envelope_ts(self):
+        """The envelope exchange ts from the WSMessage lands on the snapshot."""
+        r = LiveRunner("BTCUSDT")
+        msg = WSMessage(
+            stream="tickers", symbol="BTCUSDT",
+            data={"symbol": "BTCUSDT", "lastPrice": "50000"},
+            recv_ts=1.0, envelope_ts=1700000000123,
+        )
+        r._on_ticker(msg)
+        assert r.ticker is not None
+        assert r.ticker.ts == 1700000000123
+
+    def test_on_ticker_default_envelope_ts_zero(self):
+        """Helper WSMessages without envelope_ts default to ts=0 (back-compat)."""
+        r = LiveRunner("BTCUSDT")
+        r._on_ticker(_ticker_msg())
+        assert r.ticker is not None
+        assert r.ticker.ts == 0
 
     def test_orderbook_snapshot_then_delta(self):
         r = LiveRunner("BTCUSDT")
@@ -758,3 +777,45 @@ class TestSnapshotExportRetry:
         ok = r._safe_parquet_export(conn, "coverage.parquet", "COPY ...")
         assert ok is True
         assert conn.execute.call_count == 2
+
+
+# ──────────────────────────────────────────────────────────────────
+# Collector dispatch — envelope ts propagation
+# ──────────────────────────────────────────────────────────────────
+
+class TestCollectorEnvelopeTs:
+    def test_dispatch_propagates_envelope_ts(self):
+        """_dispatch must copy the Bybit envelope ``ts`` onto the WSMessage."""
+        collector = BybitWSCollector(symbol="BTCUSDT")
+        captured: list[WSMessage] = []
+        collector.add_handler("tickers", lambda m: captured.append(m))
+
+        payload = {
+            "topic": "tickers.BTCUSDT",
+            "type": "snapshot",
+            "ts": 1700000000123,
+            "data": {"symbol": "BTCUSDT", "lastPrice": "50000"},
+        }
+        asyncio.run(collector._dispatch(payload, recv_ts=1.0))
+
+        assert len(captured) == 1
+        assert captured[0].envelope_ts == 1700000000123
+        # And it survives into the queued message too.
+        queued = collector.queues["tickers"].get_nowait()
+        assert queued.envelope_ts == 1700000000123
+
+    def test_dispatch_missing_ts_defaults_zero(self):
+        """A payload without ``ts`` yields envelope_ts=0 (back-compat)."""
+        collector = BybitWSCollector(symbol="BTCUSDT")
+        captured: list[WSMessage] = []
+        collector.add_handler("tickers", lambda m: captured.append(m))
+
+        payload = {
+            "topic": "tickers.BTCUSDT",
+            "type": "delta",
+            "data": {"symbol": "BTCUSDT", "fundingRate": "0.0001"},
+        }
+        asyncio.run(collector._dispatch(payload, recv_ts=1.0))
+
+        assert len(captured) == 1
+        assert captured[0].envelope_ts == 0

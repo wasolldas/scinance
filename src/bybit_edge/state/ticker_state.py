@@ -60,11 +60,23 @@ class TickerSnapshot:
     # ------------------------------------------------------------------
 
     @classmethod
-    def from_ws(cls, data: dict, recv_ts: float | None = None) -> "TickerSnapshot":
+    def from_ws(
+        cls,
+        data: dict,
+        recv_ts: float | None = None,
+        exchange_ts: int | None = None,
+    ) -> "TickerSnapshot":
         """Build a ``TickerSnapshot`` from a Bybit V5 tickers WS payload.
 
         Fields that may be absent in delta updates default to 0 / 0.0.
+
+        The Bybit V5 envelope carries the exchange timestamp (``ts``) on the
+        outer message, not inside ``data``. Pass it explicitly via
+        ``exchange_ts`` so the snapshot records the real event time. When
+        ``exchange_ts`` is missing/zero, falls back to ``data.get("ts", 0)``
+        (legacy behaviour, back-compat).
         """
+        ts = int(exchange_ts) if exchange_ts else int(data.get("ts", 0))
         return cls(
             symbol=str(data.get("symbol", "")),
             last_price=float(data.get("lastPrice", 0)),
@@ -78,7 +90,7 @@ class TickerSnapshot:
             bid1_size=float(data.get("bid1Size", 0)),
             ask1_price=float(data.get("ask1Price", 0)),
             ask1_size=float(data.get("ask1Size", 0)),
-            ts=int(data.get("ts", 0)),
+            ts=ts,
             recv_ts=recv_ts if recv_ts is not None else time.time(),
         )
 

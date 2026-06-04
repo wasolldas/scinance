@@ -197,7 +197,9 @@ class LiveRunner:
         # Delta-Merge: nur vorhandene Felder überschreiben
         self._raw_ticker.update(msg.data)
         self._raw_ticker["symbol"] = self.symbol
-        self.ticker = TickerSnapshot.from_ws(self._raw_ticker, recv_ts=msg.recv_ts)
+        self.ticker = TickerSnapshot.from_ws(
+            self._raw_ticker, recv_ts=msg.recv_ts, exchange_ts=msg.envelope_ts
+        )
         self._msg_count += 1
         if self.persist is not None and self.ticker.last_price > 0:
             self._buf_tickers.append(self.ticker)
