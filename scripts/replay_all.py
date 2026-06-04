@@ -27,6 +27,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import logging
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
@@ -144,6 +145,7 @@ def run_symbol(
     test_days: int,
     embargo_minutes: int,
     diagnose: bool = False,
+    progress: bool = False,
 ) -> Optional[tuple[dict[str, BacktestResult], int, int, dict[str, Any]]]:
     """Run the replay for a single symbol.
 
@@ -161,6 +163,10 @@ def run_symbol(
         )
     else:
         bt = ReplayBacktester(symbol=symbol, db_path=db_path)
+    # Only forward ``progress`` when enabled, so fakes/stubs that monkey-patch
+    # ReplayBacktester with the pre-progress run()/run_walkforward() signature
+    # keep working on the default (progress-off in tests) path.
+    progress_kw: dict[str, Any] = {"progress": True} if progress else {}
     try:
         n_events = bt.load_events()
         if n_events == 0:
@@ -171,6 +177,7 @@ def run_symbol(
                 train_days=train_days,
                 test_days=test_days,
                 embargo_minutes=embargo_minutes,
+                **progress_kw,
             )
             n_folds = int(bt.last_walkforward_folds)
             # get_diagnostics() is only invoked when diagnosing so fakes/stubs
@@ -182,7 +189,7 @@ def run_symbol(
                 # that to the caller so it can flag this symbol as skipped.
                 return results, n_events, 0, diagnostics
             return results, n_events, n_folds, diagnostics
-        results = bt.run(pipeline_interval_seconds=interval)
+        results = bt.run(pipeline_interval_seconds=interval, **progress_kw)
         diagnostics = bt.get_diagnostics() if diagnose else {}
         return results, n_events, 0, diagnostics
     finally:
@@ -492,6 +499,7 @@ def run(
     embargo_minutes: int,
     diagnose: bool = False,
     diagnostics_sink: Optional[dict[str, dict[str, Any]]] = None,
+    progress: bool = False,
 ) -> tuple[
     dict[str, dict[str, dict[str, Any]]],
     dict[str, dict[str, Any]],
@@ -527,6 +535,7 @@ def run(
                 test_days=test_days,
                 embargo_minutes=embargo_minutes,
                 diagnose=diagnose,
+                progress=progress,
             )
         except Exception as exc:  # noqa: BLE001 — keep going on per-symbol error
             print(f"  ! Replay fuer {sym} fehlgeschlagen: {exc}")
@@ -662,12 +671,36 @@ def _parse_args(argv: Optional[list[str]] = None) -> argparse.Namespace:
             "schwarz auf weiss WELCHES Gate blockiert. Kein Einfluss auf Trades."
         ),
     )
+    parser.add_argument(
+        "--progress",
+        dest="progress",
+        action="store_true",
+        default=True,
+        help=(
+            "Fortschritts-Logging pro Symbol (Default AN): alle ~250k Events "
+            "bzw. ~10s eine Zeile mit Prozent + ETA, am Symbol-Ende eine "
+            "'fertig in Xs'-Zeile. Kein Einfluss auf Trades."
+        ),
+    )
+    parser.add_argument(
+        "--no-progress",
+        dest="progress",
+        action="store_false",
+        help="Fortschritts-Logging abschalten.",
+    )
     return parser.parse_args(argv)
 
 
 def main(argv: Optional[list[str]] = None) -> int:
     args = _parse_args(argv)
     db_path = Path(args.db) if args.db else DB_PATH
+
+    # Surface the per-symbol progress lines (logging.INFO on the backtester
+    # logger) when running interactively with progress enabled.
+    if args.progress:
+        logging.basicConfig(
+            level=logging.INFO, format="%(asctime)s | %(levelname)s | %(message)s"
+        )
 
     symbols, source = resolve_symbols(args.symbols, args.auto, db_path)
 
@@ -710,6 +743,7 @@ def main(argv: Optional[list[str]] = None) -> int:
         embargo_minutes=args.embargo_minutes,
         diagnose=args.diagnose,
         diagnostics_sink=diagnostics_per_symbol,
+        progress=args.progress,
     )
 
     mode = "walkforward" if args.walkforward else "single_pass"

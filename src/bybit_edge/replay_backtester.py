@@ -31,11 +31,39 @@ Ehrliche Einordnung der Daten-Limits:
       Single-Symbol-Tickdaten nicht abbildbar. Beide sind ``datenlimitiert``.
     * Real testbar sind S1 (Liquidations-Kaskade) und S3 (Pre-Settlement /
       M22-M24-Familie, inkl. live erfasstem Premium-Index).
+
+Performance / GPU (ehrliche Einordnung — gemessen, nicht geraten):
+    Ein cProfile-Lauf (``scripts/_profile_replay.py``) zeigt: der Replay ist
+    CPU-gebunden, und der Hotspot ist M15 ``_fit_omori`` via
+    ``scipy.optimize.curve_fit`` (~90 % der kumulativen Zeit auf einem
+    Liquidations-Cascade-Stream). M14 ``_fit_mle`` ist dank des zeit-basierten
+    ``HAWKES_REFIT_SECONDS``-Throttles vernachlässigbar (~1 % — refittet nur
+    alle 30 s Event-Zeit, im Live identisch). S3 (M22/M23/M24/M8) inkl.
+    ``np.quantile`` ist ebenfalls vernachlässigbar.
+
+    Warum GPU hier NICHT hilft (kein Cargo-Cult): curve_fit / minimize sind
+    SEQUENZIELLE Levenberg-Marquardt-/L-BFGS-Optimierungen auf winzigen
+    (10..120-Punkte-) Fenstern. Der Host->Device-Transfer-Overhead pro Iter
+    übersteigt den Rechen-Nutzen um Größenordnungen; es gibt nichts zu
+    batchen. Die regelbasierten Strategien sind numpy-Skalar-Arithmetik —
+    auch kein GPU-Fall. GPU lohnt sich nur im OFFLINE-Training der
+    Torch-Modelle (M18/M19/M20, M1) via ``scripts/train_models.py --device
+    cuda``; im Replay werden die ML-Module datenlimitiert kaum aufgerufen und
+    Per-Tick-Inferenz ist die falsche Granularität fürs GPU-Batching. Der
+    Replay bleibt daher korrekterweise CPU-gebunden.
+
+    Behebbarer Overhead (verhaltens-erhaltend umgesetzt): M15 ``compute`` baute
+    pro Tick mehrere Python-Listcomps über den (bis zu 100k großen)
+    Liquidations-Buffer auf. Diese wurden auf einen einzigen vektorisierten
+    ``np.fromiter`` + Boolean-Masken reduziert (bit-identische Ergebnisse,
+    abgesichert durch ``test_replay_optimization_preserves_results`` /
+    ``TestOptimizedComputeMatchesLegacy``).
 """
 from __future__ import annotations
 
 import logging
 import sys
+import time
 from collections import Counter, deque
 from contextlib import nullcontext
 from pathlib import Path
@@ -81,6 +109,13 @@ _PRICE_HISTORY_MAXLEN: int = 512
 # fly (see ``self._data_limited``).
 _DATA_LIMITED: frozenset[str] = frozenset({"S2", "S4", "S5"})
 
+# Default cadence (in processed events) for the optional progress reporter, and
+# the wall-clock floor between two emitted progress lines. Used by the CLIs
+# which pass ``progress=True``; the ReplayBacktester default stays OFF so the
+# unit tests / bit-identical guarantees are unaffected.
+_DEFAULT_PROGRESS_EVERY_EVENTS: int = 250_000
+_PROGRESS_MIN_WALL_SECONDS: float = 10.0
+
 
 def _effective_ts_ms(kind: str, payload: dict[str, Any]) -> int:
     """Effective event-time (ms) used for the chronological merge sort.
@@ -104,6 +139,95 @@ def _effective_ts_ms(kind: str, payload: dict[str, Any]) -> int:
         return ts
     recv = payload.get("recv_ts", 0.0)
     return int(float(recv) * 1000.0) if recv else 0
+
+
+class _ProgressReporter:
+    """Optional, strictly-observational progress reporter for a replay run.
+
+    Emits a single ``logging.INFO`` line every ``every_events`` processed
+    events OR every :data:`_PROGRESS_MIN_WALL_SECONDS` of wall-clock (whichever
+    comes first, but never more than once per the wall-clock floor so a tight
+    event cadence cannot spam the log), plus a final ``fertig in Xs`` line.
+
+    It tracks how many pipeline ticks evaluated each strategy so the operator
+    sees activity, mirroring the requested layout::
+
+        [BTCUSDT] 1.250.000 / 4.547.724 Events (27%) | S3 evaluated 8200x |
+        38s elapsed | ETA ~95s
+
+    The reporter never reads or mutates the trade path; building one and calling
+    its hooks is the only overhead, and it is only constructed when the caller
+    asks for progress.
+    """
+
+    def __init__(
+        self,
+        symbol: str,
+        total_events: int,
+        every_events: int,
+        logger_: logging.Logger,
+        focus_strategy: str = "S3",
+    ) -> None:
+        self._symbol = symbol
+        self._total = max(int(total_events), 0)
+        self._every = max(int(every_events), 1)
+        self._log = logger_
+        self._focus = focus_strategy
+        self._processed = 0
+        self._focus_evals = 0
+        self._t0 = time.perf_counter()
+        self._last_emit_wall = self._t0
+        self._last_emit_count = 0
+
+    def on_event(self) -> None:
+        """Count one processed event and maybe emit a progress line."""
+        self._processed += 1
+        if self._processed - self._last_emit_count < self._every:
+            return
+        now = time.perf_counter()
+        if now - self._last_emit_wall < _PROGRESS_MIN_WALL_SECONDS:
+            # Respect the wall-clock floor even when the event cadence is hit
+            # often (e.g. tiny ``every_events`` on a fast stream).
+            return
+        self._emit(now)
+        self._last_emit_wall = now
+        self._last_emit_count = self._processed
+
+    def on_pipeline_tick(self) -> None:
+        """Count one pipeline tick where the focus strategy was evaluated."""
+        self._focus_evals += 1
+
+    def _emit(self, now: float) -> None:
+        elapsed = now - self._t0
+        pct = (self._processed / self._total * 100.0) if self._total else 0.0
+        if self._processed > 0 and self._total > 0:
+            eta = elapsed * (self._total - self._processed) / self._processed
+            eta_str = f"ETA ~{eta:.0f}s"
+        else:
+            eta_str = "ETA ~?s"
+        self._log.info(
+            "[%s] %s / %s Events (%.0f%%) | %s evaluated %dx | %.0fs elapsed | %s",
+            self._symbol,
+            f"{self._processed:,}".replace(",", "."),
+            f"{self._total:,}".replace(",", "."),
+            pct,
+            self._focus,
+            self._focus_evals,
+            elapsed,
+            eta_str,
+        )
+
+    def finish(self) -> None:
+        """Emit the terminal ``fertig in Xs`` line."""
+        elapsed = time.perf_counter() - self._t0
+        self._log.info(
+            "[%s] fertig in %.1fs (%s Events, %s evaluated %dx)",
+            self._symbol,
+            elapsed,
+            f"{self._processed:,}".replace(",", "."),
+            self._focus,
+            self._focus_evals,
+        )
 
 
 class ReplayBacktester:
@@ -754,7 +878,12 @@ class ReplayBacktester:
     # Replay
     # ------------------------------------------------------------------
 
-    def run(self, pipeline_interval_seconds: float = 1.0) -> dict[str, BacktestResult]:
+    def run(
+        self,
+        pipeline_interval_seconds: float = 1.0,
+        progress: bool = False,
+        progress_every_events: int = 0,
+    ) -> dict[str, BacktestResult]:
         """Replay the loaded events chronologically through every strategy.
 
         Events are ingested strictly in ``ts`` order. After ingesting an event
@@ -762,6 +891,23 @@ class ReplayBacktester:
         ``pipeline_interval_seconds`` (throttled exactly like the LiveRunner).
         Each strategy keeps its own open position; an ``enter`` opens a
         position, an ``exit`` closes it into a round-trip :class:`Trade`.
+
+        Parameters
+        ----------
+        pipeline_interval_seconds
+            Pipeline throttle (matches the LiveRunner).
+        progress
+            When ``True`` a progress line is logged to the module logger
+            (``logging.INFO``) every ``progress_every_events`` processed events
+            (or at least every ~10 s of wall-clock), plus a final
+            ``fertig in Xs`` line. Default ``False`` so the replay stays
+            bit-identical and overhead-free for the unit tests; the CLIs flip
+            it on. Progress reporting is strictly observational — it never
+            touches the trade path.
+        progress_every_events
+            Event cadence for the progress line. ``0`` (default) means: use
+            :data:`_DEFAULT_PROGRESS_EVERY_EVENTS` when ``progress`` is on, and
+            stay silent otherwise.
 
         Returns
         -------
@@ -781,6 +927,17 @@ class ReplayBacktester:
         liq_buffer = LiquidationBuffer(maxlen=2000)
         price_history: deque[float] = deque(maxlen=_PRICE_HISTORY_MAXLEN)
 
+        reporter = self._make_progress_reporter(
+            progress=progress,
+            progress_every_events=progress_every_events,
+            total_events=len(self._events),
+        )
+
+        # Only forward ``progress_reporter`` when active (see _run_walkforward_
+        # inner for the rationale — keeps the default override signature intact).
+        extra: dict[str, Any] = (
+            {"progress_reporter": reporter} if reporter is not None else {}
+        )
         last_ticker, last_ob_snap, last_ts_ms = self._replay_events(
             events=self._events,
             strategies=strategies,
@@ -794,7 +951,10 @@ class ReplayBacktester:
             last_ticker=None,
             last_ob_snap=None,
             last_pipeline_ms=None,
+            **extra,
         )
+        if reporter is not None:
+            reporter.finish()
 
         # Force-close any open positions at the last observed price.
         final_price = (
@@ -823,6 +983,30 @@ class ReplayBacktester:
     # Internal replay primitive — shared by run() and run_walkforward()
     # ------------------------------------------------------------------
 
+    def _make_progress_reporter(
+        self,
+        progress: bool,
+        progress_every_events: int,
+        total_events: int,
+    ) -> Optional[_ProgressReporter]:
+        """Build a :class:`_ProgressReporter` when progress is requested.
+
+        Returns ``None`` (the default) when neither ``progress`` is set nor a
+        positive ``progress_every_events`` is given, so the hot loop carries no
+        reporting overhead and stays bit-identical to the no-progress path.
+        """
+        every = progress_every_events
+        if every <= 0:
+            if not progress:
+                return None
+            every = _DEFAULT_PROGRESS_EVERY_EVENTS
+        return _ProgressReporter(
+            symbol=self.symbol,
+            total_events=total_events,
+            every_events=every,
+            logger_=logger,
+        )
+
     @staticmethod
     def _build_strategies() -> dict[str, Any]:
         """Construct one fresh instance per strategy id (mirrors live runner)."""
@@ -848,6 +1032,7 @@ class ReplayBacktester:
         last_ticker: Optional[dict[str, Any]],
         last_ob_snap: Optional[dict[str, Any]],
         last_pipeline_ms: Optional[int],
+        progress_reporter: Optional[_ProgressReporter] = None,
     ) -> tuple[Optional[dict[str, Any]], Optional[dict[str, Any]], Optional[int]]:
         """Drive the causal replay loop over *events*.
 
@@ -883,6 +1068,8 @@ class ReplayBacktester:
         last_eff_ts_ms: Optional[int] = None
 
         for ts_ms, kind, payload in events:
+            if progress_reporter is not None:
+                progress_reporter.on_event()
             # --- Ingest event into the appropriate causal buffer ---
             if kind == "trade":
                 evt = TradeEvent(
@@ -952,6 +1139,8 @@ class ReplayBacktester:
                 continue
             last_pipeline_ms = eff_ts_ms
             last_eff_ts_ms = eff_ts_ms
+            if progress_reporter is not None:
+                progress_reporter.on_pipeline_tick()
 
             ticker_data = self._build_ticker_data(
                 snap=last_ticker,
@@ -1003,6 +1192,8 @@ class ReplayBacktester:
         embargo_minutes: int = WF_EMBARGO_MINUTES,
         min_train_events: int = 100,
         param_overrides: Optional[dict[str, Any]] = None,
+        progress: bool = False,
+        progress_every_events: int = 0,
     ) -> dict[str, BacktestResult]:
         """Replay events in walk-forward folds: train (warmup, trades discarded)
         → embargo → test (trades counted). Slides by ``test_days``. Concatenates
@@ -1050,14 +1241,23 @@ class ReplayBacktester:
         else:
             ctx = nullcontext()
 
+        reporter = self._make_progress_reporter(
+            progress=progress,
+            progress_every_events=progress_every_events,
+            total_events=len(self._events),
+        )
         with ctx:
-            return self._run_walkforward_inner(
+            results = self._run_walkforward_inner(
                 pipeline_interval_seconds=pipeline_interval_seconds,
                 train_days=train_days,
                 test_days=test_days,
                 embargo_minutes=embargo_minutes,
                 min_train_events=min_train_events,
+                progress_reporter=reporter,
             )
+        if reporter is not None:
+            reporter.finish()
+        return results
 
     def _run_walkforward_inner(
         self,
@@ -1066,6 +1266,7 @@ class ReplayBacktester:
         test_days: int,
         embargo_minutes: int,
         min_train_events: int,
+        progress_reporter: Optional[_ProgressReporter] = None,
     ) -> dict[str, BacktestResult]:
         """Body of :meth:`run_walkforward` — executes the fold sweep.
 
@@ -1203,6 +1404,15 @@ class ReplayBacktester:
             test_trades_fold: dict[str, list[Trade]] = {
                 sid: [] for sid in strategies
             }
+            # Only forward ``progress_reporter`` when one is active. Keeping the
+            # default call signature otherwise identical preserves compatibility
+            # with subclasses/tests that override ``_replay_events`` with the
+            # pre-progress signature.
+            extra: dict[str, Any] = (
+                {"progress_reporter": progress_reporter}
+                if progress_reporter is not None
+                else {}
+            )
             last_ticker, last_ob_snap, last_ts_ms = self._replay_events(
                 events=test_events,
                 strategies=strategies,
@@ -1216,6 +1426,7 @@ class ReplayBacktester:
                 last_ticker=last_ticker,
                 last_ob_snap=last_ob_snap,
                 last_pipeline_ms=None,
+                **extra,
             )
 
             # Force-close any positions still open at end-of-test.

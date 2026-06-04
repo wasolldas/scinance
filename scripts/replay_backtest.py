@@ -20,6 +20,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import logging
 from pathlib import Path
 from typing import Any
 
@@ -120,7 +121,31 @@ def main() -> None:
             "schwarz auf weiss WELCHES Gate blockiert. Kein Einfluss auf Trades."
         ),
     )
+    parser.add_argument(
+        "--progress",
+        dest="progress",
+        action="store_true",
+        default=True,
+        help=(
+            "Fortschritts-Logging (Default AN): alle ~250k Events bzw. ~10s "
+            "eine Zeile auf den Logger mit Prozent + ETA. Kein Einfluss auf "
+            "Trades."
+        ),
+    )
+    parser.add_argument(
+        "--no-progress",
+        dest="progress",
+        action="store_false",
+        help="Fortschritts-Logging abschalten.",
+    )
     args = parser.parse_args()
+
+    # Ensure the progress lines (logging.INFO on the backtester logger) are
+    # actually surfaced when running interactively.
+    if args.progress:
+        logging.basicConfig(
+            level=logging.INFO, format="%(asctime)s | %(levelname)s | %(message)s"
+        )
 
     db_path = Path(args.db) if args.db else DB_PATH
 
@@ -169,11 +194,15 @@ def main() -> None:
                 train_days=args.train_days,
                 test_days=args.test_days,
                 embargo_minutes=args.embargo_minutes,
+                progress=args.progress,
             )
             n_folds = bt.last_walkforward_folds
             print(f"  Folds executed: {n_folds}")
         else:
-            results = bt.run(pipeline_interval_seconds=args.interval)
+            results = bt.run(
+                pipeline_interval_seconds=args.interval,
+                progress=args.progress,
+            )
         diagnostics = bt.get_diagnostics()
     finally:
         bt.close()

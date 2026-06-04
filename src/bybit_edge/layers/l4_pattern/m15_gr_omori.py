@@ -184,10 +184,35 @@ class M15GROmori(BaseModule):
         # ----------------------------------------------------------
         # 2. Filter to last 24h
         # ----------------------------------------------------------
+        # Vectorised single-pass over the buffer instead of repeatedly
+        # rebuilding Python lists/arrays per compute() call. The buffer is a
+        # bounded deque (maxlen 100k) and ``compute`` historically scanned it
+        # several times per tick (one listcomp for ``recent`` plus two more to
+        # build the usd arrays, plus a third for the aftershock times). On a
+        # liquidation cascade S1 calls this every cadence tick, so those scans
+        # dominated the per-tick cost. We materialise the (ts, usd) buffer into
+        # two parallel ``float64`` arrays ONCE and slice with boolean masks; the
+        # numeric results are bit-identical to the previous list-based path.
         cutoff_ms: int = int((current_ts - 86400) * 1000)
-        recent: list[tuple[int, float]] = [
-            (ts, usd) for ts, usd in self._event_buffer if ts >= cutoff_ms
-        ]
+        if self._event_buffer:
+            buf_ts = np.fromiter(
+                (ts for ts, _ in self._event_buffer),
+                dtype=np.int64,
+                count=len(self._event_buffer),
+            )
+            buf_usd = np.fromiter(
+                (usd for _, usd in self._event_buffer),
+                dtype=np.float64,
+                count=len(self._event_buffer),
+            )
+            recent_mask = buf_ts >= cutoff_ms
+            recent_ts = buf_ts[recent_mask]
+            recent_usd = buf_usd[recent_mask]
+        else:
+            recent_ts = np.empty(0, dtype=np.int64)
+            recent_usd = np.empty(0, dtype=np.float64)
+
+        n_recent: int = int(recent_ts.size)
 
         # ----------------------------------------------------------
         # 3. Compute magnitudes: M = log10(usd_value)
@@ -195,9 +220,8 @@ class M15GROmori(BaseModule):
         b_value: float | None = None
         b_low: bool = False
 
-        if len(recent) >= self._min_events:
-            usd_values = np.array([usd for _, usd in recent], dtype=np.float64)
-            usd_values = usd_values[usd_values > 0]  # safety: avoid log10(0)
+        if n_recent >= self._min_events:
+            usd_values = recent_usd[recent_usd > 0]  # safety: avoid log10(0)
             if len(usd_values) >= self._min_events:
                 magnitudes = np.log10(usd_values)
                 b_value = self._aki_b_value(magnitudes)
@@ -209,9 +233,11 @@ class M15GROmori(BaseModule):
         # ----------------------------------------------------------
         mainshock: bool = False
 
-        if len(recent) >= self._min_events:
-            usd_arr = np.array([usd for _, usd in recent], dtype=np.float64)
-            q99 = float(np.quantile(usd_arr, self._mainshock_quantile))
+        if n_recent >= self._min_events:
+            # Reuse the recent-usd array directly (the unfiltered values, to
+            # match the previous behaviour where the Q99 quantile was computed
+            # over ALL recent usd values, including any non-positive ones).
+            q99 = float(np.quantile(recent_usd, self._mainshock_quantile))
 
             # Check new events only (from liq_events)
             for ev in liq_events:
@@ -235,11 +261,11 @@ class M15GROmori(BaseModule):
             elapsed_min = (current_ts - self._mainshock_ts) / 60.0
 
             if 0.0 < elapsed_min <= self._omori_forecast_minutes:
-                # Attempt Omori fit on aftershock times
-                aftershock_times = np.array(
-                    [ts / 1000.0 for ts, _ in recent if ts / 1000.0 > self._mainshock_ts],
-                    dtype=np.float64,
-                )
+                # Attempt Omori fit on aftershock times. Vectorised mask over
+                # the already-materialised recent arrays; identical to the prior
+                # ``[ts/1000 for ts,_ in recent if ts/1000 > mainshock_ts]``.
+                recent_ts_s = recent_ts / 1000.0
+                aftershock_times = recent_ts_s[recent_ts_s > self._mainshock_ts]
 
                 if len(aftershock_times) >= _MIN_AFTERSHOCKS_FOR_FIT:
                     fit = self._fit_omori(aftershock_times, self._mainshock_ts)

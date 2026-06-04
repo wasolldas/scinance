@@ -1450,3 +1450,249 @@ class TestLoadEventsChronologicalWithLegacyTs:
             _BASE_TS + i * 1000 for i in (0, 1, 2, 3, 4, 5)
         )
         assert ts_sequence == expected
+
+
+# ══════════════════════════════════════════════════════════════════════
+# Performance work: behaviour-preservation + Hawkes throttle + progress.
+# ══════════════════════════════════════════════════════════════════════
+
+
+def _persist_cascade_for_s1(persist: PersistenceLayer) -> None:
+    """Persist a ticker grid + trade flow + a dense liquidation cascade.
+
+    The cascade drives S1 -> M14 (Hawkes-MLE) + M15 (Omori curve_fit), i.e.
+    the exact hot path the optimisation touches, so the behaviour-preservation
+    assertion is meaningful (not 0==0 on an inert stream).
+    """
+    base = _BASE_TS
+    tickers = [
+        _ticker(0, last_price=30_000.0 + (i % 11), ts=base + i * 1000)
+        for i in range(400)
+    ]
+    persist.write_tickers_batch(tickers)
+    persist.write_trades_batch(
+        [
+            TradeEvent(
+                timestamp_ms=base + i * 1000,
+                price=30_000.0 - i * 2.0,
+                volume=1.0 + (i % 5),
+                side="Sell",
+                is_block=False,
+            )
+            for i in range(200)
+        ],
+        symbol=_SYMBOL,
+    )
+    liqs = []
+    for i in range(120):
+        liqs.append(
+            LiquidationEvent(
+                timestamp_ms=base + (150 + i) * 1000,
+                symbol=_SYMBOL,
+                side="Sell",
+                volume=(1.0e6 + i * 5e4) / 30_000.0,
+                price=30_000.0,
+                usd_value=1.0e6 + i * 5e4,
+            )
+        )
+    persist.write_liquidations_batch(liqs)
+
+
+class TestReplayOptimizationPreservesResults:
+    """The replay results must be identical before/after the M15 optimisation.
+
+    We assert two complementary properties:
+
+    1. **Determinism** — the exact same loaded stream replayed twice yields
+       identical per-strategy ``n_trades`` / ``sharpe`` (no hidden state leak
+       from the vectorised buffers).
+    2. **Equivalence to the legacy M15 path** — replaying with the live
+       (vectorised) ``M15GROmori.compute`` must produce the SAME per-strategy
+       results as replaying with the pre-optimisation list-based compute,
+       monkey-patched in as an oracle. This is the load-bearing guarantee that
+       the optimisation did not move any trade.
+    """
+
+    def test_replay_is_deterministic(self, persist: PersistenceLayer) -> None:
+        _persist_cascade_for_s1(persist)
+        bt1 = _new_bt(persist)
+        bt1.load_events()
+        r1 = bt1.run(pipeline_interval_seconds=1.0)
+
+        bt2 = _new_bt(persist)
+        bt2.load_events()
+        r2 = bt2.run(pipeline_interval_seconds=1.0)
+
+        for sid in ("S1", "S2", "S3", "S4", "S5"):
+            assert r1[sid].n_trades == r2[sid].n_trades
+            assert r1[sid].sharpe == pytest.approx(r2[sid].sharpe, rel=1e-12)
+            assert r1[sid].total_return == pytest.approx(
+                r2[sid].total_return, rel=1e-12
+            )
+
+    def test_results_match_legacy_m15(
+        self, persist: PersistenceLayer, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        from tests.unit.test_m15_gr_omori import _legacy_compute
+        from bybit_edge.layers.l4_pattern.m15_gr_omori import M15GROmori
+
+        _persist_cascade_for_s1(persist)
+
+        # Optimised (live) path.
+        bt_opt = _new_bt(persist)
+        bt_opt.load_events()
+        res_opt = bt_opt.run(pipeline_interval_seconds=1.0)
+
+        # Legacy oracle path — the pre-optimisation list-based compute. The
+        # legacy reference returns a subset of keys; the replay only consumes
+        # b_value / omori_active / omori_params / mainshock_ts, all present.
+        def legacy_compute(self, liq_events, current_ts):  # noqa: ANN001
+            return _legacy_compute(self, liq_events, current_ts)
+
+        monkeypatch.setattr(M15GROmori, "compute", legacy_compute)
+
+        bt_legacy = _new_bt(persist)
+        bt_legacy.load_events()
+        res_legacy = bt_legacy.run(pipeline_interval_seconds=1.0)
+
+        for sid in ("S1", "S2", "S3", "S4", "S5"):
+            assert res_opt[sid].n_trades == res_legacy[sid].n_trades, (
+                f"{sid}: optimisation changed n_trades "
+                f"({res_legacy[sid].n_trades} -> {res_opt[sid].n_trades})"
+            )
+            assert res_opt[sid].sharpe == pytest.approx(
+                res_legacy[sid].sharpe, rel=1e-9, abs=1e-9
+            )
+
+
+class TestHawkesRefitThrottled:
+    """M14 must refit the MLE at most once per ``HAWKES_REFIT_SECONDS`` of
+    event time — the throttle is time-based so the LiveRunner behaves
+    identically. We count ``_fit_mle`` invocations over many compute() calls
+    inside a single refit window and assert it ran exactly once."""
+
+    def test_fit_called_once_within_refit_window(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        from bybit_edge.config import HAWKES_REFIT_SECONDS
+        from bybit_edge.layers.l4_pattern.m14_hawkes import M14HawkesSingleChannel
+
+        m14 = M14HawkesSingleChannel()
+        calls = {"n": 0}
+        real_fit = m14._fit_mle
+
+        def counting_fit(events):  # noqa: ANN001
+            calls["n"] += 1
+            return real_fit(events)
+
+        monkeypatch.setattr(m14, "_fit_mle", counting_fit)
+
+        # Enough events for a fit, all inside one refit window.
+        base = 1000.0
+        event_times = np.array([base + i * 0.5 for i in range(20)], dtype=np.float64)
+        # Many compute() calls spaced < HAWKES_REFIT_SECONDS apart in event time.
+        n_calls = 0
+        t = base + 10.0
+        while t < base + HAWKES_REFIT_SECONDS - 1.0:
+            m14.compute(event_times, current_ts=t)
+            n_calls += 1
+            t += 1.0
+
+        assert n_calls > 1, "test must issue multiple compute calls"
+        assert calls["n"] == 1, (
+            f"M14 refit {calls['n']}x inside one {HAWKES_REFIT_SECONDS}s window "
+            "— the throttle is broken (would be the per-tick MLE killer)"
+        )
+
+    def test_fit_runs_again_after_refit_window(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        from bybit_edge.config import HAWKES_REFIT_SECONDS
+        from bybit_edge.layers.l4_pattern.m14_hawkes import M14HawkesSingleChannel
+
+        m14 = M14HawkesSingleChannel()
+        calls = {"n": 0}
+        real_fit = m14._fit_mle
+
+        def counting_fit(events):  # noqa: ANN001
+            calls["n"] += 1
+            return real_fit(events)
+
+        monkeypatch.setattr(m14, "_fit_mle", counting_fit)
+
+        base = 1000.0
+        event_times = np.array([base + i * 0.5 for i in range(20)], dtype=np.float64)
+        m14.compute(event_times, current_ts=base + 10.0)  # fit #1
+        # Advance > refit window -> a second fit must fire.
+        m14.compute(event_times, current_ts=base + 10.0 + HAWKES_REFIT_SECONDS + 1.0)
+        assert calls["n"] == 2
+
+
+class TestProgressLogging:
+    """The opt-in progress reporter must emit lines when enabled and stay
+    completely silent (and bit-identical) when disabled."""
+
+    def test_progress_emits_when_enabled(
+        self, persist: PersistenceLayer, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        persist.write_tickers_batch(
+            [_ticker(i, last_price=30_000.0 + i, ts=_BASE_TS + i * 1000)
+             for i in range(60)]
+        )
+        bt = _new_bt(persist)
+        bt.load_events()
+
+        with caplog.at_level("INFO", logger="bybit_edge.replay_backtester"):
+            # Tiny cadence so a progress line fires within the short stream.
+            # The wall-clock floor is bypassed by the final finish() line, which
+            # always emits, so we assert on that deterministically.
+            bt.run(
+                pipeline_interval_seconds=1.0,
+                progress=True,
+                progress_every_events=10,
+            )
+
+        msgs = [r.getMessage() for r in caplog.records]
+        assert any("fertig in" in m for m in msgs), (
+            f"no terminal progress line emitted: {msgs}"
+        )
+        assert any(m.startswith(f"[{_SYMBOL}]") for m in msgs)
+
+    def test_progress_silent_when_disabled(
+        self, persist: PersistenceLayer, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        persist.write_tickers_batch(
+            [_ticker(i, last_price=30_000.0 + i, ts=_BASE_TS + i * 1000)
+             for i in range(60)]
+        )
+        bt = _new_bt(persist)
+        bt.load_events()
+
+        with caplog.at_level("INFO", logger="bybit_edge.replay_backtester"):
+            bt.run(pipeline_interval_seconds=1.0)  # progress defaults OFF
+
+        progress_lines = [
+            r.getMessage() for r in caplog.records
+            if "fertig in" in r.getMessage() or r.getMessage().startswith("[")
+        ]
+        assert progress_lines == [], (
+            f"progress lines leaked with progress disabled: {progress_lines}"
+        )
+
+    def test_progress_does_not_change_trades(
+        self, persist: PersistenceLayer
+    ) -> None:
+        _persist_cascade_for_s1(persist)
+
+        bt_off = _new_bt(persist)
+        bt_off.load_events()
+        res_off = bt_off.run(pipeline_interval_seconds=1.0)
+
+        bt_on = _new_bt(persist)
+        bt_on.load_events()
+        res_on = bt_on.run(
+            pipeline_interval_seconds=1.0, progress=True, progress_every_events=5
+        )
+
+        for sid in ("S1", "S2", "S3", "S4", "S5"):
+            assert res_off[sid].n_trades == res_on[sid].n_trades

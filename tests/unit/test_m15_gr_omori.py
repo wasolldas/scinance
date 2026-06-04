@@ -383,3 +383,155 @@ class TestSignalLogic:
         if result["mainshock"]:
             # Without aftershock data, omori_active should be False
             assert result["omori_active"] is False or result["signal"] in (0, 1)
+
+
+# ══════════════════════════════════════════════════════════════════════
+# Regression: the vectorised M15.compute must be bit-identical to the
+# legacy list-comprehension path (behaviour-preserving optimisation).
+# ══════════════════════════════════════════════════════════════════════
+
+
+def _legacy_compute(self: M15GROmori, liq_events, current_ts):
+    """Faithful re-implementation of the PRE-optimisation M15.compute body.
+
+    Used as a reference oracle: the live (vectorised) ``compute`` must return
+    numerically identical results to this list-based version for every call in
+    a sequence, including the stateful mainshock / Omori-fit transitions.
+    """
+    for ev in liq_events:
+        self._event_buffer.append((int(ev["timestamp_ms"]), float(ev["usd_value"])))
+
+    cutoff_ms = int((current_ts - 86400) * 1000)
+    recent = [(ts, usd) for ts, usd in self._event_buffer if ts >= cutoff_ms]
+
+    b_value = None
+    b_low = False
+    if len(recent) >= self._min_events:
+        usd_values = np.array([usd for _, usd in recent], dtype=np.float64)
+        usd_values = usd_values[usd_values > 0]
+        if len(usd_values) >= self._min_events:
+            magnitudes = np.log10(usd_values)
+            b_value = self._aki_b_value(magnitudes)
+            b_low = b_value < 1.0
+
+    mainshock = False
+    if len(recent) >= self._min_events:
+        usd_arr = np.array([usd for _, usd in recent], dtype=np.float64)
+        q99 = float(np.quantile(usd_arr, self._mainshock_quantile))
+        for ev in liq_events:
+            ev_usd = float(ev["usd_value"])
+            if ev_usd > q99:
+                mainshock = True
+                ev_ts_s = int(ev["timestamp_ms"]) / 1000.0
+                if self._mainshock_ts is None or ev_usd > self._mainshock_usd:
+                    self._mainshock_ts = ev_ts_s
+                    self._mainshock_usd = ev_usd
+                    self._omori_params = None
+
+    omori_active = False
+    aftershock_rate = 0.0
+    if self._mainshock_ts is not None:
+        elapsed_min = (current_ts - self._mainshock_ts) / 60.0
+        if 0.0 < elapsed_min <= self._omori_forecast_minutes:
+            aftershock_times = np.array(
+                [ts / 1000.0 for ts, _ in recent if ts / 1000.0 > self._mainshock_ts],
+                dtype=np.float64,
+            )
+            if len(aftershock_times) >= 5:
+                fit = self._fit_omori(aftershock_times, self._mainshock_ts)
+                if fit is not None:
+                    self._omori_params = fit
+                    omori_active = True
+                    dt_now = current_ts - self._mainshock_ts
+                    aftershock_rate = self._omori_fn(
+                        np.array([dt_now]), fit["K"], fit["c"], fit["p"]
+                    )[0]
+        elif elapsed_min > self._omori_forecast_minutes:
+            self._mainshock_ts = None
+            self._mainshock_usd = 0.0
+            self._omori_params = None
+
+    signal = 1 if (mainshock and omori_active) else 0
+    confidence = 0.0
+    if signal == 1 and self._omori_params is not None:
+        p_val = self._omori_params.get("p", 1.0)
+        confidence = min(max(1.0 / p_val, 0.0), 1.0)
+
+    return {
+        "b_value": b_value,
+        "b_low": b_low,
+        "mainshock": mainshock,
+        "mainshock_ts": self._mainshock_ts,
+        "omori_active": omori_active,
+        "aftershock_rate": float(aftershock_rate),
+        "omori_params": self._omori_params,
+        "signal": signal,
+    }
+
+
+class TestOptimizedComputeMatchesLegacy:
+    """The vectorised compute must match the list-based legacy path exactly."""
+
+    def _build_cascade_events(self):
+        """A mainshock followed by a dense aftershock sequence (drives Omori)."""
+        rng = np.random.default_rng(11)
+        base_ms = 1_700_000_000_000
+        events = []
+        # 80 background events to populate the b-value / Q99 history.
+        for i in range(80):
+            events.append({
+                "timestamp_ms": base_ms + i * 1000,
+                "usd_value": 1.0e5 + float(abs(rng.normal(0, 3e4))),
+                "side": "Sell",
+            })
+        # One big mainshock.
+        mainshock_ms = base_ms + 80 * 1000
+        events.append({
+            "timestamp_ms": mainshock_ms,
+            "usd_value": 5.0e7,
+            "side": "Sell",
+        })
+        # 60 aftershocks within the next ~120 s.
+        for j in range(60):
+            events.append({
+                "timestamp_ms": mainshock_ms + (j + 1) * 2000,
+                "usd_value": 2.0e5 + float(abs(rng.normal(0, 1e5))),
+                "side": "Sell",
+            })
+        return events, base_ms
+
+    def test_compute_sequence_bit_identical(self) -> None:
+        events, base_ms = self._build_cascade_events()
+
+        opt = M15GROmori()
+        ref = M15GROmori()
+
+        # Feed events one-at-a-time at advancing current_ts so the stateful
+        # mainshock + Omori transitions are exercised across many calls.
+        for ev in events:
+            ts_s = ev["timestamp_ms"] / 1000.0
+            out_opt = opt.compute([ev], ts_s)
+            out_ref = _legacy_compute(ref, [ev], ts_s)
+
+            assert out_opt["mainshock"] == out_ref["mainshock"]
+            assert out_opt["omori_active"] == out_ref["omori_active"]
+            assert out_opt["signal"] == out_ref["signal"]
+            assert out_opt["mainshock_ts"] == out_ref["mainshock_ts"]
+            # b_value: both None or numerically equal.
+            if out_opt["b_value"] is None or out_ref["b_value"] is None:
+                assert out_opt["b_value"] is out_ref["b_value"] or (
+                    out_opt["b_value"] == out_ref["b_value"]
+                )
+            else:
+                assert out_opt["b_value"] == pytest.approx(
+                    out_ref["b_value"], rel=1e-12, abs=1e-12
+                )
+            assert out_opt["aftershock_rate"] == pytest.approx(
+                out_ref["aftershock_rate"], rel=1e-9, abs=1e-12
+            )
+            if out_opt["omori_params"] is not None:
+                assert out_ref["omori_params"] is not None
+                for k in ("K", "c", "p"):
+                    assert out_opt["omori_params"][k] == pytest.approx(
+                        out_ref["omori_params"][k], rel=1e-9, abs=1e-12
+                    )

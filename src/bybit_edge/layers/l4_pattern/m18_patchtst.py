@@ -315,7 +315,16 @@ class M18PatchTST(BaseModule):
                 Y = torch.cat([Y, Y[:, -1:].repeat(1, pad)], dim=1)
 
         ds = TensorDataset(X, Y)
-        loader = DataLoader(ds, batch_size=batch_size, shuffle=True, drop_last=False)
+        # pin_memory only pays off (and is only valid) for CUDA host->device
+        # copies; it is a no-op / mild waste on CPU, so gate it on the device.
+        _pin = self._device == "cuda"
+        loader = DataLoader(
+            ds,
+            batch_size=batch_size,
+            shuffle=True,
+            drop_last=False,
+            pin_memory=_pin,
+        )
 
         optim = torch.optim.Adam(self._model.parameters(), lr=lr)
         sched = torch.optim.lr_scheduler.CosineAnnealingLR(optim, T_max=max(1, epochs))
@@ -327,8 +336,8 @@ class M18PatchTST(BaseModule):
             self._model.train()
             ep_losses: list[float] = []
             for xb, yb in loader:
-                xb = xb.to(self._device)
-                yb = yb.to(self._device)
+                xb = xb.to(self._device, non_blocking=_pin)
+                yb = yb.to(self._device, non_blocking=_pin)
                 optim.zero_grad()
                 pred = self._model(xb)
                 loss = loss_fn(pred, yb)
