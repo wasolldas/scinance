@@ -725,6 +725,88 @@ class TestPersistence:
         finally:
             db.close()
 
+    def test_read_only_connect_skips_schema_init(self, tmp_path: Path) -> None:
+        """A pre-populated DB can be opened ``read_only=True`` without crash.
+
+        Replay-backtester scenario: a writer has already created the schema
+        and inserted rows. A second connection with ``read_only=True`` must
+        attach, see the existing data, and NOT attempt to (re-)create the
+        schema (DuckDB rejects DDL on a read-only handle).
+        """
+        db_file = tmp_path / "ro.duckdb"
+
+        # ── 1) writer creates schema + inserts a ticker ──
+        writer = PersistenceLayer(db_path=db_file)
+        try:
+            snap = TickerSnapshot(
+                symbol="BTCUSDT",
+                last_price=12345.0,
+                mark_price=12346.0,
+                index_price=12345.5,
+                funding_rate=0.0,
+                next_funding_time=0,
+                open_interest=0.0,
+                open_interest_value=0.0,
+                bid1_price=12344.0,
+                bid1_size=1.0,
+                ask1_price=12346.0,
+                ask1_size=1.0,
+                ts=1_700_000_000_000,
+                recv_ts=0.0,
+            )
+            writer.write_ticker(snap)
+        finally:
+            writer.close()
+
+        # ── 2) reader opens the same file read-only ──
+        reader = PersistenceLayer(db_path=db_file, read_only=True)
+        try:
+            rows = reader.query_tickers("BTCUSDT", 0, 2_000_000_000_000)
+            assert len(rows) == 1
+            assert rows[0][1] == "BTCUSDT"
+            assert rows[0][2] == 12345.0
+        finally:
+            reader.close()
+
+    def test_read_only_cannot_write(self, tmp_path: Path) -> None:
+        """A read-only ``PersistenceLayer`` must refuse INSERTs.
+
+        DuckDB itself blocks DDL/DML on a read-only handle — the test only
+        asserts that the resulting exception bubbles up so that callers
+        cannot silently corrupt the writer's view.
+        """
+        db_file = tmp_path / "ro_write.duckdb"
+
+        # First open writable to create the schema.
+        writer = PersistenceLayer(db_path=db_file)
+        try:
+            writer._init_schema()
+        finally:
+            writer.close()
+
+        reader = PersistenceLayer(db_path=db_file, read_only=True)
+        try:
+            snap = TickerSnapshot(
+                symbol="BTCUSDT",
+                last_price=1.0,
+                mark_price=1.0,
+                index_price=1.0,
+                funding_rate=0.0,
+                next_funding_time=0,
+                open_interest=0.0,
+                open_interest_value=0.0,
+                bid1_price=0.9,
+                bid1_size=1.0,
+                ask1_price=1.1,
+                ask1_size=1.0,
+                ts=1_700_000_000_001,
+                recv_ts=0.0,
+            )
+            with pytest.raises(Exception):  # noqa: PT011 — DuckDB-Exception
+                reader.write_ticker(snap)
+        finally:
+            reader.close()
+
 
 # =====================================================================
 # PersistenceLayer — L2 orderbook snapshots

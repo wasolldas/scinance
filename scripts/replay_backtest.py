@@ -88,6 +88,10 @@ def main() -> None:
             f" / test={args.test_days}d (sliding by test_days)"
         )
     print(f"  DuckDB: {db_path}")
+    print(
+        "  DuckDB wird READ-ONLY geoeffnet — kann parallel zum laufenden "
+        "Live-System genutzt werden."
+    )
     print("=" * 75)
 
     if str(db_path) != ":memory:" and not Path(db_path).exists():

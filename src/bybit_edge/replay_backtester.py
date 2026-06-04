@@ -35,6 +35,7 @@ Ehrliche Einordnung der Daten-Limits:
 from __future__ import annotations
 
 import logging
+import sys
 from collections import deque
 from contextlib import nullcontext
 from pathlib import Path
@@ -120,9 +121,39 @@ class ReplayBacktester:
     # ------------------------------------------------------------------
 
     def _open(self) -> PersistenceLayer:
-        """Return an open persistence layer, creating one if necessary."""
+        """Return an open persistence layer, creating one if necessary.
+
+        The replay backtester is strictly read-only — it never writes back
+        into the DuckDB it consumes. Opening the connection with
+        ``read_only=True`` allows it to attach concurrently while the
+        LiveRunner is writing into the same file (DuckDB serialises
+        multi-process access via the read-only flag).
+
+        If the connect still fails (e.g. on Windows where the writer can
+        hold an exclusive OS-level lock that even read-only attaches
+        cannot bypass) we surface a clear, actionable hint and exit with
+        code 2 instead of dumping a raw ``IOException`` traceback on the
+        operator.
+        """
         if self.persist is None:
-            self.persist = PersistenceLayer(db_path=self._db_path)
+            try:
+                self.persist = PersistenceLayer(
+                    db_path=self._db_path, read_only=True
+                )
+            except Exception as exc:  # noqa: BLE001 — operator-facing hint
+                msg = (
+                    "\nKonnte DuckDB nicht read-only oeffnen "
+                    f"({type(exc).__name__}: {exc}).\n"
+                    "Auf Windows haelt der LiveRunner manchmal einen "
+                    "exklusiven Lock — stoppe den LiveRunner kurz fuer den "
+                    "Replay\nODER kopiere data/bybit_edge.duckdb in eine "
+                    "Replay-Kopie\n"
+                    "  (z.B. `copy data\\bybit_edge.duckdb "
+                    "data\\bybit_edge_replay.duckdb`)\n"
+                    "und nutze `--db-path data/bybit_edge_replay.duckdb`.\n"
+                )
+                print(msg, file=sys.stderr)
+                sys.exit(2)
         return self.persist
 
     def load_events(

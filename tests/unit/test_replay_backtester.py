@@ -789,3 +789,54 @@ class TestReplayWalkForward:
         # And: the probe must have seen at least one pipeline tick — i.e.
         # we actually exercised the causal path, not a vacuously-empty loop.
         assert pipeline_ts_seen, "walk-forward never evaluated a pipeline tick"
+
+
+# ══════════════════════════════════════════════════════════════════════
+# DuckDB concurrent-read regression: replay opens read-only
+# ══════════════════════════════════════════════════════════════════════
+
+
+class TestReplayReadOnlyConnect:
+    """Regression: ``ReplayBacktester._open`` must request ``read_only=True``.
+
+    Without this, the replay cannot attach to a DuckDB while the LiveRunner
+    is holding the writer lock (``IOException: File is already open``). The
+    test patches the :class:`PersistenceLayer` constructor and asserts the
+    flag is set.
+    """
+
+    def test_replay_uses_read_only_connect(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        captured_kwargs: dict[str, Any] = {}
+
+        # Build a minimal stub that mimics the attribute surface used by
+        # ``_open`` callers (``conn`` + ``close``). We intercept the
+        # constructor to capture the ``read_only`` flag without touching
+        # any real DuckDB file.
+        real_layer = PersistenceLayer(db_path=Path(":memory:"))
+
+        class _StubLayer:
+            def __init__(self, *args: Any, **kwargs: Any) -> None:
+                captured_kwargs.update(kwargs)
+                # Reuse the in-memory layer's connection so that any
+                # downstream attribute access (``conn.execute(...)``) still
+                # works — relevant for the ``load_events`` path even though
+                # we don't drive it here.
+                self.conn = real_layer.conn
+
+            def close(self) -> None:
+                pass
+
+        monkeypatch.setattr(
+            "bybit_edge.replay_backtester.PersistenceLayer", _StubLayer
+        )
+
+        try:
+            bt = ReplayBacktester(symbol=_SYMBOL, db_path=Path("dummy.duckdb"))
+            bt._open()
+            assert captured_kwargs.get("read_only") is True, (
+                f"expected read_only=True, got kwargs={captured_kwargs!r}"
+            )
+        finally:
+            real_layer.close()

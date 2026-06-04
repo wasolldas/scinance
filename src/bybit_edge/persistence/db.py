@@ -43,14 +43,46 @@ logger = logging.getLogger(__name__)
 class PersistenceLayer:
     """DuckDB-backed persistence with Parquet archival."""
 
-    def __init__(self, db_path: Optional[Path] = None) -> None:
+    def __init__(
+        self,
+        db_path: Optional[Path] = None,
+        read_only: bool = False,
+    ) -> None:
+        """Open a DuckDB-backed persistence layer.
+
+        Parameters
+        ----------
+        db_path
+            Path to the DuckDB file or ``Path(":memory:")`` for a transient
+            in-memory database. ``None`` resolves to ``config.DB_PATH``.
+        read_only
+            When ``True`` the connection is opened with ``read_only=True``
+            and the schema-initialisation step is skipped (read-only DuckDB
+            connections cannot create tables / indices). This allows the
+            replay backtester / dashboard to attach concurrently to a DB
+            already opened by the LiveRunner without fighting for the
+            writer lock. Default ``False`` keeps the historical writer
+            behaviour bit-identical.
+        """
         resolved = db_path if db_path is not None else DB_PATH
+        self._read_only: bool = bool(read_only)
         if str(resolved) == ":memory:":
+            # An in-memory DB never has a peer process holding it, so the
+            # ``read_only`` flag is only honoured by skipping schema init —
+            # passing read_only=True to ``:memory:`` would create a useless
+            # empty DB with no tables.
             self.conn = duckdb.connect(":memory:")
         else:
-            resolved.parent.mkdir(parents=True, exist_ok=True)
-            self.conn = duckdb.connect(str(resolved))
-        self._init_schema()
+            if not self._read_only:
+                resolved.parent.mkdir(parents=True, exist_ok=True)
+                self.conn = duckdb.connect(str(resolved))
+            else:
+                # Do NOT create the parent directory in read-only mode —
+                # opening a non-existent DB read-only is a user error and
+                # should fail loudly rather than silently spawning a file.
+                self.conn = duckdb.connect(str(resolved), read_only=True)
+        if not self._read_only:
+            self._init_schema()
 
     def close(self) -> None:
         """Close the underlying DuckDB connection."""
