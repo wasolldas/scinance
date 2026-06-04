@@ -16,11 +16,12 @@ Signal = 1 wenn Mainshock + Omori aktiv (Kaskaden-Risiko).
 from __future__ import annotations
 
 import time
+import warnings
 from collections import deque
 from typing import Any
 
 import numpy as np
-from scipy.optimize import curve_fit
+from scipy.optimize import OptimizeWarning, curve_fit
 
 from bybit_edge.config import (
     GR_MAINSHOCK_QUANTILE,
@@ -133,14 +134,19 @@ class M15GROmori(BaseModule):
         rate_data = counts[mask].astype(np.float64)
 
         try:
-            popt, _ = curve_fit(
-                self._omori_fn,
-                t_data,
-                rate_data,
-                p0=[rate_data[0], 1.0, 1.0],
-                bounds=([0.0, 0.001, 0.5], [np.inf, np.inf, 2.5]),
-                maxfev=2000,
-            )
+            # The Omori fit is valid even when scipy cannot estimate the
+            # parameter covariance; suppress only that harmless OptimizeWarning
+            # so it does not flood diagnostic output. Fit logic is unchanged.
+            with warnings.catch_warnings():
+                warnings.simplefilter("ignore", OptimizeWarning)
+                popt, _ = curve_fit(
+                    self._omori_fn,
+                    t_data,
+                    rate_data,
+                    p0=[rate_data[0], 1.0, 1.0],
+                    bounds=([0.0, 0.001, 0.5], [np.inf, np.inf, 2.5]),
+                    maxfev=2000,
+                )
             return {"K": float(popt[0]), "c": float(popt[1]), "p": float(popt[2])}
         except (RuntimeError, ValueError):
             return None

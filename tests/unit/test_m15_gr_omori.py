@@ -15,9 +15,11 @@ Tests:
 from __future__ import annotations
 
 import time
+import warnings
 
 import numpy as np
 import pytest
+from scipy.optimize import OptimizeWarning, curve_fit
 
 from bybit_edge.config import (
     GR_MAINSHOCK_QUANTILE,
@@ -280,6 +282,83 @@ class TestReturnDictStructure:
         )
         assert result["method_id"] == "M15"
         assert result["signal"] in (0, 1)
+
+
+class TestNoOptimizeWarningLeaks:
+    """The Omori curve_fit must not leak the harmless OptimizeWarning.
+
+    ``scipy.optimize.curve_fit`` emits an ``OptimizeWarning`` ("Covariance of
+    the parameters could not be estimated") when the problem is degenerate
+    (e.g. 3 data points for 3 free parameters). The fit (popt) is still valid,
+    but the warning floods diagnostic output. ``_fit_omori`` suppresses only
+    that specific warning.
+    """
+
+    # Aftershock offsets (seconds after the mainshock) that bin down to exactly
+    # three non-zero 1-second bins, which forces curve_fit into a covariance-
+    # estimation failure and thus reliably raises the OptimizeWarning.
+    _TRIGGER_OFFSETS_S = (0.3, 0.6, 1.5, 2.5, 4.2)
+
+    def test_trigger_offsets_actually_warn_when_unsuppressed(self) -> None:
+        """Sanity check: the raw fit on this data does emit OptimizeWarning.
+
+        Guards the leak test against silently becoming a no-op if scipy's
+        warning behaviour changes.
+        """
+        mainshock = 1_000.0
+        times = np.array(
+            [mainshock + d for d in self._TRIGGER_OFFSETS_S], dtype=np.float64
+        )
+        dt = times - mainshock
+        dt = dt[dt > 0]
+        dt_sorted = np.sort(dt)
+        n_bins = max(int(dt_sorted[-1]), 1)
+        bin_edges = np.arange(0, n_bins + 1, dtype=np.float64)
+        counts, _ = np.histogram(dt_sorted, bins=bin_edges)
+        bin_centers = (bin_edges[:-1] + bin_edges[1:]) / 2.0
+        mask = counts > 0
+        t_data = bin_centers[mask]
+        rate_data = counts[mask].astype(np.float64)
+
+        m = M15GROmori()
+        with warnings.catch_warnings(record=True) as caught:
+            warnings.simplefilter("always")
+            curve_fit(
+                m._omori_fn,
+                t_data,
+                rate_data,
+                p0=[rate_data[0], 1.0, 1.0],
+                bounds=([0.0, 0.001, 0.5], [np.inf, np.inf, 2.5]),
+                maxfev=2000,
+            )
+        optimize_warnings = [
+            w for w in caught if issubclass(w.category, OptimizeWarning)
+        ]
+        assert optimize_warnings, (
+            "Expected the raw curve_fit on the trigger data to emit an "
+            "OptimizeWarning; the leak test below would otherwise be vacuous."
+        )
+
+    def test_fit_omori_does_not_leak_optimize_warning(self) -> None:
+        """_fit_omori on warning-triggering data must not leak OptimizeWarning."""
+        mainshock = 1_000.0
+        times = np.array(
+            [mainshock + d for d in self._TRIGGER_OFFSETS_S], dtype=np.float64
+        )
+
+        m = M15GROmori()
+        with warnings.catch_warnings(record=True) as caught:
+            warnings.simplefilter("always")
+            result = m._fit_omori(times, mainshock)
+
+        leaked = [w for w in caught if issubclass(w.category, OptimizeWarning)]
+        assert not leaked, (
+            f"OptimizeWarning leaked through _fit_omori: "
+            f"{[str(w.message) for w in leaked]}"
+        )
+        # Fit logic/return values are unchanged: a valid fit still comes back.
+        assert result is not None
+        assert {"K", "c", "p"} == set(result.keys())
 
 
 class TestSignalLogic:
