@@ -840,3 +840,131 @@ class TestReplayReadOnlyConnect:
             )
         finally:
             real_layer.close()
+
+
+# ══════════════════════════════════════════════════════════════════════
+# Regression: Replay must produce S3 trades on a pre-settlement scenario
+# the live system would also trigger on.
+# ══════════════════════════════════════════════════════════════════════
+
+
+class TestReplayProducesS3Trades:
+    """End-to-end regression for the "live triggers, replay stays at 0
+    trades" bug.
+
+    Context: the LiveRunner had logged ``SIGNAL [S3] action=long dir=1
+    size=0.1988 conf=1.000`` on a 17h multi-symbol tick stream, yet
+    ``python scripts/replay_all.py --auto`` reported ``n_trades=0`` for
+    every strategy on every symbol. The replay must be apples-to-apples
+    with live on the textbook PRD-7.3 pre-settlement scenario --
+    otherwise the per-strategy edge metrics are meaningless.
+
+    The test builds a deterministic two-phase ticker stream that
+    satisfies every entry gate of :class:`Strategy3PreSettlement`:
+
+    1. A "background" phase (3000 ticks) with mark==index ->
+       basis = 0, pressure = 0. This builds up the Q90 pressure-history
+       (>= 100 samples) and the M22 sigma estimate with benign samples,
+       exactly mirroring what the LiveRunner would have accumulated
+       before the settlement window opened. ``next_funding_time`` is
+       set 2h ahead so we are NOT in the entry window during warmup.
+    2. A "pressure" phase (200 ticks) where ``index_price`` is bumped
+       0.5% above ``mark_price`` so that:
+
+         * basis    = (mark - index) / index = -0.005  (-0.5%)
+         * diff     = I_t - P_t = 0.0003 - (-0.005) = +0.0053
+         * pressure = diff - clamp(diff, ±0.0005) = +0.0048 (positive)
+         * direction = +1 (Long-reversion)
+         * basis * direction = -0.005 * 1 < 0  (basis-aligned per PRD 7.3)
+
+       ``next_funding_time`` is set to ``ticker_ts + 600_000 ms`` so that
+       ``seconds_to_settlement`` is ~10 minutes -- well inside the 30-min
+       :data:`PRESSURE_ENTRY_WINDOW_MINUTES` gate.
+
+    With those inputs, S3's PRD-7.3 entry must fire on (at least) the
+    first pressure tick. The replay therefore must return ``n_trades >= 1``
+    on S3.
+
+    Regression scope: this test pins down the contract that on a
+    perfectly-aligned synthetic scenario the replay reaches an entry.
+    A future refactor that breaks the strategy-direct ``action="enter"``
+    contract or the ``_apply_signal`` ``"enter"``/``"exit"`` handling --
+    e.g. routing the replay through the aggregator and forgetting to
+    map ``"long"``/``"short"`` back -- will flip this test red.
+    """
+
+    def _persist_pre_settlement_scenario(
+        self, persist: PersistenceLayer
+    ) -> int:
+        """Insert a warmup + pre-settlement ticker stream into DuckDB.
+
+        Returns the timestamp (ms) of the first pre-settlement ticker so
+        the test can sanity-check that ``seconds_to_settlement`` is well
+        inside the 30-min window.
+        """
+        warmup_n = 3000  # >= Q90 history minimum (100) with comfortable margin
+        pressure_n = 200
+        step_ms = 1_000  # 1 ticker / second
+
+        base_ts = _BASE_TS
+        tickers: list[TickerSnapshot] = []
+
+        # Phase 1: benign warmup -- mark == index so basis = 0 -> pressure = 0.
+        # next_funding_time set far in the future so we are NOT in the
+        # entry window yet (Condition 1 rejects).
+        for i in range(warmup_n):
+            ts = base_ts + i * step_ms
+            tickers.append(_ticker(
+                0,
+                last_price=30_000.0 + (i % 5),  # tiny noise, no drift
+                mark_price=30_000.0,
+                index_price=30_000.0,
+                next_funding_time=ts + 2 * 3600 * 1000,  # 2h ahead
+                ts=ts,
+            ))
+
+        # Phase 2: pre-settlement pressure.
+        # index_price bumped 0.5% above mark_price -> negative premium.
+        # next_funding_time = ts + 10 min, so we ARE in the 30-min window.
+        pre_settlement_start_ts = base_ts + warmup_n * step_ms
+        mark_at_pressure = 30_000.0
+        index_at_pressure = mark_at_pressure * (1.0 + 0.005)  # +0.5%
+        for j in range(pressure_n):
+            ts = pre_settlement_start_ts + j * step_ms
+            tickers.append(_ticker(
+                0,
+                last_price=mark_at_pressure,
+                mark_price=mark_at_pressure,
+                index_price=index_at_pressure,
+                next_funding_time=ts + 600_000,  # 10 min into the future
+                ts=ts,
+            ))
+
+        persist.write_tickers_batch(tickers)
+        return pre_settlement_start_ts
+
+    def test_pre_settlement_scenario_yields_at_least_one_s3_trade(
+        self, persist: PersistenceLayer
+    ) -> None:
+        pre_ts = self._persist_pre_settlement_scenario(persist)
+
+        bt = _new_bt(persist)
+        n = bt.load_events()
+        assert n > 0, "scenario must populate events"
+
+        # Sanity check: at pre_ts, seconds_to_settlement is in (0, 30 min).
+        secs = ReplayBacktester._seconds_to_settlement(pre_ts + 600_000, pre_ts)
+        assert 0.0 < secs < 30 * 60.0, (
+            f"scenario broken: secs_to_settlement={secs}"
+        )
+
+        # Drive the replay through the real strategies (no fake_eval).
+        # Use a tight pipeline interval so every ticker fires the strategies
+        # -- mirrors the LiveRunner's 1s default but for fine resolution.
+        results = bt.run(pipeline_interval_seconds=1.0)
+
+        assert results["S3"].n_trades >= 1, (
+            "S3 must trigger at least one round-trip trade on a textbook "
+            "PRD-7.3 pre-settlement scenario; live ran this and emitted "
+            f"a signal, replay returned n_trades={results['S3'].n_trades}"
+        )
