@@ -7,8 +7,10 @@ Keine echten Netzwerk-Calls — alles gemockt.
 from __future__ import annotations
 
 import asyncio
-from unittest.mock import AsyncMock
+import logging
+from unittest.mock import AsyncMock, MagicMock
 
+import duckdb
 import numpy as np
 import pytest
 
@@ -536,3 +538,223 @@ class TestLiveRunnerDecision:
         assert received, "round_qty wurde nicht aufgerufen"
         assert received[0] == pytest.approx(0.004, rel=1e-6)
         ex.place_market_order.assert_awaited_once()
+
+
+# ──────────────────────────────────────────────────────────────────
+# Risk-Loop Robustness — transient timeouts, backoff escalation
+# ──────────────────────────────────────────────────────────────────
+
+class TestRiskLoopRobustness:
+    """Verifies that transient errors in get_equity() don't spam the logs
+    with stacktraces and that the consecutive-error counter escalates
+    severity exactly after N failures."""
+
+    def _make_runner_with_mocked_executor(
+        self, side_effect=None, return_value=None
+    ) -> LiveRunner:
+        from bybit_edge.risk import RiskBudget
+        import pathlib
+        import tempfile
+
+        r = LiveRunner("BTCUSDT")
+        # Risk-Budget muss truthy sein, damit der Tick aktiv arbeitet.
+        tmp = pathlib.Path(tempfile.mkdtemp()) / "risk_state.json"
+        r.risk_budget = RiskBudget(
+            daily_loss_pct=-0.03,
+            max_dd_pct=-0.15,
+            vol_scaling_enabled=False,
+            vol_target_bps=50.0,
+            state_path=tmp,
+        )
+        r.risk_budget.load(current_equity=1000.0)
+
+        ex = AsyncMock()
+        if side_effect is not None:
+            ex.get_equity = AsyncMock(side_effect=side_effect)
+        else:
+            ex.get_equity = AsyncMock(return_value=return_value)
+        r.executor = ex
+        return r
+
+    @pytest.mark.asyncio
+    async def test_risk_loop_logs_warning_on_first_timeout(self, caplog):
+        r = self._make_runner_with_mocked_executor(
+            side_effect=asyncio.TimeoutError()
+        )
+        caplog.set_level(logging.WARNING, logger="bybit_edge.live_runner")
+
+        ok = await r._risk_loop_tick()
+        # Counter wird vom Loop hochgezählt; der Tick selbst gibt nur False zurück.
+        assert ok is False
+
+        warnings = [rec for rec in caplog.records if rec.levelno == logging.WARNING]
+        errors = [rec for rec in caplog.records if rec.levelno == logging.ERROR]
+        assert len(warnings) == 1
+        assert errors == []
+        assert "TimeoutError" in warnings[0].getMessage()
+        # Kein Stacktrace mitgeloggt.
+        assert warnings[0].exc_info is None
+
+    @pytest.mark.asyncio
+    async def test_risk_loop_logs_error_after_consecutive_failures(self, caplog):
+        r = self._make_runner_with_mocked_executor(
+            side_effect=asyncio.TimeoutError()
+        )
+        caplog.set_level(logging.WARNING, logger="bybit_edge.live_runner")
+
+        # Simuliere 4 vorausgegangene Fehler — der nächste (5.) Tick muss als
+        # ERROR geloggt werden (Eskalations-Schwelle = 5).
+        r._risk_consec_errors = 4
+        caplog.clear()
+        ok = await r._risk_loop_tick()
+        assert ok is False
+
+        errors = [rec for rec in caplog.records if rec.levelno == logging.ERROR]
+        warnings = [rec for rec in caplog.records if rec.levelno == logging.WARNING]
+        assert len(errors) == 1
+        assert warnings == []
+        assert "aufeinanderfolgenden Fehlern" in errors[0].getMessage()
+
+    @pytest.mark.asyncio
+    async def test_risk_loop_resets_counter_on_success(self, caplog):
+        """Drei Failures, dann ein Erfolg → Counter ist 0; der nächste
+        Fehler wird wieder als WARNING (nicht ERROR) geloggt."""
+        call_results = [
+            asyncio.TimeoutError(),
+            asyncio.TimeoutError(),
+            asyncio.TimeoutError(),
+            1234.5,  # success
+            asyncio.TimeoutError(),  # neuer Fehler nach Reset
+        ]
+
+        async def fake_get_equity():
+            v = call_results.pop(0)
+            if isinstance(v, BaseException):
+                raise v
+            return v
+
+        r = self._make_runner_with_mocked_executor(return_value=0.0)
+        r.executor.get_equity = fake_get_equity
+        caplog.set_level(logging.WARNING, logger="bybit_edge.live_runner")
+
+        # Drei Failures: Counter manuell hochzählen wie der Loop es täte.
+        for _ in range(3):
+            ok = await r._risk_loop_tick()
+            assert ok is False
+            r._risk_consec_errors += 1
+        assert r._risk_consec_errors == 3
+
+        # Erfolg → Loop würde Counter auf 0 setzen.
+        ok = await r._risk_loop_tick()
+        assert ok is True
+        r._risk_consec_errors = 0
+
+        caplog.clear()
+        ok = await r._risk_loop_tick()
+        assert ok is False
+        warnings = [rec for rec in caplog.records if rec.levelno == logging.WARNING]
+        errors = [rec for rec in caplog.records if rec.levelno == logging.ERROR]
+        # Nach Reset MUSS der erste neue Fehler wieder ein WARNING sein.
+        assert len(warnings) == 1
+        assert errors == []
+
+    @pytest.mark.asyncio
+    async def test_risk_loop_unknown_exception_logs_stacktrace(self, caplog):
+        """Echte Bugs (nicht-transiente Exceptions) müssen weiterhin mit
+        vollem Stacktrace geloggt werden, nicht als WARNING verschluckt."""
+        r = self._make_runner_with_mocked_executor(
+            side_effect=ValueError("totally unexpected")
+        )
+        caplog.set_level(logging.WARNING, logger="bybit_edge.live_runner")
+
+        ok = await r._risk_loop_tick()
+        # Unbekannte Exception → Tick returnt True (kein Backoff-Spin).
+        assert ok is True
+        errors = [rec for rec in caplog.records if rec.levelno == logging.ERROR]
+        assert len(errors) == 1
+        assert errors[0].exc_info is not None
+        assert "Fehler im Risk-Loop" in errors[0].getMessage()
+
+
+# ──────────────────────────────────────────────────────────────────
+# Snapshot Export Retry — Windows file-lock contention
+# ──────────────────────────────────────────────────────────────────
+
+class TestSnapshotExportRetry:
+    """Verifies the retry helper for DuckDB COPY-to-Parquet exports.
+
+    Background: Windows refuses to rename a Parquet file while a Dashboard
+    reader holds it open. The helper retries a few times with a tiny
+    sleep — the reader almost always closes within 50-150 ms.
+    """
+
+    def test_export_retries_on_permission_denied(self, caplog):
+        r = LiveRunner("BTCUSDT")
+        caplog.set_level(logging.WARNING, logger="bybit_edge.live_runner")
+
+        conn = MagicMock()
+        # 1. Aufruf wirft (lock), 2. klappt.
+        conn.execute = MagicMock(side_effect=[
+            duckdb.IOException("IO Error: Could not move file: Zugriff verweigert"),
+            None,
+        ])
+        ok = r._safe_parquet_export(conn, "row_counts.parquet", "COPY ...")
+        assert ok is True
+        assert conn.execute.call_count == 2
+        # Kein WARNING — Retry war erfolgreich.
+        warnings = [rec for rec in caplog.records if rec.levelno == logging.WARNING]
+        assert warnings == []
+
+    def test_export_gives_up_after_3_retries(self, caplog):
+        r = LiveRunner("BTCUSDT")
+        caplog.set_level(logging.WARNING, logger="bybit_edge.live_runner")
+
+        conn = MagicMock()
+        conn.execute = MagicMock(side_effect=duckdb.IOException(
+            "IO Error: Could not move file: Zugriff verweigert"
+        ))
+        ok = r._safe_parquet_export(conn, "row_counts.parquet", "COPY ...")
+        assert ok is False
+        assert conn.execute.call_count == 3
+        warnings = [rec for rec in caplog.records if rec.levelno == logging.WARNING]
+        errors = [rec for rec in caplog.records if rec.levelno == logging.ERROR]
+        assert len(warnings) == 1
+        # Genau 1 WARNING, KEIN Stacktrace, KEIN ERROR.
+        assert warnings[0].exc_info is None
+        assert "skipped this cycle" in warnings[0].getMessage()
+        assert errors == []
+
+    def test_export_does_not_retry_on_other_io_error(self, caplog):
+        """Andere IOException-Varianten (z.B. 'disk full') sind echte
+        Probleme und werden sofort mit Stacktrace als ERROR geloggt –
+        keine Retries."""
+        r = LiveRunner("BTCUSDT")
+        caplog.set_level(logging.WARNING, logger="bybit_edge.live_runner")
+
+        conn = MagicMock()
+        conn.execute = MagicMock(side_effect=duckdb.IOException(
+            "IO Error: disk full"
+        ))
+        ok = r._safe_parquet_export(conn, "row_counts.parquet", "COPY ...")
+        assert ok is False
+        # Genau 1 Aufruf — keine Retries für nicht-Lock-Fehler.
+        assert conn.execute.call_count == 1
+        errors = [rec for rec in caplog.records if rec.levelno == logging.ERROR]
+        assert len(errors) == 1
+        # ERROR mit Stacktrace (logger.exception).
+        assert errors[0].exc_info is not None
+        assert "konnte nicht geschrieben werden" in errors[0].getMessage()
+
+    def test_export_permission_denied_english_marker(self, caplog):
+        """Auch die englische Fehlervariante 'Permission denied' triggert Retries."""
+        r = LiveRunner("BTCUSDT")
+        caplog.set_level(logging.WARNING, logger="bybit_edge.live_runner")
+
+        conn = MagicMock()
+        conn.execute = MagicMock(side_effect=[
+            duckdb.IOException("IO Error: Permission denied"),
+            None,
+        ])
+        ok = r._safe_parquet_export(conn, "coverage.parquet", "COPY ...")
+        assert ok is True
+        assert conn.execute.call_count == 2

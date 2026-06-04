@@ -23,6 +23,8 @@ from collections import deque
 from pathlib import Path
 from typing import Any, Optional
 
+import aiohttp
+import duckdb
 import numpy as np
 
 from bybit_edge.collector.ws_collector import BybitWSCollector, WSMessage
@@ -62,6 +64,34 @@ from bybit_edge.state.ticker_state import TickerSnapshot
 from bybit_edge.state.trade_buffer import TradeBuffer, TradeEvent
 
 logger = logging.getLogger(__name__)
+
+
+# Transient errors in the risk loop that should NOT be logged with full
+# stacktrace (network hiccups against the Bybit API are expected).
+_RISK_TRANSIENT_ERRORS: tuple[type[BaseException], ...] = (
+    asyncio.TimeoutError,
+    aiohttp.ClientError,
+    ConnectionError,
+)
+
+# After this many consecutive transient errors the risk loop escalates the
+# log level (real outage, not just a hiccup).
+_RISK_ERROR_ESCALATE_AFTER: int = 5
+
+# Backoff is capped at 5 minutes — beyond that we just keep retrying.
+_RISK_BACKOFF_CAP_SECONDS: float = 300.0
+
+# Substrings (lower-case) that mark a Parquet-export failure as a transient
+# file-lock contention on Windows. Retrying the COPY a few ms later resolves
+# it once the dashboard reader has closed the previous handle.
+_PARQUET_LOCK_MARKERS: tuple[str, ...] = (
+    "zugriff verweigert",
+    "permission denied",
+    "sharing violation",
+    "being used by another process",
+)
+
+_PARQUET_EXPORT_RETRIES: int = 3
 
 
 class LiveRunner:
@@ -127,6 +157,9 @@ class LiveRunner:
         self._last_pipeline_ts: float = 0.0
         self._running = False
         self._msg_count = 0
+
+        # Risk-Loop Konsekutiv-Fehler-Counter für Backoff/Log-Eskalation.
+        self._risk_consec_errors: int = 0
 
         # Trade-Journal (CSV) für spätere Strategie-Auswertung
         self._journal_path: Path = DATA_DIR / "trades_journal.csv"
@@ -447,6 +480,68 @@ class LiveRunner:
         # es diese Parquet-Snapshots.
         self._export_dashboard_snapshots()
 
+    @staticmethod
+    def _is_parquet_lock_error(exc: BaseException) -> bool:
+        """Heuristik: ist ``exc`` ein transientes File-Lock (Windows)?
+
+        DuckDBs ``COPY ... TO file.parquet`` schreibt in eine ``.tmp``-Datei
+        und macht dann ``rename`` zum Zielnamen. Unter Windows schlägt das
+        fehl, sobald das Dashboard die Zieldatei zum Lesen offen hält.
+        """
+        if not isinstance(exc, duckdb.IOException):
+            return False
+        msg = str(exc).lower()
+        return any(marker in msg for marker in _PARQUET_LOCK_MARKERS)
+
+    def _safe_parquet_export(
+        self,
+        conn: Any,
+        name: str,
+        copy_sql: str,
+        *,
+        retries: int = _PARQUET_EXPORT_RETRIES,
+    ) -> bool:
+        """Führt ``conn.execute(copy_sql)`` mit Lock-Retries aus.
+
+        - Bei einem als File-Lock erkennbaren ``duckdb.IOException`` wird
+          bis zu ``retries``-mal mit linear wachsendem Sleep (50ms, 100ms,
+          150ms, ...) neu versucht.
+        - Hilft das nichts, wird ein einzeiliges WARNING ohne Stacktrace
+          geloggt und der Snapshot in diesem Flush ausgelassen — der
+          nächste Flush versucht es ohnehin direkt wieder.
+        - Jeder andere Fehler wird sofort als ``logger.exception`` mit
+          Stacktrace geloggt (echte Bugs sollen sichtbar bleiben).
+
+        Returns
+        -------
+        bool
+            True wenn der Snapshot geschrieben wurde, False sonst.
+        """
+        for attempt in range(retries):
+            try:
+                conn.execute(copy_sql)
+                return True
+            except duckdb.IOException as exc:
+                if not self._is_parquet_lock_error(exc):
+                    logger.exception(
+                        "Snapshot %s konnte nicht geschrieben werden.", name,
+                    )
+                    return False
+                if attempt < retries - 1:
+                    time.sleep(0.05 * (attempt + 1))
+                    continue
+                logger.warning(
+                    "Snapshot %s skipped this cycle (locked by reader, "
+                    "retry next flush)", name,
+                )
+                return False
+            except Exception:
+                logger.exception(
+                    "Snapshot %s konnte nicht geschrieben werden.", name,
+                )
+                return False
+        return False
+
     def _export_dashboard_snapshots(self) -> None:
         """Exportiert kompakte Dashboard-Snapshots als Parquet.
 
@@ -479,77 +574,123 @@ class LiveRunner:
         )
 
         # 1) row_counts.parquet
-        try:
-            union_parts = [
-                f"SELECT '{tbl}' AS table_name, "
-                f"COUNT(*)::BIGINT AS row_count, "
-                f"CURRENT_TIMESTAMP AS exported_at "
-                f"FROM {tbl}"
-                for tbl in tables
-            ]
-            select_sql = " UNION ALL ".join(union_parts)
-            out_path = DASHBOARD_SNAPSHOT_DIR / "row_counts.parquet"
-            conn.execute(
-                f"COPY ({select_sql}) TO '{out_path.as_posix()}' (FORMAT PARQUET)"
-            )
-        except Exception:
-            logger.warning("Snapshot row_counts.parquet konnte nicht geschrieben werden.",
-                           exc_info=True)
+        union_parts = [
+            f"SELECT '{tbl}' AS table_name, "
+            f"COUNT(*)::BIGINT AS row_count, "
+            f"CURRENT_TIMESTAMP AS exported_at "
+            f"FROM {tbl}"
+            for tbl in tables
+        ]
+        select_sql = " UNION ALL ".join(union_parts)
+        out_path = DASHBOARD_SNAPSHOT_DIR / "row_counts.parquet"
+        self._safe_parquet_export(
+            conn,
+            "row_counts.parquet",
+            f"COPY ({select_sql}) TO '{out_path.as_posix()}' (FORMAT PARQUET)",
+        )
 
         # 2) liquidations_recent.parquet — letzte 200 Liquidationen
-        try:
-            out_path = DASHBOARD_SNAPSHOT_DIR / "liquidations_recent.parquet"
-            conn.execute(
-                f"""
-                COPY (
-                    SELECT ts, symbol, side, volume, price, usd_value
-                    FROM liquidations
-                    ORDER BY ts DESC
-                    LIMIT 200
-                ) TO '{out_path.as_posix()}' (FORMAT PARQUET)
-                """
-            )
-        except Exception:
-            logger.warning("Snapshot liquidations_recent.parquet konnte nicht geschrieben werden.",
-                           exc_info=True)
+        out_path = DASHBOARD_SNAPSHOT_DIR / "liquidations_recent.parquet"
+        self._safe_parquet_export(
+            conn,
+            "liquidations_recent.parquet",
+            (
+                "COPY (SELECT ts, symbol, side, volume, price, usd_value "
+                "FROM liquidations ORDER BY ts DESC LIMIT 200) "
+                f"TO '{out_path.as_posix()}' (FORMAT PARQUET)"
+            ),
+        )
 
         # 3) coverage.parquet — min_ts/max_ts/count pro Tabelle
-        try:
-            cov_parts = [
-                f"SELECT '{tbl}' AS table_name, "
-                f"MIN(ts) AS min_ts, MAX(ts) AS max_ts, "
-                f"COUNT(*)::BIGINT AS row_count "
-                f"FROM {tbl}"
-                for tbl in tables
-            ]
-            cov_sql = " UNION ALL ".join(cov_parts)
-            out_path = DASHBOARD_SNAPSHOT_DIR / "coverage.parquet"
-            conn.execute(
-                f"COPY ({cov_sql}) TO '{out_path.as_posix()}' (FORMAT PARQUET)"
-            )
-        except Exception:
-            logger.warning("Snapshot coverage.parquet konnte nicht geschrieben werden.",
-                           exc_info=True)
+        cov_parts = [
+            f"SELECT '{tbl}' AS table_name, "
+            f"MIN(ts) AS min_ts, MAX(ts) AS max_ts, "
+            f"COUNT(*)::BIGINT AS row_count "
+            f"FROM {tbl}"
+            for tbl in tables
+        ]
+        cov_sql = " UNION ALL ".join(cov_parts)
+        out_path = DASHBOARD_SNAPSHOT_DIR / "coverage.parquet"
+        self._safe_parquet_export(
+            conn,
+            "coverage.parquet",
+            f"COPY ({cov_sql}) TO '{out_path.as_posix()}' (FORMAT PARQUET)",
+        )
 
     async def _persist_loop(self) -> None:
         while self._running:
             await asyncio.sleep(PERSIST_FLUSH_SECONDS)
             self._flush_persist()
 
+    async def _risk_loop_tick(self) -> bool:
+        """Eine einzelne Risk-Loop-Iteration (ohne Sleep).
+
+        Returns
+        -------
+        bool
+            ``True``  → Equity-Abfrage erfolgreich (Counter reset).
+            ``False`` → transienter Fehler (Timeout/Netzwerk); Counter
+                       wird vom Loop hochgezählt und in das Backoff
+                       eingerechnet.
+
+        Anderes (echte Bugs / unerwartete Exceptions) wird mit vollem
+        Stacktrace geloggt und wir geben ``True`` zurück, damit der
+        Loop nicht in einen Backoff-Spin geht — die Exception wurde
+        ja als ERROR sichtbar gemacht.
+        """
+        if self.risk_budget is None or self.executor is None:
+            return True
+        try:
+            equity = await self.executor.get_equity()
+        except _RISK_TRANSIENT_ERRORS as exc:
+            consec = self._risk_consec_errors + 1
+            if consec >= _RISK_ERROR_ESCALATE_AFTER:
+                logger.error(
+                    "Risk-Loop: %s nach %d aufeinanderfolgenden Fehlern (%s)",
+                    type(exc).__name__, consec, exc,
+                )
+            else:
+                logger.warning(
+                    "Risk-Loop: %s — skip cycle (try %d)",
+                    type(exc).__name__, consec,
+                )
+            return False
+        except Exception:
+            # Echter Programmierfehler — voller Stacktrace, kein Backoff.
+            logger.exception("Fehler im Risk-Loop")
+            return True
+
+        if equity > 0:
+            # Recovery-Check zuerst, damit ein neuer Tag die Sperre löst.
+            self.risk_budget.reset_if_recovered(equity)
+            self.risk_budget.on_equity_update(equity)
+        return True
+
     async def _risk_loop(self) -> None:
-        """Periodisch Equity abfragen und Risiko-Budget aktualisieren."""
+        """Periodisch Equity abfragen und Risiko-Budget aktualisieren.
+
+        Bei transienten Fehlern (Timeout, Netzwerk) wird mit exponentiellem
+        Backoff (Cap = 5 min) wiederholt. Nach
+        ``_RISK_ERROR_ESCALATE_AFTER`` aufeinanderfolgenden Fehlern wird
+        die Schwere des Logs von WARNING auf ERROR angehoben.
+        """
         if self.risk_budget is None or self.executor is None:
             return
+        base_delay = float(RISK_EQUITY_POLL_SECONDS)
         while self._running:
-            await asyncio.sleep(RISK_EQUITY_POLL_SECONDS)
-            try:
-                equity = await self.executor.get_equity()
-                if equity > 0:
-                    # Recovery-Check zuerst, damit ein neuer Tag die Sperre löst.
-                    self.risk_budget.reset_if_recovered(equity)
-                    self.risk_budget.on_equity_update(equity)
-            except Exception:
-                logger.exception("Fehler im Risk-Loop")
+            consec = self._risk_consec_errors
+            if consec == 0:
+                delay = base_delay
+            else:
+                delay = min(base_delay * (2 ** (consec - 1)), _RISK_BACKOFF_CAP_SECONDS)
+            await asyncio.sleep(delay)
+            if not self._running:
+                break
+            ok = await self._risk_loop_tick()
+            if ok:
+                self._risk_consec_errors = 0
+            else:
+                self._risk_consec_errors += 1
 
     async def _heartbeat_loop(self) -> None:
         while self._running:
