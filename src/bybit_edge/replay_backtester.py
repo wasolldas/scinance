@@ -818,9 +818,13 @@ class ReplayBacktester:
         if last_pipeline_ms is None:
             last_pipeline_ms = -interval_ms  # ensures first ticker fires
 
-        last_ts_ms: Optional[int] = (
-            events[-1][0] if events else None
-        )
+        # Tracks the effective event-time (see ``eff_ts_ms`` below) of the most
+        # recent ticker the pipeline actually evaluated. Returned to the caller
+        # so residual open positions are force-closed at a timestamp that is
+        # consistent with the entry timestamps (which also use the effective
+        # clock) — critical when the persisted exchange ``ts`` is 0 and the
+        # cadence runs off ``recv_ts`` instead.
+        last_eff_ts_ms: Optional[int] = None
 
         for ts_ms, kind, payload in events:
             # --- Ingest event into the appropriate causal buffer ---
@@ -862,20 +866,46 @@ class ReplayBacktester:
             if payload["last_price"] <= 0:
                 continue
 
+            # Effective event-time clock that drives the throttle / cadence.
+            #
+            # Bybit V5 ticker WS payloads carry the message timestamp on the
+            # *envelope* (``payload["ts"]``), NOT inside the ticker ``data``
+            # object that ``TickerSnapshot.from_ws`` parses — so every
+            # persisted ticker row historically lands with ``ts == 0``. With a
+            # constant ``ts`` the event-time throttle below fires exactly once
+            # (the first tick), then ``eff_ts_ms - last_pipeline_ms`` is always
+            # ``0 < interval_ms`` and the pipeline is never re-evaluated again —
+            # the "1 tick over millions of events" bug.
+            #
+            # Fall back to the per-row ``recv_ts`` (reception wall-clock, in
+            # seconds, always strictly increasing in stream order and persisted
+            # alongside every ticker) whenever the exchange ``ts`` is missing /
+            # non-positive. recv_ts >= the event's exchange time, so using it as
+            # ``now_ms`` for the causal buffer windows can only ever include
+            # already-ingested (past) events — the lookahead guarantee is
+            # preserved. When ``ts`` *is* present and advancing (e.g. synthetic
+            # test streams) this branch is never taken and behaviour is
+            # bit-identical to before.
+            if ts_ms > 0:
+                eff_ts_ms = ts_ms
+            else:
+                eff_ts_ms = int(payload.get("recv_ts", 0.0) * 1000.0)
+
             # Throttle: re-evaluate the pipeline at most every interval.
-            if ts_ms - last_pipeline_ms < interval_ms:
+            if eff_ts_ms - last_pipeline_ms < interval_ms:
                 continue
-            last_pipeline_ms = ts_ms
+            last_pipeline_ms = eff_ts_ms
+            last_eff_ts_ms = eff_ts_ms
 
             ticker_data = self._build_ticker_data(
                 snap=last_ticker,
                 trade_buffer=trade_buffer,
                 liq_buffer=liq_buffer,
                 price_history=price_history,
-                now_ms=ts_ms,
+                now_ms=eff_ts_ms,
                 ob_snap=last_ob_snap,
             )
-            ts_seconds = ts_ms / 1000.0
+            ts_seconds = eff_ts_ms / 1000.0
             price = float(ticker_data["last_price"])
 
             for sid, strat in strategies.items():
@@ -887,12 +917,21 @@ class ReplayBacktester:
                     strategy_id=sid,
                     signal=signal,
                     price=price,
-                    ts_ms=ts_ms,
+                    ts_ms=eff_ts_ms,
                     open_pos=open_pos,
                     trades_out=trades_out,
                     record_trades=record_trades,
                 )
 
+        # Prefer the effective time of the last evaluated ticker so the
+        # caller's force-close stays consistent with the entry timestamps.
+        # When no ticker fired (e.g. trade-only slice) fall back to the raw ts
+        # of the final event, preserving the previous return contract.
+        last_ts_ms: Optional[int] = (
+            last_eff_ts_ms
+            if last_eff_ts_ms is not None
+            else (events[-1][0] if events else None)
+        )
         return last_ticker, last_ob_snap, last_ts_ms
 
     # ------------------------------------------------------------------

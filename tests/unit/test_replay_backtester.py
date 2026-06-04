@@ -971,6 +971,120 @@ class TestReplayProducesS3Trades:
 
 
 # ══════════════════════════════════════════════════════════════════════
+# Regression: Replay must evaluate the strategies on every cadence interval
+# across the whole event-time span — not exactly once.
+# ══════════════════════════════════════════════════════════════════════
+
+
+class TestReplayEvaluatesEveryInterval:
+    """Regression for the "1 tick over millions of events" bug.
+
+    Symptom (``replay_all.py --diagnose``)::
+
+        S3: 1 ticks | in_window: 0 | pressure>Q90: 0 | ... | all_gates: 0
+
+    i.e. on a multi-million-event production stream the strategies were
+    evaluated EXACTLY ONCE instead of once per ``pipeline_interval_seconds``
+    of event time, so no entry gate could ever accumulate and every symbol
+    reported 0 trades.
+
+    Root cause: Bybit V5 ticker WS payloads carry the message timestamp on the
+    *envelope* (``payload["ts"]``), never inside the ticker ``data`` object that
+    ``TickerSnapshot.from_ws`` parses. Every persisted ticker therefore lands
+    with ``ts == 0``. The replay's event-time throttle compares
+    ``ts - last_pipeline_ms < interval_ms``; with a constant ``ts`` this is true
+    for every ticker after the first, so the pipeline fires once and never
+    again.
+
+    Fix: when the exchange ``ts`` is missing / non-positive the replay drives
+    the cadence off the per-row ``recv_ts`` (reception wall-clock, persisted
+    with every ticker and strictly increasing in stream order).
+
+    This test reproduces the exact production shape — ``ts == 0`` with a
+    ``recv_ts`` spread across ~1000 s of event time (one event every 2 s) — and
+    asserts the strategies are evaluated hundreds of times, not once.
+    """
+
+    def _persist_ts_zero_stream(
+        self, persist: PersistenceLayer, *, n: int, step_s: float
+    ) -> None:
+        """Insert *n* tickers with ``ts == 0`` and ``recv_ts`` advancing by
+        ``step_s`` seconds — mirroring how the LiveRunner actually persisted
+        ticker rows (envelope ``ts`` dropped → 0)."""
+        base_recv_s = _BASE_TS / 1000.0
+        tickers = [
+            TickerSnapshot(
+                symbol=_SYMBOL,
+                last_price=30_000.0 + (i % 5),
+                mark_price=30_000.0,
+                index_price=30_000.0,
+                funding_rate=0.0001,
+                next_funding_time=0,
+                open_interest=1_000_000.0,
+                open_interest_value=3.0e10,
+                bid1_price=29_999.0,
+                bid1_size=5.0,
+                ask1_price=30_001.0,
+                ask1_size=5.0,
+                ts=0,  # <-- the production reality: envelope ts is dropped
+                recv_ts=base_recv_s + i * step_s,
+            )
+            for i in range(n)
+        ]
+        persist.write_tickers_batch(tickers)
+
+    def test_strategies_evaluated_many_times_when_ts_is_zero(
+        self, persist: PersistenceLayer
+    ) -> None:
+        # 500 events, one every 2 s -> ~1000 s of event time. At a 1 s cadence
+        # the strategies must be evaluated ~hundreds of times, not once.
+        self._persist_ts_zero_stream(persist, n=500, step_s=2.0)
+
+        bt = ReplayBacktester(_SYMBOL, db_path=None, collect_diagnostics=True)
+        bt.persist = persist
+        n = bt.load_events()
+        assert n == 500
+
+        bt.run(pipeline_interval_seconds=1.0)
+
+        n_ticks = bt.get_diagnostics()["S3"]["n_ticks_total"]
+        # Pre-fix this was exactly 1 (throttle stuck on the constant ts==0).
+        # Post-fix it tracks event-time via recv_ts: ~498. Use a generous lower
+        # bound so the assertion is robust rather than brittle.
+        assert n_ticks >= 50, (
+            f"replay evaluated the pipeline only {n_ticks} time(s) over a "
+            "~1000 s event-time span — the cadence is not advancing per "
+            "interval (the '1 tick over millions of events' bug)"
+        )
+        # All five strategies share the same cadence -> each saw the same count.
+        for sid in ("S1", "S2", "S3", "S4", "S5"):
+            rc = bt.get_diagnostics()[sid]["reason_counts"]
+            assert sum(rc.values()) >= 50, (
+                f"{sid} evaluated only {sum(rc.values())} time(s)"
+            )
+
+    def test_distinct_exchange_ts_still_drives_cadence(
+        self, persist: PersistenceLayer
+    ) -> None:
+        """When the exchange ``ts`` IS present and advancing (synthetic streams),
+        the cadence keeps using it — behaviour is unchanged."""
+        n = 500
+        step_ms = 2_000  # one event / 2 s of *exchange* time
+        persist.write_tickers_batch([
+            _ticker(0, last_price=30_000.0 + (i % 5), ts=_BASE_TS + i * step_ms)
+            for i in range(n)
+        ])
+
+        bt = ReplayBacktester(_SYMBOL, db_path=None, collect_diagnostics=True)
+        bt.persist = persist
+        bt.load_events()
+        bt.run(pipeline_interval_seconds=1.0)
+
+        n_ticks = bt.get_diagnostics()["S3"]["n_ticks_total"]
+        assert n_ticks >= 50, n_ticks
+
+
+# ══════════════════════════════════════════════════════════════════════
 # Diagnostics (opt-in wait-reason / S3 gate counters)
 # ══════════════════════════════════════════════════════════════════════
 
