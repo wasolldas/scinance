@@ -82,6 +82,30 @@ _PRICE_HISTORY_MAXLEN: int = 512
 _DATA_LIMITED: frozenset[str] = frozenset({"S2", "S4", "S5"})
 
 
+def _effective_ts_ms(kind: str, payload: dict[str, Any]) -> int:
+    """Effective event-time (ms) used for the chronological merge sort.
+
+    The persisted exchange ``ts`` is authoritative whenever it is positive.
+    Only legacy ``ticker`` rows suffer the Bybit V5 envelope-ts bug (every
+    such row lands with ``ts == 0`` because the collector dropped the
+    envelope timestamp), so they fall back to the per-row reception
+    wall-clock ``recv_ts`` (seconds → ms). ``recv_ts`` is monotone in stream
+    order and ``>=`` the event's exchange time, so the lookahead guarantee is
+    preserved. ``trade``/``liq``/``ob`` events always carry a real exchange
+    ``ts`` (from the "T"/timestamp field) — they never need the fallback, so
+    this returns their raw ``ts`` unchanged.
+
+    Crucially: when ``ts > 0`` (fresh data, synthetic test streams) this
+    returns the raw ``ts`` for every event type, so the merge sort is
+    bit-identical to the legacy raw-``ts`` sort.
+    """
+    ts = int(payload.get("ts", payload.get("timestamp_ms", 0)) or 0)
+    if ts > 0 or kind != "ticker":
+        return ts
+    recv = payload.get("recv_ts", 0.0)
+    return int(float(recv) * 1000.0) if recv else 0
+
+
 class ReplayBacktester:
     """Replays persisted DuckDB ticks through the real strategies.
 
@@ -184,8 +208,13 @@ class ReplayBacktester:
 
         The three tables are queried for *symbol* within the optional
         ``[start_ts, end_ts]`` (Unix milliseconds) window, tagged by kind, and
-        merged into a single list sorted strictly ascending by ``ts``. Ties
-        are broken deterministically by kind so the ordering is stable.
+        merged into a single list sorted strictly ascending by EFFECTIVE
+        event-time (:func:`_effective_ts_ms` — the raw exchange ``ts`` when it
+        is positive, else the ``recv_ts`` fallback for legacy ts=0 ticker
+        rows). This interleaves legacy ts=0 tickers chronologically with
+        real-ts trades/liquidations instead of clumping them at the front of
+        the stream. Ties are broken deterministically by kind so the ordering
+        is stable.
 
         Returns
         -------
@@ -218,26 +247,25 @@ class ReplayBacktester:
             [self.symbol, lo, hi],
         ).fetchall()
         for r in ticker_rows:
-            events.append((
-                int(r[0]),
-                "ticker",
-                {
-                    "ts": int(r[0]),
-                    "symbol": str(r[1]),
-                    "last_price": float(r[2] or 0.0),
-                    "mark_price": float(r[3] or 0.0),
-                    "index_price": float(r[4] or 0.0),
-                    "funding_rate": float(r[5] or 0.0),
-                    "next_funding_time": int(r[6] or 0),
-                    "open_interest": float(r[7] or 0.0),
-                    "open_interest_value": float(r[8] or 0.0),
-                    "bid1_price": float(r[9] or 0.0),
-                    "bid1_size": float(r[10] or 0.0),
-                    "ask1_price": float(r[11] or 0.0),
-                    "ask1_size": float(r[12] or 0.0),
-                    "recv_ts": float(r[13] or 0.0),
-                },
-            ))
+            payload = {
+                "ts": int(r[0]),
+                "symbol": str(r[1]),
+                "last_price": float(r[2] or 0.0),
+                "mark_price": float(r[3] or 0.0),
+                "index_price": float(r[4] or 0.0),
+                "funding_rate": float(r[5] or 0.0),
+                "next_funding_time": int(r[6] or 0),
+                "open_interest": float(r[7] or 0.0),
+                "open_interest_value": float(r[8] or 0.0),
+                "bid1_price": float(r[9] or 0.0),
+                "bid1_size": float(r[10] or 0.0),
+                "ask1_price": float(r[11] or 0.0),
+                "ask1_size": float(r[12] or 0.0),
+                "recv_ts": float(r[13] or 0.0),
+            }
+            events.append(
+                (_effective_ts_ms("ticker", payload), "ticker", payload)
+            )
 
         trade_rows = conn.execute(
             """
@@ -310,11 +338,16 @@ class ReplayBacktester:
                 },
             ))
 
-        # Stable chronological sort. Tie-break by a fixed kind order so that
-        # at equal ts we deterministically ingest market data first (ticker,
-        # trade, liq, ob) — never a future event before a past one. The OB
-        # snapshot lands last among equal-ts events so that the depth profile
-        # observed at ts==T reflects state after all other market events at T.
+        # Stable chronological sort by EFFECTIVE event-time. Each tuple's first
+        # element is already ``_effective_ts_ms`` (raw ``ts`` when ``ts > 0``,
+        # else the ``recv_ts``-fallback for legacy ts=0 tickers), so legacy
+        # ts=0 tickers interleave with real-ts trades instead of clumping at
+        # the front of the stream. Tie-break by a fixed kind order so that at
+        # equal effective ts we deterministically ingest market data first
+        # (ticker, trade, liq, ob) — never a future event before a past one.
+        # The OB snapshot lands last among equal-ts events so that the depth
+        # profile observed at ts==T reflects state after all other market
+        # events at T.
         kind_order = {"ticker": 0, "trade": 1, "liq": 2, "ob": 3}
         events.sort(key=lambda e: (e[0], kind_order[e[1]]))
 

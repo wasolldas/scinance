@@ -1295,3 +1295,158 @@ class TestReplayDiagnostics:
         assert res_on["S3"].n_trades >= 1
         # Sanity: the enter was observed in the diagnostics.
         assert bt_on.get_diagnostics()["S3"]["n_all_gates_passed"] >= 1
+
+
+# ══════════════════════════════════════════════════════════════════════
+# Regression: load_events must interleave ts=0 legacy tickers with real-ts
+# trades by EFFECTIVE time (recv_ts fallback), not clump them at ts=0.
+# ══════════════════════════════════════════════════════════════════════
+
+
+class TestLoadEventsChronologicalWithLegacyTs:
+    """Regression for the "ts=0 ticker clump destroys chronology" bug.
+
+    On legacy collected data EVERY ticker row lands with ``ts == 0`` (the
+    Bybit V5 envelope-ts was dropped by the collector), while trades carry a
+    real exchange ``ts`` (from the "T" field). ``load_events`` merged all
+    tables into one stream and sorted strictly by the raw ``ts``. Because
+    ``0`` sorts before every real ms timestamp, ALL ts=0 tickers clumped at
+    the very front of the stream instead of being interleaved chronologically
+    with the trades — and within that clump the recv_ts order was not even
+    guaranteed monotone.
+
+    The downstream effect: the causal replay first burned through every
+    ticker (driving the cadence off recv_ts) with EMPTY trade/liq buffers,
+    then replayed every trade afterwards — so trade-history-dependent gates
+    (Kyle's lambda, event-time arrays, S1 cascade) saw a buffer state that
+    never matched what the ticker's effective time implied. This made the
+    per-symbol results erratic / order-dependent.
+
+    Fix: sort the merged stream by the EFFECTIVE event time
+    (``ts`` when ``ts > 0`` else ``recv_ts * 1000``), keeping the kind-order
+    tie-break. After the fix a ts=0 ticker with ``recv_ts=1002 s`` lands
+    AFTER a trade at ``ts=1001000 ms`` but BEFORE a trade at ``ts=1003000 ms``.
+    """
+
+    def test_legacy_ts_zero_tickers_interleave_with_real_ts_trades(
+        self, persist: PersistenceLayer
+    ) -> None:
+        # Build a mixed sequence over ~1 h of event time.
+        #   * tickers: ts=0, recv_ts = 1000, 1002, 1004, ... seconds
+        #   * trades : real ts in ms, offset 1 s "between" consecutive tickers
+        #     so the correct interleaving is strictly trade/ticker/trade/...
+        base_recv_s = 1000.0
+        n = 50
+        step_s = 2.0
+
+        tickers = [
+            TickerSnapshot(
+                symbol=_SYMBOL,
+                last_price=30_000.0 + (i % 5),
+                mark_price=30_000.0,
+                index_price=30_000.0,
+                funding_rate=0.0001,
+                next_funding_time=0,
+                open_interest=1_000_000.0,
+                open_interest_value=3.0e10,
+                bid1_price=29_999.0,
+                bid1_size=5.0,
+                ask1_price=30_001.0,
+                ask1_size=5.0,
+                ts=0,  # <-- legacy collected reality
+                recv_ts=base_recv_s + i * step_s,
+            )
+            for i in range(n)
+        ]
+        persist.write_tickers_batch(tickers)
+
+        # Trades with REAL ts (ms) placed 1 s after each ticker's recv time,
+        # i.e. ts_ms = (base_recv_s + i*step_s + 1.0) * 1000. The correct
+        # chronological order is therefore:
+        #   ticker_0 (eff=1000s) , trade_0 (1001s) , ticker_1 (1002s) ,
+        #   trade_1 (1003s) , ticker_2 (1004s) , ...
+        trades = [
+            TradeEvent(
+                timestamp_ms=int((base_recv_s + i * step_s + 1.0) * 1000.0),
+                price=30_000.0 + i,
+                volume=1.0,
+                side="Buy",
+                is_block=False,
+            )
+            for i in range(n)
+        ]
+        persist.write_trades_batch(trades, symbol=_SYMBOL)
+
+        bt = _new_bt(persist)
+        loaded = bt.load_events()
+        assert loaded == 2 * n
+
+        # Effective time of each event in stream order.
+        def _eff(event: tuple) -> int:
+            ts_ms, kind, payload = event
+            if kind == "ticker":
+                ts = int(payload["ts"])
+                if ts > 0:
+                    return ts
+                return int(float(payload.get("recv_ts", 0.0)) * 1000.0)
+            # trades / liq / ob carry a real exchange ts.
+            return int(ts_ms)
+
+        eff_sequence = [_eff(e) for e in bt._events]
+
+        # Core assertion: the stream is monotone non-decreasing in EFFECTIVE
+        # time. Pre-fix the 50 ts=0 tickers all clump at eff=... but with
+        # tuple-ts 0 sorted first, so eff_sequence would start with the whole
+        # ticker block (1000s..1098s) then jump back to the first trade
+        # (1001s) — a hard non-monotone drop.
+        assert eff_sequence == sorted(eff_sequence), (
+            "merged stream is not chronological by effective time — ts=0 "
+            "tickers clump instead of interleaving with real-ts trades"
+        )
+
+        # Stronger: assert the exact interleaving around a sample boundary.
+        # ticker_1 has eff=1002s; it must sit AFTER trade_0 (eff=1001s) and
+        # BEFORE trade_1 (eff=1003s).
+        ticker1_eff = int((base_recv_s + 1 * step_s) * 1000.0)  # 1002000
+        trade0_eff = int((base_recv_s + 0 * step_s + 1.0) * 1000.0)  # 1001000
+        trade1_eff = int((base_recv_s + 1 * step_s + 1.0) * 1000.0)  # 1003000
+
+        idx_ticker1 = next(
+            i for i, e in enumerate(bt._events)
+            if e[1] == "ticker" and _eff(e) == ticker1_eff
+        )
+        idx_trade0 = next(
+            i for i, e in enumerate(bt._events)
+            if e[1] == "trade" and e[0] == trade0_eff
+        )
+        idx_trade1 = next(
+            i for i, e in enumerate(bt._events)
+            if e[1] == "trade" and e[0] == trade1_eff
+        )
+        assert idx_trade0 < idx_ticker1 < idx_trade1, (
+            "ticker_1 (eff=1002s) is not interleaved between trade_0 "
+            "(1001s) and trade_1 (1003s)"
+        )
+
+    def test_real_ts_sort_is_bit_identical(
+        self, persist: PersistenceLayer
+    ) -> None:
+        """With genuine ts>0 data the effective-time sort key must reduce to
+        the raw ts — the merged stream is unchanged versus the legacy
+        behaviour (eff_ts == ts when ts>0)."""
+        persist.write_tickers_batch([_ticker(5), _ticker(1), _ticker(3)])
+        persist.write_trades_batch([_trade(4), _trade(0)], symbol=_SYMBOL)
+        persist.write_liquidations_batch([_liq(2)])
+
+        bt = _new_bt(persist)
+        n = bt.load_events()
+        assert n == 6
+
+        ts_sequence = [e[0] for e in bt._events]
+        # Tuple-ts equals the raw exchange ts for every event (no recv_ts
+        # substitution happened) and is strictly sorted.
+        assert ts_sequence == sorted(ts_sequence)
+        expected = sorted(
+            _BASE_TS + i * 1000 for i in (0, 1, 2, 3, 4, 5)
+        )
+        assert ts_sequence == expected
