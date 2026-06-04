@@ -346,6 +346,7 @@ class ReplayBacktester:
         price_history: deque[float],
         now_ms: int,
         ob_snap: Optional[dict[str, Any]] = None,
+        recv_ts: Optional[float] = None,
     ) -> dict[str, Any]:
         """Build a ``ticker_data`` dict in the exact format the pipeline uses.
 
@@ -354,6 +355,16 @@ class ReplayBacktester:
         ts <= now_ms) the depth profile arrays are taken from it; otherwise
         the order-book depth is reconstructed as a 1-level fallback from
         ``bid1``/``ask1``.
+
+        ``recv_ts`` (seconds) is the reception wall-clock of the ticker row.
+        When explicitly provided AND the persisted exchange ``ts`` of the
+        ticker is non-positive (``snap["ts"] <= 0`` — see the envelope-ts
+        bug documented in :meth:`_replay_events`), it is used as the
+        event-time anchor for ``seconds_to_settlement``. This mirrors the
+        fallback the throttle in :meth:`_replay_events` already uses, so
+        the settlement-window detection stays consistent with the cadence.
+        Defaults to ``None`` — the legacy behaviour (event-time = ``snap["ts"]``)
+        is bit-identical when the caller does not pass it in.
         """
         last_price: float = snap["last_price"]
         mark_price: float = snap["mark_price"] or last_price
@@ -440,8 +451,20 @@ class ReplayBacktester:
             (mark_price - index_price) / index_price if index_price else 0.0
         )
 
+        # Event-time anchor for the settlement countdown. When the persisted
+        # exchange ``ts`` is missing/non-positive (Bybit V5 envelope-ts bug —
+        # see :meth:`_replay_events`) the cadence already falls back to
+        # ``recv_ts * 1000`` for the throttle. Mirror that fallback here so
+        # ``seconds_to_settlement`` is consistent with the cadence and not
+        # ~next_funding_time/1000 (≈ 1.7e9 s, well past any 30-min window),
+        # which would silently gate every single replay tick "out of window".
+        snap_ts: int = int(snap["ts"])
+        if snap_ts > 0 or recv_ts is None:
+            eff_ticker_ts_ms: int = snap_ts
+        else:
+            eff_ticker_ts_ms = int(recv_ts * 1000.0)
         seconds_to_settlement: float = self._seconds_to_settlement(
-            snap["next_funding_time"], snap["ts"]
+            snap["next_funding_time"], eff_ticker_ts_ms
         )
 
         liq_events = [
@@ -904,6 +927,7 @@ class ReplayBacktester:
                 price_history=price_history,
                 now_ms=eff_ts_ms,
                 ob_snap=last_ob_snap,
+                recv_ts=float(last_ticker.get("recv_ts", 0.0)) or None,
             )
             ts_seconds = eff_ts_ms / 1000.0
             price = float(ticker_data["last_price"])

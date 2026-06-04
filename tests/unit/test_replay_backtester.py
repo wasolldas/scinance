@@ -1085,8 +1085,96 @@ class TestReplayEvaluatesEveryInterval:
 
 
 # ══════════════════════════════════════════════════════════════════════
-# Diagnostics (opt-in wait-reason / S3 gate counters)
+# Regression: Replay must detect the settlement window when persisted
+# ticker rows have ``ts == 0`` (envelope-ts bug for legacy collected data).
 # ══════════════════════════════════════════════════════════════════════
+
+
+class TestReplayWindowDetection:
+    """Regression for the "every tick outside settlement window" bug on
+    legacy collected ticker rows where ``ts == 0``.
+
+    Symptom (``replay_all.py --diagnose`` on a real 17h, 6-settlement
+    stream)::
+
+        S3: 2207 ticks | in_window: 0 | pressure>Q90: 0 | basis_aligned: 0
+            | all_gates: 0
+            wait_reasons: outside_settlement_window=2207
+
+    Root cause: an earlier fix made the *throttle* in ``_replay_events``
+    fall back to ``recv_ts * 1000`` when the persisted exchange ``ts``
+    is 0, but :meth:`_build_ticker_data` still computed
+    ``seconds_to_settlement`` off the raw ``snap["ts"] == 0``, yielding
+    ``(next_funding_time - 0) / 1000 ≈ 1.7e9 s`` — i.e. orders of
+    magnitude past the 30-min entry window. Every replay tick therefore
+    reported ``outside_settlement_window`` and S3 produced 0 trades on
+    legacy data, even on streams that the live runner had traded.
+
+    Fix: when the persisted ``ts <= 0`` AND a ``recv_ts`` is available,
+    the settlement countdown uses ``recv_ts * 1000`` as the event-time
+    anchor — exactly the same fallback the throttle already uses, so
+    the cadence and the window detection stay consistent.
+    """
+
+    def _persist_ts_zero_in_window_stream(
+        self, persist: PersistenceLayer
+    ) -> None:
+        """Insert tickers with ``ts == 0`` (legacy collected) spanning ~1 h of
+        ``recv_ts``, with ``next_funding_time`` set so the last ~5 min of the
+        stream fall inside the 30-min entry window."""
+        n = 3600  # 1 ticker per second of recv_ts -> 3600 s = 1 h event time
+        base_recv_s = _BASE_TS / 1000.0
+        # Final tick lands 5 min before the next funding settlement, so
+        # ~the last 30 min of the stream are inside the entry window.
+        last_recv_s = base_recv_s + (n - 1) * 1.0
+        next_funding_ms = int(last_recv_s * 1000.0) + 5 * 60 * 1000
+
+        tickers = [
+            TickerSnapshot(
+                symbol=_SYMBOL,
+                last_price=30_000.0 + (i % 5),
+                mark_price=30_000.0,
+                index_price=30_000.0,
+                funding_rate=0.0001,
+                next_funding_time=next_funding_ms,
+                open_interest=1_000_000.0,
+                open_interest_value=3.0e10,
+                bid1_price=29_999.0,
+                bid1_size=5.0,
+                ask1_price=30_001.0,
+                ask1_size=5.0,
+                ts=0,  # <-- the production reality on legacy collected rows
+                recv_ts=base_recv_s + i * 1.0,
+            )
+            for i in range(n)
+        ]
+        persist.write_tickers_batch(tickers)
+
+    def test_in_window_detected_when_ticker_ts_is_zero(
+        self, persist: PersistenceLayer
+    ) -> None:
+        """At least a few ticks at the end of the stream must register as
+        ``in_window`` once the settlement countdown uses the ``recv_ts``
+        fallback to anchor itself in event time."""
+        self._persist_ts_zero_in_window_stream(persist)
+
+        bt = ReplayBacktester(_SYMBOL, db_path=None, collect_diagnostics=True)
+        bt.persist = persist
+        n = bt.load_events()
+        assert n == 3600
+
+        bt.run(pipeline_interval_seconds=1.0)
+
+        diag = bt.get_diagnostics()["S3"]
+        # Sanity: the cadence fix from the previous bug is still effective —
+        # we must be evaluating the strategies many times, not exactly once.
+        assert diag["n_ticks_total"] >= 100, diag
+        # Core regression assertion: at least some ticks fall inside the
+        # settlement window. Pre-fix this was 0 across millions of events.
+        assert diag["n_in_window"] > 0, (
+            "seconds_to_settlement still uses raw ticker.ts=0 — every "
+            f"replay tick is gated outside_settlement_window: {diag}"
+        )
 
 
 class TestReplayDiagnostics:
