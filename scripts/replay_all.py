@@ -143,14 +143,24 @@ def run_symbol(
     train_days: int,
     test_days: int,
     embargo_minutes: int,
-) -> Optional[tuple[dict[str, BacktestResult], int, int]]:
+    diagnose: bool = False,
+) -> Optional[tuple[dict[str, BacktestResult], int, int, dict[str, Any]]]:
     """Run the replay for a single symbol.
 
-    Returns ``(results, n_events, n_folds)`` on success or ``None`` when the
-    symbol has no events / cannot be replayed. ``n_folds`` is 0 in single-pass
-    mode.
+    Returns ``(results, n_events, n_folds, diagnostics)`` on success or
+    ``None`` when the symbol has no events / cannot be replayed. ``n_folds``
+    is 0 in single-pass mode. ``diagnostics`` is the per-strategy wait-reason /
+    gate-counter dict (empty when ``diagnose`` is False).
     """
-    bt = ReplayBacktester(symbol=symbol, db_path=db_path)
+    # Only pass collect_diagnostics when actually diagnosing, so the default
+    # path keeps the exact pre-diagnostics constructor signature (relevant for
+    # fakes/stubs that monkey-patch ReplayBacktester without the new kwarg).
+    if diagnose:
+        bt = ReplayBacktester(
+            symbol=symbol, db_path=db_path, collect_diagnostics=True
+        )
+    else:
+        bt = ReplayBacktester(symbol=symbol, db_path=db_path)
     try:
         n_events = bt.load_events()
         if n_events == 0:
@@ -163,14 +173,18 @@ def run_symbol(
                 embargo_minutes=embargo_minutes,
             )
             n_folds = int(bt.last_walkforward_folds)
+            # get_diagnostics() is only invoked when diagnosing so fakes/stubs
+            # without that method keep working on the default path.
+            diagnostics = bt.get_diagnostics() if diagnose else {}
             if n_folds == 0:
                 # Not enough data for a single fold — degrade gracefully:
                 # the per-strategy results are all-empty trade lists. Surface
                 # that to the caller so it can flag this symbol as skipped.
-                return results, n_events, 0
-            return results, n_events, n_folds
+                return results, n_events, 0, diagnostics
+            return results, n_events, n_folds, diagnostics
         results = bt.run(pipeline_interval_seconds=interval)
-        return results, n_events, 0
+        diagnostics = bt.get_diagnostics() if diagnose else {}
+        return results, n_events, 0, diagnostics
     finally:
         bt.close()
 
@@ -406,6 +420,47 @@ def _print_per_symbol_section(
             )
 
 
+def _format_reason_counts(reason_counts: dict[str, Any], top: int = 8) -> str:
+    """Render a reason->count map as ``reason=count`` pairs, most frequent first."""
+    if not reason_counts:
+        return "(keine)"
+    items = sorted(
+        reason_counts.items(), key=lambda kv: kv[1], reverse=True
+    )[:top]
+    return ", ".join(f"{r}={n}" for r, n in items)
+
+
+def print_diagnostics(
+    symbol: str, diagnostics: dict[str, dict[str, Any]]
+) -> None:
+    """Print the per-strategy wait-reason diagnose section for one symbol.
+
+    Mirrors the single-symbol ``scripts/replay_backtest.py`` layout so the
+    operator sees the *same* picture regardless of which driver they ran.
+    """
+    if not diagnostics:
+        return
+    print(f"\n=== DIAGNOSE {symbol} ===")
+    s3 = diagnostics.get("S3")
+    if s3 is not None:
+        print(
+            f"S3: {s3.get('n_ticks_total', 0)} ticks | "
+            f"in_window: {s3.get('n_in_window', 0)} | "
+            f"pressure>Q90: {s3.get('n_pressure_extreme', 0)} | "
+            f"basis_aligned: {s3.get('n_basis_aligned', 0)} | "
+            f"all_gates: {s3.get('n_all_gates_passed', 0)}"
+        )
+        print(
+            "    wait_reasons: "
+            f"{_format_reason_counts(s3.get('reason_counts', {}))}"
+        )
+    for sid in sorted(diagnostics.keys()):
+        if sid == "S3":
+            continue
+        rc = diagnostics[sid].get("reason_counts", {})
+        print(f"{sid}: reasons: {_format_reason_counts(rc)}")
+
+
 def _print_top3(per_symbol: dict[str, dict[str, dict[str, Any]]]) -> None:
     triples: list[tuple[str, str, float, int]] = []
     for sym, sym_res in per_symbol.items():
@@ -435,6 +490,8 @@ def run(
     train_days: int,
     test_days: int,
     embargo_minutes: int,
+    diagnose: bool = False,
+    diagnostics_sink: Optional[dict[str, dict[str, Any]]] = None,
 ) -> tuple[
     dict[str, dict[str, dict[str, Any]]],
     dict[str, dict[str, Any]],
@@ -444,11 +501,19 @@ def run(
     """Run every symbol, collect per_symbol + aggregate.
 
     Returns ``(per_symbol, per_strategy_aggregate, skipped_symbols, wf_meta)``.
+
+    When ``diagnose`` is set and ``diagnostics_sink`` is provided, the
+    per-symbol wait-reason / gate-counter diagnostics are written into that
+    dict in-place (keyed by symbol). The 4-tuple return shape is preserved so
+    existing callers / tests are unaffected.
     """
     per_symbol: dict[str, dict[str, dict[str, Any]]] = {}
     skipped: list[str] = []
     wf_folds_per_symbol: dict[str, int] = {}
     n_events_per_symbol: dict[str, int] = {}
+    diagnostics_per_symbol: dict[str, dict[str, Any]] = (
+        diagnostics_sink if diagnostics_sink is not None else {}
+    )
 
     for sym in symbols:
         print(f"\n--- {sym} ---")
@@ -461,6 +526,7 @@ def run(
                 train_days=train_days,
                 test_days=test_days,
                 embargo_minutes=embargo_minutes,
+                diagnose=diagnose,
             )
         except Exception as exc:  # noqa: BLE001 — keep going on per-symbol error
             print(f"  ! Replay fuer {sym} fehlgeschlagen: {exc}")
@@ -472,8 +538,10 @@ def run(
             skipped.append(sym)
             continue
 
-        results, n_events, n_folds = outcome
+        results, n_events, n_folds, diagnostics = outcome
         n_events_per_symbol[sym] = n_events
+        if diagnose and diagnostics:
+            diagnostics_per_symbol[sym] = diagnostics
         if walkforward:
             wf_folds_per_symbol[sym] = n_folds
             if n_folds == 0:
@@ -584,6 +652,16 @@ def _parse_args(argv: Optional[list[str]] = None) -> argparse.Namespace:
         default=1.0,
         help="Pipeline-Throttle in Sekunden (wie LiveRunner).",
     )
+    parser.add_argument(
+        "--diagnose",
+        action="store_true",
+        help=(
+            "Diagnose-Modus: zaehlt pro Strategie + Symbol wie oft welcher "
+            "wait_reason auftrat und (fuer S3) die Entry-Gate-Verteilung "
+            "(in_window / pressure>Q90 / basis_aligned / all_gates). Zeigt "
+            "schwarz auf weiss WELCHES Gate blockiert. Kein Einfluss auf Trades."
+        ),
+    )
     return parser.parse_args(argv)
 
 
@@ -621,6 +699,7 @@ def main(argv: Optional[list[str]] = None) -> int:
         )
         return 1
 
+    diagnostics_per_symbol: dict[str, dict[str, Any]] = {}
     per_symbol, aggregate, skipped, wf_meta = run(
         symbols=symbols,
         db_path=db_path,
@@ -629,6 +708,8 @@ def main(argv: Optional[list[str]] = None) -> int:
         train_days=args.train_days,
         test_days=args.test_days,
         embargo_minutes=args.embargo_minutes,
+        diagnose=args.diagnose,
+        diagnostics_sink=diagnostics_per_symbol,
     )
 
     mode = "walkforward" if args.walkforward else "single_pass"
@@ -641,6 +722,8 @@ def main(argv: Optional[list[str]] = None) -> int:
         walkforward_meta=wf_meta,
         interval_seconds=args.interval,
     )
+    if args.diagnose:
+        payload["diagnostics"] = diagnostics_per_symbol
     legacy_payload = build_legacy_payload(
         mode=mode,
         symbols=symbols,
@@ -673,6 +756,13 @@ def main(argv: Optional[list[str]] = None) -> int:
 
         print("\n" + "=" * 80)
         _print_top3(per_symbol)
+
+    if args.diagnose and diagnostics_per_symbol:
+        print("\n" + "=" * 80)
+        print("  DIAGNOSE — Pro Symbol: welches Entry-Gate blockiert?")
+        print("=" * 80)
+        for sym in sorted(diagnostics_per_symbol.keys()):
+            print_diagnostics(sym, diagnostics_per_symbol[sym])
 
     if skipped:
         print(f"\n  Skipped Symbole: {', '.join(skipped)}")

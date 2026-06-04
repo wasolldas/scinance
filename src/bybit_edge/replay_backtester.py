@@ -36,7 +36,7 @@ from __future__ import annotations
 
 import logging
 import sys
-from collections import deque
+from collections import Counter, deque
 from contextlib import nullcontext
 from pathlib import Path
 from typing import Any, Optional
@@ -91,9 +91,28 @@ class ReplayBacktester:
     with :meth:`BacktestEngine.compute_metrics`.
     """
 
-    def __init__(self, symbol: str, db_path: Optional[Path] = None) -> None:
+    def __init__(
+        self,
+        symbol: str,
+        db_path: Optional[Path] = None,
+        collect_diagnostics: bool = False,
+    ) -> None:
         self.symbol: str = symbol
         self._db_path: Optional[Path] = db_path
+
+        # Diagnostics: when enabled, count per-strategy "reason"/"wait_reason"
+        # occurrences plus S3-specific gate counters so the operator can see
+        # *which* entry gate blocks. Strictly observational — the trade path is
+        # never altered. When False (default) NO counter is ever touched, so the
+        # replay is bit-identical to the pre-diagnostics behaviour and carries
+        # zero per-tick overhead.
+        self._collect_diagnostics: bool = bool(collect_diagnostics)
+        # Per-strategy reason-counter: {sid: Counter[reason -> n]}.
+        self._reason_counts: dict[str, Counter] = {}
+        # S3-specific scalar gate counters (see _record_diagnostics).
+        self._s3_counters: dict[str, int] = {}
+        if self._collect_diagnostics:
+            self._init_diagnostics()
 
         # Persistence handle (DuckDB). Opened lazily / in load_events.
         self.persist: Optional[PersistenceLayer] = None
@@ -554,6 +573,128 @@ class ReplayBacktester:
         return {"action": "wait", "direction": 0, "strategy": strategy_id}
 
     # ------------------------------------------------------------------
+    # Diagnostics (opt-in, strictly observational)
+    # ------------------------------------------------------------------
+
+    # The S3 entry gates are checked in a fixed order inside
+    # Strategy3PreSettlement._check_entry. The returned "reason" string
+    # therefore pinpoints the *first* gate that failed (or "all_conditions_met"
+    # on a pass). Mapping each reason to how far the tick progressed through the
+    # gate chain lets us reconstruct the per-gate pass counts without touching
+    # the strategy: a reason past gate K implies gates 1..K all passed.
+    #
+    #   outside_settlement_window  -> failed gate 1 (window)
+    #   pressure_below_q90         -> passed window; failed Q90
+    #   pressure_zero              -> passed window+Q90; failed (pressure==0)
+    #   basis_wrong_direction      -> passed window+Q90; failed basis
+    #   bocpd_changepoint_detected -> passed window+Q90+basis; failed BOCPD
+    #   all_conditions_met         -> passed everything (entry)
+    _S3_REASON_PRESSURE_EXTREME: frozenset[str] = frozenset({
+        "pressure_zero",
+        "basis_wrong_direction",
+        "bocpd_changepoint_detected",
+        "all_conditions_met",
+    })
+    _S3_REASON_BASIS_ALIGNED: frozenset[str] = frozenset({
+        "bocpd_changepoint_detected",
+        "all_conditions_met",
+    })
+
+    def _init_diagnostics(self) -> None:
+        """(Re)initialise the per-strategy diagnostic accumulators."""
+        self._reason_counts = {
+            sid: Counter() for sid in ("S1", "S2", "S3", "S4", "S5")
+        }
+        self._s3_counters = {
+            "n_ticks_total": 0,
+            "n_in_window": 0,
+            "n_pressure_extreme": 0,
+            "n_basis_aligned": 0,
+            "n_all_gates_passed": 0,
+        }
+
+    def _record_diagnostics(
+        self, strategy_id: str, signal: dict[str, Any]
+    ) -> None:
+        """Observe a strategy signal and update the diagnostic counters.
+
+        Called once per strategy per evaluated pipeline tick *only* when
+        ``collect_diagnostics`` is enabled. It never mutates ``signal`` nor any
+        trade state — it merely reads the strategy's own return dict.
+
+        Every tick at which the strategy did not return ``action == "enter"``
+        increments the per-strategy reason counter by the signal's ``reason``
+        value (fallback ``"unknown"`` when the strategy exposes no reason key,
+        e.g. the gated-off neutral ``wait`` dicts from :meth:`_eval_strategy`).
+        Ticks that *do* enter are counted under the ``__enter__`` sentinel so
+        the enter/no-enter split is always recoverable.
+        """
+        action: str = signal.get("action", "wait")
+        # All five strategies put their human-readable gate reason under
+        # "reason" (verified against each strategy's return dict). The
+        # gated-off neutral dicts built in _eval_strategy carry no reason key
+        # -> "unknown" fallback as specified.
+        reason: str = str(signal.get("reason", "unknown"))
+
+        counter = self._reason_counts.get(strategy_id)
+        if counter is not None:
+            if action == "enter":
+                counter["__enter__"] += 1
+            else:
+                counter[reason] += 1
+
+        if strategy_id == "S3":
+            self._record_s3_diagnostics(signal, action, reason)
+
+    def _record_s3_diagnostics(
+        self, signal: dict[str, Any], action: str, reason: str
+    ) -> None:
+        """Update S3-specific gate counters from its module sub-results.
+
+        ``n_in_window`` is read directly from the embedded M22 sub-result
+        (``modules["M22"]["in_window"]``), which M22 computes on *every* tick
+        regardless of trade state. The remaining gate counters are inferred
+        from the ordered ``reason`` chain (see ``_S3_REASON_*``); these only
+        advance on ticks where the entry check actually ran (i.e. not while a
+        position is open).
+        """
+        c = self._s3_counters
+        c["n_ticks_total"] += 1
+
+        modules = signal.get("modules")
+        if isinstance(modules, dict):
+            m22 = modules.get("M22")
+            if isinstance(m22, dict) and m22.get("in_window"):
+                c["n_in_window"] += 1
+
+        if reason in self._S3_REASON_PRESSURE_EXTREME or action == "enter":
+            c["n_pressure_extreme"] += 1
+        if reason in self._S3_REASON_BASIS_ALIGNED or action == "enter":
+            c["n_basis_aligned"] += 1
+        if action == "enter":
+            c["n_all_gates_passed"] += 1
+
+    def get_diagnostics(self) -> dict[str, dict[str, Any]]:
+        """Return the collected diagnostics, keyed by strategy id.
+
+        Each strategy maps to ``{"reason_counts": {reason: n, ...}}``. The S3
+        entry adds the scalar gate counters (``n_ticks_total``, ``n_in_window``,
+        ``n_pressure_extreme``, ``n_basis_aligned``, ``n_all_gates_passed``).
+
+        Returns an empty dict when ``collect_diagnostics`` was not enabled, so
+        callers can cheaply test ``if bt.get_diagnostics():``.
+        """
+        if not self._collect_diagnostics:
+            return {}
+        out: dict[str, dict[str, Any]] = {}
+        for sid, counter in self._reason_counts.items():
+            entry: dict[str, Any] = {"reason_counts": dict(counter)}
+            if sid == "S3":
+                entry.update(self._s3_counters)
+            out[sid] = entry
+        return out
+
+    # ------------------------------------------------------------------
     # Replay
     # ------------------------------------------------------------------
 
@@ -739,6 +880,9 @@ class ReplayBacktester:
 
             for sid, strat in strategies.items():
                 signal = self._eval_strategy(sid, strat, ticker_data, ts_seconds)
+                if self._collect_diagnostics:
+                    # Strictly observational — never alters the trade path.
+                    self._record_diagnostics(sid, signal)
                 self._apply_signal(
                     strategy_id=sid,
                     signal=signal,

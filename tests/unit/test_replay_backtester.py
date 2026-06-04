@@ -968,3 +968,128 @@ class TestReplayProducesS3Trades:
             "PRD-7.3 pre-settlement scenario; live ran this and emitted "
             f"a signal, replay returned n_trades={results['S3'].n_trades}"
         )
+
+
+# ══════════════════════════════════════════════════════════════════════
+# Diagnostics (opt-in wait-reason / S3 gate counters)
+# ══════════════════════════════════════════════════════════════════════
+
+
+class TestReplayDiagnostics:
+    """Tests for the opt-in ``collect_diagnostics`` instrumentation.
+
+    The diagnostics are strictly observational: with ``collect_diagnostics``
+    off the replay must stay bit-identical, and with it on the trade counts
+    must NOT change while the per-strategy wait-reason counters / S3 gate
+    counters become populated.
+    """
+
+    def _flat_in_window_ticks(self) -> list[TickerSnapshot]:
+        """Build a flat (mark==index) ticker stream *inside* the S3 settlement
+        window.
+
+        ``next_funding_time`` is 10 min ahead so ``seconds_to_settlement`` is
+        well inside the 30-min entry window, but mark==index keeps the funding
+        pressure at zero -> the Q90 gate (``pressure_below_q90``) blocks every
+        entry. No round-trip trade can form.
+        """
+        n = 200
+        step_ms = 1_000
+        base_ts = _BASE_TS
+        tickers: list[TickerSnapshot] = []
+        for i in range(n):
+            ts = base_ts + i * step_ms
+            tickers.append(_ticker(
+                0,
+                last_price=30_000.0 + (i % 3),  # tiny noise, no drift
+                mark_price=30_000.0,
+                index_price=30_000.0,
+                next_funding_time=ts + 600_000,  # 10 min ahead -> in window
+                ts=ts,
+            ))
+        return tickers
+
+    def test_diagnostics_disabled_by_default(
+        self, persist: PersistenceLayer
+    ) -> None:
+        """Without ``collect_diagnostics`` the accumulators stay empty and
+        ``get_diagnostics`` returns an empty dict (no per-tick overhead)."""
+        persist.write_tickers_batch(self._flat_in_window_ticks())
+        bt = _new_bt(persist)
+        bt.load_events()
+        bt.run(pipeline_interval_seconds=1.0)
+
+        assert bt.get_diagnostics() == {}
+        # No counters were ever touched.
+        assert bt._reason_counts == {}
+        assert bt._s3_counters == {}
+
+    def test_diagnostics_counts_wait_reasons(
+        self, persist: PersistenceLayer
+    ) -> None:
+        """A non-triggering in-window stream must accumulate S3 wait reasons,
+        with ``pressure_below_q90`` dominating (window passes, Q90 blocks)."""
+        persist.write_tickers_batch(self._flat_in_window_ticks())
+        bt = ReplayBacktester(_SYMBOL, db_path=None, collect_diagnostics=True)
+        bt.persist = persist
+        bt.load_events()
+        results = bt.run(pipeline_interval_seconds=1.0)
+
+        diag = bt.get_diagnostics()
+        assert set(diag.keys()) == {"S1", "S2", "S3", "S4", "S5"}
+        s3_reasons = diag["S3"]["reason_counts"]
+        assert s3_reasons.get("pressure_below_q90", 0) > 0, (
+            f"expected pressure_below_q90 to dominate, got {s3_reasons}"
+        )
+        # The flat stream never triggers -> no S3 trades, no enter sentinel.
+        assert results["S3"].n_trades == 0
+        assert "__enter__" not in s3_reasons
+
+    def test_diagnostics_s3_window_counter(
+        self, persist: PersistenceLayer
+    ) -> None:
+        """Ticks placed inside the settlement window must increment
+        ``n_in_window`` (read from M22's per-tick ``in_window`` sub-result)."""
+        persist.write_tickers_batch(self._flat_in_window_ticks())
+        bt = ReplayBacktester(_SYMBOL, db_path=None, collect_diagnostics=True)
+        bt.persist = persist
+        bt.load_events()
+        bt.run(pipeline_interval_seconds=1.0)
+
+        s3 = bt.get_diagnostics()["S3"]
+        assert s3["n_ticks_total"] > 0
+        assert s3["n_in_window"] > 0, (
+            f"all ticks are inside the 30-min window, got {s3}"
+        )
+        # Pressure never exceeds Q90 on a flat stream -> no extreme / gates.
+        assert s3["n_pressure_extreme"] == 0
+        assert s3["n_all_gates_passed"] == 0
+
+    def test_diagnostics_does_not_change_trades(
+        self, persist: PersistenceLayer
+    ) -> None:
+        """The same replay with and without ``collect_diagnostics`` must yield
+        IDENTICAL per-strategy trade counts — observation never alters the
+        trade path. Uses the PRD-7.3 pre-settlement scenario so S3 actually
+        trades (a non-trivial path to keep identical)."""
+        scenario = TestReplayProducesS3Trades()
+        scenario._persist_pre_settlement_scenario(persist)
+
+        bt_off = _new_bt(persist)
+        bt_off.load_events()
+        res_off = bt_off.run(pipeline_interval_seconds=1.0)
+
+        bt_on = ReplayBacktester(_SYMBOL, db_path=None, collect_diagnostics=True)
+        bt_on.persist = persist
+        bt_on.load_events()
+        res_on = bt_on.run(pipeline_interval_seconds=1.0)
+
+        for sid in ("S1", "S2", "S3", "S4", "S5"):
+            assert res_off[sid].n_trades == res_on[sid].n_trades, (
+                f"{sid}: diagnostics changed trade count "
+                f"({res_off[sid].n_trades} -> {res_on[sid].n_trades})"
+            )
+        # And S3 did actually trade (so the equality is meaningful, not 0==0).
+        assert res_on["S3"].n_trades >= 1
+        # Sanity: the enter was observed in the diagnostics.
+        assert bt_on.get_diagnostics()["S3"]["n_all_gates_passed"] >= 1

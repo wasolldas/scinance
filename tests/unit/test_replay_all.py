@@ -374,3 +374,55 @@ def test_replay_all_cli_auto_default() -> None:
     assert ns.symbols is None
     assert ns.auto is False
     assert ns.walkforward is False
+    # --diagnose defaults off.
+    assert ns.diagnose is False
+
+
+def test_replay_all_cli_parses_diagnose_flag() -> None:
+    ns = replay_all._parse_args(["--diagnose"])
+    assert ns.diagnose is True
+
+
+# ----------------------------------------------------------------------
+# Diagnostics wiring (opt-in)
+# ----------------------------------------------------------------------
+
+def test_replay_all_collects_diagnostics_into_sink(tmp_path: Path) -> None:
+    """With ``diagnose=True`` and a sink dict, ``run`` fills per-symbol
+    diagnostics in-place while preserving the 4-tuple return shape."""
+    db_path = _make_db(tmp_path, {"AAA": 20})
+    sink: dict[str, Any] = {}
+    per_symbol, agg, skipped, wf_meta = replay_all.run(
+        symbols=["AAA"],
+        db_path=db_path,
+        interval=1.0,
+        walkforward=False,
+        train_days=7,
+        test_days=1,
+        embargo_minutes=30,
+        diagnose=True,
+        diagnostics_sink=sink,
+    )
+    assert "AAA" in per_symbol
+    assert "AAA" in sink
+    # Per-strategy reason counters present for all five strategies.
+    assert set(sink["AAA"].keys()) == {"S1", "S2", "S3", "S4", "S5"}
+    assert "reason_counts" in sink["AAA"]["S3"]
+    assert "n_ticks_total" in sink["AAA"]["S3"]
+
+
+def test_replay_all_diagnose_off_leaves_sink_empty(tmp_path: Path) -> None:
+    """Without ``diagnose`` the sink stays empty (no overhead, default off)."""
+    db_path = _make_db(tmp_path, {"AAA": 20})
+    sink: dict[str, Any] = {}
+    replay_all.run(
+        symbols=["AAA"],
+        db_path=db_path,
+        interval=1.0,
+        walkforward=False,
+        train_days=7,
+        test_days=1,
+        embargo_minutes=30,
+        diagnostics_sink=sink,
+    )
+    assert sink == {}

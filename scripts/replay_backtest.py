@@ -32,6 +32,41 @@ from bybit_edge.config import (
 from bybit_edge.replay_backtester import ReplayBacktester
 
 
+def _format_reason_counts(reason_counts: dict[str, Any], top: int = 8) -> str:
+    """Render a reason->count map as ``reason=count`` pairs, most frequent first."""
+    if not reason_counts:
+        return "(keine)"
+    items = sorted(
+        reason_counts.items(), key=lambda kv: kv[1], reverse=True
+    )[:top]
+    return ", ".join(f"{r}={n}" for r, n in items)
+
+
+def print_diagnostics(symbol: str, diagnostics: dict[str, dict[str, Any]]) -> None:
+    """Print the per-strategy wait-reason diagnose section for one symbol."""
+    if not diagnostics:
+        return
+    print(f"\n=== DIAGNOSE {symbol} ===")
+    s3 = diagnostics.get("S3")
+    if s3 is not None:
+        print(
+            f"S3: {s3.get('n_ticks_total', 0)} ticks | "
+            f"in_window: {s3.get('n_in_window', 0)} | "
+            f"pressure>Q90: {s3.get('n_pressure_extreme', 0)} | "
+            f"basis_aligned: {s3.get('n_basis_aligned', 0)} | "
+            f"all_gates: {s3.get('n_all_gates_passed', 0)}"
+        )
+        print(
+            "    wait_reasons: "
+            f"{_format_reason_counts(s3.get('reason_counts', {}))}"
+        )
+    for sid in sorted(diagnostics.keys()):
+        if sid == "S3":
+            continue
+        rc = diagnostics[sid].get("reason_counts", {})
+        print(f"{sid}: reasons: {_format_reason_counts(rc)}")
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description="Bybit Edge Replay-Backtest-Driver")
     parser.add_argument("--symbol", default="BTCUSDT")
@@ -75,6 +110,16 @@ def main() -> None:
             f"(Default: {WF_EMBARGO_MINUTES})"
         ),
     )
+    parser.add_argument(
+        "--diagnose",
+        action="store_true",
+        help=(
+            "Diagnose-Modus: zaehlt pro Strategie wie oft welcher wait_reason "
+            "auftrat und (fuer S3) Verteilungs-Zaehler der Entry-Gates "
+            "(in_window / pressure>Q90 / basis_aligned / all_gates). Zeigt "
+            "schwarz auf weiss WELCHES Gate blockiert. Kein Einfluss auf Trades."
+        ),
+    )
     args = parser.parse_args()
 
     db_path = Path(args.db) if args.db else DB_PATH
@@ -102,7 +147,11 @@ def main() -> None:
         )
         return
 
-    bt = ReplayBacktester(symbol=args.symbol, db_path=db_path)
+    bt = ReplayBacktester(
+        symbol=args.symbol,
+        db_path=db_path,
+        collect_diagnostics=args.diagnose,
+    )
     n_folds: int = 0
     try:
         n_events = bt.load_events()
@@ -125,6 +174,7 @@ def main() -> None:
             print(f"  Folds executed: {n_folds}")
         else:
             results = bt.run(pipeline_interval_seconds=args.interval)
+        diagnostics = bt.get_diagnostics()
     finally:
         bt.close()
 
@@ -154,6 +204,9 @@ def main() -> None:
             f"{r['max_dd']:>11.4f}{r['total_return']:>11.4f}{r['n_trades']:>8}"
             f"  {note}"
         )
+
+    if args.diagnose:
+        print_diagnostics(args.symbol, diagnostics)
 
     out_name = (
         "walkforward_results.json" if args.walkforward else "replay_backtest_results.json"
@@ -190,6 +243,8 @@ def main() -> None:
         }
     else:
         payload["mode"] = "single_pass"
+    if args.diagnose:
+        payload["diagnostics"] = diagnostics
     out.write_text(json.dumps(payload, indent=2), encoding="utf-8")
     print(f"\nErgebnisse gespeichert: {out}")
     print(
