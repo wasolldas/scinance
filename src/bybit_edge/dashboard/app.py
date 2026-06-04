@@ -54,7 +54,9 @@ from bybit_edge.dashboard.data import (
     load_coverage,
     load_heartbeat_file,
     load_journal,
+    load_journal_aggregated,
     load_recent_liquidations,
+    load_replay_results,
     load_row_counts,
     ms_to_iso,
 )
@@ -334,6 +336,172 @@ def _render_pipeline_tab() -> None:
     st.caption(f"Position-Side im LiveRunner: `{hb.get('position_side', '') or 'flat'}`")
 
 
+def _sharpe_color(sharpe: float) -> str:
+    """Plotly-Farb-Bucket je nach Sharpe-Niveau."""
+    if sharpe >= 1.0:
+        return "#16a34a"   # green-600
+    if sharpe >= 0.0:
+        return "#eab308"   # yellow-500
+    return "#dc2626"       # red-600
+
+
+def _replay_status(n_trades: int, data_limited: bool) -> str:
+    if data_limited and n_trades == 0:
+        return "data-limited"
+    if n_trades == 0:
+        return "no-trades"
+    if n_trades < 5:
+        return "data-limited"
+    return "OK"
+
+
+def _render_strategy_performance_tab(journal_path: Path) -> None:
+    """Tab 6 — Strategie-Performance: OOS-Replay + Live-Aggregat."""
+    st.markdown("#### Sektion A — OOS-Replay-Ergebnisse")
+    replay = load_replay_results()
+    if replay is None or not replay.get("per_strategy"):
+        st.info(
+            "Noch kein Replay durchgeführt — führe "
+            "`python scripts/replay_backtest.py --symbol BTCUSDT --walkforward` "
+            "aus. Single-Pass: `python scripts/replay_backtest.py --symbol BTCUSDT`."
+        )
+    else:
+        per_strat: dict[str, dict] = replay["per_strategy"]
+        src = replay["source"]
+        label = "Walk-Forward OOS-Replay" if src == "walkforward" else "Single-Pass-Replay"
+        st.caption(
+            f"Quelle: **{label}** — `{replay['path']}` · Datei-Stand: "
+            f"{replay.get('timestamp', '?')} · Symbol: "
+            f"{replay.get('symbol', '?') or '?'} · Events: "
+            f"{replay.get('n_events', 0):,}"
+        )
+        if src == "walkforward" and replay.get("walkforward"):
+            wf = replay["walkforward"]
+            st.caption(
+                f"Fold: train={wf.get('train_days', '?')}d / "
+                f"embargo={wf.get('embargo_minutes', '?')}min / "
+                f"test={wf.get('test_days', '?')}d · "
+                f"Folds executed: {wf.get('n_folds_executed', '?')}"
+            )
+
+        # KPI-Cards — bis zu 5 Strategien (S1..S5)
+        sids_sorted = sorted(per_strat.keys())
+        cols = st.columns(max(len(sids_sorted), 1))
+        for col, sid in zip(cols, sids_sorted):
+            m = per_strat[sid]
+            n = m["n_trades"]
+            sharpe = m["sharpe"]
+            wr = m["win_rate"]
+            status = _replay_status(n, m.get("data_limited", False))
+            if n == 0:
+                col.markdown(
+                    f"<div style='padding:8px;border-radius:6px;"
+                    f"background:#1f2937;color:#9ca3af'>"
+                    f"<b>{sid}</b><br>Sharpe: n/a<br>Trades: 0<br>"
+                    f"Status: {status}</div>",
+                    unsafe_allow_html=True,
+                )
+            else:
+                color = _sharpe_color(sharpe)
+                col.markdown(
+                    f"<div style='padding:8px;border-radius:6px;"
+                    f"background:{color};color:white'>"
+                    f"<b>{sid}</b><br>Sharpe: {sharpe:.2f}<br>"
+                    f"Trades: {n}<br>WinRate: {wr:.0%}<br>"
+                    f"Status: {status}</div>",
+                    unsafe_allow_html=True,
+                )
+
+        # Bar-Chart — Sharpe pro Strategie, absteigend
+        chart_rows = [
+            {
+                "strategy": sid,
+                "sharpe": m["sharpe"],
+                "n_trades": m["n_trades"],
+                "color": _sharpe_color(m["sharpe"]),
+            }
+            for sid, m in per_strat.items()
+        ]
+        chart_df = pd.DataFrame(chart_rows).sort_values("sharpe", ascending=False)
+        if _HAS_PLOTLY and len(chart_df):
+            fig = go.Figure(
+                data=[
+                    go.Bar(
+                        x=chart_df["strategy"],
+                        y=chart_df["sharpe"],
+                        marker_color=chart_df["color"].tolist(),
+                        text=[f"{s:.2f}" for s in chart_df["sharpe"]],
+                        textposition="outside",
+                    )
+                ]
+            )
+            fig.update_layout(
+                title="Sharpe-Ratio pro Strategie (OOS)",
+                yaxis_title="Sharpe",
+                xaxis_title="Strategie",
+                margin=dict(l=10, r=10, t=40, b=10),
+                height=340,
+            )
+            st.plotly_chart(fig, width="stretch")
+        elif len(chart_df):
+            st.bar_chart(chart_df.set_index("strategy")["sharpe"])
+
+        # Detail-Tabelle
+        detail_rows = []
+        for sid in sorted(per_strat.keys()):
+            m = per_strat[sid]
+            detail_rows.append(
+                {
+                    "Strategie": sid,
+                    "Sharpe": round(m["sharpe"], 3),
+                    "WinRate": round(m["win_rate"], 3),
+                    "MaxDD": round(m["max_drawdown"], 4),
+                    "Total Return": round(m["total_return"], 4),
+                    "Trades": m["n_trades"],
+                    "Status": _replay_status(
+                        m["n_trades"], m.get("data_limited", False)
+                    ),
+                }
+            )
+        st.dataframe(pd.DataFrame(detail_rows), width="stretch")
+
+    st.markdown("---")
+    st.markdown("#### Sektion B — Live-Trade-Aggregat (`trades_journal.csv`)")
+    agg = load_journal_aggregated(journal_path)
+    if not agg:
+        st.info(
+            "Noch keine Live-Trades aufgezeichnet "
+            "(EXECUTION_ENABLED=true setzen + auf gefüllte Signale warten)."
+        )
+    else:
+        rows = []
+        for sid in sorted(agg.keys()):
+            r = agg[sid]
+            n_total = max(r["n_total"], 1)
+            rows.append(
+                {
+                    "Strategie": sid,
+                    "Total": r["n_total"],
+                    "Enter": r["n_enter"],
+                    "Exit": r["n_exit"],
+                    "Risk-Block": r["n_risk_block"],
+                    "Erfolg (ret_code=0)": r["n_success"],
+                    "Erfolgsrate": round(r["n_success"] / n_total, 3),
+                }
+            )
+        st.dataframe(pd.DataFrame(rows), width="stretch")
+
+    st.markdown("---")
+    st.markdown("#### Sektion C — Lese-Hinweis")
+    st.markdown(
+        "> Sektion A zeigt was die Strategien rückblickend AUF GESAMMELTEN "
+        "TICKS getan hätten (out-of-sample wenn Walk-Forward). Sektion B "
+        "zeigt was sie tatsächlich live ausgeführt haben. Walk-Forward ist "
+        "der ehrlichere Maßstab — Live-Stats werden erst nach Wochen "
+        "statistisch belastbar."
+    )
+
+
 def _trades_today_count(journal_df: pd.DataFrame) -> int:
     if journal_df.empty or "ts_unix" not in journal_df.columns:
         return 0
@@ -415,8 +583,15 @@ def main() -> None:  # pragma: no cover — UI-only
     )
 
     # --- Tabs ------------------------------------------------------------
-    tab_eq, tab_tr, tab_liq, tab_pers, tab_pipe = st.tabs(
-        ["Equity", "Recent Trades", "Liquidations", "Persistence", "Pipeline-Stats"]
+    tab_eq, tab_tr, tab_liq, tab_pers, tab_pipe, tab_strat = st.tabs(
+        [
+            "Equity",
+            "Recent Trades",
+            "Liquidations",
+            "Persistence",
+            "Pipeline-Stats",
+            "Strategie-Performance",
+        ]
     )
     with tab_eq:
         _equity_chart(st.session_state.equity_history)
@@ -428,6 +603,8 @@ def main() -> None:  # pragma: no cover — UI-only
         _render_persistence_tab(conn)
     with tab_pipe:
         _render_pipeline_tab()
+    with tab_strat:
+        _render_strategy_performance_tab(JOURNAL_PATH)
 
     if conn is not None:
         try:

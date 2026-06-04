@@ -449,3 +449,213 @@ def ms_to_iso(ts_ms: int | float | None) -> str:
         )
     except Exception:
         return ""
+
+
+# --------------------------------------------------------------------------
+# Replay-Backtest-Ergebnisse (Walk-Forward / Single-Pass)
+# --------------------------------------------------------------------------
+
+_DEFAULT_REPLAY_RESULTS_DIR = Path("edge_research_framework/results")
+_WALKFORWARD_FILENAME = "walkforward_results.json"
+_SINGLE_PASS_FILENAME = "replay_backtest_results.json"
+
+
+def _normalise_replay_payload(payload: Any) -> dict[str, dict[str, Any]]:
+    """Convert the on-disk replay JSON shape into ``{strategy_id: metrics}``.
+
+    The on-disk format (from ``scripts/replay_backtest.py``) is::
+
+        {"results": [
+            {"strategy": "S1", "sharpe": ..., "win_rate": ..., "max_dd": ...,
+             "total_return": ..., "n_trades": ..., "data_limited": bool},
+            ...
+        ], ...}
+
+    For robustness we also accept a pre-aggregated ``{"results": {sid: {...}}}``
+    mapping shape — useful for tests and downstream tooling that might write
+    the dict form directly.
+    """
+    if not isinstance(payload, dict):
+        return {}
+    results = payload.get("results")
+    out: dict[str, dict[str, Any]] = {}
+    if isinstance(results, list):
+        for row in results:
+            if not isinstance(row, dict):
+                continue
+            sid = str(row.get("strategy") or row.get("strategy_id") or "").strip()
+            if not sid:
+                continue
+            out[sid] = {
+                "sharpe": float(row.get("sharpe", 0.0) or 0.0),
+                "win_rate": float(row.get("win_rate", 0.0) or 0.0),
+                "max_drawdown": float(
+                    row.get("max_drawdown", row.get("max_dd", 0.0)) or 0.0
+                ),
+                "total_return": float(row.get("total_return", 0.0) or 0.0),
+                "n_trades": int(row.get("n_trades", 0) or 0),
+                "data_limited": bool(row.get("data_limited", False)),
+            }
+    elif isinstance(results, dict):
+        for sid, row in results.items():
+            if not isinstance(row, dict):
+                continue
+            out[str(sid)] = {
+                "sharpe": float(row.get("sharpe", 0.0) or 0.0),
+                "win_rate": float(row.get("win_rate", 0.0) or 0.0),
+                "max_drawdown": float(
+                    row.get("max_drawdown", row.get("max_dd", 0.0)) or 0.0
+                ),
+                "total_return": float(row.get("total_return", 0.0) or 0.0),
+                "n_trades": int(row.get("n_trades", 0) or 0),
+                "data_limited": bool(row.get("data_limited", False)),
+            }
+    return out
+
+
+def load_replay_results(
+    results_dir: Optional[Path] = None,
+) -> Optional[dict[str, Any]]:
+    """Lädt Replay-Backtester-Ergebnisse — bevorzugt Walk-Forward.
+
+    Sucht zunächst ``walkforward_results.json``; existiert die Datei nicht,
+    wird auf ``replay_backtest_results.json`` zurückgefallen. Beide Dateien
+    werden vom ``scripts/replay_backtest.py``-Treiber geschrieben.
+
+    Parameters
+    ----------
+    results_dir
+        Verzeichnis mit den Replay-JSONs. Default:
+        ``edge_research_framework/results``.
+
+    Returns
+    -------
+    dict | None
+        ``None`` wenn keine der beiden JSONs existiert. Sonst ein dict mit::
+
+            {
+                "source": "walkforward" | "single_pass",
+                "timestamp": "<ISO-Zeit der Datei-mtime>",
+                "path": "<str-Pfad zur JSON>",
+                "symbol": "<str>",
+                "n_events": int,
+                "walkforward": {...} | None,   # Fold-Geometrie wenn vorhanden
+                "per_strategy": {
+                    "S1": {sharpe, win_rate, max_drawdown,
+                           total_return, n_trades, data_limited},
+                    ...
+                },
+            }
+
+        Bei beschädigter JSON wird ein Logging-Eintrag erzeugt und ``None``
+        zurückgegeben (kein Crash).
+    """
+    base = Path(results_dir) if results_dir is not None else _DEFAULT_REPLAY_RESULTS_DIR
+    wf = base / _WALKFORWARD_FILENAME
+    sp = base / _SINGLE_PASS_FILENAME
+
+    if wf.exists():
+        target = wf
+        source = "walkforward"
+    elif sp.exists():
+        target = sp
+        source = "single_pass"
+    else:
+        return None
+
+    try:
+        with open(target, "r", encoding="utf-8") as f:
+            payload = json.load(f)
+    except Exception:
+        logger.exception("Replay-Ergebnis-JSON konnte nicht geparst werden: %s", target)
+        return None
+
+    if not isinstance(payload, dict):
+        logger.warning("Replay-JSON %s hat unerwarteten Top-Level-Typ", target)
+        return None
+
+    per_strategy = _normalise_replay_payload(payload)
+    try:
+        mtime = target.stat().st_mtime
+        timestamp = (
+            pd.Timestamp(mtime, unit="s", tz="UTC").strftime("%Y-%m-%d %H:%M:%S")
+        )
+    except Exception:
+        timestamp = ""
+
+    return {
+        "source": source,
+        "timestamp": timestamp,
+        "path": str(target),
+        "symbol": str(payload.get("symbol", "") or ""),
+        "n_events": int(payload.get("n_events", 0) or 0),
+        "walkforward": payload.get("walkforward") if source == "walkforward" else None,
+        "per_strategy": per_strategy,
+    }
+
+
+# --------------------------------------------------------------------------
+# Live-Trade-Journal Aggregation (per strategy_id)
+# --------------------------------------------------------------------------
+
+def load_journal_aggregated(
+    path: Optional[Path] = None,
+) -> dict[str, dict[str, int]]:
+    """Aggregiere das Trade-Journal pro ``strategy_id``.
+
+    Zählt aus dem ``trades_journal.csv`` (vom LiveRunner geschrieben) pro
+    Strategie:
+
+    * ``n_total``      — Gesamtanzahl Journal-Zeilen
+    * ``n_enter``      — Anzahl Zeilen mit ``action == 'enter'``
+    * ``n_exit``       — Anzahl Zeilen mit ``action == 'exit'``
+    * ``n_risk_block`` — Anzahl Zeilen mit ``action == 'risk_block'``
+    * ``n_success``    — Anzahl Zeilen mit ``ret_code == 0``
+
+    Parameters
+    ----------
+    path
+        Pfad zum CSV. ``None`` oder nicht existierende Datei → leeres dict.
+
+    Returns
+    -------
+    dict[str, dict[str, int]]
+        ``{strategy_id: {n_total, n_enter, n_exit, n_risk_block, n_success}}``.
+        Leeres Dict bei fehlender / leerer / korrupter CSV.
+    """
+    if path is None:
+        return {}
+    p = Path(path)
+    if not p.exists():
+        return {}
+    try:
+        df = pd.read_csv(p)
+    except Exception:
+        logger.exception("Trade-Journal CSV konnte nicht gelesen werden: %s", p)
+        return {}
+    if df.empty or "strategy_id" not in df.columns:
+        return {}
+
+    df = df.copy()
+    df["strategy_id"] = df["strategy_id"].fillna("").astype(str)
+    if "action" not in df.columns:
+        df["action"] = ""
+    df["action"] = df["action"].fillna("").astype(str).str.lower()
+    if "ret_code" not in df.columns:
+        df["ret_code"] = pd.NA
+    ret_code = pd.to_numeric(df["ret_code"], errors="coerce")
+
+    out: dict[str, dict[str, int]] = {}
+    for sid, sub_idx in df.groupby("strategy_id").indices.items():
+        if not sid:
+            continue
+        sub = df.iloc[sub_idx]
+        rc_sub = ret_code.iloc[sub_idx]
+        out[str(sid)] = {
+            "n_total": int(len(sub)),
+            "n_enter": int((sub["action"] == "enter").sum()),
+            "n_exit": int((sub["action"] == "exit").sum()),
+            "n_risk_block": int((sub["action"] == "risk_block").sum()),
+            "n_success": int((rc_sub == 0).sum()),
+        }
+    return out

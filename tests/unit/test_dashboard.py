@@ -20,7 +20,9 @@ from bybit_edge.dashboard.data import (
     load_coverage,
     load_heartbeat_file,
     load_journal,
+    load_journal_aggregated,
     load_recent_liquidations,
+    load_replay_results,
     load_row_counts,
     ms_to_iso,
 )
@@ -556,3 +558,167 @@ def test_liverunner_exports_dashboard_snapshots_on_flush(
         assert liq.iloc[0]["symbol"] == "BTCUSDT"
     finally:
         runner.persist.close()
+
+
+# --------------------------------------------------------------------------
+# Strategie-Performance Tab — Replay-Results + Journal-Aggregation
+# --------------------------------------------------------------------------
+
+def _wf_payload(symbol: str = "BTCUSDT") -> dict:
+    return {
+        "symbol": symbol,
+        "interval_seconds": 1.0,
+        "n_events": 5000,
+        "mode": "walkforward",
+        "walkforward": {
+            "train_days": 7,
+            "test_days": 1,
+            "embargo_minutes": 30,
+            "n_folds_executed": 3,
+        },
+        "results": [
+            {
+                "strategy": "S1", "sharpe": 1.42, "win_rate": 0.55,
+                "max_dd": 0.08, "total_return": 0.12, "n_trades": 21,
+                "data_limited": False,
+            },
+            {
+                "strategy": "S3", "sharpe": 0.80, "win_rate": 0.50,
+                "max_dd": 0.04, "total_return": 0.03, "n_trades": 7,
+                "data_limited": False,
+            },
+            {
+                "strategy": "S2", "sharpe": 0.0, "win_rate": 0.0,
+                "max_dd": 0.0, "total_return": 0.0, "n_trades": 0,
+                "data_limited": True,
+            },
+        ],
+    }
+
+
+def _single_pass_payload(symbol: str = "BTCUSDT") -> dict:
+    return {
+        "symbol": symbol,
+        "interval_seconds": 1.0,
+        "n_events": 1234,
+        "mode": "single_pass",
+        "results": [
+            {
+                "strategy": "S1", "sharpe": 0.45, "win_rate": 0.51,
+                "max_dd": 0.03, "total_return": 0.02, "n_trades": 8,
+                "data_limited": False,
+            },
+        ],
+    }
+
+
+def test_load_replay_results_prefers_walkforward(tmp_path: Path) -> None:
+    """Beide JSONs vorhanden → Walk-Forward gewinnt."""
+    (tmp_path / "walkforward_results.json").write_text(
+        json.dumps(_wf_payload()), encoding="utf-8"
+    )
+    (tmp_path / "replay_backtest_results.json").write_text(
+        json.dumps(_single_pass_payload()), encoding="utf-8"
+    )
+
+    out = load_replay_results(results_dir=tmp_path)
+    assert out is not None
+    assert out["source"] == "walkforward"
+    assert out["path"].endswith("walkforward_results.json")
+    assert out["symbol"] == "BTCUSDT"
+    assert out["n_events"] == 5000
+    assert out["walkforward"]["n_folds_executed"] == 3
+    # per_strategy enthält alle drei Strategien mit den richtigen Feldern
+    assert set(out["per_strategy"].keys()) == {"S1", "S2", "S3"}
+    s1 = out["per_strategy"]["S1"]
+    assert s1["sharpe"] == pytest.approx(1.42)
+    assert s1["win_rate"] == pytest.approx(0.55)
+    assert s1["max_drawdown"] == pytest.approx(0.08)
+    assert s1["total_return"] == pytest.approx(0.12)
+    assert s1["n_trades"] == 21
+    assert s1["data_limited"] is False
+    assert out["per_strategy"]["S2"]["data_limited"] is True
+
+
+def test_load_replay_results_fallback_single_pass(tmp_path: Path) -> None:
+    """Nur Single-Pass JSON vorhanden → wird genommen, source = single_pass."""
+    (tmp_path / "replay_backtest_results.json").write_text(
+        json.dumps(_single_pass_payload()), encoding="utf-8"
+    )
+
+    out = load_replay_results(results_dir=tmp_path)
+    assert out is not None
+    assert out["source"] == "single_pass"
+    assert out["path"].endswith("replay_backtest_results.json")
+    assert out["walkforward"] is None
+    assert "S1" in out["per_strategy"]
+    assert out["per_strategy"]["S1"]["n_trades"] == 8
+
+
+def test_load_replay_results_none_when_missing(tmp_path: Path) -> None:
+    """Verzeichnis existiert, aber keine JSON drin → None."""
+    out = load_replay_results(results_dir=tmp_path)
+    assert out is None
+    # Auch nicht existierendes Verzeichnis darf nicht crashen
+    out2 = load_replay_results(results_dir=tmp_path / "does_not_exist")
+    assert out2 is None
+
+
+def test_load_replay_results_handles_malformed_json(tmp_path: Path) -> None:
+    """Kaputte JSON → logging + None, kein Crash."""
+    (tmp_path / "walkforward_results.json").write_text(
+        "{not valid json,,", encoding="utf-8"
+    )
+    out = load_replay_results(results_dir=tmp_path)
+    assert out is None
+
+
+def test_load_journal_aggregated_groups_by_strategy(tmp_path: Path) -> None:
+    """CSV mit gemischten strategy_ids → korrekt aggregiert pro sid."""
+    path = tmp_path / "trades_journal.csv"
+    rows = [
+        # S1: 3 Trades — 2 enter, 1 exit, 2 erfolgreich (ret_code=0), 1 Fehler
+        {"ts_iso": "2026-05-30T12:00:00Z", "ts_unix": 1, "symbol": "BTCUSDT",
+         "strategy_id": "S1", "action": "enter", "side": "Buy", "qty": 0.01,
+         "price": 70000.0, "confidence": 0.8, "ret_code": 0, "order_id": "a"},
+        {"ts_iso": "2026-05-30T12:01:00Z", "ts_unix": 2, "symbol": "BTCUSDT",
+         "strategy_id": "S1", "action": "enter", "side": "Buy", "qty": 0.01,
+         "price": 70010.0, "confidence": 0.7, "ret_code": 0, "order_id": "b"},
+        {"ts_iso": "2026-05-30T12:02:00Z", "ts_unix": 3, "symbol": "BTCUSDT",
+         "strategy_id": "S1", "action": "exit", "side": "Sell", "qty": 0.02,
+         "price": 70020.0, "confidence": 0.6, "ret_code": 110007,
+         "order_id": "c"},
+        # S3: 2 Trades — 1 enter, 1 risk_block, 1 erfolgreich
+        {"ts_iso": "2026-05-30T12:03:00Z", "ts_unix": 4, "symbol": "BTCUSDT",
+         "strategy_id": "S3", "action": "enter", "side": "Sell", "qty": 0.005,
+         "price": 70030.0, "confidence": 0.9, "ret_code": 0, "order_id": "d"},
+        {"ts_iso": "2026-05-30T12:04:00Z", "ts_unix": 5, "symbol": "BTCUSDT",
+         "strategy_id": "S3", "action": "risk_block", "side": "", "qty": 0.0,
+         "price": 0.0, "confidence": 0.0, "ret_code": -1, "order_id": ""},
+    ]
+    pd.DataFrame(rows).to_csv(path, index=False)
+
+    agg = load_journal_aggregated(path)
+    assert set(agg.keys()) == {"S1", "S3"}
+    assert agg["S1"]["n_total"] == 3
+    assert agg["S1"]["n_enter"] == 2
+    assert agg["S1"]["n_exit"] == 1
+    assert agg["S1"]["n_risk_block"] == 0
+    assert agg["S1"]["n_success"] == 2
+    assert agg["S3"]["n_total"] == 2
+    assert agg["S3"]["n_enter"] == 1
+    assert agg["S3"]["n_risk_block"] == 1
+    assert agg["S3"]["n_exit"] == 0
+    assert agg["S3"]["n_success"] == 1
+
+
+def test_load_journal_aggregated_empty_csv(tmp_path: Path) -> None:
+    """Leeres oder fehlendes CSV → leeres dict."""
+    # Pfad None
+    assert load_journal_aggregated(None) == {}
+    # Datei existiert nicht
+    assert load_journal_aggregated(tmp_path / "no.csv") == {}
+    # Datei existiert aber ist leer (nur Header)
+    p = tmp_path / "empty.csv"
+    pd.DataFrame(columns=JOURNAL_COLUMNS).to_csv(p, index=False)
+    assert load_journal_aggregated(p) == {}
