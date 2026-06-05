@@ -294,6 +294,13 @@ GR_BUFFER_SIZE: Final[int] = 1000  # Sliding 1000-Events
 GR_BUCKET_SECONDS: Final[int] = 1  # 1-s-Buckets
 OMORI_FORECAST_MINUTES: Final[int] = 30  # Forward 30 min
 OMORI_MAINSHOCK_WINDOW_MINUTES: Final[int] = 5  # Mainshock = max in 5 min
+# Opt-in throttle for the M15 Omori ``curve_fit`` step in the replay
+# backtester. Default of 0.0 means "no throttle, refit per tick" — the live
+# pipeline and the legacy bit-identical replay both use 0.0 so behaviour is
+# unchanged. When the replay CLI is invoked with ``--fast-omori`` and no
+# explicit value, this constant is used as the refit interval (seconds of
+# event time between two ``curve_fit`` calls on the same mainshock).
+OMORI_REFIT_SECONDS: Final[float] = 30.0
 
 # ═══════════════════════════════════════════════════════════════════
 # M16: TFSAX + Smith-Waterman Alignment (PRD M16)

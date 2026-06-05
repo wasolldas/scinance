@@ -26,11 +26,34 @@ from typing import Any
 
 from bybit_edge.config import (
     DB_PATH,
+    OMORI_REFIT_SECONDS,
     WF_EMBARGO_MINUTES,
     WF_TEST_DAYS,
     WF_TRAIN_DAYS,
 )
 from bybit_edge.replay_backtester import ReplayBacktester
+
+# Sentinel returned by argparse when ``--fast-omori`` is passed *without* an
+# explicit value (``nargs="?"``). We use a sentinel object (not ``None`` and not
+# a float) so we can disambiguate "flag absent" (default ``None``), "flag with
+# no value → use config default" (``_FAST_OMORI_DEFAULT_SENTINEL``) and "flag
+# with value" (a plain ``float``). Kept module-private; the CLI translates it
+# to :data:`OMORI_REFIT_SECONDS` before passing to :class:`ReplayBacktester`.
+_FAST_OMORI_DEFAULT_SENTINEL: object = object()
+
+
+def _resolve_fast_omori(fast_omori: Any) -> float:
+    """Resolve the ``--fast-omori`` argparse value to a refit-seconds float.
+
+    * ``None``                            → 0.0 (flag absent / default off).
+    * :data:`_FAST_OMORI_DEFAULT_SENTINEL` → :data:`OMORI_REFIT_SECONDS`.
+    * any other value                     → ``float(value)``.
+    """
+    if fast_omori is None:
+        return 0.0
+    if fast_omori is _FAST_OMORI_DEFAULT_SENTINEL:
+        return float(OMORI_REFIT_SECONDS)
+    return float(fast_omori)
 
 
 def _format_reason_counts(reason_counts: dict[str, Any], top: int = 8) -> str:
@@ -138,7 +161,25 @@ def main() -> None:
         action="store_false",
         help="Fortschritts-Logging abschalten.",
     )
+    parser.add_argument(
+        "--fast-omori",
+        dest="fast_omori",
+        nargs="?",
+        const=_FAST_OMORI_DEFAULT_SENTINEL,
+        default=None,
+        type=float,
+        help=(
+            "Opt-in Performance-Modus: drosselt den teuren M15 Omori-curve_fit "
+            "auf alle N Sekunden Event-Zeit (Default ohne Wert: "
+            f"OMORI_REFIT_SECONDS={OMORI_REFIT_SECONDS}s). Ohne das Flag ist "
+            "das Verhalten bit-identisch zur Live-Pipeline. Mit dem Flag ist "
+            "die Trade-Liste in Grenzfaellen (Aftershock-Decay im Refit-"
+            "Fenster) nicht mehr bit-identisch, typischer Speedup ~5-10x auf "
+            "cascade-lastigen Daten."
+        ),
+    )
     args = parser.parse_args()
+    m15_refit_seconds = _resolve_fast_omori(args.fast_omori)
 
     # Ensure the progress lines (logging.INFO on the backtester logger) are
     # actually surfaced when running interactively.
@@ -162,6 +203,11 @@ def main() -> None:
         "  DuckDB wird READ-ONLY geoeffnet — kann parallel zum laufenden "
         "Live-System genutzt werden."
     )
+    if m15_refit_seconds > 0.0:
+        print(
+            f"  Performance-Modus: --fast-omori (M15 Omori-Refit alle "
+            f"{m15_refit_seconds:g}s, kann Ergebnisse leicht abweichen)"
+        )
     print("=" * 75)
 
     if str(db_path) != ":memory:" and not Path(db_path).exists():
@@ -172,10 +218,18 @@ def main() -> None:
         )
         return
 
+    # Only forward ``m15_refit_seconds`` when the throttle is actually opt-in
+    # ON. The default path keeps the pre-throttle constructor signature so
+    # fakes/stubs that monkey-patch ReplayBacktester without the new kwarg keep
+    # working.
+    bt_kwargs: dict[str, Any] = {}
+    if m15_refit_seconds > 0.0:
+        bt_kwargs["m15_refit_seconds"] = m15_refit_seconds
     bt = ReplayBacktester(
         symbol=args.symbol,
         db_path=db_path,
         collect_diagnostics=args.diagnose,
+        **bt_kwargs,
     )
     n_folds: int = 0
     try:

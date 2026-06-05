@@ -244,9 +244,18 @@ class ReplayBacktester:
         symbol: str,
         db_path: Optional[Path] = None,
         collect_diagnostics: bool = False,
+        m15_refit_seconds: float = 0.0,
     ) -> None:
         self.symbol: str = symbol
         self._db_path: Optional[Path] = db_path
+
+        # Opt-in M15 Omori curve_fit throttle. Default 0.0 (per-tick refit,
+        # bit-identical to the live/legacy behaviour). When > 0 the
+        # ReplayBacktester forwards it to every Strategy1's internal
+        # ``M15GROmori`` instance — see :meth:`_build_strategies`. Live
+        # behaviour is unchanged because the LiveRunner constructs Strategy1
+        # directly (no override), so its M15 keeps ``refit_seconds=0.0``.
+        self._m15_refit_seconds: float = float(m15_refit_seconds)
 
         # Diagnostics: when enabled, count per-strategy "reason"/"wait_reason"
         # occurrences plus S3-specific gate counters so the operator can see
@@ -1007,11 +1016,22 @@ class ReplayBacktester:
             logger_=logger,
         )
 
-    @staticmethod
-    def _build_strategies() -> dict[str, Any]:
-        """Construct one fresh instance per strategy id (mirrors live runner)."""
+    def _build_strategies(self) -> dict[str, Any]:
+        """Construct one fresh instance per strategy id (mirrors live runner).
+
+        When :attr:`_m15_refit_seconds` is positive the Strategy1 instance's
+        internal ``M15GROmori`` is replaced with a throttled copy. The default
+        ``0.0`` skips the replacement entirely — the returned Strategy1 is then
+        byte-for-byte identical to ``Strategy1CascadeDetector()``, matching the
+        LiveRunner.
+        """
+        s1 = Strategy1CascadeDetector()
+        if self._m15_refit_seconds > 0.0:
+            # Lazy import to keep the module-level imports unchanged.
+            from bybit_edge.layers.l4_pattern.m15_gr_omori import M15GROmori
+            s1.m15 = M15GROmori(refit_seconds=self._m15_refit_seconds)
         return {
-            "S1": Strategy1CascadeDetector(),
+            "S1": s1,
             "S2": Strategy2EntropyMomentum(),
             "S3": Strategy3PreSettlement(),
             "S4": Strategy4PatternEnsemble(),

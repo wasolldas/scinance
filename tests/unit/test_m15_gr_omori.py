@@ -535,3 +535,221 @@ class TestOptimizedComputeMatchesLegacy:
                     assert out_opt["omori_params"][k] == pytest.approx(
                         out_ref["omori_params"][k], rel=1e-9, abs=1e-12
                     )
+
+
+# ══════════════════════════════════════════════════════════════════════
+# Opt-in Omori-refit throttle (refit_seconds)
+# ══════════════════════════════════════════════════════════════════════
+
+
+def _cascade_events(n_aftershocks: int = 60) -> tuple[list[dict], int]:
+    """Background + one mainshock + ``n_aftershocks`` dense aftershocks.
+
+    Same shape as the bit-identical regression test above so that the throttle
+    behaviour is exercised on a realistic cascade.
+    """
+    rng = np.random.default_rng(11)
+    base_ms = 1_700_000_000_000
+    events: list[dict] = []
+    for i in range(80):
+        events.append({
+            "timestamp_ms": base_ms + i * 1000,
+            "usd_value": 1.0e5 + float(abs(rng.normal(0, 3e4))),
+            "side": "Sell",
+        })
+    mainshock_ms = base_ms + 80 * 1000
+    events.append({
+        "timestamp_ms": mainshock_ms,
+        "usd_value": 5.0e7,
+        "side": "Sell",
+    })
+    for j in range(n_aftershocks):
+        events.append({
+            "timestamp_ms": mainshock_ms + (j + 1) * 2000,
+            "usd_value": 2.0e5 + float(abs(rng.normal(0, 1e5))),
+            "side": "Sell",
+        })
+    return events, mainshock_ms
+
+
+class TestThrottleNoOpDefault:
+    """``refit_seconds=0`` (default) must be bit-identical to no-throttle."""
+
+    def test_no_throttle_default_bit_identical(self) -> None:
+        """Feeding the same cascade tick-by-tick to ``refit_seconds=0`` and to
+        a freshly-built default M15 yields byte-equal compute() outputs."""
+        events, _ = _cascade_events()
+
+        a = M15GROmori()  # default refit_seconds=0.0
+        b = M15GROmori(refit_seconds=0.0)
+        for ev in events:
+            ts_s = ev["timestamp_ms"] / 1000.0
+            out_a = a.compute([ev], ts_s)
+            out_b = b.compute([ev], ts_s)
+            for k in (
+                "mainshock",
+                "omori_active",
+                "signal",
+                "mainshock_ts",
+                "b_value",
+                "b_low",
+            ):
+                assert out_a[k] == out_b[k], f"Mismatch on '{k}'"
+            assert out_a["aftershock_rate"] == pytest.approx(
+                out_b["aftershock_rate"], rel=1e-12, abs=1e-12
+            )
+            if out_a["omori_params"] is None:
+                assert out_b["omori_params"] is None
+            else:
+                for k in ("K", "c", "p"):
+                    assert out_a["omori_params"][k] == pytest.approx(
+                        out_b["omori_params"][k], rel=1e-12, abs=1e-12
+                    )
+
+
+class TestThrottleCachesFit:
+    """With ``refit_seconds>0`` ``curve_fit`` is called at most once per window."""
+
+    def test_throttle_caches_fit_within_window(self) -> None:
+        """100 compute() calls within 30 simulated seconds → curve_fit hit ONCE.
+
+        Without the throttle the same scenario would invoke ``curve_fit`` once
+        per tick where aftershocks are present (i.e. roughly per call).
+        """
+        events, mainshock_ms = _cascade_events()
+        # Seed: mainshock + first batch of aftershocks so the throttled module
+        # has data for one initial fit ON THE FIRST measured tick.
+        seed_events = [
+            e for e in events if e["timestamp_ms"] <= mainshock_ms + 60_000
+        ]
+
+        m = M15GROmori(refit_seconds=30.0)
+
+        from unittest import mock
+
+        original = m._fit_omori
+        call_counter = {"n": 0}
+
+        def spy(*args, **kwargs):
+            call_counter["n"] += 1
+            return original(*args, **kwargs)
+
+        with mock.patch.object(m, "_fit_omori", side_effect=spy):
+            # 1) First tick: feeds mainshock + aftershocks → 1 curve_fit call.
+            first_ts = (mainshock_ms + 60_000) / 1000.0
+            m.compute(seed_events, first_ts)
+            assert call_counter["n"] == 1, (
+                "First tick of a fresh mainshock must trigger a fit"
+            )
+            # 2) 100 more ticks spaced 0.2 s apart → total span 19.8 s < 30 s.
+            #    All should hit the cache (curve_fit MUST NOT be called again).
+            for k in range(100):
+                m.compute([], first_ts + 0.2 * (k + 1))
+        assert call_counter["n"] == 1, (
+            f"Expected exactly 1 curve_fit call in the 30s window, "
+            f"got {call_counter['n']}"
+        )
+
+
+class TestThrottleRefitsAfterWindow:
+    """After ``refit_seconds`` of event time elapses, a new fit is triggered."""
+
+    def test_throttle_refits_after_window(self) -> None:
+        events, mainshock_ms = _cascade_events()
+        m = M15GROmori(refit_seconds=30.0)
+        # Drive mainshock + initial aftershocks.
+        for ev in events:
+            ts_s = ev["timestamp_ms"] / 1000.0
+            m.compute([ev], ts_s)
+        # ``_last_fit_ts`` should now be set.
+        assert m._last_fit_ts is not None
+        first_fit_ts = m._last_fit_ts
+
+        from unittest import mock
+
+        original = m._fit_omori
+        call_counter = {"n": 0}
+
+        def spy(*args, **kwargs):
+            call_counter["n"] += 1
+            return original(*args, **kwargs)
+
+        # Jump 31 s of event time forward — past the 30s throttle window.
+        bumped_ts = first_fit_ts + 31.0
+        with mock.patch.object(m, "_fit_omori", side_effect=spy):
+            m.compute([], bumped_ts)
+        assert call_counter["n"] == 1, (
+            "Expected a single refit AFTER the 30s window"
+        )
+        # And ``_last_fit_ts`` must have advanced to the new fit time.
+        assert m._last_fit_ts == pytest.approx(bumped_ts)
+
+
+class TestThrottleRefitsOnNewMainshock:
+    """A new mainshock invalidates the cache even mid-window."""
+
+    def test_throttle_refits_on_new_mainshock(self) -> None:
+        events, mainshock_ms = _cascade_events()
+        m = M15GROmori(refit_seconds=30.0)
+        for ev in events:
+            ts_s = ev["timestamp_ms"] / 1000.0
+            m.compute([ev], ts_s)
+        assert m._last_fit_ts is not None
+        first_mainshock_ts = m._mainshock_ts
+        first_fit_ts = m._last_fit_ts
+
+        # Inject a bigger mainshock ONLY 5s later — well inside the 30s window.
+        new_mainshock_ms = mainshock_ms + 5_000
+        new_event = {
+            "timestamp_ms": new_mainshock_ms,
+            "usd_value": 2.0e8,  # 4x the previous mainshock
+            "side": "Sell",
+        }
+        from unittest import mock
+
+        original = m._fit_omori
+        call_counter = {"n": 0}
+
+        def spy(*args, **kwargs):
+            call_counter["n"] += 1
+            return original(*args, **kwargs)
+
+        with mock.patch.object(m, "_fit_omori", side_effect=spy):
+            m.compute([new_event], new_mainshock_ms / 1000.0 + 0.5)
+        # Cache must have been invalidated: mainshock_ts moved and a fresh fit
+        # must have been attempted (count ≥ 1; ``_last_fit_ts`` advanced).
+        assert m._mainshock_ts != first_mainshock_ts
+        assert call_counter["n"] >= 1, (
+            "Expected curve_fit to be called on new mainshock"
+        )
+        assert m._last_fit_ts != first_fit_ts
+
+
+class TestThrottleReturnsCachedParams:
+    """Between refits the cached K/c/p must drive ``aftershock_rate`` (no NaN)."""
+
+    def test_throttle_returns_cached_params(self) -> None:
+        events, mainshock_ms = _cascade_events()
+        m = M15GROmori(refit_seconds=30.0)
+        # Warm.
+        for ev in events:
+            m.compute([ev], ev["timestamp_ms"] / 1000.0)
+        assert m._omori_params is not None
+        cached = dict(m._omori_params)
+
+        # Force the throttle to skip refit by removing ``_fit_omori`` ability
+        # to find new data: call compute with empty events, just inside the
+        # window. The cached params must still drive aftershock_rate.
+        from unittest import mock
+
+        with mock.patch.object(m, "_fit_omori", side_effect=AssertionError(
+            "curve_fit must NOT be invoked within the throttle window"
+        )):
+            # Stay 5 s past the last fit — well inside the 30s window.
+            res = m.compute([], m._last_fit_ts + 5.0)
+        # Cached params unchanged.
+        assert m._omori_params == cached
+        # Aftershock rate is finite and computed from the cached params (not 0).
+        assert np.isfinite(res["aftershock_rate"])
+        assert res["omori_active"] is True
+        assert res["aftershock_rate"] > 0.0

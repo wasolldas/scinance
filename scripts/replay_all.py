@@ -39,11 +39,24 @@ from bybit_edge.backtester.engine import BacktestResult
 from bybit_edge.config import (
     DB_PATH,
     MULTI_SYMBOL_UNIVERSE,
+    OMORI_REFIT_SECONDS,
     WF_EMBARGO_MINUTES,
     WF_TEST_DAYS,
     WF_TRAIN_DAYS,
 )
 from bybit_edge.replay_backtester import ReplayBacktester
+
+# See ``scripts/replay_backtest.py`` for the identical sentinel/resolver pattern.
+_FAST_OMORI_DEFAULT_SENTINEL: object = object()
+
+
+def _resolve_fast_omori(fast_omori: Any) -> float:
+    """Resolve the ``--fast-omori`` argparse value to a refit-seconds float."""
+    if fast_omori is None:
+        return 0.0
+    if fast_omori is _FAST_OMORI_DEFAULT_SENTINEL:
+        return float(OMORI_REFIT_SECONDS)
+    return float(fast_omori)
 
 
 # ----------------------------------------------------------------------
@@ -146,6 +159,7 @@ def run_symbol(
     embargo_minutes: int,
     diagnose: bool = False,
     progress: bool = False,
+    m15_refit_seconds: float = 0.0,
 ) -> Optional[tuple[dict[str, BacktestResult], int, int, dict[str, Any]]]:
     """Run the replay for a single symbol.
 
@@ -154,15 +168,16 @@ def run_symbol(
     is 0 in single-pass mode. ``diagnostics`` is the per-strategy wait-reason /
     gate-counter dict (empty when ``diagnose`` is False).
     """
-    # Only pass collect_diagnostics when actually diagnosing, so the default
-    # path keeps the exact pre-diagnostics constructor signature (relevant for
-    # fakes/stubs that monkey-patch ReplayBacktester without the new kwarg).
+    # Only pass collect_diagnostics / m15_refit_seconds when actually opted-in,
+    # so the default path keeps the exact pre-diagnostics constructor signature
+    # (relevant for fakes/stubs that monkey-patch ReplayBacktester without the
+    # new kwargs).
+    bt_kwargs: dict[str, Any] = {}
     if diagnose:
-        bt = ReplayBacktester(
-            symbol=symbol, db_path=db_path, collect_diagnostics=True
-        )
-    else:
-        bt = ReplayBacktester(symbol=symbol, db_path=db_path)
+        bt_kwargs["collect_diagnostics"] = True
+    if m15_refit_seconds > 0.0:
+        bt_kwargs["m15_refit_seconds"] = m15_refit_seconds
+    bt = ReplayBacktester(symbol=symbol, db_path=db_path, **bt_kwargs)
     # Only forward ``progress`` when enabled, so fakes/stubs that monkey-patch
     # ReplayBacktester with the pre-progress run()/run_walkforward() signature
     # keep working on the default (progress-off in tests) path.
@@ -500,6 +515,7 @@ def run(
     diagnose: bool = False,
     diagnostics_sink: Optional[dict[str, dict[str, Any]]] = None,
     progress: bool = False,
+    m15_refit_seconds: float = 0.0,
 ) -> tuple[
     dict[str, dict[str, dict[str, Any]]],
     dict[str, dict[str, Any]],
@@ -536,6 +552,7 @@ def run(
                 embargo_minutes=embargo_minutes,
                 diagnose=diagnose,
                 progress=progress,
+                m15_refit_seconds=m15_refit_seconds,
             )
         except Exception as exc:  # noqa: BLE001 — keep going on per-symbol error
             print(f"  ! Replay fuer {sym} fehlgeschlagen: {exc}")
@@ -688,12 +705,29 @@ def _parse_args(argv: Optional[list[str]] = None) -> argparse.Namespace:
         action="store_false",
         help="Fortschritts-Logging abschalten.",
     )
+    parser.add_argument(
+        "--fast-omori",
+        dest="fast_omori",
+        nargs="?",
+        const=_FAST_OMORI_DEFAULT_SENTINEL,
+        default=None,
+        type=float,
+        help=(
+            "Opt-in Performance-Modus: drosselt den teuren M15 Omori-curve_fit "
+            "auf alle N Sekunden Event-Zeit (Default ohne Wert: "
+            f"OMORI_REFIT_SECONDS={OMORI_REFIT_SECONDS}s). Ohne das Flag ist "
+            "das Verhalten bit-identisch zur Live-Pipeline. Typischer Speedup "
+            "~5-10x auf cascade-lastigen Daten; Trade-Liste in Grenzfaellen "
+            "(Aftershock-Decay im Refit-Fenster) leicht abweichend."
+        ),
+    )
     return parser.parse_args(argv)
 
 
 def main(argv: Optional[list[str]] = None) -> int:
     args = _parse_args(argv)
     db_path = Path(args.db) if args.db else DB_PATH
+    m15_refit_seconds = _resolve_fast_omori(args.fast_omori)
 
     # Surface the per-symbol progress lines (logging.INFO on the backtester
     # logger) when running interactively with progress enabled.
@@ -719,6 +753,11 @@ def main(argv: Optional[list[str]] = None) -> int:
         )
     print(f"  DuckDB: {db_path}")
     print("  DuckDB read-only — parallel zum LiveRunner nutzbar.")
+    if m15_refit_seconds > 0.0:
+        print(
+            f"  Performance-Modus: --fast-omori (M15 Omori-Refit alle "
+            f"{m15_refit_seconds:g}s, kann Ergebnisse leicht abweichen)"
+        )
     print("=" * 80)
 
     if not symbols:
@@ -744,6 +783,7 @@ def main(argv: Optional[list[str]] = None) -> int:
         diagnose=args.diagnose,
         diagnostics_sink=diagnostics_per_symbol,
         progress=args.progress,
+        m15_refit_seconds=m15_refit_seconds,
     )
 
     mode = "walkforward" if args.walkforward else "single_pass"

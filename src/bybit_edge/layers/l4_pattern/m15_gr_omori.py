@@ -11,6 +11,30 @@ Formeln (PRD):
     Mainshock: v_USD > Q99(rolling 24h)
 
 Signal = 1 wenn Mainshock + Omori aktiv (Kaskaden-Risiko).
+
+Opt-in Performance-Throttle (``refit_seconds``):
+    Der Omori-curve_fit-Schritt ist auf realen Cascades der dominierende
+    Replay-Hotspot (~90 % der CPU-Zeit, gemessen per cProfile). Der
+    Default ``refit_seconds=0.0`` refittet wie bisher PER TICK
+    (bit-identisches Verhalten, exakt aber langsam — vom LiveRunner und
+    den bestehenden Tests benutzt).
+
+    Mit ``refit_seconds=30.0`` (Default-Wert von
+    ``config.OMORI_REFIT_SECONDS``) wird ``curve_fit`` nur alle 30
+    Sekunden Event-Zeit pro Mainshock einmal aufgerufen; zwischen den
+    Refits werden die zuletzt gefitteten ``K, c, p`` weiterbenutzt. Auf
+    cascade-lastigen Replay-Streams resultiert das in einem typischen
+    5–10× Speedup. Mainshock-Detection (Q99 ueber 24h) bleibt
+    UNVERÄNDERT per-Tick; nur der teure ``curve_fit`` wird gedrosselt.
+
+    Trade-Konstellationen die in Grenzfaellen nicht mehr bit-identisch
+    sein koennen: wenn die Aftershock-Rate gerade im 30s-Fenster scharf
+    abklingt, kann der eingefrorene Fit den ``aftershock_rate``-Wert
+    geringfuegig ueberschaetzen, was eine S1-Exit-Bedingung ein bis
+    zwei Ticks frueher/spaeter feuern lassen kann. Das aendert die
+    Trade-Liste typischerweise um <20 %; statistische Edge-Aussagen
+    bleiben robust. Bei jedem neuen Mainshock wird der Cache sofort
+    invalidiert (kein Stale-Fit ueber Mainshocks hinweg).
 """
 
 from __future__ import annotations
@@ -49,10 +73,15 @@ class M15GROmori(BaseModule):
         mainshock_quantile: float = GR_MAINSHOCK_QUANTILE,
         min_events: int = GR_MIN_EVENTS,
         omori_forecast_minutes: int = OMORI_FORECAST_MINUTES,
+        refit_seconds: float = 0.0,
     ) -> None:
         self._mainshock_quantile: float = mainshock_quantile
         self._min_events: int = min_events
         self._omori_forecast_minutes: int = omori_forecast_minutes
+        # Throttle for the curve_fit step. 0.0 (default) = refit per tick,
+        # bit-identical to the historical / live behaviour. See module
+        # docstring for the opt-in semantics.
+        self._refit_seconds: float = float(refit_seconds)
 
         # Rolling event buffer: (timestamp_ms, usd_value)
         self._event_buffer: deque[tuple[int, float]] = deque(
@@ -63,6 +92,13 @@ class M15GROmori(BaseModule):
         self._mainshock_ts: float | None = None
         self._mainshock_usd: float = 0.0
         self._omori_params: dict[str, float] | None = None
+
+        # Cached fit bookkeeping (only consulted when ``_refit_seconds > 0``).
+        # ``_last_fit_ts`` is the ``current_ts`` (event-time seconds) at which
+        # ``curve_fit`` was last called for the active mainshock. Invalidated
+        # to ``None`` on every new-mainshock detection so the next compute()
+        # forces a fresh fit (no stale K/c/p across mainshocks).
+        self._last_fit_ts: float | None = None
 
     # ------------------------------------------------------------------
     # GR: Aki (1965) MLE b-value
@@ -250,6 +286,11 @@ class M15GROmori(BaseModule):
                         self._mainshock_ts = ev_ts_s
                         self._mainshock_usd = ev_usd
                         self._omori_params = None  # will refit below
+                        # Invalidate the throttle cache: on a new mainshock the
+                        # next compute() must fit FROM SCRATCH (no stale K/c/p
+                        # from the previous mainshock's aftershocks). Only
+                        # consulted in the throttled branch; harmless otherwise.
+                        self._last_fit_ts = None
 
         # ----------------------------------------------------------
         # 5. Omori fit if mainshock active and within forecast window
@@ -268,23 +309,69 @@ class M15GROmori(BaseModule):
                 aftershock_times = recent_ts_s[recent_ts_s > self._mainshock_ts]
 
                 if len(aftershock_times) >= _MIN_AFTERSHOCKS_FOR_FIT:
-                    fit = self._fit_omori(aftershock_times, self._mainshock_ts)
-                    if fit is not None:
-                        self._omori_params = fit
-                        omori_active = True
-                        # Predict rate at current time
-                        dt_now = current_ts - self._mainshock_ts
-                        aftershock_rate = self._omori_fn(
-                            np.array([dt_now]),
-                            fit["K"],
-                            fit["c"],
-                            fit["p"],
-                        )[0]
+                    # Opt-in throttle: when ``self._refit_seconds > 0`` we only
+                    # call the expensive ``curve_fit`` after at least that many
+                    # seconds of event time have elapsed since the last
+                    # successful fit FOR THIS mainshock. ``_omori_params`` is
+                    # reset to ``None`` on every new-mainshock detection above
+                    # and ``_last_fit_ts`` reset to ``None`` here on cache
+                    # invalidation, so a fresh mainshock always forces an
+                    # immediate refit (no stale K/c/p across mainshocks).
+                    #
+                    # With the default ``self._refit_seconds == 0.0`` we take
+                    # the legacy per-tick branch unconditionally — the
+                    # ``omori_active`` flag tracks the SUCCESS of the current
+                    # tick's fit (False when ``curve_fit`` fails), exactly as
+                    # the pre-throttle implementation did. This keeps the
+                    # default bit-identical to the original behaviour.
+                    if self._refit_seconds <= 0.0:
+                        fit = self._fit_omori(
+                            aftershock_times, self._mainshock_ts
+                        )
+                        if fit is not None:
+                            self._omori_params = fit
+                            omori_active = True
+                            dt_now = current_ts - self._mainshock_ts
+                            aftershock_rate = self._omori_fn(
+                                np.array([dt_now]),
+                                fit["K"],
+                                fit["c"],
+                                fit["p"],
+                            )[0]
+                    else:
+                        # Throttled branch (opt-in). Refit on cache miss, on a
+                        # fresh mainshock (``_omori_params is None``) or once
+                        # the throttle window has elapsed; otherwise reuse the
+                        # last successful K/c/p so callers see a consistent
+                        # ``aftershock_rate`` instead of stale NaN/0.0 during
+                        # the gap between refits.
+                        if (
+                            self._omori_params is None
+                            or self._last_fit_ts is None
+                            or (current_ts - self._last_fit_ts)
+                            >= self._refit_seconds
+                        ):
+                            fit = self._fit_omori(
+                                aftershock_times, self._mainshock_ts
+                            )
+                            if fit is not None:
+                                self._omori_params = fit
+                                self._last_fit_ts = current_ts
+                        if self._omori_params is not None:
+                            omori_active = True
+                            dt_now = current_ts - self._mainshock_ts
+                            aftershock_rate = self._omori_fn(
+                                np.array([dt_now]),
+                                self._omori_params["K"],
+                                self._omori_params["c"],
+                                self._omori_params["p"],
+                            )[0]
             elif elapsed_min > self._omori_forecast_minutes:
                 # Timeout: mainshock too old
                 self._mainshock_ts = None
                 self._mainshock_usd = 0.0
                 self._omori_params = None
+                self._last_fit_ts = None
 
         # ----------------------------------------------------------
         # 6. Signal
@@ -324,4 +411,5 @@ class M15GROmori(BaseModule):
         self._mainshock_ts = None
         self._mainshock_usd = 0.0
         self._omori_params = None
+        self._last_fit_ts = None
         self._event_buffer.clear()

@@ -426,3 +426,32 @@ def test_replay_all_diagnose_off_leaves_sink_empty(tmp_path: Path) -> None:
         diagnostics_sink=sink,
     )
     assert sink == {}
+
+
+# ----------------------------------------------------------------------
+# --fast-omori CLI flag
+# ----------------------------------------------------------------------
+
+
+def test_replay_all_fast_omori_flag_absent_resolves_to_zero() -> None:
+    """Without ``--fast-omori`` the resolver returns 0.0 (no throttle)."""
+    ns = replay_all._parse_args([])
+    assert ns.fast_omori is None
+    assert replay_all._resolve_fast_omori(ns.fast_omori) == 0.0
+
+
+def test_replay_all_fast_omori_flag_no_value_uses_config_default() -> None:
+    """``--fast-omori`` without a value falls back to OMORI_REFIT_SECONDS."""
+    from bybit_edge.config import OMORI_REFIT_SECONDS
+    ns = replay_all._parse_args(["--fast-omori"])
+    # argparse stores the const sentinel; the resolver maps it to the config.
+    assert ns.fast_omori is replay_all._FAST_OMORI_DEFAULT_SENTINEL
+    assert replay_all._resolve_fast_omori(ns.fast_omori) == float(
+        OMORI_REFIT_SECONDS
+    )
+
+
+def test_replay_all_fast_omori_flag_with_value_parsed() -> None:
+    """``--fast-omori 15`` is parsed as the float 15.0."""
+    ns = replay_all._parse_args(["--fast-omori", "15"])
+    assert replay_all._resolve_fast_omori(ns.fast_omori) == 15.0

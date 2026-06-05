@@ -1696,3 +1696,199 @@ class TestProgressLogging:
 
         for sid in ("S1", "S2", "S3", "S4", "S5"):
             assert res_off[sid].n_trades == res_on[sid].n_trades
+
+
+# ══════════════════════════════════════════════════════════════════════
+# Opt-in M15 Omori refit throttle (--fast-omori path)
+# ══════════════════════════════════════════════════════════════════════
+
+
+class TestReplayM15RefitThrottle:
+    """The ``m15_refit_seconds`` constructor kwarg wires the M15 throttle.
+
+    Bit-identical default + measurable speedup when opted-in + tolerance band
+    around the un-throttled result on a cascade-heavy stream.
+    """
+
+    def test_replay_default_uses_no_throttle(
+        self, persist: PersistenceLayer
+    ) -> None:
+        """Default ReplayBacktester() builds Strategy1 with M15 ``refit_seconds=0``."""
+        bt = _new_bt(persist)
+        assert bt._m15_refit_seconds == 0.0
+        strategies = bt._build_strategies()
+        # Default M15 has refit_seconds=0.0 (bit-identical path).
+        assert strategies["S1"].m15._refit_seconds == 0.0
+
+    def test_replay_with_m15_refit_overrides_strategy1_m15(
+        self, persist: PersistenceLayer
+    ) -> None:
+        """Passing the kwarg replaces Strategy1's M15 with a throttled copy."""
+        bt = ReplayBacktester(_SYMBOL, db_path=None, m15_refit_seconds=30.0)
+        bt.persist = persist
+        strategies = bt._build_strategies()
+        assert strategies["S1"].m15._refit_seconds == 30.0
+
+    @staticmethod
+    def _persist_real_cascade(persist: PersistenceLayer) -> None:
+        """Persist a stream that actually drives M15 ``_fit_omori`` per tick.
+
+        ``_persist_cascade_for_s1`` builds a monotonically growing liquidation
+        list which never crosses Q99 (the largest events ARE the right tail).
+        We need: many background events at low USD, ONE clear mainshock spike
+        well above Q99, then dense aftershocks AFTER the mainshock — exactly
+        the shape M15 was designed for.
+        """
+        base = _BASE_TS
+        # Ticker grid so the pipeline ticks every second.
+        tickers = [
+            _ticker(0, last_price=30_000.0 + (i % 11), ts=base + i * 1000)
+            for i in range(400)
+        ]
+        persist.write_tickers_batch(tickers)
+        persist.write_trades_batch(
+            [
+                TradeEvent(
+                    timestamp_ms=base + i * 1000,
+                    price=30_000.0 - (i % 17) * 0.5,
+                    volume=1.0 + (i % 5),
+                    side="Sell",
+                    is_block=False,
+                )
+                for i in range(200)
+            ],
+            symbol=_SYMBOL,
+        )
+        liqs: list[LiquidationEvent] = []
+        # 80 small background liquidations spread across the first 80s, so the
+        # rolling Q99 is anchored below the mainshock.
+        for i in range(80):
+            liqs.append(
+                LiquidationEvent(
+                    timestamp_ms=base + i * 1000,
+                    symbol=_SYMBOL,
+                    side="Sell",
+                    volume=30.0,
+                    price=30_000.0,
+                    usd_value=1.0e5 + (i % 7) * 1.0e4,
+                )
+            )
+        # The mainshock — a single huge event.
+        mainshock_ms = base + 80_000
+        liqs.append(
+            LiquidationEvent(
+                timestamp_ms=mainshock_ms,
+                symbol=_SYMBOL,
+                side="Sell",
+                volume=2_000.0,
+                price=30_000.0,
+                usd_value=6.0e7,
+            )
+        )
+        # 60 aftershocks within the next ~120s (1 every 2 s), all moderate.
+        for j in range(60):
+            liqs.append(
+                LiquidationEvent(
+                    timestamp_ms=mainshock_ms + (j + 1) * 2000,
+                    symbol=_SYMBOL,
+                    side="Sell",
+                    volume=10.0,
+                    price=30_000.0,
+                    usd_value=2.0e5 + (j % 5) * 3.0e4,
+                )
+            )
+        persist.write_liquidations_batch(liqs)
+
+    def test_replay_with_fast_omori_speedup(
+        self, persist: PersistenceLayer
+    ) -> None:
+        """Throttled replay calls ``_fit_omori`` fewer times than the default.
+
+        We count invocations via :func:`unittest.mock.patch.object` on the
+        ``M15GROmori._fit_omori`` method (class-level patch so it covers every
+        freshly constructed M15 inside the replay).
+        """
+        from unittest import mock
+        from bybit_edge.layers.l4_pattern.m15_gr_omori import M15GROmori
+
+        self._persist_real_cascade(persist)
+
+        # Default (no throttle).
+        bt_off = _new_bt(persist)
+        bt_off.load_events()
+        original = M15GROmori._fit_omori
+        counter_off = {"n": 0}
+
+        def spy_off(self, *args, **kwargs):  # noqa: ANN001
+            counter_off["n"] += 1
+            return original(self, *args, **kwargs)
+
+        with mock.patch.object(M15GROmori, "_fit_omori", spy_off):
+            bt_off.run(pipeline_interval_seconds=1.0)
+        n_fits_off = counter_off["n"]
+
+        # Throttled — refit only every 30 s of event time.
+        bt_on = ReplayBacktester(
+            _SYMBOL, db_path=None, m15_refit_seconds=30.0
+        )
+        bt_on.persist = persist
+        bt_on.load_events()
+        counter_on = {"n": 0}
+
+        def spy_on(self, *args, **kwargs):  # noqa: ANN001
+            counter_on["n"] += 1
+            return original(self, *args, **kwargs)
+
+        with mock.patch.object(M15GROmori, "_fit_omori", spy_on):
+            bt_on.run(pipeline_interval_seconds=1.0)
+        n_fits_on = counter_on["n"]
+
+        # On a 120 s cascade the throttled path should fit a handful of times
+        # while the un-throttled path is per-tick. Strict requirement:
+        # throttled MUST be strictly smaller (and both paths must actually
+        # exercise ``_fit_omori`` so the assertion isn't vacuous).
+        assert n_fits_off > 0, (
+            "Synthetic cascade did not trigger any curve_fit calls in the "
+            "default path — the test setup is broken."
+        )
+        assert n_fits_on < n_fits_off, (
+            f"Throttle did not reduce curve_fit calls: "
+            f"off={n_fits_off}, on={n_fits_on}"
+        )
+
+    def test_replay_with_fast_omori_close_to_default(
+        self, persist: PersistenceLayer
+    ) -> None:
+        """Throttled result must be in a tolerance band around the default.
+
+        Documented tolerance: ±20 % on ``n_trades`` per strategy. On synthetic
+        data the trade sets are often even identical; the band absorbs the
+        documented Aftershock-Decay grey-zone (see M15 docstring).
+        """
+        self._persist_real_cascade(persist)
+
+        bt_off = _new_bt(persist)
+        bt_off.load_events()
+        res_off = bt_off.run(pipeline_interval_seconds=1.0)
+
+        bt_on = ReplayBacktester(
+            _SYMBOL, db_path=None, m15_refit_seconds=30.0
+        )
+        bt_on.persist = persist
+        bt_on.load_events()
+        res_on = bt_on.run(pipeline_interval_seconds=1.0)
+
+        for sid in ("S1", "S2", "S3", "S4", "S5"):
+            n_off = res_off[sid].n_trades
+            n_on = res_on[sid].n_trades
+            if n_off == 0:
+                # When the default produced no trades, the band is absolute:
+                # at most a handful of extra trades.
+                assert n_on <= 2, (
+                    f"{sid}: throttle produced {n_on} trades vs default 0"
+                )
+            else:
+                tol = max(1, int(round(0.20 * n_off)))
+                assert abs(n_on - n_off) <= tol, (
+                    f"{sid}: |n_on={n_on} - n_off={n_off}| > {tol} (±20%)"
+                )
