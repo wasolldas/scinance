@@ -26,6 +26,7 @@ from typing import Any
 
 import numpy as np
 
+from bybit_edge import config as _cfg
 from bybit_edge.config import (
     S2_ENTROPY_ZSCORE,
     S2_PRESSURE_DISSIPATION,
@@ -161,6 +162,8 @@ class Strategy2EntropyMomentum:
             if entry_ok:
                 # Direction from OFI sign
                 direction: int = 1 if ofi > 0 else -1
+                if _cfg.S2_INVERT_DIRECTION:
+                    direction = -direction
                 self._in_trade = True
                 self._entry_price = price
                 self._entry_direction = direction

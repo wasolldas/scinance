@@ -327,6 +327,7 @@ def build_payload(
     skipped: list[str],
     walkforward_meta: Optional[dict[str, Any]] = None,
     interval_seconds: float = 1.0,
+    inverted_strategies: Optional[list[str]] = None,
 ) -> dict[str, Any]:
     """Assemble the JSON payload written to ``replay_all_results.json``."""
     payload: dict[str, Any] = {
@@ -335,6 +336,9 @@ def build_payload(
         "skipped_symbols": list(skipped),
         "generated_at": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
         "interval_seconds": float(interval_seconds),
+        "inverted_strategies": (
+            sorted(list(inverted_strategies)) if inverted_strategies else []
+        ),
         "per_strategy_aggregate": per_strategy_aggregate,
         "per_symbol": per_symbol,
     }
@@ -706,6 +710,15 @@ def _parse_args(argv: Optional[list[str]] = None) -> argparse.Namespace:
         help="Fortschritts-Logging abschalten.",
     )
     parser.add_argument(
+        "--invert-strategies",
+        type=str,
+        default="",
+        help=(
+            "Comma-separated list of strategy IDs to invert direction for, "
+            "e.g. 'S2,S3'. Tests whether direction-sign is wrong. Default off."
+        ),
+    )
+    parser.add_argument(
         "--fast-omori",
         dest="fast_omori",
         nargs="?",
@@ -728,6 +741,24 @@ def main(argv: Optional[list[str]] = None) -> int:
     args = _parse_args(argv)
     db_path = Path(args.db) if args.db else DB_PATH
     m15_refit_seconds = _resolve_fast_omori(args.fast_omori)
+
+    # Apply direction-inversion flags BEFORE running any backtester so the
+    # strategy instances see the flipped sign at trade-entry time.
+    from bybit_edge import config as _cfg
+    inverts = {
+        t.strip().upper()
+        for t in args.invert_strategies.split(",")
+        if t.strip()
+    }
+    unknown = inverts - {"S2", "S3"}
+    if unknown:
+        raise SystemExit(
+            f"--invert-strategies: unknown {sorted(unknown)}; allowed: S2,S3"
+        )
+    if "S2" in inverts:
+        _cfg.S2_INVERT_DIRECTION = True
+    if "S3" in inverts:
+        _cfg.S3_INVERT_DIRECTION = True
 
     # Surface the per-symbol progress lines (logging.INFO on the backtester
     # logger) when running interactively with progress enabled.
@@ -758,6 +789,8 @@ def main(argv: Optional[list[str]] = None) -> int:
             f"  Performance-Modus: --fast-omori (M15 Omori-Refit alle "
             f"{m15_refit_seconds:g}s, kann Ergebnisse leicht abweichen)"
         )
+    if inverts:
+        print(f"  [INVERT] Inverted directions: {', '.join(sorted(inverts))}")
     print("=" * 80)
 
     if not symbols:
@@ -795,6 +828,7 @@ def main(argv: Optional[list[str]] = None) -> int:
         skipped=skipped,
         walkforward_meta=wf_meta,
         interval_seconds=args.interval,
+        inverted_strategies=sorted(list(inverts)),
     )
     if args.diagnose:
         payload["diagnostics"] = diagnostics_per_symbol

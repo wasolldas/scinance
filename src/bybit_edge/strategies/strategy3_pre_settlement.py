@@ -227,8 +227,14 @@ class Strategy3PreSettlement:
         PRD 7.3 / M22: positive pressure stems from a negative Premium
         (perp underpriced) -> Long-reversion (+1); negative pressure from a
         positive Premium (perp overpriced) -> Short-reversion (-1).
+
+        When ``config.S3_INVERT_DIRECTION`` is True (debug/research flag),
+        the resulting sign is flipped. The flag is read at call time so
+        :class:`bybit_edge.tuning.ParameterContext` patches take effect.
         """
-        return 1 if pressure > 0 else -1
+        from bybit_edge import config as _cfg
+        base = 1 if pressure > 0 else -1
+        return -base if _cfg.S3_INVERT_DIRECTION else base
 
     # ------------------------------------------------------------------
     # Internal: Entry conditions

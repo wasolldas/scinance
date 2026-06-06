@@ -427,10 +427,16 @@ S1_OMORI_DECAY_FACTOR: Final[float] = 5.0  # t > 5·c → Exit
 # Strategie 2: Entropie-Momentum
 S2_ENTROPY_ZSCORE: Final[float] = 2.0  # H < Median - 2σ
 S2_PRESSURE_DISSIPATION: Final[float] = 0.0001  # |P - F| < 0.01%
+# Direction-inversion flags (debug/research; default False = current behavior).
+# When True the corresponding strategy flips the sign of the direction it
+# would enter with. Used to test the hypothesis that the PRD direction
+# mapping is inverted vs. the actual edge.
+S2_INVERT_DIRECTION: bool = False
 
 # Strategie 3: Pre-Settlement Pressure-Release
 S3_PRESSURE_QUANTILE: Final[float] = 0.90  # |Pressure| > Q90
 S3_EXIT_FUNDING_BAND: Final[tuple[float, float]] = (-0.0001, 0.0001)
+S3_INVERT_DIRECTION: bool = False
 
 # Strategie 4: Pattern × Foundation Ensemble
 S4_CONSENSUS_MIN_MODELS: Final[int] = 2  # ≥ 2 von 3

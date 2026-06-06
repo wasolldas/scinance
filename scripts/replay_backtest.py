@@ -162,6 +162,15 @@ def main() -> None:
         help="Fortschritts-Logging abschalten.",
     )
     parser.add_argument(
+        "--invert-strategies",
+        type=str,
+        default="",
+        help=(
+            "Comma-separated list of strategy IDs to invert direction for, "
+            "e.g. 'S2,S3'. Tests whether direction-sign is wrong. Default off."
+        ),
+    )
+    parser.add_argument(
         "--fast-omori",
         dest="fast_omori",
         nargs="?",
@@ -180,6 +189,24 @@ def main() -> None:
     )
     args = parser.parse_args()
     m15_refit_seconds = _resolve_fast_omori(args.fast_omori)
+
+    # Apply direction-inversion flags BEFORE constructing the backtester so
+    # the strategy instances see the flipped sign at trade-entry time.
+    from bybit_edge import config as _cfg
+    inverts = {
+        t.strip().upper()
+        for t in args.invert_strategies.split(",")
+        if t.strip()
+    }
+    unknown = inverts - {"S2", "S3"}
+    if unknown:
+        raise SystemExit(
+            f"--invert-strategies: unknown {sorted(unknown)}; allowed: S2,S3"
+        )
+    if "S2" in inverts:
+        _cfg.S2_INVERT_DIRECTION = True
+    if "S3" in inverts:
+        _cfg.S3_INVERT_DIRECTION = True
 
     # Ensure the progress lines (logging.INFO on the backtester logger) are
     # actually surfaced when running interactively.
@@ -208,6 +235,8 @@ def main() -> None:
             f"  Performance-Modus: --fast-omori (M15 Omori-Refit alle "
             f"{m15_refit_seconds:g}s, kann Ergebnisse leicht abweichen)"
         )
+    if inverts:
+        print(f"  [INVERT] Inverted directions: {', '.join(sorted(inverts))}")
     print("=" * 75)
 
     if str(db_path) != ":memory:" and not Path(db_path).exists():
