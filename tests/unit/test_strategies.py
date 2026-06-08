@@ -649,3 +649,97 @@ class TestDecisionAggregator:
         assert result["position_size_pct"] <= 0.25  # Kelly cap
         assert result["strategy_id"] == "S2"
         assert result["confidence"] > 0.0
+
+
+# ═══════════════════════════════════════════════════════════════════
+# T3: diagnostics blind-spot regression — every S1/S5 wait dict
+#     (including ReplayBacktester._eval_strategy short-circuits, the
+#     actual source of the "unknown" buckets analyst flagged as W10)
+#     must carry a named "reason" key.
+# ═══════════════════════════════════════════════════════════════════
+
+
+class TestS1S5DiagnosticsNoUnknown:
+
+    def test_strategy1_wait_dict_carries_named_reason(self) -> None:
+        """Drive S1 to a wait state (low rho); ensure the dict has a
+        ``"reason"`` that is not ``"unknown"`` — covers the briefing's
+        ``test_strategy1_diagnostics_no_unknown`` requirement."""
+        strat = Strategy1CascadeDetector()
+        with patch.object(strat.m14, "compute", return_value={
+            "branching_ratio": 0.5, "intensity": 1.0, "mu": 0.1,
+            "alpha": 0.3, "beta": 0.5, "critical": False, "signal": 0,
+            "method_id": "M14", "confidence": 0.3, "ts": time.time(),
+        }), patch.object(strat.m15, "compute", return_value={
+            "b_value": None, "b_low": False, "mainshock": False,
+            "mainshock_ts": None, "omori_active": False,
+            "aftershock_rate": 0.0, "omori_params": None, "signal": 0,
+            "method_id": "M15", "confidence": 0.0, "ts": time.time(),
+        }), patch.object(strat.m26, "compute", return_value={
+            "signal": 0, "r0": 0.5, "beta": 0.0, "gamma": 0.0,
+            "s_current": 1000, "i_current": 0, "peak_i_forecast": 0,
+            "cascade_risk": False, "method_id": "M26",
+            "confidence": 0.0, "ts": time.time(),
+        }), patch.object(strat.m25, "compute", return_value={
+            "signal": 0, "kyle_lambda": 0.1, "lambda_q95": 0.5,
+            "toxic_flow": False, "method_id": "M25",
+            "confidence": 0.0, "ts": time.time(),
+        }):
+            result = strat.on_data(
+                liq_events=_make_liq_events(5),
+                event_times=_make_event_times(5),
+                open_interest=10000.0, trades=_make_trades(5),
+                current_ts=time.time(), liq_side="Long",
+            )
+        assert result["action"] == "wait"
+        assert result.get("reason") not in (None, "unknown")
+
+    def test_strategy5_wait_dict_carries_named_reason(self) -> None:
+        """Drive S5 to a wait state (HMM HIGH_VOL veto)."""
+        strat = Strategy5CrossSectional()
+        with patch.object(strat.m13, "compute", return_value={
+            "z_scores": {"ETHUSDT": 3.5},
+            "extreme_symbols": [{"symbol": "ETHUSDT", "z": 3.5,
+                                 "direction": -1}],
+            "signal": 1, "method_id": "M13", "confidence": 0.7,
+            "ts": time.time(),
+        }), patch.object(strat.m17, "compute", return_value={
+            "te_scores": {"ETHUSDT": 0.10}, "lead_lag_edges": [],
+            "signal": 1, "method_id": "M17",
+            "confidence": 0.5, "ts": time.time(),
+        }), patch.object(strat.m9, "compute", return_value={
+            "state": 2, "state_label": "HIGH_VOL",
+            "state_probs": [0.05, 0.10, 0.85], "signal": -1,
+            "method_id": "M9", "confidence": 0.85, "ts": time.time(),
+        }):
+            r = strat.on_data(
+                returns={"ETHUSDT": -0.05},
+                returns_matrix={
+                    "ETHUSDT": np.random.default_rng(0).normal(0, 0.01, 100),
+                },
+                hmm_features=np.array([0.05, -0.3, 0.0005]),
+                target_symbol="ETHUSDT", current_price=2500.0,
+            )
+        assert r["action"] == "wait"
+        assert r.get("reason") not in (None, "unknown")
+
+    def test_replay_eval_strategy_short_circuits_emit_reasons(self) -> None:
+        """The neutral wait dicts built by ReplayBacktester._eval_strategy
+        (the actual source of the diagnose-mode 'unknown' buckets analyst
+        flagged on S1-on-BNB and S5-everywhere) must carry named reasons."""
+        from bybit_edge.replay_backtester import ReplayBacktester
+
+        bt = ReplayBacktester(symbol="BTCUSDT", db_path=None)
+        ticker_data: dict[str, Any] = {
+            "last_price": 30_000.0, "seconds_to_settlement": 3600.0,
+            "open_interest": 1000.0, "liq_events": [],
+            "event_times": np.array([], dtype=np.float64), "trades": [],
+        }
+        sig_s1 = bt._eval_strategy("S1", strategy=None,
+                                   ticker_data=ticker_data,
+                                   ts_seconds=1_700_000_000.0)
+        sig_s5 = bt._eval_strategy("S5", strategy=None,
+                                   ticker_data=ticker_data,
+                                   ts_seconds=1_700_000_000.0)
+        assert sig_s1.get("reason") == "liquidations_below_min_events"
+        assert sig_s5.get("reason") == "single_symbol_replay_unsupported"

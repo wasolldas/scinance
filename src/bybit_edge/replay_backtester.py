@@ -714,7 +714,15 @@ class ReplayBacktester:
         if strategy_id == "S1":
             liq_events = ticker_data["liq_events"]
             if not liq_events:
-                return {"action": "wait", "direction": 0, "strategy": "S1"}
+                # Named so the diagnose mode shows the actual structural
+                # blocker (cascade strategy starves without a liquidation
+                # stream) instead of the "unknown" fallback at line ~826.
+                return {
+                    "action": "wait",
+                    "direction": 0,
+                    "strategy": "S1",
+                    "reason": "liquidations_below_min_events",
+                }
             liq_side = self._dominant_liq_side(liq_events)
             return strategy.on_data(
                 liq_events=liq_events,
@@ -747,7 +755,12 @@ class ReplayBacktester:
         if strategy_id == "S4":
             price_series = ticker_data["price_series"]
             if len(price_series) <= 10:
-                return {"action": "wait", "direction": 0, "strategy": "S4"}
+                return {
+                    "action": "wait",
+                    "direction": 0,
+                    "strategy": "S4",
+                    "reason": "insufficient_price_history",
+                }
             return strategy.on_data(
                 price_series=price_series,
                 library=None,
@@ -758,9 +771,19 @@ class ReplayBacktester:
         if strategy_id == "S5":
             # No multi-symbol panel is persisted, so S5 is never triggerable
             # in single-symbol replay. Kept for completeness / honesty.
-            return {"action": "wait", "direction": 0, "strategy": "S5"}
+            return {
+                "action": "wait",
+                "direction": 0,
+                "strategy": "S5",
+                "reason": "single_symbol_replay_unsupported",
+            }
 
-        return {"action": "wait", "direction": 0, "strategy": strategy_id}
+        return {
+            "action": "wait",
+            "direction": 0,
+            "strategy": strategy_id,
+            "reason": "strategy_not_evaluated",
+        }
 
     # ------------------------------------------------------------------
     # Diagnostics (opt-in, strictly observational)
