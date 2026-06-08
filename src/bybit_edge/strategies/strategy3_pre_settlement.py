@@ -188,6 +188,14 @@ class Strategy3PreSettlement:
                 # Direction from M22 (PRD 7.3/M22): positive pressure
                 # (negative Premium) -> Long (+1); negative pressure -> Short (-1)
                 direction: int = self._direction_from_pressure(pressure)
+                # Opt-in research flag: flip ONLY the entered direction.
+                # The basis-alignment gate above already ran on the
+                # un-inverted direction, so the entered-tick population is
+                # invariant under this flag (gate-invariant inversion).
+                # Mirrors the S2 pattern in strategy2_entropy_momentum.py.
+                from bybit_edge import config as _cfg
+                if _cfg.S3_INVERT_DIRECTION:
+                    direction = -direction
                 self._in_trade = True
                 self._entry_price = price
                 self._entry_direction = direction
@@ -228,13 +236,14 @@ class Strategy3PreSettlement:
         (perp underpriced) -> Long-reversion (+1); negative pressure from a
         positive Premium (perp overpriced) -> Short-reversion (-1).
 
-        When ``config.S3_INVERT_DIRECTION`` is True (debug/research flag),
-        the resulting sign is flipped. The flag is read at call time so
-        :class:`bybit_edge.tuning.ParameterContext` patches take effect.
+        The ``config.S3_INVERT_DIRECTION`` debug/research flag is NOT consulted
+        here. Inversion is applied at the entry-emission call site in
+        :meth:`on_ticker` so that the basis-alignment gate in
+        :meth:`_check_entry` always evaluates against the un-inverted
+        (economically intended) direction. This keeps the gate population
+        invariant under the flag — only the *entered* direction flips.
         """
-        from bybit_edge import config as _cfg
-        base = 1 if pressure > 0 else -1
-        return -base if _cfg.S3_INVERT_DIRECTION else base
+        return 1 if pressure > 0 else -1
 
     # ------------------------------------------------------------------
     # Internal: Entry conditions
