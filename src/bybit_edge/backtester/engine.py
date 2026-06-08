@@ -43,18 +43,31 @@ _MS_PER_MIN = 60 * 1000
 
 @dataclass
 class Trade:
-    """A single round-trip trade produced by the backtester."""
+    """A single round-trip trade produced by the backtester.
+
+    ``pnl`` is the *net* P&L (post-fee, post-slippage). The new
+    ``raw_pnl`` / ``entry_fee`` / ``exit_fee`` fields are widened-in with
+    ``0.0`` defaults so existing constructor calls and serialisers remain
+    valid; the replay backtester's ``_make_trade`` populates them, enabling
+    a friction-vs-direction decomposition without re-running the replay.
+    Slippage is folded into ``entry_price`` / ``exit_price`` (they are the
+    *slipped* prices), so the identity ``pnl == raw_pnl - entry_fee -
+    exit_fee`` holds up to float tolerance.
+    """
 
     symbol: str
     entry_ts: int              # ms
     exit_ts: int               # ms
     side: str                  # "Long" or "Short"
-    entry_price: float
-    exit_price: float
+    entry_price: float         # slipped entry price
+    exit_price: float          # slipped exit price
     quantity: float
     fee_type: str              # "taker" or "maker"
-    pnl: float = 0.0          # absolute P&L in quote currency
-    pnl_bps: float = 0.0      # P&L in basis points
+    pnl: float = 0.0           # net P&L in quote currency (raw_pnl - fees)
+    pnl_bps: float = 0.0       # net P&L in basis points
+    raw_pnl: float = 0.0       # pre-friction P&L: (slip_exit - slip_entry) * qty * sign
+    entry_fee: float = 0.0     # taker/maker fee on the entry leg
+    exit_fee: float = 0.0      # taker/maker fee on the exit leg
 
 
 @dataclass

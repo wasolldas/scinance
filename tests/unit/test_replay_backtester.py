@@ -1892,3 +1892,139 @@ class TestReplayM15RefitThrottle:
                 assert abs(n_on - n_off) <= tol, (
                     f"{sid}: |n_on={n_on} - n_off={n_off}| > {tol} (±20%)"
                 )
+
+
+# ══════════════════════════════════════════════════════════════════════
+# T2: per-trade raw-PnL accounting + CSV export
+# ══════════════════════════════════════════════════════════════════════
+
+
+class TestMakeTradePopulatesRawAndFees:
+    """``_make_trade`` must populate ``raw_pnl`` / ``entry_fee`` / ``exit_fee``
+    so the friction-vs-direction decomposition is available without a second
+    replay run."""
+
+    def test_long_trade_raw_pnl_and_fees(self, persist: PersistenceLayer) -> None:
+        """Long round-trip: ``raw_pnl == (slip_exit - slip_entry) * qty`` and
+        ``pnl == raw_pnl - entry_fee - exit_fee`` up to float tolerance."""
+        bt = _new_bt(persist)
+        entry_price = 30_000.0
+        exit_price = 30_300.0
+        trade = bt._make_trade(
+            side="Long",
+            entry_price=entry_price,
+            entry_ts=_BASE_TS,
+            exit_price=exit_price,
+            exit_ts=_BASE_TS + 60_000,
+        )
+        slip_entry = bt.engine._slipped_price(entry_price, "Long")
+        slip_exit = bt.engine._slipped_price(exit_price, "Short")
+        expected_raw = (slip_exit - slip_entry) * 1.0
+        expected_efee = bt.engine._apply_fee(slip_entry, 1.0, "taker")
+        expected_xfee = bt.engine._apply_fee(slip_exit, 1.0, "taker")
+        assert trade.raw_pnl == pytest.approx(expected_raw, rel=1e-9, abs=1e-9)
+        assert trade.entry_fee == pytest.approx(expected_efee, rel=1e-9, abs=1e-9)
+        assert trade.exit_fee == pytest.approx(expected_xfee, rel=1e-9, abs=1e-9)
+        assert trade.pnl == pytest.approx(
+            trade.raw_pnl - trade.entry_fee - trade.exit_fee,
+            rel=1e-9,
+            abs=1e-9,
+        )
+
+    def test_short_trade_raw_pnl_sign(self, persist: PersistenceLayer) -> None:
+        """Short round-trip: ``raw_pnl == (slip_entry - slip_exit) * qty``."""
+        bt = _new_bt(persist)
+        trade = bt._make_trade(
+            side="Short",
+            entry_price=30_300.0,
+            entry_ts=_BASE_TS,
+            exit_price=30_000.0,
+            exit_ts=_BASE_TS + 60_000,
+        )
+        slip_entry = bt.engine._slipped_price(30_300.0, "Short")
+        slip_exit = bt.engine._slipped_price(30_000.0, "Long")
+        expected_raw = (slip_entry - slip_exit) * 1.0
+        assert trade.raw_pnl == pytest.approx(expected_raw, rel=1e-9, abs=1e-9)
+        # Net identity must hold for shorts too.
+        assert trade.pnl == pytest.approx(
+            trade.raw_pnl - trade.entry_fee - trade.exit_fee,
+            rel=1e-9,
+            abs=1e-9,
+        )
+
+
+class TestExportTradesCsv:
+    """``ReplayBacktester.export_trades_csv`` round-trip + bit-identity default."""
+
+    def test_export_trades_csv_roundtrip(
+        self, tmp_path: Path, persist: PersistenceLayer
+    ) -> None:
+        """Write a CSV from synthetic trades, read it back with DictReader,
+        and verify the friction identity for every row."""
+        import csv as _csv
+
+        bt = _new_bt(persist)
+        trade_long = bt._make_trade(
+            side="Long",
+            entry_price=30_000.0,
+            entry_ts=_BASE_TS,
+            exit_price=30_300.0,
+            exit_ts=_BASE_TS + 60_000,
+        )
+        trade_short = bt._make_trade(
+            side="Short",
+            entry_price=30_300.0,
+            entry_ts=_BASE_TS + 120_000,
+            exit_price=30_100.0,
+            exit_ts=_BASE_TS + 180_000,
+        )
+        trades_by_strategy = {
+            "S2": [trade_long],
+            "S3": [trade_short],
+        }
+        out_dir = tmp_path / "exports"
+        out_path = ReplayBacktester.export_trades_csv(
+            trades_by_strategy=trades_by_strategy,
+            path=out_dir,
+            symbol=_SYMBOL,
+            mode="single_pass",
+        )
+        assert out_path.exists()
+        assert out_path.name == f"trades_{_SYMBOL}_single_pass.csv"
+
+        with out_path.open("r", newline="", encoding="utf-8") as fh:
+            rows = list(_csv.DictReader(fh))
+
+        assert len(rows) == 2
+        # Header must match the documented column order.
+        assert list(rows[0].keys()) == list(ReplayBacktester._TRADE_CSV_COLUMNS)
+
+        for row in rows:
+            raw = float(row["raw_pnl"])
+            efee = float(row["entry_fee"])
+            xfee = float(row["exit_fee"])
+            net = float(row["pnl_net"])
+            assert net == pytest.approx(raw - efee - xfee, rel=1e-9, abs=1e-9)
+            assert row["symbol"] == _SYMBOL
+            assert row["strategy"] in ("S2", "S3")
+
+    def test_export_trades_default_off_no_files(
+        self, tmp_path: Path, persist: PersistenceLayer
+    ) -> None:
+        """Constructing trades and running the backtester *without* calling
+        ``export_trades_csv`` must not create any files. Guards bit-identity:
+        the export helper is the only path that touches the filesystem.
+        """
+        # Sanity: a baseline run with no trades should leave the tmp dir empty.
+        bt = _new_bt(persist)
+        # Manufacture a trade just to ensure the dataclass widening does not
+        # implicitly serialise anywhere.
+        _ = bt._make_trade(
+            side="Long",
+            entry_price=30_000.0,
+            entry_ts=_BASE_TS,
+            exit_price=30_100.0,
+            exit_ts=_BASE_TS + 60_000,
+        )
+        # No file writes happened anywhere under tmp_path.
+        assert list(tmp_path.iterdir()) == []

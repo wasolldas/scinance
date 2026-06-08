@@ -61,6 +61,7 @@ Performance / GPU (ehrliche Einordnung — gemessen, nicht geraten):
 """
 from __future__ import annotations
 
+import csv
 import logging
 import sys
 import time
@@ -1564,6 +1565,9 @@ class ReplayBacktester:
             fee_type="taker",
             pnl=net_pnl,
             pnl_bps=pnl_bps,
+            raw_pnl=raw_pnl,
+            entry_fee=entry_fee,
+            exit_fee=exit_fee,
         )
 
     # ------------------------------------------------------------------
@@ -1580,6 +1584,82 @@ class ReplayBacktester:
         prefer :meth:`is_data_limited_runtime` on a loaded instance.
         """
         return strategy_id in _DATA_LIMITED
+
+    # Stable column order for the per-trade CSV export. Kept as a class-level
+    # constant so both drivers (and the aggregated trades_all.csv) emit the
+    # same header.
+    _TRADE_CSV_COLUMNS: tuple[str, ...] = (
+        "symbol",
+        "strategy",
+        "entry_ts",
+        "exit_ts",
+        "side",
+        "entry_price",
+        "exit_price",
+        "quantity",
+        "raw_pnl",
+        "entry_fee",
+        "exit_fee",
+        "pnl_net",
+        "pnl_bps",
+    )
+
+    @staticmethod
+    def export_trades_csv(
+        trades_by_strategy: dict[str, list[Trade]],
+        path: Path,
+        symbol: str,
+        mode: str,
+    ) -> Path:
+        """Write a per-(symbol, mode) trade CSV using :mod:`csv` (stdlib only).
+
+        Emits one row per :class:`Trade` across all strategies, columns are
+        :attr:`_TRADE_CSV_COLUMNS`. Float fields use ``repr()`` to preserve
+        full precision; timestamps are written as integer ms; the ``side``
+        and ``strategy`` strings are written unquoted unless the underlying
+        :mod:`csv` writer decides quoting is required (commas / quotes).
+
+        The caller is responsible for creating ``path`` 's parent directory.
+        Returns the resolved output path (``path / f"trades_{symbol}_{mode}.csv"``).
+        Bit-identity guarantee: this function is only invoked when the
+        opt-in ``--export-trades`` flag is set on the driver CLI; no replay
+        code path calls it implicitly.
+        """
+        path = Path(path)
+        path.mkdir(parents=True, exist_ok=True)
+        out_path = path / f"trades_{symbol}_{mode}.csv"
+        with out_path.open("w", newline="", encoding="utf-8") as fh:
+            writer = csv.writer(fh)
+            writer.writerow(ReplayBacktester._TRADE_CSV_COLUMNS)
+            for sid in sorted(trades_by_strategy.keys()):
+                for tr in trades_by_strategy[sid]:
+                    writer.writerow(
+                        ReplayBacktester._trade_to_csv_row(tr, sid)
+                    )
+        return out_path
+
+    @staticmethod
+    def _trade_to_csv_row(trade: Trade, strategy_id: str) -> list[str]:
+        """Render a single :class:`Trade` as a list of strings for csv.writer.
+
+        Floats use ``repr()`` so the round-trip is lossless; ints (timestamps,
+        strategy id, side) pass through as their natural representations.
+        """
+        return [
+            str(trade.symbol),
+            str(strategy_id),
+            str(int(trade.entry_ts)),
+            str(int(trade.exit_ts)),
+            str(trade.side),
+            repr(float(trade.entry_price)),
+            repr(float(trade.exit_price)),
+            repr(float(trade.quantity)),
+            repr(float(trade.raw_pnl)),
+            repr(float(trade.entry_fee)),
+            repr(float(trade.exit_fee)),
+            repr(float(trade.pnl)),
+            repr(float(trade.pnl_bps)),
+        ]
 
     def is_data_limited_runtime(self, strategy_id: str) -> bool:
         """Per-instance data-limited check.

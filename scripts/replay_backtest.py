@@ -187,6 +187,21 @@ def main() -> None:
             "cascade-lastigen Daten."
         ),
     )
+    parser.add_argument(
+        "--export-trades",
+        dest="export_trades",
+        default=None,
+        type=str,
+        help=(
+            "Opt-in per-trade CSV export. Path to a writeable directory. "
+            "When set, writes 'trades_{symbol}_{mode}.csv' with one row per "
+            "round-trip trade and the columns symbol, strategy, entry_ts, "
+            "exit_ts, side, entry_price, exit_price, quantity, raw_pnl, "
+            "entry_fee, exit_fee, pnl_net, pnl_bps. Enables a friction-vs-"
+            "direction decomposition from a single replay run. Default off "
+            "(no file writes) -> bit-identical to current behaviour."
+        ),
+    )
     args = parser.parse_args()
     m15_refit_seconds = _resolve_fast_omori(args.fast_omori)
 
@@ -287,6 +302,18 @@ def main() -> None:
                 progress=args.progress,
             )
         diagnostics = bt.get_diagnostics()
+
+        # Opt-in per-trade CSV export (default off -> bit-identical).
+        if args.export_trades:
+            trades_by_strategy = {sid: res.trades for sid, res in results.items()}
+            mode_tag = "walkforward" if args.walkforward else "single_pass"
+            csv_path = ReplayBacktester.export_trades_csv(
+                trades_by_strategy=trades_by_strategy,
+                path=Path(args.export_trades),
+                symbol=args.symbol,
+                mode=mode_tag,
+            )
+            print(f"  Per-trade CSV exportiert: {csv_path}")
     finally:
         bt.close()
 

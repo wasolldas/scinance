@@ -26,6 +26,7 @@ Aufruf::
 from __future__ import annotations
 
 import argparse
+import csv
 import json
 import logging
 import sys
@@ -520,6 +521,7 @@ def run(
     diagnostics_sink: Optional[dict[str, dict[str, Any]]] = None,
     progress: bool = False,
     m15_refit_seconds: float = 0.0,
+    export_trades_dir: Optional[Path] = None,
 ) -> tuple[
     dict[str, dict[str, dict[str, Any]]],
     dict[str, dict[str, Any]],
@@ -534,6 +536,11 @@ def run(
     per-symbol wait-reason / gate-counter diagnostics are written into that
     dict in-place (keyed by symbol). The 4-tuple return shape is preserved so
     existing callers / tests are unaffected.
+
+    When ``export_trades_dir`` is set, after each symbol completes its replay
+    a ``trades_{symbol}_{mode}.csv`` is written into that directory, and a
+    concatenated ``trades_all.csv`` is written once at the end. Default
+    ``None`` -> no file writes (bit-identical).
     """
     per_symbol: dict[str, dict[str, dict[str, Any]]] = {}
     skipped: list[str] = []
@@ -542,6 +549,10 @@ def run(
     diagnostics_per_symbol: dict[str, dict[str, Any]] = (
         diagnostics_sink if diagnostics_sink is not None else {}
     )
+
+    mode_tag: str = "walkforward" if walkforward else "single_pass"
+    # Per-(symbol, strategy) trade lists, only populated when exporting.
+    exported_csv_paths: list[Path] = []
 
     for sym in symbols:
         print(f"\n--- {sym} ---")
@@ -604,6 +615,22 @@ def run(
                 f"status={m['status']}"
             )
 
+        # Opt-in per-symbol trade-CSV export. Default off -> bit-identical.
+        if export_trades_dir is not None:
+            trades_by_strategy = {sid: res.trades for sid, res in results.items()}
+            csv_path = _ReplayBT_Real.export_trades_csv(
+                trades_by_strategy=trades_by_strategy,
+                path=export_trades_dir,
+                symbol=sym,
+                mode=mode_tag,
+            )
+            exported_csv_paths.append(csv_path)
+            print(f"    trades CSV: {csv_path}")
+
+    # Optional aggregated trades_all.csv across all per-symbol CSVs.
+    if export_trades_dir is not None and exported_csv_paths:
+        _concatenate_trade_csvs(exported_csv_paths, export_trades_dir / "trades_all.csv")
+
     aggregate = aggregate_per_strategy(per_symbol)
 
     wf_meta: Optional[dict[str, Any]] = None
@@ -615,6 +642,34 @@ def run(
             "folds_per_symbol": wf_folds_per_symbol,
         }
     return per_symbol, aggregate, skipped, wf_meta
+
+
+def _concatenate_trade_csvs(per_symbol_csvs: list[Path], out_path: Path) -> Path:
+    """Concatenate per-symbol trade CSVs into ``trades_all.csv``.
+
+    Header is taken from the first input file; subsequent files contribute
+    their data rows only. Uses stdlib :mod:`csv` to preserve quoting; each
+    input CSV is read once and its rows passed through unchanged so the
+    aggregated file is byte-for-byte the union of its inputs (modulo the
+    duplicated header). The output directory is created if missing.
+    """
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+    with out_path.open("w", newline="", encoding="utf-8") as fout:
+        writer = csv.writer(fout)
+        header_written: bool = False
+        for in_csv in per_symbol_csvs:
+            with in_csv.open("r", newline="", encoding="utf-8") as fin:
+                reader = csv.reader(fin)
+                try:
+                    header = next(reader)
+                except StopIteration:
+                    continue
+                if not header_written:
+                    writer.writerow(header)
+                    header_written = True
+                for row in reader:
+                    writer.writerow(row)
+    return out_path
 
 
 def write_outputs(
@@ -734,6 +789,22 @@ def _parse_args(argv: Optional[list[str]] = None) -> argparse.Namespace:
             "(Aftershock-Decay im Refit-Fenster) leicht abweichend."
         ),
     )
+    parser.add_argument(
+        "--export-trades",
+        dest="export_trades",
+        default=None,
+        type=str,
+        help=(
+            "Opt-in per-trade CSV export. Path to a writeable directory. "
+            "When set, writes one 'trades_{symbol}_{mode}.csv' per symbol "
+            "plus an aggregated 'trades_all.csv' across symbols, with one "
+            "row per round-trip trade (columns: symbol, strategy, entry_ts, "
+            "exit_ts, side, entry_price, exit_price, quantity, raw_pnl, "
+            "entry_fee, exit_fee, pnl_net, pnl_bps). Enables friction-vs-"
+            "direction decomposition from a single replay run. Default off "
+            "(no file writes) -> bit-identical to current behaviour."
+        ),
+    )
     return parser.parse_args(argv)
 
 
@@ -805,6 +876,9 @@ def main(argv: Optional[list[str]] = None) -> int:
         return 1
 
     diagnostics_per_symbol: dict[str, dict[str, Any]] = {}
+    export_trades_dir: Optional[Path] = (
+        Path(args.export_trades) if args.export_trades else None
+    )
     per_symbol, aggregate, skipped, wf_meta = run(
         symbols=symbols,
         db_path=db_path,
@@ -817,6 +891,7 @@ def main(argv: Optional[list[str]] = None) -> int:
         diagnostics_sink=diagnostics_per_symbol,
         progress=args.progress,
         m15_refit_seconds=m15_refit_seconds,
+        export_trades_dir=export_trades_dir,
     )
 
     mode = "walkforward" if args.walkforward else "single_pass"
