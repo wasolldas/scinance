@@ -438,6 +438,14 @@ S3_PRESSURE_QUANTILE: Final[float] = 0.90  # |Pressure| > Q90
 S3_EXIT_FUNDING_BAND: Final[tuple[float, float]] = (-0.0001, 0.0001)
 S3_INVERT_DIRECTION: bool = False
 
+# Iter-4 Push A: bounded-loss exits for S3. Both default off ->
+# bit-identical to iter-3 behavior. Enable via CLI flags
+# --s3-time-stop / --s3-hard-stop on the replay drivers.
+S3_TIME_STOP_ENABLED: bool = False
+S3_TIME_STOP_MS: int = 120_000              # 120 s wall-clock cap
+S3_HARD_STOP_ENABLED: bool = False
+S3_HARD_STOP_BPS: float = -30.0             # -30 bps mark-to-market floor
+
 # Strategie 4: Pattern × Foundation Ensemble
 S4_CONSENSUS_MIN_MODELS: Final[int] = 2  # ≥ 2 von 3
 S4_FORECAST_PEARSON_MIN: Final[float] = 0.6  # Pearson > 0.6

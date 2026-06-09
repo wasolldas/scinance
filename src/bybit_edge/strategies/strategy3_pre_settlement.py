@@ -158,7 +158,7 @@ class Strategy3PreSettlement:
         # ----------------------------------------------------------
         if self._in_trade:
             exit_reason: str | None = self._check_exit(
-                seconds_to_settlement, pressure, now
+                seconds_to_settlement, pressure, now, price
             )
             if exit_reason is not None:
                 self._in_trade = False
@@ -317,10 +317,16 @@ class Strategy3PreSettlement:
         seconds_to_settlement: float,
         pressure: float,
         now: float,
+        price: float,
     ) -> str | None:
         """Evaluate exit conditions.
 
         Returns a reason string if exit should happen, None otherwise.
+
+        Iter-4 Push A adds two opt-in bounded-loss exits AFTER the existing
+        clauses: a wall-clock time-stop and a mark-to-market hard-stop. Both
+        are gated by config flags that default to False, so when the flags
+        are off the control flow is byte-identical to iter-3.
         """
         # Exit condition 1: Settlement-Tick + 10 min
         # We detect this by checking if we have passed the settlement
@@ -339,6 +345,34 @@ class Strategy3PreSettlement:
         band_low, band_high = _exit_band()
         if band_low <= pressure <= band_high:
             return "pressure_dissipated"
+
+        # Iter-4 bounded-loss exits. Lazy import mirrors the on_ticker pattern
+        # (line 196) so ParameterContext can hot-reload tuning overrides.
+        from bybit_edge import config as _cfg
+
+        # Exit condition 3: wall-clock time-stop (iter-4 Push A T1).
+        if _cfg.S3_TIME_STOP_ENABLED and self._entry_ts > 0:
+            elapsed_ms: float = (now - self._entry_ts) * 1000.0
+            if elapsed_ms > _cfg.S3_TIME_STOP_MS:
+                return "time_stop_exceeded"
+
+        # Exit condition 4: mark-to-market hard-stop (iter-4 Push A T1).
+        # Sign-safe under S3_INVERT_DIRECTION because mtm is computed from
+        # the actually-entered direction (_entry_direction), which already
+        # carries any inversion applied at on_ticker entry-emission time.
+        if _cfg.S3_HARD_STOP_ENABLED and self._entry_price > 0:
+            if self._entry_direction == 1:
+                mtm_bps: float = (
+                    (price - self._entry_price) / self._entry_price * 1e4
+                )
+            elif self._entry_direction == -1:
+                mtm_bps = (
+                    (self._entry_price - price) / self._entry_price * 1e4
+                )
+            else:
+                mtm_bps = 0.0
+            if mtm_bps < _cfg.S3_HARD_STOP_BPS:
+                return "hard_stop_loss"
 
         return None
 

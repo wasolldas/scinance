@@ -774,6 +774,28 @@ def _parse_args(argv: Optional[list[str]] = None) -> argparse.Namespace:
         ),
     )
     parser.add_argument(
+        "--s3-time-stop",
+        dest="s3_time_stop",
+        action="store_true",
+        default=False,
+        help=(
+            "Iter-4 Push A T1: enable S3's wall-clock time-stop "
+            "(default 120 s, see S3_TIME_STOP_MS). Default off -> "
+            "bit-identical to iter-3 behaviour."
+        ),
+    )
+    parser.add_argument(
+        "--s3-hard-stop",
+        dest="s3_hard_stop",
+        action="store_true",
+        default=False,
+        help=(
+            "Iter-4 Push A T1: enable S3's mark-to-market hard-stop-loss "
+            "(default -30 bps, see S3_HARD_STOP_BPS). Default off -> "
+            "bit-identical to iter-3 behaviour."
+        ),
+    )
+    parser.add_argument(
         "--fast-omori",
         dest="fast_omori",
         nargs="?",
@@ -831,6 +853,12 @@ def main(argv: Optional[list[str]] = None) -> int:
     if "S3" in inverts:
         _cfg.S3_INVERT_DIRECTION = True
 
+    # Iter-4 Push A T1: opt-in bounded-loss exits for S3.
+    if args.s3_time_stop:
+        _cfg.S3_TIME_STOP_ENABLED = True
+    if args.s3_hard_stop:
+        _cfg.S3_HARD_STOP_ENABLED = True
+
     # Surface the per-symbol progress lines (logging.INFO on the backtester
     # logger) when running interactively with progress enabled.
     if args.progress:
@@ -862,6 +890,10 @@ def main(argv: Optional[list[str]] = None) -> int:
         )
     if inverts:
         print(f"  [INVERT] Inverted directions: {', '.join(sorted(inverts))}")
+    if args.s3_time_stop:
+        print(f"  [S3-TIME-STOP] enabled at {_cfg.S3_TIME_STOP_MS} ms")
+    if args.s3_hard_stop:
+        print(f"  [S3-HARD-STOP] enabled at {_cfg.S3_HARD_STOP_BPS} bps")
     print("=" * 80)
 
     if not symbols:
