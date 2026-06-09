@@ -193,6 +193,18 @@ def main() -> None:
         ),
     )
     parser.add_argument(
+        "--s1-rho-instrument",
+        dest="s1_rho_instrument",
+        action="store_true",
+        default=False,
+        help=(
+            "Iter-4 Push A T2: opt-in S1 rho-distribution instrumentation. "
+            "Captures every rho value seen at the _check_entry call site "
+            "and writes 'rho_distribution_{symbol}.json' with quantiles to "
+            "edge_research_framework/results/. Default off -> bit-identical."
+        ),
+    )
+    parser.add_argument(
         "--fast-omori",
         dest="fast_omori",
         nargs="?",
@@ -250,6 +262,9 @@ def main() -> None:
         _cfg.S3_TIME_STOP_ENABLED = True
     if args.s3_hard_stop:
         _cfg.S3_HARD_STOP_ENABLED = True
+    # Iter-4 Push A T2: opt-in S1 rho-distribution instrumentation.
+    if args.s1_rho_instrument:
+        _cfg.S1_RHO_INSTRUMENT_ENABLED = True
 
     # Ensure the progress lines (logging.INFO on the backtester logger) are
     # actually surfaced when running interactively.
@@ -284,6 +299,8 @@ def main() -> None:
         print(f"  [S3-TIME-STOP] enabled at {_cfg.S3_TIME_STOP_MS} ms")
     if args.s3_hard_stop:
         print(f"  [S3-HARD-STOP] enabled at {_cfg.S3_HARD_STOP_BPS} bps")
+    if args.s1_rho_instrument:
+        print("  [S1-RHO-INSTRUMENT] enabled (will dump rho_distribution_*.json)")
     print("=" * 75)
 
     if str(db_path) != ":memory:" and not Path(db_path).exists():
@@ -334,6 +351,19 @@ def main() -> None:
                 progress=args.progress,
             )
         diagnostics = bt.get_diagnostics()
+
+        # Iter-4 Push A T2: opt-in S1 rho-distribution flush.
+        if args.s1_rho_instrument:
+            s1 = bt.get_strategy("S1")
+            if s1 is not None:
+                rho_out_dir = (
+                    Path(__file__).resolve().parent.parent
+                    / "edge_research_framework"
+                    / "results"
+                )
+                dumped = s1.dump_rho_distribution(args.symbol, rho_out_dir)
+                if dumped is not None:
+                    print(f"  Rho-Distribution exportiert: {dumped}")
 
         # Opt-in per-trade CSV export (default off -> bit-identical).
         if args.export_trades:

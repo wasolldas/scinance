@@ -21,8 +21,10 @@ Edge: Mean-Reversion nach Liquidations-Klimax.
 
 from __future__ import annotations
 
+import json
 import time
 from collections import deque
+from pathlib import Path
 from typing import Any
 
 import numpy as np
@@ -71,6 +73,11 @@ class Strategy1CascadeDetector:
 
         # b-value history for z-score
         self._b_history: deque[float] = deque(maxlen=_B_HISTORY_MAXLEN)
+
+        # Iter-4 Push A T2: opt-in rho-distribution instrumentation.
+        # Lazily allocated on the first _check_entry call when the flag is
+        # ON. Stays None when the flag is OFF -> zero overhead.
+        self._rho_samples: deque[float] | None = None
 
     # ------------------------------------------------------------------
     # Public API
@@ -208,6 +215,19 @@ class Strategy1CascadeDetector:
         """Evaluate all four entry conditions from PRD 7.1."""
         rho: float = m14_out["branching_ratio"]
 
+        # Iter-4 Push A T2: opt-in rho-distribution instrumentation.
+        # Captured BEFORE the short-circuit below so the sample population
+        # includes the (typically dominant) rho_below_threshold ticks.
+        # Lazy config import + lazy buffer alloc keep the flag-off path
+        # bit-identical to iter-3.
+        from bybit_edge import config as _cfg
+        if _cfg.S1_RHO_INSTRUMENT_ENABLED:
+            if self._rho_samples is None:
+                self._rho_samples = deque(
+                    maxlen=_cfg.S1_RHO_INSTRUMENT_MAXLEN
+                )
+            self._rho_samples.append(float(rho))
+
         # Condition 1: rho > 0.85 AND rising (d_rho/dt > 0)
         if rho <= S1_RHO_ENTRY:
             return False, "rho_below_threshold"
@@ -297,6 +317,45 @@ class Strategy1CascadeDetector:
         self._pre_cascade_oi = 0.0
         self._rho_history.clear()
         self._b_history.clear()
+        # Iter-4 Push A T2: drop any collected instrumentation samples so a
+        # post-reset replay does not commingle samples across runs.
+        if self._rho_samples is not None:
+            self._rho_samples.clear()
+
+    def dump_rho_distribution(
+        self, symbol: str, out_dir: Path
+    ) -> Path | None:
+        """Write the captured rho-sample distribution as JSON.
+
+        Iter-4 Push A T2 instrumentation flush. Returns the written path or
+        ``None`` if no samples were collected (flag was off, or strategy
+        was never driven). Output file:
+        ``out_dir / f"rho_distribution_{symbol}.json"``.
+        """
+        if self._rho_samples is None or len(self._rho_samples) == 0:
+            return None
+        arr = np.asarray(list(self._rho_samples), dtype=np.float64)
+        quantiles = {
+            "min": float(arr.min()),
+            "p10": float(np.quantile(arr, 0.10)),
+            "p25": float(np.quantile(arr, 0.25)),
+            "p50": float(np.quantile(arr, 0.50)),
+            "p75": float(np.quantile(arr, 0.75)),
+            "p90": float(np.quantile(arr, 0.90)),
+            "p95": float(np.quantile(arr, 0.95)),
+            "p99": float(np.quantile(arr, 0.99)),
+            "max": float(arr.max()),
+        }
+        payload: dict[str, Any] = {
+            "symbol": symbol,
+            "n_samples": int(arr.size),
+            "threshold": float(S1_RHO_ENTRY),
+            "quantiles": quantiles,
+        }
+        out_dir.mkdir(parents=True, exist_ok=True)
+        out_path = out_dir / f"rho_distribution_{symbol}.json"
+        out_path.write_text(json.dumps(payload, indent=2), encoding="utf-8")
+        return out_path
 
     @property
     def in_trade(self) -> bool:

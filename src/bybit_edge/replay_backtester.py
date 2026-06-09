@@ -292,6 +292,11 @@ class ReplayBacktester:
         # Number of folds executed by the last ``run_walkforward`` call.
         # 0 until a walk-forward run has been completed.
         self.last_walkforward_folds: int = 0
+        # Strategies dict from the most recent run / run_walkforward call.
+        # Set inside ``run`` / ``run_walkforward`` after construction. Exposed
+        # read-only via :meth:`get_strategy` so CLI drivers can flush
+        # opt-in instrumentation (e.g. S1 rho samples) after the replay.
+        self._last_strategies: dict[str, Any] = {}
 
     # ------------------------------------------------------------------
     # Event loading
@@ -950,6 +955,9 @@ class ReplayBacktester:
         strategies: dict[str, Any] = self._build_strategies()
         for strat in strategies.values():
             strat.reset()
+        # Make the post-run strategy instances reachable via get_strategy()
+        # so CLI drivers can flush opt-in instrumentation after the replay.
+        self._last_strategies = strategies
 
         # Per-strategy open position: {"side","entry_price","entry_ts"} or None.
         open_pos: dict[str, Optional[dict[str, Any]]] = {sid: None for sid in strategies}
@@ -1039,6 +1047,16 @@ class ReplayBacktester:
             every_events=every,
             logger_=logger,
         )
+
+    def get_strategy(self, sid: str) -> Optional[Any]:
+        """Return the post-run strategy instance for ``sid``, or None.
+
+        Read-only accessor exposed so CLI drivers can flush opt-in
+        instrumentation (e.g. S1 rho-distribution sampling, T2) after the
+        replay finishes. Returns None before any ``run`` / ``run_walkforward``
+        call and for unknown strategy ids.
+        """
+        return self._last_strategies.get(sid)
 
     def _build_strategies(self) -> dict[str, Any]:
         """Construct one fresh instance per strategy id (mirrors live runner).
@@ -1409,6 +1427,9 @@ class ReplayBacktester:
             strategies = self._build_strategies()
             for strat in strategies.values():
                 strat.reset()
+            # Track the latest fold's strategies so post-run flush hooks
+            # (e.g. dump_rho_distribution) see the most recent state.
+            self._last_strategies = strategies
 
             trade_buffer = TradeBuffer(maxlen=2000)
             liq_buffer = LiquidationBuffer(maxlen=2000)

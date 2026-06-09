@@ -161,6 +161,7 @@ def run_symbol(
     diagnose: bool = False,
     progress: bool = False,
     m15_refit_seconds: float = 0.0,
+    s1_rho_instrument_dir: Optional[Path] = None,
 ) -> Optional[tuple[dict[str, BacktestResult], int, int, dict[str, Any]]]:
     """Run the replay for a single symbol.
 
@@ -209,6 +210,11 @@ def run_symbol(
         diagnostics = bt.get_diagnostics() if diagnose else {}
         return results, n_events, 0, diagnostics
     finally:
+        # Iter-4 Push A T2: flush S1 rho-distribution before close().
+        if s1_rho_instrument_dir is not None:
+            s1 = bt.get_strategy("S1")
+            if s1 is not None:
+                s1.dump_rho_distribution(symbol, s1_rho_instrument_dir)
         bt.close()
 
 
@@ -522,6 +528,7 @@ def run(
     progress: bool = False,
     m15_refit_seconds: float = 0.0,
     export_trades_dir: Optional[Path] = None,
+    s1_rho_instrument_dir: Optional[Path] = None,
 ) -> tuple[
     dict[str, dict[str, dict[str, Any]]],
     dict[str, dict[str, Any]],
@@ -568,6 +575,7 @@ def run(
                 diagnose=diagnose,
                 progress=progress,
                 m15_refit_seconds=m15_refit_seconds,
+                s1_rho_instrument_dir=s1_rho_instrument_dir,
             )
         except Exception as exc:  # noqa: BLE001 — keep going on per-symbol error
             print(f"  ! Replay fuer {sym} fehlgeschlagen: {exc}")
@@ -796,6 +804,19 @@ def _parse_args(argv: Optional[list[str]] = None) -> argparse.Namespace:
         ),
     )
     parser.add_argument(
+        "--s1-rho-instrument",
+        dest="s1_rho_instrument",
+        action="store_true",
+        default=False,
+        help=(
+            "Iter-4 Push A T2: opt-in S1 rho-distribution instrumentation. "
+            "Captures every rho value seen at the _check_entry call site "
+            "and writes one 'rho_distribution_{symbol}.json' per symbol "
+            "with quantiles to edge_research_framework/results/. Default "
+            "off -> bit-identical."
+        ),
+    )
+    parser.add_argument(
         "--fast-omori",
         dest="fast_omori",
         nargs="?",
@@ -858,6 +879,9 @@ def main(argv: Optional[list[str]] = None) -> int:
         _cfg.S3_TIME_STOP_ENABLED = True
     if args.s3_hard_stop:
         _cfg.S3_HARD_STOP_ENABLED = True
+    # Iter-4 Push A T2: opt-in S1 rho-distribution instrumentation.
+    if args.s1_rho_instrument:
+        _cfg.S1_RHO_INSTRUMENT_ENABLED = True
 
     # Surface the per-symbol progress lines (logging.INFO on the backtester
     # logger) when running interactively with progress enabled.
@@ -894,6 +918,8 @@ def main(argv: Optional[list[str]] = None) -> int:
         print(f"  [S3-TIME-STOP] enabled at {_cfg.S3_TIME_STOP_MS} ms")
     if args.s3_hard_stop:
         print(f"  [S3-HARD-STOP] enabled at {_cfg.S3_HARD_STOP_BPS} bps")
+    if args.s1_rho_instrument:
+        print("  [S1-RHO-INSTRUMENT] enabled (will dump rho_distribution_*.json)")
     print("=" * 80)
 
     if not symbols:
@@ -911,6 +937,15 @@ def main(argv: Optional[list[str]] = None) -> int:
     export_trades_dir: Optional[Path] = (
         Path(args.export_trades) if args.export_trades else None
     )
+    # Iter-4 Push A T2: where rho_distribution_{symbol}.json files land
+    # when --s1-rho-instrument is set. Mirrors the run-output directory.
+    s1_rho_dir: Optional[Path] = None
+    if args.s1_rho_instrument:
+        s1_rho_dir = (
+            Path(__file__).resolve().parent.parent
+            / "edge_research_framework"
+            / "results"
+        )
     per_symbol, aggregate, skipped, wf_meta = run(
         symbols=symbols,
         db_path=db_path,
@@ -924,6 +959,7 @@ def main(argv: Optional[list[str]] = None) -> int:
         progress=args.progress,
         m15_refit_seconds=m15_refit_seconds,
         export_trades_dir=export_trades_dir,
+        s1_rho_instrument_dir=s1_rho_dir,
     )
 
     mode = "walkforward" if args.walkforward else "single_pass"

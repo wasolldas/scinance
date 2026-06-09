@@ -424,6 +424,11 @@ S1_RHO_EXIT: Final[float] = 0.50  # ρ(Φ) < 0.5
 S1_B_ZSCORE: Final[float] = 2.0  # b < b̄_30d - 2σ
 S1_OMORI_DECAY_FACTOR: Final[float] = 5.0  # t > 5·c → Exit
 
+# Iter-4 Push A: opt-in rho-distribution instrumentation. Default off ->
+# the histogram path is dead code and the strategy has zero overhead.
+S1_RHO_INSTRUMENT_ENABLED: bool = False
+S1_RHO_INSTRUMENT_MAXLEN: int = 100_000
+
 # Strategie 2: Entropie-Momentum
 S2_ENTROPY_ZSCORE: Final[float] = 2.0  # H < Median - 2σ
 S2_PRESSURE_DISSIPATION: Final[float] = 0.0001  # |P - F| < 0.01%
