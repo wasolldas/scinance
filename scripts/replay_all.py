@@ -817,6 +817,18 @@ def _parse_args(argv: Optional[list[str]] = None) -> argparse.Namespace:
         ),
     )
     parser.add_argument(
+        "--s2-maker-only",
+        dest="s2_maker_only",
+        action="store_true",
+        default=False,
+        help=(
+            "Iter-4 Push A T3: opt-in maker-only fill model for S2 only. "
+            "Sets both S2 trade legs to 0.0 fees (worst-case-for-our-"
+            "hypothesis vs. the ~-2.5 bps Bybit maker rebate). S3 and other "
+            "strategies are unaffected. Default off -> bit-identical."
+        ),
+    )
+    parser.add_argument(
         "--fast-omori",
         dest="fast_omori",
         nargs="?",
@@ -882,6 +894,9 @@ def main(argv: Optional[list[str]] = None) -> int:
     # Iter-4 Push A T2: opt-in S1 rho-distribution instrumentation.
     if args.s1_rho_instrument:
         _cfg.S1_RHO_INSTRUMENT_ENABLED = True
+    # Iter-4 Push A T3: opt-in S2 maker-only fee model.
+    if args.s2_maker_only:
+        _cfg.S2_MAKER_ONLY = True
 
     # Surface the per-symbol progress lines (logging.INFO on the backtester
     # logger) when running interactively with progress enabled.
@@ -920,6 +935,8 @@ def main(argv: Optional[list[str]] = None) -> int:
         print(f"  [S3-HARD-STOP] enabled at {_cfg.S3_HARD_STOP_BPS} bps")
     if args.s1_rho_instrument:
         print("  [S1-RHO-INSTRUMENT] enabled (will dump rho_distribution_*.json)")
+    if args.s2_maker_only:
+        print("  [S2-MAKER-ONLY] enabled (S2 fees set to 0.0; S3 unaffected)")
     print("=" * 80)
 
     if not symbols:

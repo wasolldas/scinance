@@ -1012,6 +1012,7 @@ class ReplayBacktester:
                         entry_ts=pos["entry_ts"],
                         exit_price=final_price,
                         exit_ts=final_ts_ms,
+                        strategy_id=sid,
                     )
                 )
                 open_pos[sid] = None
@@ -1509,6 +1510,7 @@ class ReplayBacktester:
                             entry_ts=pos["entry_ts"],
                             exit_price=final_price,
                             exit_ts=final_ts_ms,
+                            strategy_id=sid,
                         )
                     )
                     open_pos[sid] = None
@@ -1568,6 +1570,7 @@ class ReplayBacktester:
                         entry_ts=pos["entry_ts"],
                         exit_price=price,
                         exit_ts=ts_ms,
+                        strategy_id=strategy_id,
                     )
                 )
             open_pos[strategy_id] = None
@@ -1579,15 +1582,29 @@ class ReplayBacktester:
         entry_ts: int,
         exit_price: float,
         exit_ts: int,
+        strategy_id: str = "",
     ) -> Trade:
-        """Build a fee/slippage-aware round-trip :class:`Trade` (qty=1.0)."""
+        """Build a fee/slippage-aware round-trip :class:`Trade` (qty=1.0).
+
+        Iter-4 Push A T3: when ``strategy_id == "S2"`` and the opt-in flag
+        ``config.S2_MAKER_ONLY`` is True, both legs are charged 0.0 fees
+        (worst-case-for-our-hypothesis vs. the ~-2.5 bps Bybit maker
+        rebate — if S2 still loses with zero fees it would still lose
+        with rebates). S3 (and every other strategy) is unaffected; this
+        is strictly an S2 forensic flag. Default off -> bit-identical.
+        """
         qty = 1.0
         slip_entry = self.engine._slipped_price(entry_price, side)
         exit_side = "Short" if side == "Long" else "Long"
         slip_exit = self.engine._slipped_price(exit_price, exit_side)
 
-        entry_fee = self.engine._apply_fee(slip_entry, qty, "taker")
-        exit_fee = self.engine._apply_fee(slip_exit, qty, "taker")
+        from bybit_edge import config as _cfg
+        if strategy_id == "S2" and _cfg.S2_MAKER_ONLY:
+            entry_fee = 0.0
+            exit_fee = 0.0
+        else:
+            entry_fee = self.engine._apply_fee(slip_entry, qty, "taker")
+            exit_fee = self.engine._apply_fee(slip_exit, qty, "taker")
 
         if side == "Long":
             raw_pnl = (slip_exit - slip_entry) * qty

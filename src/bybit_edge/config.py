@@ -438,6 +438,13 @@ S2_PRESSURE_DISSIPATION: Final[float] = 0.0001  # |P - F| < 0.01%
 # mapping is inverted vs. the actual edge.
 S2_INVERT_DIRECTION: bool = False
 
+# Iter-4 Push A: opt-in maker-only fill model for S2. Default False ->
+# bit-identical taker-fee behavior. When True, S2 trade fees are 0.0
+# (worst-case-for-our-hypothesis vs. the ~-2.5 bps Bybit maker rebate;
+# if S2 still loses with zero fees, it would still lose with rebates).
+# S3 fees are unaffected; this is strictly an S2 forensic.
+S2_MAKER_ONLY: bool = False
+
 # Strategie 3: Pre-Settlement Pressure-Release
 S3_PRESSURE_QUANTILE: Final[float] = 0.90  # |Pressure| > Q90
 S3_EXIT_FUNDING_BAND: Final[tuple[float, float]] = (-0.0001, 0.0001)
