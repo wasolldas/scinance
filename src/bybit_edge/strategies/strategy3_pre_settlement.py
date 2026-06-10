@@ -372,10 +372,16 @@ class Strategy3PreSettlement:
             if elapsed_ms > _cfg.S3_TIME_STOP_MS:
                 return "time_stop_exceeded"
 
-        # Exit condition 4: mark-to-market hard-stop (iter-4 Push A T1).
-        # Sign-safe under S3_INVERT_DIRECTION because mtm is computed from
-        # the actually-entered direction (_entry_direction), which already
-        # carries any inversion applied at on_ticker entry-emission time.
+        # Exit condition 4: friction-aware mark-to-market hard-stop (iter-5 T2).
+        # Compare PROJECTED NET pnl (mtm minus the round-trip taker fees that
+        # will have been paid by the time this exit settles) against the floor.
+        # The entry leg fee is already sunk; the exit leg is about to be paid;
+        # the threshold (-30 bps) is therefore consistently expressed in NET
+        # bps. Closes the iter-4 calibration gap where 33 of 213 trades exited
+        # at pnl_bps < -30 because the floor compared raw MTM, not projected
+        # net. Sign-safe under S3_INVERT_DIRECTION because mtm is computed
+        # from the actually-entered direction (_entry_direction), which
+        # already carries any inversion applied at entry-emission time.
         if _cfg.S3_HARD_STOP_ENABLED and self._entry_price > 0:
             if self._entry_direction == 1:
                 mtm_bps: float = (
@@ -387,7 +393,8 @@ class Strategy3PreSettlement:
                 )
             else:
                 mtm_bps = 0.0
-            if mtm_bps < _cfg.S3_HARD_STOP_BPS:
+            projected_net_bps: float = mtm_bps - 2.0 * _cfg.S3_FRICTION_BPS_PER_LEG
+            if projected_net_bps < _cfg.S3_HARD_STOP_BPS:
                 return "hard_stop_loss"
 
         return None

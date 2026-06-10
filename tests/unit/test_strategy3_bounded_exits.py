@@ -75,6 +75,7 @@ def _reset_s3_flags():
         _cfg.S3_HARD_STOP_ENABLED,
         _cfg.S3_HARD_STOP_BPS,
         _cfg.S3_INVERT_DIRECTION,
+        _cfg.S3_FRICTION_BPS_PER_LEG,
     )
     _cfg.S3_TIME_STOP_ENABLED = False
     _cfg.S3_HARD_STOP_ENABLED = False
@@ -86,6 +87,7 @@ def _reset_s3_flags():
         _cfg.S3_HARD_STOP_ENABLED,
         _cfg.S3_HARD_STOP_BPS,
         _cfg.S3_INVERT_DIRECTION,
+        _cfg.S3_FRICTION_BPS_PER_LEG,
     ) = saved
 
 
@@ -420,3 +422,75 @@ def test_replay_call_site_passes_ts() -> None:
         assert strat._entry_ts == 12345.0
     finally:
         bt.close()
+
+
+# ═══════════════════════════════════════════════════════════════════
+# iter-5 T2: friction-aware hard-stop
+# ═══════════════════════════════════════════════════════════════════
+
+def test_hard_stop_friction_aware_threshold() -> None:
+    """Pin the new boundary: with S3_FRICTION_BPS_PER_LEG=5.5 and
+    S3_HARD_STOP_BPS=-30.0, the hard-stop fires when
+    `mtm_bps - 2 * 5.5 < -30`, i.e. when raw MTM < -19 bps (strict).
+
+    - raw -19 bps -> projected -30 bps: NOT fire (strict `<` boundary).
+    - raw -20 bps -> projected -31 bps: FIRES.
+    - raw -18 bps -> projected -29 bps: NOT fire.
+    """
+    strat = Strategy3PreSettlement()
+    strat._in_trade = True
+    strat._entry_price = 100.0
+    strat._entry_direction = 1
+    strat._entry_ts = 1_000.0
+    strat._settlement_ts = 5_000.0
+
+    _cfg.S3_HARD_STOP_ENABLED = True
+    _cfg.S3_FRICTION_BPS_PER_LEG = 5.5
+    _cfg.S3_HARD_STOP_BPS = -30.0
+
+    # Exactly at the floor: projected = -30 bps. Strict `<` -> NOT fire.
+    r_boundary = strat._check_exit(
+        seconds_to_settlement=500.0, pressure=0.0005, now=1_001.0, price=99.81
+    )
+    assert r_boundary != "hard_stop_loss"
+
+    # Just below: projected = -31 bps -> FIRES.
+    r_below = strat._check_exit(
+        seconds_to_settlement=500.0, pressure=0.0005, now=1_001.0, price=99.80
+    )
+    assert r_below == "hard_stop_loss"
+
+    # Just above: projected = -29 bps -> NOT fire.
+    r_above = strat._check_exit(
+        seconds_to_settlement=500.0, pressure=0.0005, now=1_001.0, price=99.82
+    )
+    assert r_above != "hard_stop_loss"
+
+
+def test_hard_stop_friction_config_overridable() -> None:
+    """Setting S3_FRICTION_BPS_PER_LEG=0 collapses the projection to raw
+    MTM (iter-4 behavior). Confirms the config knob actually controls
+    the threshold and the math is wired correctly.
+    """
+    strat = Strategy3PreSettlement()
+    strat._in_trade = True
+    strat._entry_price = 100.0
+    strat._entry_direction = 1
+    strat._entry_ts = 1_000.0
+    strat._settlement_ts = 5_000.0
+
+    _cfg.S3_HARD_STOP_ENABLED = True
+    _cfg.S3_FRICTION_BPS_PER_LEG = 0.0
+    _cfg.S3_HARD_STOP_BPS = -30.0
+
+    # raw -29 bps -> projected -29 bps: NOT fire.
+    r_above = strat._check_exit(
+        seconds_to_settlement=500.0, pressure=0.0005, now=1_001.0, price=99.71
+    )
+    assert r_above != "hard_stop_loss"
+
+    # raw -31 bps -> projected -31 bps: FIRES.
+    r_below = strat._check_exit(
+        seconds_to_settlement=500.0, pressure=0.0005, now=1_001.0, price=99.69
+    )
+    assert r_below == "hard_stop_loss"

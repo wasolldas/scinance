@@ -458,6 +458,13 @@ S3_TIME_STOP_MS: int = 120_000              # 120 s wall-clock cap
 S3_HARD_STOP_ENABLED: bool = False
 S3_HARD_STOP_BPS: float = -30.0             # -30 bps mark-to-market floor
 
+# iter-5 T2: friction projection used by the hard-stop. Bybit taker = 5.5 bps
+# per leg as of 2026-06 (1 bps = 0.0001). Set per-leg (not round-trip) so the
+# arithmetic at the call-site is `mtm_bps - 2 * S3_FRICTION_BPS_PER_LEG`, which
+# reads as "subtract the entry leg already paid plus the exit leg about to
+# be paid". Mutable (not Final) so live runners can override at startup.
+S3_FRICTION_BPS_PER_LEG: float = 5.5
+
 # Strategie 4: Pattern × Foundation Ensemble
 S4_CONSENSUS_MIN_MODELS: Final[int] = 2  # ≥ 2 von 3
 S4_FORECAST_PEARSON_MIN: Final[float] = 0.6  # Pearson > 0.6
