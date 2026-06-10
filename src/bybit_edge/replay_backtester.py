@@ -755,6 +755,7 @@ class ReplayBacktester:
                 ticker_data=ticker_data,
                 seconds_to_settlement=seconds_to_settlement,
                 open_interest=open_interest,
+                ts=ts_seconds,
             )
 
         if strategy_id == "S4":

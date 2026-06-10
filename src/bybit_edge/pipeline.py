@@ -237,6 +237,7 @@ class Pipeline:
             ticker_data=ticker_data,
             seconds_to_settlement=seconds_to_settlement,
             open_interest=open_interest,
+            ts=ts,
         )
         s3_signal.setdefault("confidence", l5_m22.get("confidence", 0.0))
         strategy_signals.append(s3_signal)

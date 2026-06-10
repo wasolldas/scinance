@@ -304,3 +304,119 @@ def test_flags_off_baseline_unchanged() -> None:
 
     expected: list[tuple[str, str]] = [("exit", "pressure_dissipated")]
     assert exits == expected
+
+
+# ═══════════════════════════════════════════════════════════════════
+# iter-5 T1: market-tick time threaded through on_ticker
+# ═══════════════════════════════════════════════════════════════════
+
+def test_time_stop_uses_market_time_not_wall_clock() -> None:
+    """Regression for the iter-4 fast-replay bug. Pass `ts=` to on_ticker
+    and advance market time by 121 s WITHOUT touching wall-clock. The
+    time-stop must fire because the elapsed math now uses market time.
+
+    This is the load-bearing test of iter-5 T1: would have caught the
+    1-of-213-firings bug in iter-4 Push A.
+    """
+    strat = Strategy3PreSettlement()
+    _warm_up_strategy(strat)
+
+    # Enter Long at market-tick ts = 1_000_000.0
+    entry_ticker = _make_ticker(
+        last_price=49950.0,
+        premium_index=-0.01,
+        mark_price=49950.0,
+        index_price=50000.0,
+    )
+    entry_result = strat.on_ticker(
+        entry_ticker,
+        seconds_to_settlement=900.0,
+        open_interest=1100.0,
+        ts=1_000_000.0,
+    )
+    assert entry_result["action"] == "enter"
+    assert strat._entry_ts == 1_000_000.0
+
+    _cfg.S3_TIME_STOP_ENABLED = True
+
+    # Drive a follow-up tick 121 s LATER in market time. Wall-clock
+    # between the two on_ticker calls is sub-millisecond — the iter-4
+    # implementation would NOT have fired the time-stop here.
+    result = strat.on_ticker(
+        _make_ticker(premium_index=-0.01, mark_price=49950.0),
+        seconds_to_settlement=779.0,
+        open_interest=1100.0,
+        ts=1_000_121.0,
+    )
+    assert result["action"] == "exit"
+    assert result["reason"] == "time_stop_exceeded"
+
+
+def test_default_ts_falls_back_to_wall_clock() -> None:
+    """Bit-identical guard: when `ts` is not passed, on_ticker falls back
+    to `time.time()` for both the entry stamp and the time-stop math, so
+    iter-4-style `patch("...time.time", ...)` mocks keep working.
+    """
+    import time as _time
+
+    strat = Strategy3PreSettlement()
+    _warm_up_strategy(strat)
+
+    # Enter without passing ts=. Confirm _entry_ts comes from wall-clock.
+    wall_before: float = _time.time()
+    _enter_long(strat)
+    wall_after: float = _time.time()
+    assert wall_before <= strat._entry_ts <= wall_after
+
+    entry_ts = strat._entry_ts
+    _cfg.S3_TIME_STOP_ENABLED = True
+
+    # Drive another tick without ts= and patch time.time forward.
+    with patch("bybit_edge.strategies.strategy3_pre_settlement.time.time",
+               return_value=entry_ts + 121.0):
+        result = strat.on_ticker(
+            _make_ticker(premium_index=-0.01, mark_price=49950.0),
+            seconds_to_settlement=800.0,
+            open_interest=1100.0,
+        )
+    assert result["action"] == "exit"
+    assert result["reason"] == "time_stop_exceeded"
+
+
+def test_replay_call_site_passes_ts() -> None:
+    """Call-site contract: ReplayBacktester._eval_strategy must thread
+    ts_seconds into Strategy3PreSettlement.on_ticker as the `ts` kwarg.
+
+    Uses the real-strategy form: build a Strategy3PreSettlement, warm it
+    up to entry-ready, then call _eval_strategy with a known ts_seconds
+    and assert the entry stamp matches.
+    """
+    from pathlib import Path
+
+    from bybit_edge.replay_backtester import ReplayBacktester
+
+    bt = ReplayBacktester(symbol="BTCUSDT", db_path=Path(":memory:"))
+    try:
+        strat = Strategy3PreSettlement()
+        _warm_up_strategy(strat)
+
+        # Build the minimal ticker_data _eval_strategy reads for S3.
+        ticker_data: dict[str, Any] = {
+            "last_price": 49950.0,
+            "mark_price": 49950.0,
+            "index_price": 50000.0,
+            "funding_rate": 0.0001,
+            "premium_index": -0.01,
+            "seconds_to_settlement": 900.0,
+            "open_interest": 1100.0,
+        }
+        result = bt._eval_strategy(
+            strategy_id="S3",
+            strategy=strat,
+            ticker_data=ticker_data,
+            ts_seconds=12345.0,
+        )
+        assert result["action"] == "enter"
+        assert strat._entry_ts == 12345.0
+    finally:
+        bt.close()

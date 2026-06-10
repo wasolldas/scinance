@@ -107,6 +107,7 @@ class Strategy3PreSettlement:
         ticker_data: dict[str, Any],
         seconds_to_settlement: float,
         open_interest: float,
+        ts: float | None = None,
     ) -> dict[str, Any]:
         """Process a ticker update and return an action signal.
 
@@ -121,12 +122,27 @@ class Strategy3PreSettlement:
             we are past settlement (useful for exit timing).
         open_interest : float
             Current open interest value for BOCPD regime detection.
+        ts : float | None, optional
+            Market-tick time in **seconds** (epoch float). When supplied,
+            both the entry stamp ``_entry_ts`` and the time-stop comparison
+            use this value instead of ``time.time()``. This is the iter-5
+            fix for the fast-replay time-stop bug (see
+            ``ANALYSIS_REPORT_iter4.md`` §4): in a replay that processes
+            24 h of market data in minutes of wall-clock, the 120 s budget
+            against ``time.time()`` essentially never fires. Live callers
+            should pass the exchange tick timestamp; if omitted (None) the
+            strategy falls back to ``time.time()`` for back-compat.
 
         Returns
         -------
         dict with keys: action, direction, price, strategy, modules, reason.
         """
-        now: float = time.time()
+        # iter-5 T1: prefer market-tick time when provided. Both callers
+        # (replay_backtester._eval_strategy, pipeline.process_ticker) thread the
+        # tick's `ts` (seconds). When `ts is None` we fall back to wall-clock,
+        # which keeps unit-test mocks of `time.time` working bit-identically and
+        # preserves the original semantics for any caller that hasn't been updated.
+        now: float = float(ts) if ts is not None else time.time()
 
         # ----------------------------------------------------------
         # 1. Compute all module outputs
