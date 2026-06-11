@@ -16,7 +16,7 @@
 | P2: C-42-Repro | LightGBM-Vol-Modell purged-WF, FDR über 36 Features | Build nötig |
 | P3: C-36-Recording | Recording-Engine, gedeckelt, Sunset-Review; ERWEITERT Collector | Build nötig, früher Start (Vorlauf!) |
 | P4: C-31-CFAR | CFAR-Falsifikations-Gate, billig, basis-unabhängig | Build nötig |
-| WP-0: Hypothesen-Registry | Pflicht vor jedem Gate-Lauf (PRD §8) | Angelegt (leer), Befüllung in PLAN |
+| WP-0: Hypothesen-Registry | Pflicht vor jedem Gate-Lauf (PRD §8) | H-01/H-02/H-03 registriert (WP-0 erledigt, 2026-06-11) |
 
 ## Schutzgüter (CLAUDE.md)
 
@@ -33,3 +33,9 @@
 - [ ] Phase 5 GATE_CHECK — je Pilot
 - [ ] Phase 6 HANDOFF — handoff_local Runner (T2/T3)
 - [ ] Phase 7 ANALYZE — Morgen-Auswertung, Schleife bis alle Welle-1-Gates entschieden
+
+## CHANGELOG
+
+- WP-0 (2026-06-11): H-02 (C-42-Repro) registriert — Gate OOS-R² ≥ 0.15 UND QLIKE schlägt naive HAR-RV (PRD §3 wörtlich); FDR F-VOL, BH α=0.10 über 36 Features; purged WF ≥L2, ≥2 OOS-Fenster.
+- WP-0 (2026-06-11): H-03 (C-31-CFAR) registriert — Gate Surrogate p ≤ 0.05 in ≥2 Fenstern UND Lead > 50 ms UND Edge > 11 bps; hartes Ein-Fenster-DROP (§8.5); FDR F-CFAR.
+- WP-0 (2026-06-11): Abschnitt „Registry-Disziplin" (PRD §8.2–8.5 + Gate-Auditor-Veto + GRAUBEREICH-Ein-Fenster-Wiederholung) in `hypothesis_registry.md` ergänzt; PRD-Lücken (Symbole, Friction-Wand-Herkunft) konservativ aus verdict.md abgeleitet und als Quelle markiert.
