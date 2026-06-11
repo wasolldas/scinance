@@ -137,3 +137,102 @@ Die nachgelagerten Entscheidungen, die dieses Cluster messbar verbessern soll, s
 4. **C-31s Fee-Risiko ist real, nicht hypothetisch.** Die Quelle flaggt selbst, dass der Sekunden-Horizont unter der 11-bps-Fee-Schwelle liegen könnte. Die Kernrelation des Evidence-Registers (Friktion > jede gemessene Roh-Edge) ist die empirisch *bestbelegte* Aussage im ganzen Projekt — und sie steht gegen C-31. Ich halte C-31 für PILOT-würdig *nur* wegen des CFAR-Mechanismus und nur mit dem harten >11-bps-Handelbarkeits-Gate vorgeschaltet; ohne das wäre es DROP.
 
 5. **Die schwächste Einzelannahme (geteilt mit CS-06/C-30): unkalibrierte theoretische Schwellen.** Mehrere Komplexitätsmaße tragen importierte „universelle" Schwellwerte (RQA DET>0.7, PH z=3, analog κ₁≈0.070). Das ist *strukturell dieselbe Annahme*, die C-14 via E-01 gefällt hat. Mein Erreichbarkeits-Check-Gate (Distributions-Check zuerst) ist die Gegenmaßnahme — aber bis er gelaufen ist, teilt dieses Cluster das S1-Risiko vollständig.
+
+---
+
+## SKEPTIC — Antwort
+
+> **Vorbemerkung des Skeptic (verbindlich):** Ich würdige zwei Dinge vorab uneingeschränkt, weil sie methodisch tragen. (a) **E-10 ist die sauberste isolierte Verlustquelle im ganzen Register** — die Tail-Signatur (worst-Trades 1.7–3.0× länger gehalten) ist cross-symbol UND cross-arm robust (Belastbarkeit MITTEL-HOCH, die einzige iter-3-Evidenz, die in beiden Richtungs-Armen hält). Der Advocate baut hier auf dem Festesten, was es gibt. (b) **„Anti-S1" — inkrementelle ΔR²-Gates statt importierter Schwellen (A-2) — ist ein echter methodischer Fortschritt.** Genau diese Importschwellen-Annahme hat C-14 via E-01 gekillt (ρ-Median 2e-7, 6 Größenordnungen unter 0.85); ein gemessenes ΔR² gegen ein laufendes Modell ist die richtige Lehre daraus. Beides bleibt nach meiner Kritik stehen.
+>
+> **Mein Generaleinwand (gilt unter allem):** Die gesamte positive Argumentation des Clusters hängt an **null Outcome-Evidenz** (Advocate-Zugeständnis #1, Alignment: alle sechs Claims UNTESTED, kein E-xx misst einen Outcome) plus *einem* nicht-reproduzierten Fremdbefund (C-42, in der Matrix als **L1-Selbstauskunft aus research_notes** geführt, „NICHT in dieser Pipeline re-validiert"). Das ist keine Basis für sechs PILOTs — es ist eine Basis für **eine Reproduktion und einen Erreichbarkeits-Check**, danach für Reihenfolge.
+
+---
+
+### A-1 — C-08 BOCPD als Risk-Cap-Schalter (Futures)
+
+- **Steelman:** Der nachgelagerte Use-Case ist sauber benannt (binärer Risk-Cap, kein Alpha), und er zielt auf **E-10** — die einzige isoliert belegte Verlustsignatur. Der vorgeschaltete Erreichbarkeits-Check (analog E-01) ist intellektuell ehrlich: er akzeptiert vorab das Risiko, an dem C-14 starb.
+- **Spot:** Zustimmung zu DROP. BOCPD auf RV-Spot ist redundant zur Vol-Baseline (C-42); kein eigener Mechanismus.
+- **Futures — Härtester Einwand (Ockham):** **E-10 motiviert einen Time-Stop, keinen bayesianischen Changepoint-Detektor.** Die Tail-Signatur ist „lange Trades verlieren" — das adressiert iter-5 (E-15) bereits mit zwei trivialen Parametern: Time-Stop auf Tick-Zeit (`now = ts_ms/1000.0`) + friction-aware Hard-Stop. Wenn `if elapsed > 120s: exit` denselben Tail schneidet wie BOCPD, trägt der Detektor **null inkrementelle Erklärung** für E-10. C-08 muss seinen Mehrwert *gegen die iter-5-Baseline* zeigen, nicht gegen die ungate-te Strategie. Hinzu kommt: C-08 ist in CS-03 ein dokumentierter **No-Op** (E-12: kein Changepoint im Fenster, n_pressure_extreme==n_basis_aligned) — d.h. der Detektor hat in der einzigen Pipeline, in der er lief, *nichts beigetragen*. Das ist kein Beweis gegen ihn (GM-6), aber es verschiebt die Beweislast: er muss zeigen, dass er *überhaupt feuert*, bevor er einen Risk-Cap rechtfertigt.
+- **Optionen:** N/A — unstrittig.
+- **Falsifikations-Gate-Test (eigenständig, nicht basis-abhängig?):** Der Erreichbarkeits-Check (feuert BOCPD auf einem Bulk-Fenster mit *bekannten* historischen Brüchen?) ist tatsächlich basis-unabhängig. Das ist das eigenständigste Falsifikations-Gate im Cluster. **Aber:** es braucht Bulk-Historie mit dokumentierten Bruch-Episoden (GM-6, siehe unten) — Wochen bis Monate Vorlauf.
+- **Minimale Bedingung für PILOT:** Reihenfolge erzwingen — (1) iter-5 (E-15) abwarten; schneidet der triviale Time-Stop den E-10-Tail bereits ausreichend, ist C-08 für diesen Zweck **DROP** (Ockham). (2) Nur falls iter-5 zeigt, dass der Restbtail *regime-getrieben statt dauer-getrieben* ist, geht C-08 in einen reinen Erreichbarkeits-Check (feuert auf bekannten Brüchen, Latenz messbar) — und *erst danach* in ein Outcome-Gate (DD-Reduktion ≥20% bei Sharpe-Verlust ≤10% gegen die iter-5-Baseline, nicht gegen die ungate-te Strategie). Bis dahin: **PARK, nicht PILOT.**
+
+---
+
+### A-2 — C-11/C-12 als Vol-/Tail-Feature gegen die C-42-Baseline (Futures)
+
+- **Steelman:** Das ΔR²-Gate gegen eine laufende Baseline ist der Anti-S1-Pfad schlechthin — keine importierte Schwelle, sondern ein gemessenes Inkrement. Methodisch ist das der stärkste Punkt des gesamten Advocate-Parts, und ich würdige ihn ausdrücklich.
+- **Spot:** Zustimmung zu DROP solo.
+- **Optionen:** Zustimmung zu PARK (INC-04, kein IV-Archiv).
+- **Futures — Härtester Einwand:** **Das ΔR²-Gate misst gegen eine Baseline, die selbst nicht reproduziert ist.** C-42 ist in der Alignment-Matrix PARTIAL mit *keinem E-xx* — „research_notes-Eigenangabe", „NICHT in dieser Reconciliation-Pipeline als E-xx re-validiert", „konservativ als L1-Selbstauskunft behandelt", „keine unabhängige Reproduktion, keine FDR-Betrachtung über die 36 Features". Ein ΔR² ≥ +0.02 *über C-42* ist nur dann interpretierbar, wenn C-42s R²=0.249 selbst in *dieser* Pipeline mit *demselben* Split/Fenster steht. Sonst misst man ein Inkrement gegen eine fremde Zahl aus einem fremden Datensatz (Apr-2026-OOS nach Jan–Mar-Training) — und ein positives ΔR² könnte reines Baseline-Artefakt sein. **Das Gate ist methodisch sauber, aber es steht auf Sand, solange die Baseline nicht steht.** Die Anti-S1-Logik ist richtig; ihre Voraussetzung (laufende, validierte Baseline) ist unerfüllt.
+- **Falsifikations-Gate-Test:** Das ΔR²-Gate ist *nicht* eigenständig — es hängt definitionsgemäß an C-42. Damit fällt es unter das Enabler-Falsifikations-Kriterium (siehe A-6).
+- **Minimale Bedingung für PILOT:** **Reproduktions-Reihenfolge zwingend:** Schritt 0 = C-42 in dieser Pipeline als E-xx reproduzieren (LightGBM/HAR-RV, eigener Walk-Forward, FDR über die Features). Erst wenn C-42 ein eigenes E-xx ≥ L1 hat, ist das ΔR²-Gate für C-11/C-12 sinnvoll. Dann PILOT mit FDR-Korrektur über die getesteten Komplexitäts-Features (GM-2!), Abbruch bei ΔR² ≤ 0. Vor Schritt 0: **PARK.**
+
+---
+
+### A-3 — C-31 Cyclostationary CFAR (Futures)
+
+- **Steelman:** Korrekt und stark — C-31 ist der **einzige** Detektor im Cluster mit *eingebauter* Falschalarm-Kontrolle (CFAR). Das adressiert GM-2 (in keiner Quelle FDR-korrigiert) und INC-03 (Q90 übertriggert, 50–60 Trades/24h) auf Mechanismus-Ebene statt per Schwellen-Bastelei. Das ist ein echtes Alleinstellungsmerkmal.
+- **Spot/Optionen:** Zustimmung zu DROP/N/A.
+- **Futures — Härtester Einwand (Kostenehrlichkeit):** Die **bestbelegte Aussage des ganzen Projekts** steht gegen C-31: Round-Trip-Friktion 11 bps (Kostenbaseline) übersteigt jede gemessene Roh-Edge (max |Roh| ≈ 4–7 bps). Die Quelle selbst flaggt den Sekunden-Horizont als evtl. unter der Fee-Schwelle. CFAR kontrolliert die *Falschalarmrate*, nicht die *Edge-Größe* — ein perfekt kalibrierter Detektor eines Musters, das < 11 bps trägt, ist trotzdem wertlos. Der Advocate gesteht das in Zugeständnis #4 selbst zu. Die eingebaute Falschalarm-Kontrolle adressiert das *Trigger*-Problem (INC-03), nicht das *Friktions*-Problem (E-16: Friktion ~35× Richtung auf S2).
+- **Falsifikations-Gate-Test:** Das Handelbarkeits-Gate (Lead-Zeit > 50 ms, Edge > 11 bps) ist **eigenständig** — es prüft eine physikalische/ökonomische Erreichbarkeit, nicht ein nachgelagertes Signal. Zusammen mit A-1s Erreichbarkeits-Check ist das eines der zwei Gates im Cluster, die das Enabler-Kriterium bestehen.
+- **Minimale Bedingung für PILOT:** Surrogate-Test (p ≤ 0.05, ≥ 2 Fenster) UND Handelbarkeits-Gate (Lead-Zeit > 50 ms UND realisierter Edge-Horizont > 11 bps) *vor* jedem Strategie-Bau. Besteht eines davon nicht: sofortiger DROP. Unter diesem strikt vorgeschalteten Gate akzeptiere ich PILOT — der CFAR-Mechanismus rechtfertigt den Erreichbarkeits-Test, mehr nicht.
+
+---
+
+### A-4 — C-16 TFSAX + Smith-Waterman als Präzedenz-Label (Futures)
+
+- **Steelman:** Bestechend — C-16 bringt sein **eigenes hartes Drop-Gate** mit (PRD-kestrel: OOS-AUC > 0.55, *sonst ersatzloser Drop*). Ein Ansatz, der bereit ist, sich selbst zu falsifizieren, ist das Gegenteil der „schönen Mathematik ohne Abbruchkriterium" von C-14. Und CS-04 ist nachweislich eine **Mess-Lücke, keine Niederlage** (E-13: reiner Loader-Defekt, „mehr Daten helfen nicht").
+- **Spot/Optionen:** Zustimmung zu DROP.
+- **Futures — Härtester Einwand (Multiple Testing + Datenbedarf):** Das harte Gate ist genau richtig — aber der M-S23-Orderflow-Variante fehlt jede Evidenz (UNTESTED, kein E-xx), und ein Präzedenz-Match-Verfahren über eine 5y-Bibliothek mit Smith-Waterman-Scoring ist ein **Multiple-Testing-Magnet** (GM-2, in keiner Quelle korrigiert): viele Templates × viele Alignments → ein hochsignifikanter Match ist als Zufallstreffer wahrscheinlich, wenn nicht surrogat-kontrolliert. Das PRD-fable5-Gate verlangt zu Recht *zusätzlich* einen Surrogate-Test (p < 0.05). Mein Einwand ist nicht gegen das Gate, sondern gegen die Priorisierung: C-16 ist der **datenhungrigste** Kandidat (5y-Bibliothek, publicTrade-Archiv) bei null Vorbefund — die Opportunitätskosten gegenüber A-3/C-31 (billiger Surrogate-Test) sind hoch.
+- **Falsifikations-Gate-Test:** Das OOS-AUC-Gate ist **eigenständig** im Sinne, dass es C-16 als Klassifikator direkt prüft (Regime-Label vs. Forward-Outcome), nicht über ein fremdes Basissignal. Das ist sauber — C-16 ist neben C-31 der Kandidat mit dem klarsten eigenen Falsifikations-Gate.
+- **Minimale Bedingung für PILOT:** Akzeptiert — aber **nachgeordnet** hinter C-31 (billiger) und der C-42-Reproduktion. Gate: OOS-AUC > 0.55 (bzw. BA ≥ 0.55) + Surrogate p < 0.05, walk-forward ≥ 2 Fenster, sonst ersatzloser Drop. Kein Nachverhandeln — das ist der Vorbild-Teil.
+
+---
+
+### A-5 — C-43 Conformal Prediction als Sizing-Kalibrator (alle Märkte)
+
+- **Steelman:** Mechanistisch elegant — CP übersetzt Unsicherheit *verteilungsfrei und prüfbar* (Coverage ≥ 85% OOS) in Positionsgröße, und als Friktions-Filter („nur handeln wenn Konfidenz-Intervall eng genug, dass Edge > 11 bps") hätte es das S2-Verlustmuster (E-16: Friktion ~35× Signal; E-04: hit_sum 0.179) tatsächlich unterdrückt.
+- **Härtester Einwand (Unfalsifizierbarkeit):** **C-43 ist der reinste Fall des Enabler-Problems.** Der Advocate gesteht es in Zugeständnis #2 selbst: CP ist „kein Alpha-Generator", testbar *erst* wenn ein L3-Basissignal existiert — und **kein einziges L3-Basissignal im Register hat je die Münzwurf-Linie überschritten** (außer C-42, das selbst kein Direktionssignal ist). Das Coverage-Gate (≥ 85%) ist trivial erfüllbar (ein hinreichend breites Intervall deckt immer ≥ 85%) und sagt *nichts* über ökonomischen Nutzen. Das zweite Gate (gated Sharpe > un-kalibriert) ist das ökonomisch relevante — aber es ist **per Konstruktion nicht ausführbar ohne Basissignal.** C-43 ist „ein perfekter Filter für ein nicht-existentes Signal" (Advocate-Wortlaut).
+- **Spot/Optionen:** dieselbe Abhängigkeit; Optionen zusätzlich an INC-04 gebunden.
+- **Falsifikations-Gate-Test:** **Besteht nicht.** Das einzige eigenständige Gate (Coverage ≥ 85%) ist nicht-ökonomisch und trivial; das ökonomische Gate hängt vollständig an einer nicht-existenten Basis-Strategie.
+- **Minimale Bedingung für PILOT:** **DROP als eigenständiger PILOT — stattdessen PARK als Querschnitts-Wrapper**, der *automatisch* aktiviert wird, sobald *irgendein* L3-Signal ein eigenes Outcome-E-xx > Münzwurf erreicht. C-43 ist kein PILOT-Kandidat, sondern eine Architektur-Notiz fürs FINAL_PRD. Es zuerst zu pilotieren hieße, Validierungszeit in einen Layer ohne Substrat zu stecken (Opportunitätskosten).
+
+---
+
+### A-6 — Cluster-Synthese: „Regime ist die notwendige Bedingung" (INC-05)
+
+- **Steelman:** Die Doppelbeobachtung ist real und nicht-trivial: (1) unkonditional kein Richtungs-Edge (INC-05, AUC ≈ 0.50), (2) das einzige OOS-über-Münzwurf-Signal war nicht-direktional (C-42). Daraus folgt korrekt: *falls* Edge existiert, *muss* er konditional sein.
+- **Härtester Einwand (logischer Fehlschluss):** Der Advocate macht aus einer **notwendigen Bedingung eine Verheißung.** Aus „unkonditional = Münzwurf" (INC-05) folgt logisch *nur*: WENN Edge existiert, DANN ist er konditional. Es folgt **nicht**, dass Edge existiert. Die Existenz eines konditionalen Edges ist im gesamten Register **unbewiesen** (alle sechs Cluster-Claims UNTESTED, kein Outcome-E-xx; das einzige PARTIAL-Outcome C-42 ist nicht-direktional und nicht reproduziert). „Regime-Detektion ist notwendige Vorbedingung für jeden nachgelagerten Edge" ist nur dann ein Argument *für* das Cluster, wenn ein nachgelagerter Edge existiert — und genau das ist offen. Andernfalls ist Regime-Detektion die notwendige Vorbedingung für **nichts.** INC-05 adelt das Cluster nicht; es verlagert nur die Beweislast auf das nachgelagerte Signal, das niemand hat.
+- **Das harte Enabler-Falsifikations-Kriterium (auf Auftrag):** *Welches Regime-Modul hat ein eigenständiges Falsifikations-Gate, das NICHT von einer noch-nicht-existenten Basis-Strategie abhängt?* Antwort nach Durchsicht:
+  - **C-08** (A-1): JA, der Erreichbarkeits-Check (feuert auf bekannten Brüchen?) ist basis-unabhängig — aber teuer (Bulk-Historie, GM-6).
+  - **C-31** (A-3): JA, das Handelbarkeits-Gate (Lead-Zeit > 50 ms, Edge > 11 bps, Surrogate) ist basis-unabhängig und *billig*.
+  - **C-16** (A-4): JA, das OOS-AUC-Gate prüft C-16 als Klassifikator direkt gegen Forward-Outcomes — basis-unabhängig.
+  - **C-11/C-12** (A-2): NEIN — das ΔR²-Gate hängt an C-42 (die selbst reproduziert werden muss). Bedingt eigenständig *nach* C-42-Reproduktion.
+  - **C-43** (A-5): NEIN — hängt vollständig an einem nicht-existenten L3-Signal.
+- **GM-6 — Kostenehrlichkeit:** Der Advocate gesteht es in Zugeständnis #3 selbst, und es ist der härteste Cluster-Vorbehalt: **Regime-Brüche sind in 24h-Fenstern nicht enthalten** (GM-6, E-02: Liquidations-Events spärlich, nur 4/5 Symbole ausreichend; E-12: BOCPD feuert nie). *Jeder* Detektor in diesem Cluster wird im vorhandenen Fenster nicht-feuern, ohne dass das etwas beweist. Die Validierung — *jede* — braucht zwingend Bulk-Historie mit dokumentierten Bruch-Episoden: **Wochen bis Monate Aufzeichnungs-/Download-Vorlauf, bevor irgendein Test läuft.** Das ist keine „nächste Iteration", und kein PRD darf diesen Vorlauf verschweigen.
+
+---
+
+### Skeptic — Urteilstabelle (Gegenvorschlag zur Advocate-Tabelle)
+
+| Claim | Advocate | Skeptic-Gegenvorschlag (Futures) | Kern-Grund |
+|---|---|---|---|
+| C-08 BOCPD | PILOT | **PARK** → PILOT nur falls iter-5-Time-Stop den E-10-Tail NICHT schneidet | Ockham: `if elapsed>120s: exit` adressiert E-10 trivial; C-08 muss gegen iter-5-Baseline antreten, nicht ungate-t |
+| C-11 PH | PILOT | **PARK** bis C-42 reproduziert (E-xx) | ΔR²-Gate steht auf nicht-validierter Baseline (C-42 = L1-Selbstauskunft) |
+| C-12 RQA | PILOT | **PARK** bis C-42 reproduziert (E-xx) | dito |
+| C-16 TFSAX+SW | PILOT | **PILOT** (nachgeordnet), hartes OOS-AUC>0.55 + Surrogate | eigenständiges Gate ok; datenhungrig, Multiple-Testing-Magnet |
+| C-31 CFAR | PILOT | **PILOT** (priorisiert), Surrogate + >50ms + >11bps ZUERST | einziges billiges, eigenständiges, friktions-ehrliches Gate |
+| CS-07 (C-16∥C-31) | PILOT | **PARK** bis C-16 UND C-31 je einzeln das Gate bestehen | Konsens-Filter erst sinnvoll nach Einzel-Validierung |
+| C-43 CP | PILOT | **PARK** (Architektur-Notiz), auto-aktiv ab erstem L3-Outcome-E-xx | unfalsifizierbar ohne Basissignal — Filter für nichts |
+
+---
+
+### An den Orchestrator (≤ 10 Zeilen)
+
+1. **A-6/INC-05 = logischer Fehlschluss:** „unkonditional=Münzwurf" beweist NICHT, dass konditionaler Edge existiert — nur, dass er, falls er existiert, konditional sein muss. Existenz ist registerweit unbewiesen (alle 6 Claims UNTESTED, kein Outcome-E-xx). INC-05 adelt das Cluster nicht, es verlagert die Beweislast.
+2. **A-2/C-42 = Gate auf Sand:** ΔR²-Gate misst gegen eine nicht-reproduzierte L1-Selbstauskunft (research_notes, kein E-xx). Reproduktions-Reihenfolge erzwingen: C-42 als E-xx zuerst, dann C-11/C-12 → bis dahin PARK statt PILOT.
+3. **A-1/C-08 = Ockham:** iter-5-Time-Stop (`if elapsed>120s`) schneidet den E-10-Tail bereits mit 2 trivialen Parametern; BOCPD muss gegen die iter-5-Baseline antreten, nicht gegen die ungate-te Strategie → PARK bis iter-5 (E-15).
+- **Stehengelassen (gewürdigt):** E-10 ist die sauberste isolierte Verlustquelle; „Anti-S1" (ΔR² statt Importschwelle) ist echter Fortschritt. **C-31 (CFAR) und C-16 (OOS-AUC) bleiben PILOT** — sie haben die einzigen eigenständigen, basis-unabhängigen Falsifikations-Gates; C-31 priorisiert (billig, friktions-ehrlich).
+- **GM-6 Kostenwahrheit:** JEDE Cluster-Validierung braucht Monate Bulk-Historie mit Bruch-Episoden vor dem ersten Test — kein PRD darf das verschweigen.
+- **NICHT committet** (gemäß Auftrag).
