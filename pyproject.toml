@@ -56,6 +56,10 @@ dashboard = [
 tuning = [
     "optuna>=3.5",
 ]
+vol = [
+    "lightgbm>=4.0",
+    "scikit-learn>=1.4",
+]
 
 [tool.setuptools.packages.find]
 where = ["src"]
