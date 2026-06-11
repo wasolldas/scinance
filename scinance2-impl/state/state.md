@@ -6,7 +6,7 @@
 
 ## Phase
 
-`SURVEY` (Phase 1 läuft)
+`PLAN` (Phase 2 läuft)
 
 ## Welle-1-Piloten (PRD §3)
 
@@ -27,7 +27,7 @@
 ## Phasen-Log
 
 - [x] Phase 0 INIT — Framework installiert, FINAL_PRD.md im Root, Branch `scinance2-wave1`, State-Dateien angelegt
-- [ ] Phase 1 SURVEY — repo_survey.md
+- [x] Phase 1 SURVEY — 616 Tests grün (Baseline), alle 4 Pilot-Integrationspunkte kartiert; Sandbox OHNE Daten + OHNE Bybit-API → alle Live-Smokes nach T2/T3
 - [ ] Phase 2 PLAN — workplan.md (WP-xx je Pilot, Abhängigkeitsgraph)
 - [ ] Phase 3/4 BUILD/VERIFY — je WP
 - [ ] Phase 5 GATE_CHECK — je Pilot
