@@ -162,4 +162,153 @@ Die Kernrelation des Evidence-Registers — Friktion 11 bps Round-Trip > jede ge
 
 ---
 
-*Skeptic antwortet ab hier — bitte Punkt für Punkt auf A-1 bis A-8.*
+---
+
+## Skeptic
+
+**Rahmen:** Ich teile die Grundhaltung des Advocates, dass die Cascade-Familie *konzeptionell* nicht durch E-01/E-02 erledigt ist (alignment_matrix Statusregel 4; C-14 = REFUTED nur für Schwelle+Estimator, Konzept UNTESTED). Mein Angriff zielt nicht auf das Konzept, sondern auf die Behauptung, der neue Ansatz vermeide die Fallen **durch Konstruktion** statt durch Tuning — und auf die Frage, ob die behauptete Friktions-Immunität (A-8) überhaupt einen messbaren Bezugspunkt hat. Drei Märkte: Spot ist im ganzen Cluster mechanismuslos (kein Liquidations-Punktprozess) — ich folge dem Advocate hier bei DROP für ALLE Ansätze und wiederhole es unten nicht jedes Mal. Optionen sind durchgängig datenlos (INC-04, C-33). Der reale Streit ist Futures.
+
+---
+
+### S-1 auf A-1 — C-27 (Cori-Rₜ): „self-calibrating" verschiebt den freien Parameter, er verschwindet nicht
+
+**Steelman:** Der Advocate hat recht, und das ist sein stärkster Cluster-Punkt: Rₜ=1 ist *definitorisch* der kritische Punkt eines Verzweigungsprozesses, kein importierter Außenwert wie ρ=0.85 (E-01). Damit ist der **exakte Tod von C-14 (E-01/INC-01) konstruktiv ausgeschlossen** — die Schwelle kann nicht mehr „ins Leere kalibriert" werden. Diesen Fehlertyp-Vermeidungs-Punkt erkenne ich vorbehaltlos an; er ist der eigentliche Fortschritt des Clusters.
+
+**Aber — drei Einwände, die der Advocate selbst zur Hälfte einräumt und dann verharmlost:**
+
+1. **Rₜ=1 ist nur kritischer Punkt, WENN der Prozess ein Verzweigungsprozess IST.** Das ist eine *Modellannahme über Bybit-Liquidationen*, kein freies Geschenk. Die Renewal-Gleichung setzt voraus, dass Folgeliquidationen tatsächlich epidemisch von Vorläufer-Liquidationen erzeugt werden (Offspring-Struktur), nicht von einem gemeinsamen exogenen Preis-Schock, der alle gehebelten Positionen *gleichzeitig* trifft. Bei einem Margin-Call-Crash ist Letzteres der Normalfall — dann ist Rₜ ein fehlspezifiziertes Maß, und Rₜ=1 bedeutet gar nichts. Der claims_register-Eintrag C-27 nennt genau das („Liquidations-Punktprozess ist strukturell isomorph zum epidemischen Inzidenz-Punktprozess") als **Kernannahme** — also als *ungetestete Voraussetzung*, nicht als Befund. Self-calibrating heißt nur: der Schwellwert ist endogen. Es heißt **nicht**: das Modell ist korrekt spezifiziert.
+
+2. **Der freie Parameter ist nicht weg, er heißt jetzt ω_s.** Der Advocate räumt das unter „Was ich zugestehe" ein, zieht aber nicht die Konsequenz. Der Generationszeit-Kernel ω_s ist ein vollständiger funktionaler Parameter (Form + Länge), aus Bulk-Historie geschätzt, laut Quelle selbst der **kritischste Bruchpunkt** (claims_register C-27: „Strategie-A-Bruchpunkt"; alignment_matrix CS-06). Rₜ ist *linear* in der ω_s-Gewichtung — eine falsch geschätzte Kernel-Länge skaliert Rₜ direkt und verschiebt die Überschreitung von Rₜ=1 beliebig. „Self-calibrating" tauscht einen sichtbaren skalaren Schwellwert (0.85, sofort als unerreichbar falsifizierbar — das war der *Vorteil* von E-01!) gegen einen **versteckten funktionalen Parameter, dessen Fehlkalibrierung sich NICHT in einem simplen Distributions-Check zeigt.** Das ist eher eine Verschlechterung der Falsifizierbarkeit als eine Verbesserung.
+
+3. **Schätzvarianz bei E-02-Spärlichkeit — der eigentliche Knockout.** E-02 zeigt `liquidations_below_min_events` 794–28.192 je Symbol (BNB 33 % der Ticks unter Mindestzahl). Cori-Rₜ ist genau das Verfahren, das in der Epidemiologie bei *niedriger Inzidenz* berüchtigt instabil ist: die Gamma-Posterior-Varianz von Rₜ skaliert ~1/(Σ erwartete Fälle im Fenster). Bei wenigen Events pro Schätzfenster sind die glaubwürdigen Intervalle so breit, dass „Rₜ > 1" statistisch nicht von „Rₜ < 1" unterscheidbar ist. Der Advocate beziffert weder die Fensterlänge noch die Varianz — **genau die Zahlen, nach denen der Auftrag fragt und die über PILOT/DROP entscheiden.** Solange das nicht beziffert ist, ist „Rₜ schätzbar" eine Behauptung, kein Befund. Die geschlossene Posterior-Form macht das *schlimmer*, nicht besser: sie liefert auch bei N=3 Events einen scheinbar präzisen Punktschätzer mit riesiger, gern ignorierter Varianz.
+
+- **Futures:** Der Advocate-PILOT ist **nur** akzeptabel, wenn das Validierungs-Gate die Schätzvarianz selbst zum Gate macht — nicht nur „erreicht Rₜ je ≥ 1?" (A-7), sondern „erreicht das **untere** glaubwürdige Intervall von Rₜ je ≥ 1, und wie oft?". Sonst misst man Rauschspitzen.
+- **Härtester Einwand:** Self-calibrating ist nur ein Umzug des freien Parameters vom sichtbaren Schwellwert (0.85) zum versteckten Kernel ω_s — und der Kernel ist bei E-02-Spärlichkeit weder stabil schätzbar noch durch einen billigen Distributions-Check (A-7) prüfbar.
+- **Minimale Bedingung für PILOT (statt DROP):** (a) Bulk-Historie mit ≥ 30 abgegrenzten Kaskaden (GM-6) vorhanden; (b) **gemeldete Posterior-Breite** von Rₜ pro Schätzfenster, nicht nur Punktschätzer; (c) Gate auf dem unteren Kredibilitäts-Intervall. Ohne (b) ist es DROP, weil dann „Rₜ > 1" ein nicht-falsifizierbares Artefakt der Punktschätzung sein kann.
+
+---
+
+### S-2 auf A-2 — C-28 (NB-k): das LR-Test-Gate ist ehrlich, aber bei E-02-Spärlichkeit machtlos — und kein eigenständiger Schuss
+
+**Steelman:** Der Überdispersions-LR-Test (p < 0.05 NB gegen Poisson) ist ein **echtes binäres Falsifikations-Gate**, kein tunbarer Schwellwert — das ist methodisch sauberer als alles in PRD-v1, und der Advocate verdient Anerkennung dafür, dass er ein Verfahren mit eingebautem Null-Test wählt.
+
+**Aber:**
+
+1. **Das Gate hat keine Power, genau wo es zählt.** Der Advocate räumt ein, dass k „viele Kaskaden" braucht. Schärfer: Der LR-Test gegen Poisson hat bei kleiner Eventzahl (E-02) **niedrige statistische Power** — er übersieht echte Überdispersion (Typ-II), nicht weil sie fehlt, sondern weil N zu klein ist. Ein p ≥ 0.05 ist dann *nicht* „NB widerlegt", sondern „Fenster zu dünn" — also derselbe Nicht-Falsifizierbarkeits-Zustand wie GM-6. Das Gate fällt nicht ehrlich, es fällt *uninformativ*.
+2. **k ist die instabilste Größe überhaupt.** Der Dispersionsparameter eines NB ist notorisch schwer zu schätzen; seine Schätzvarianz explodiert bei kleinem N und gerade im Tail (kleines k = die seltenen explosiven Kaskaden — also die wenigsten Datenpunkte). Die „Edge" (Tail-Dispersion nicht eingepreist) hängt an der am schlechtesten schätzbaren Zahl des ganzen Clusters.
+3. **Kein unabhängiger Schuss (GM-2).** C-28 teilt den ω_s-Kernel mit C-27 (claims_register C-28: „Generationszeit-Fenster aus C-27 fixiert"). Der Advocate verkauft das als „kein freier Parameter" — korrekt — verschweigt aber die Kehrseite: **C-27 und C-28 sind statistisch nicht unabhängig.** Sie laufen auf demselben Bulk-Datensatz, mit demselben Kernel, auf demselben Punktprozess. Das ist im Multiple-Testing-Sinn (GM-2, alignment_matrix Statusregel 5) **kein zweiter unabhängiger Bestätigungs-Schuss**, sondern dieselbe Hypothese in NB-Notation. Die im Auftrag genannten „drei Schüsse auf dasselbe Ziel" (Cori/NB-k/Avalanche) sind über C-27/C-28 mindestens 1,5 korrelierte Schüsse.
+
+- **Futures:** PILOT nur gebündelt — aber dann muss der Judge wissen, dass C-27+C-28 **ein** Test ist, nicht zwei. Eine getrennte ADOPT-Zählung wäre Doppelzählung.
+- **Härtester Einwand:** Der ehrliche LR-Test verliert bei E-02-Spärlichkeit seine Power, sodass ein „Bestehen" ein N-Artefakt und ein „Fallen" uninformativ sein kann — und über den geteilten ω_s-Kernel ist C-28 ohnehin kein von C-27 unabhängiger Befund (GM-2).
+- **Minimale Bedingung für PILOT:** Power-Analyse VOR dem Run (wie viele Kaskaden braucht der LR-Test für 80 % Power bei plausiblem k?) + explizite Kennzeichnung als **gemeinsamer** Test mit C-27 im Verdict. Ohne Power-Analyse: DROP, weil das Gate sonst nur scheinbar binär ist.
+
+---
+
+### S-3 auf A-3 — C-29 (Avalanche Shape Collapse): der einzige empirisch motivierte Ansatz — aber Shape-Collapse braucht die Eventdichte, die E-02 verneint
+
+**Steelman:** Der Advocate hat hier seinen *besten* Punkt, und ich sage es explizit: C-29 ist der **einzige** Cluster-Ansatz mit direkter empirischer Motivation aus diesem Register (E-10: schlechteste Trades 1.7–3.0× länger gehalten, robust über 5 Symbole UND beide Mirror-Arme; E-07: Time-Stop war wegen Wall-Clock-Bug faktisch tot). Halte-/Burst-Dauer IST ein nachgewiesener Verlusttreiber, und C-29 ist threshold-frei — es umgeht die E-01-Frage strukturell, weil es erst greift, wenn eine Kaskade *läuft*. Das ist real und der Judge sollte es würdigen.
+
+**Aber — der Auftrag fragt scharf nach der Eventdichte, und die Antwort ist ungünstig:**
+
+1. **Shape-Collapse ist ein Vielprobenverfahren.** Crackling-noise Shape-Collapse (Sethna et al.) kalibriert die universelle Skalenfunktion, indem **viele** Avalanche-Profile reskaliert und übereinandergelegt werden — die Methode lebt davon, über Hunderte Avalanches zu mitteln. Auf einem **Bybit-Einzelsymbol** in den verfügbaren ~24h-Fenstern (GM-6) gibt es nicht annähernd genug abgegrenzte Liquidations-Bursts dafür. E-02 zeigt die Spärlichkeit direkt; der Advocate räumt „braucht genug Burst-Events auf den Trainings-Splits" ein, beziffert aber nicht, wie viele Bursts ein Einzelsymbol-Fenster liefert. Verdacht (begründet): **deutlich unter dem, was ein stabiler Collapse braucht.**
+2. **E-10 motiviert Restdauer-Prognose generell — nicht den Shape-Collapse-MECHANISMUS.** Das ist der subtile Transfer-Fehler. E-10 sagt: lange Trades sind schlecht. Daraus folgt, dass *irgendein* Restdauer-/Exit-Timing-Signal wertvoll wäre — ein simpler Hazard-Schätzer oder gar ein fixer Time-Stop (der wegen E-07 nie getestet wurde!) täte es vielleicht auch. E-10 ist **kein** Beleg, dass Bybit-Kaskaden einer *universellen invertierten Parabel* folgen. Der Advocate gesteht das unter „Was ich zugestehe" zu — gut —, aber es entwertet das „stärkste Einzelargument": die empirische Motivation stützt die *Lücke*, nicht das *spezifische Werkzeug*.
+3. **Billigerer Konkurrent existiert.** Bevor man einen physikalisch importierten Shape-Collapse kalibriert, sollte man den simplen, threshold-freien Time-Stop, der wegen des Wall-Clock-Bugs (E-07) nie gemessen wurde, *zuerst* korrekt laufen lassen (E-15 pending). Wenn ein reparierter Time-Stop die E-10-Tail-Signatur schon zu 80 % einfängt, ist der Opportunitätskosten-Fall (Prüfschwerpunkt 4) gegen C-29 erdrückend.
+
+- **Futures:** PILOT eigenständig vom ω_s-Risiko — das stimmt, C-29 hängt **nicht** am Kernel (Pluspunkt gegenüber C-27/C-28). Aber das Residual-≤-30-%-Gate ist wertlos, wenn zu wenige Bursts für einen Collapse da sind: dann ist das Residual ein Overfit an eine Handvoll Profile.
+- **Härtester Einwand:** Shape-Collapse braucht viele Avalanches zur Kalibrierung, die Eventdichte auf Bybit-Einzelsymbolen (E-02, GM-6) liefert sie vermutlich nicht, und E-10 motiviert nur die Restdauer-Lücke generisch — nicht ausgerechnet die universelle Skalenfunktion.
+- **Minimale Bedingung für PILOT:** (a) Beziffern, wie viele abgegrenzte Bursts ≥ Mindestgröße pro Symbol-Fenster verfügbar sind, und Nachweis, dass der Collapse mit dieser Zahl überhaupt identifizierbar ist; (b) **Baseline-Pflicht:** Restdauer-MAE muss nicht nur den Konstant-Mittelwert, sondern den reparierten Time-Stop (E-15) UND einen simplen Hazard-Schätzer schlagen. Schlägt es nur den trivialen Mittelwert, ist es DROP (Scheinsieg gegen Strohmann).
+
+---
+
+### S-4 auf A-4 — C-14-Konzeptrest: Zustimmung, mit Verschärfung
+
+**Steelman:** Der Advocate hat recht: E-01 tötet einen Estimator und eine Zahl (0.85), nicht das Branching-Konzept (alignment_matrix Statusregel 4, C-14-Eintrag explizit). Und er ist *fair*, indem er selbst sagt, dies sei „keine eigenständige neue Idee, sondern eine Umetikettierung", die in C-27 aufgeht und **kein eigenes Pilot-Budget** verdient. Dem stimme ich vollständig zu — hier gibt es keinen Streit.
+
+**Einzige Verschärfung:** Genau weil C-14-Konzept vollständig in C-27 aufgeht, darf es im Verdict **nicht als separater Posten** erscheinen, der die Cluster-Evidenzbasis optisch verbreitert. Sonst entsteht der Eindruck mehrerer unabhängiger Cascade-Ansätze, wo es real einer ist (Rₜ) plus zwei daran gekoppelte (NB-k über Kernel, Konzeptrest über Identität).
+
+- **Futures:** DROP als eigener Posten; geht in S-1/C-27 auf. **Minimale Bedingung:** keine — korrekt als „in C-27 absorbiert" zu führen, nicht als eigener PILOT.
+
+---
+
+### S-5 auf A-5 — C-39 (Kaskaden-Anatomie): die schärfste Achse ist die am schlechtesten verfügbare — und der Recall-Claim ist outcome-frei
+
+**Steelman:** Der Bankruptcy-Preis als zur Event-*Dichte* orthogonale Hebel-/Illiquiditäts-Achse ist ein echtes Argument: er liefert auch bei *wenigen* Liquidationen ein Stress-Signal, genau dort, wo zähl-basierte Verfahren (C-27/C-28) an E-02 verstummen. Das ist die einzige Diversifikation gegen Spärlichkeit im Cluster, die nicht selbst zähl-abhängig ist — konzeptionell stark.
+
+**Aber:**
+
+1. **GM-6 / Daten-Vorlaufzeit ist hier am tödlichsten.** Der Advocate gesteht es: Insurance/ADL haben **kein REST-Archiv** (claims_register C-39; alignment_matrix C-39). Das bedeutet 1 Woche (Live-Score) bis **3 Monate** (Backtest) Eigenaufzeichnung, BEVOR überhaupt etwas messbar ist — und reiner Live-Score ohne Backtest ist nicht walk-forward-validierbar (bleibt damit unter GM-1 auf L0-äquivalent). Die orthogonale Achse ist real, aber sie ist monatelang **leer**. Das ist kein PILOT, das ist ein PARK mit Aufzeichnungs-Auftrag.
+2. **Recall ≥ 90 % ist ein Detektions-Gate, kein Outcome-Gate.** Selbst perfekter Recall auf gelabelte Großevents sagt **nichts** darüber, ob das Risk-Off-Signal Geld spart — das ist exakt die A-8-Zirkularität (siehe S-8). Ein Detektor kann 95 % der Kaskaden erkennen und trotzdem netto verlieren, wenn die False-Positive-Ausstiege mehr Carry kosten als die vermiedenen Drawdowns.
+
+- **Futures:** PARK, nicht PILOT — der Advocate landet selbst bei „bis dahin PARK". Ich mache das verbindlich: ohne Aufzeichnungs-Vorlauf ist es nicht pilotierbar.
+- **Härtester Einwand:** Die einzige spärlichkeits-robuste Achse des Clusters ist monatelang datenleer (GM-6, kein REST-Archiv), und ihr Recall-Gate misst Detektion, nicht Profitabilität.
+- **Minimale Bedingung für PILOT:** abgeschlossener Aufzeichnungs-Vorlauf (≥ 3 Monate für Backtest) UND ein Gate, das DD-Reduktion *netto nach entgangenem Carry* misst, nicht nur Recall.
+
+---
+
+### S-6 auf A-6 — Strategien: CS-06 ist die sauberste, aber der ω_s-Single-Point-of-Failure macht die „Ensemble-Diversität" zur Illusion
+
+**Steelman:** CS-06 ist tatsächlich die **einzige** Cascade-Strategie, die kein einziges REFUTED/SUSPECT-PRD-v1-Modul mitschleppt (anders als CS-11, das C-14-Schwelle und C-15-SUSPECT erbt). Sie steht komplett auf threshold-/volumen-robusten Bausteinen, und die Quelle benennt ihren schwächsten Punkt selbst. Das ist intellektuell ehrlich und der saubereste Pilot-Kandidat des Clusters — anerkannt.
+
+**Aber der Advocate liefert mir hier mein eigenes schärfstes Argument frei Haus:**
+
+1. **ω_s-Single-Point-of-Failure (vom Advocate selbst benannt).** CS-06 *und* CS-10 hängen über C-27/C-28 an **demselben** ω_s-Kernel. Ein instabiler Kernel kippt C-27, C-28, CS-06 und CS-10 **gleichzeitig** (korrelierter Fehler). Damit ist die scheinbare Vielfalt „Cori + NB-k + Cross-Coin" real **ein** Risiko-Faktor. Die getrennten IDs (C-27/C-28/CS-06/CS-10) suggerieren Diversifikation, die es nicht gibt — das ist genau die Multiple-Testing-/Schein-Robustheits-Falle aus GM-2. Im Verdict muss CS-06 als **am Kernel-Risiko hängend** markiert sein, nicht als breit abgestütztes Ensemble.
+2. **CS-11 konvergiert nach Modul-Ersetzung auf CS-06** — dann ist CS-11 redundant, kein zweiter Pilot. C-29 ist die einzige echte Diversifikation (kernel-unabhängig, S-3), und die hat ihr eigenes Eventdichte-Problem.
+3. **Alle drei sind UNTESTED, nicht implementiert** (alignment_matrix CS-06/10/11 = 0 Evidenz). Der gesamte Strategie-Teil ist Architektur auf dem Papier.
+
+- **Futures:** CS-06 PILOT — aber explizit als kernel-risiko-gekoppelt deklariert. CS-10 PARK (E-14 Panel-Lücke + CCM laut Critic „gestreckt"). CS-11 nur falls C-29-Omori-Exit eigenständigen Wert über CS-06 zeigt, sonst redundant.
+- **Härtester Einwand:** Der ω_s-Kernel ist ein vom Advocate selbst benannter Single-Point-of-Failure, der C-27/C-28/CS-06/CS-10 gemeinsam kippt — die Cluster-„Diversität" ist überwiegend ein ID-Artefakt, kein echter Risiko-Spread (GM-2).
+- **Minimale Bedingung für PILOT (CS-06):** ω_s-Stabilitäts-Test über ≥ 2 disjunkte Regime VOR dem Strategie-Run, als Pflicht-Vorschaltung neben A-7. Bricht ω_s über Regime, fällt der halbe Cluster — das muss zuerst geklärt sein.
+
+---
+
+### S-7 auf A-7 — Distributions-Check: notwendig, aber der Advocate überschätzt, was er ausschließt
+
+**Steelman:** Vollständig zugestimmt: Der E-01-analoge Distributions-/Erreichbarkeits-Check ist das **billigste, härteste Pflicht-Gate** und schließt den teuersten C-14-Fehler aus, bevor ein Euro fließt (alignment_matrix Kritische Datenlücke #4). Pflicht-Vorschaltung für C-27/C-30/CS-06/CS-11. Das ist die beste konkrete Idee der gesamten Advocate-Seite.
+
+**Aber zwei Begrenzungen, die der Advocate halb einräumt:**
+
+1. **Er prüft Erreichbarkeit, nicht Spezifikation.** Für C-27 zeigt der Check „erreicht Rₜ je ≥ 1?" — aber wegen S-1 (Punktschätzer-Varianz) kann Rₜ ≥ 1 auch reines Schätzrauschen bei dünnen Events sein. Der Check muss auf dem **unteren Kredibilitäts-Intervall** laufen, sonst produziert er falsch-positive „erreichbar"-Urteile. Erreichbarkeit des *Punktschätzers* ist nicht Erreichbarkeit des *Signals*.
+2. **C-30 (Natural Time κ₁) ist ein C-14-Wiedergänger und gehört nicht in denselben Atemzug wie C-27 gelobt.** κ₁ ≈ 0.070 ist ein **importierter theoretischer Schwellwert** (claims_register C-30; alignment_matrix C-30: „dasselbe Risiko eines unkalibrierten theoretischen Schwellwerts wie C-14"). Das ist genau der E-01-Fehlertyp, den C-27 zu vermeiden vorgibt. Der Advocate führt C-30 korrekt nur nachrangig mit κ₁-Gate — aber im Multiple-Testing-Bild (GM-2) ist C-30 der **dritte, vierte Schuss auf dasselbe Kaskaden-Ziel** mit der schwächsten Konstruktion. Ich würde C-30 härter behandeln: PARK bis C-27 validiert, nicht parallel pilotieren.
+
+- **Futures:** Distributions-Check ADOPT als Pflicht-Gate (kein eigener Alpha-Ansatz, ein Filter). C-30 PARK statt PILOT.
+- **Minimale Bedingung:** Check läuft auf Intervall-Untergrenze, nicht Punktschätzer; C-30 erst nach C-27-Validierung.
+
+---
+
+### S-8 auf A-8 — „muss die Friktions-Wand nicht schlagen": der Zirkularitäts-Vorwurf trifft ins Zentrum
+
+**Steelman:** Der Mechanismus-Punkt ist legitim und wichtig: Ein Risk-Off-/Timing-Gate verdient seinen Wert über die **Verschiebung der Verlustverteilung** (DD-Reduktion, großer Reversal-Move), nicht über eine Per-Trade-Mikro-Edge gegen die 11-bps-Fee (E-16: Friktion ~35× Richtung; E-09: Roh-Edge -5.8 bps < 11 bps). Eine vermiedene -50-bps-Kaskade (E-09 min bps: BNB -56.6, SOL -48.9, BTC -47.7) bezahlt viele Round-Trips. Das ist die *einzige* Signalklasse im Register mit diesem strukturellen Profil, und der Advocate hat recht, das herauszustellen.
+
+**Aber hier ist der Knockout, und der Advocate hat ihn selbst hingeschrieben:** „Das ist ein **Mechanismus-Argument ohne einen einzigen positiven Outcome-Befund.**" Genau. Ich treibe es weiter:
+
+1. **DD-Reduktion ist nur wertvoll relativ zu einer Basis-Strategie, deren DD reduziert wird — und die existiert im Register nicht.** Ein Risk-Off-Overlay senkt den Drawdown *einer profitablen Long-Position*. Im gesamten Register gibt es **null** Strategie mit positiver Edge: CS-01 REFUTED, CS-02 REFUTED, CS-03 PARTIAL/negativ (E-09), CS-04/05 nie gelaufen (E-13/E-14). Der einzige positive Befund im ganzen Register ist C-42 (RV-Prognose R²=0.249) — und das ist ein **Volatilitäts**-Schätzer, **keine direktionale Basis-Strategie**, auf die ein Cascade-Risk-Off aufsetzen könnte. **Ein Drawdown-Reduzierer ohne profitable Basis reduziert den Drawdown von Null auf etwas-unter-Null — er macht aus einer Nicht-Strategie eine teurere Nicht-Strategie.** Das ist die Zirkularität in Reinform: A-8 begründet den Cluster-Wert mit einer DD-Reduktion an einer Position, die das Register nicht besitzt.
+2. **Der Erschöpfungs-Entry (C-15/C-29) ist die einzige *eigenständige* Geldverdien-These — und ihre Evidenz ist E-11, das schwächste Stück im Register.** Der Reversal-Amplituden-Beleg (E-11: BNB -195 → +187 bps Mirror-Flip) ist laut Register selbst **NIEDRIG belastbar, N=16, ein einziger Trade, in iter-4 NICHT reproduziert** (worst BNB dann nur -56.6 bps). Auf diesem Ein-Trade-Artefakt darf kein Geldverdien-Anspruch ruhen. Der Advocate zitiert es korrekt mit Vorbehalt — aber damit bleibt die einzige offensive Cascade-These empirisch praktisch unbelegt.
+3. **DD-Reduktions-Ziele (C-39 ≥ 25 %, CS-11 ≥ 20 %) sind reine PRD-Behauptung** (alignment_matrix: beide UNTESTED, 0 Evidenz). GM-6 bleibt: ohne stress-reiches Fenster ist selbst ein gutes Cascade-Signal nicht falsifizierbar — der Cluster kann seine zentrale Wertbehauptung im vorhandenen Datenmaterial **nicht testen**.
+
+- **Futures:** Das Mechanismus-Argument rettet den Cluster vor der Friktions-Wand — aber **nur konditional** darauf, dass irgendwann eine profitable Basis-Strategie existiert ODER der Erschöpfungs-Entry standalone positiv misst. Beides fehlt heute.
+- **Härtester Einwand:** DD-Reduktion ist wertlos ohne eine positive Basis-Strategie, deren DD reduziert wird — die im gesamten Register nicht existiert (alle CS REFUTED/negativ/ungelaufen; C-42 ist kein Direktional-Alpha) — also begründet A-8 den Cluster-Wert zirkulär mit einem Bezugspunkt, den es nicht gibt.
+- **Minimale Bedingung dafür, dass A-8 mehr als Rhetorik ist:** Entweder (a) eine im Register *belegte* profitable Basis-Position, deren Max-DD das Cascade-Overlay nachweislich senkt (netto nach entgangenem Carry/False-Positive-Kosten), oder (b) ein standalone-positiver Erschöpfungs-Entry auf belastbarer Stichprobe (nicht E-11/N=16). Ohne (a) oder (b) ist die Friktions-Immunität ein nicht einlösbarer Scheck.
+
+---
+
+### Skeptic — Synthese je Markt (für den Judge)
+
+Spot: DROP für alle (kein Mechanismus, unstrittig). Optionen: DROP/PARK für alle (datenlos, INC-04). Futures unten.
+
+| Ansatz | Futures — Skeptic-Position vs. Advocate |
+|---|---|
+| C-27 Cori-Rₜ | PILOT **nur** mit Posterior-Varianz-Gate auf Intervall-Untergrenze; sonst DROP (S-1). Self-calibrating ≠ parameterfrei. |
+| C-28 NB-k | PILOT nur gebündelt + Power-Analyse; im Verdict als **ein** Test mit C-27 führen, nicht zwei (S-2, GM-2). |
+| C-29 Avalanche | PILOT nur nach Eventdichte-Nachweis + Baseline gegen reparierten Time-Stop (E-15); stärkster eigenständiger Kandidat, aber Collapse braucht viele Bursts (S-3). |
+| C-30 κ₁ | **PARK** (nicht PILOT) — importierter Theorie-Schwellwert, C-14-Wiedergänger, dritter korrelierter Schuss (S-7, GM-2). |
+| C-39 Anatomie | **PARK** (nicht PILOT) — monatelang datenleer, Recall-Gate misst Detektion statt Profit (S-5). |
+| C-14 Konzeptrest | DROP als eigener Posten, in C-27 absorbiert (S-4, Zustimmung). |
+| CS-06 Cockpit | PILOT — sauberste Strategie, aber explizit als **ω_s-kernel-risiko-gekoppelt** deklarieren (S-6). |
+| CS-11 Seismograph | PARK/redundant — konvergiert auf CS-06; erbt C-14/C-15-Lasten (S-6). |
+| CS-10 Cross-Coin | PARK — E-14-Panel-Lücke + geteilter Kernel + CCM „gestreckt" (S-6). |
+
+**Pflicht-Vorschaltung (Zustimmung zu A-7, verschärft):** (1) E-01-analoger Distributions-Check **auf Intervall-Untergrenze**; (2) ω_s-Stabilitäts-Test über ≥ 2 Regime; (3) Bulk-Historie mit ≥ 30 Kaskaden (GM-6); (4) jedes Outcome-Gate netto nach Carry/False-Positive-Kosten, nicht Recall. Solange keine profitable Basis-Strategie im Register existiert, bleibt die A-8-Friktions-Immunität ein konditionaler Scheck.
+
+---
+
+*Ende Skeptic.*
