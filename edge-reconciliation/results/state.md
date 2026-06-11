@@ -5,7 +5,7 @@
 
 ## Phase
 
-`PRD` (Phase 6 läuft)
+`REVIEW` (Phase 7 läuft)
 
 ## Input-Typologie (Phase-0-Sichtung durch Orchestrator)
 
@@ -37,5 +37,5 @@
 - [x] Phase 3 ALIGNMENT — 0 CONFIRMED / 5 PARTIAL / 3 REFUTED (C-14, CS-01, CS-02) / 48 UNTESTED; 16 SUSPECT-Module
 - [x] Phase 4 DEBATE — 7 Debatten komplett (Advocate + Skeptic je Cluster, Steelman-Pflicht erfüllt)
 - [x] Phase 5 VERDICT — 0 ADOPT / ~16 PILOT / ~25 PARK / ~70 DROP / 3 REFUTED; Welle-1: E-15-Auswertung, C-42-Repro, C-36 Recording (gedeckelt), C-31 CFAR
-- [ ] Phase 6 PRD — FINAL_PRD.md
+- [x] Phase 6 PRD — FINAL_PRD.md (Welle-1: 4 Pilots, Welle-2+: 13 sequenziert, PARK: 32, REFUTED: 3, ADOPT: 0)
 - [ ] Phase 7 REVIEW — Judge-Review, max. 1 Korrektur-Loop
