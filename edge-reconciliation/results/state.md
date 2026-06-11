@@ -5,7 +5,7 @@
 
 ## Phase
 
-`EVIDENCE_AUDIT` (Phase 2 läuft)
+`ALIGNMENT` (Phase 3 läuft)
 
 ## Input-Typologie (Phase-0-Sichtung durch Orchestrator)
 
@@ -33,7 +33,7 @@
 
 - [x] Phase 0 INIT — input/ geprüft (11 Dateien + iter4_raw), state.md angelegt
 - [x] Phase 1 INVENTORY — 56 Claims (43 C-xx Module, 13 CS-xx Strategien), 6 Inkonsistenzen (INC-01..06), ID-Mapping, repo_map.md
-- [ ] Phase 2 EVIDENCE_AUDIT — evidence_register.md
+- [x] Phase 2 EVIDENCE_AUDIT — 18 E-xx (17×L0, 1×PENDING=iter-5), GM-1..6 Rahmenbedingungen, Kostenbaseline 11-15 bps, Widersprüche E-17/E-18
 - [ ] Phase 3 ALIGNMENT — alignment_matrix.md
 - [ ] Phase 4 DEBATE — debate_{cluster}.md
 - [ ] Phase 5 VERDICT — verdict.md
