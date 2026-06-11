@@ -1,5 +1,5 @@
-# ════════════════════════════════════════════════════════════════════════
-# run_short.ps1 — T2 LOCAL_SHORT Runner (Scinance 2.0 Welle 1, WP-5)
+﻿# ========================================================================
+# run_short.ps1 - T2 LOCAL_SHORT Runner (Scinance 2.0 Welle 1, WP-5)
 #
 # Aufruf (keine Pflicht-Parameter, ~10-20 min):
 #   powershell -ExecutionPolicy Bypass -File .\run_short.ps1
@@ -13,15 +13,15 @@
 #   5) C42_QUICK_LGBM   dito mit LightGBM, NUR falls installiert (optional)
 #
 # Ende: 1 Zeile je Schritt (OK/FAIL/SKIP) + Exit-Code:
-#   0 = alle OK · 1 = mind. ein FAIL · 2 = kein FAIL, aber SKIP
+#   0 = alle OK * 1 = mind. ein FAIL * 2 = kein FAIL, aber SKIP
 # Details: scinance2-impl\handoff_local\results\short_<timestamp>\
 #
 # Dry-Run (Mechanik-Test):  $env:HANDOFF_DRY_RUN='1'; .\run_short.ps1
 # Kompatibel mit Windows PowerShell 5.1 und PowerShell 7.
-# ════════════════════════════════════════════════════════════════════════
+# ========================================================================
 $ErrorActionPreference = 'Continue'
 
-# ── Pfade (bei Bedarf HIER anpassen — siehe README_RUN.md) ──────────────
+# -- Pfade (bei Bedarf HIER anpassen - siehe README_RUN.md) --------------
 $ScriptDir = $PSScriptRoot
 $RepoRoot  = (Resolve-Path (Join-Path $ScriptDir '..\..')).Path
 # Lokale DuckDB mit kline_1min/trades. Default = Repo-ueblicher Pfad aus
@@ -34,7 +34,7 @@ $E15Trades      = Join-Path $RepoRoot 'edge_research_framework\results\trades_al
 $E15BaseResults = Join-Path $RepoRoot 'edge-reconciliation\input\iter4_raw\replay_all_results.json'
 $E15BaseTrades  = Join-Path $RepoRoot 'edge-reconciliation\input\iter4_raw\trades_all.csv'
 
-# ── Umgebung ─────────────────────────────────────────────────────────────
+# -- Umgebung -------------------------------------------------------------
 $PythonExe = if ($env:PYTHON) { $env:PYTHON } else { 'python' }
 $SrcPath = Join-Path $RepoRoot 'src'
 $env:PYTHONPATH = if ($env:PYTHONPATH) { $SrcPath + ';' + $env:PYTHONPATH } else { $SrcPath }
@@ -106,22 +106,22 @@ function Invoke-Step {
     return $rc
 }
 
-Write-Host ("RUN_SHORT (T2) — Repo: " + $RepoRoot + " — Ergebnisse: " + $RunDir)
-if ($DryRun) { Write-Host "ACHTUNG: HANDOFF_DRY_RUN aktiv — keine echten Laeufe." }
+Write-Host ("RUN_SHORT (T2) - Repo: " + $RepoRoot + " - Ergebnisse: " + $RunDir)
+if ($DryRun) { Write-Host "ACHTUNG: HANDOFF_DRY_RUN aktiv - keine echten Laeufe." }
 
-# ── Schritt 1: Recorder-Smoke (5 min live gegen echte Bybit-WS) ─────────
+# -- Schritt 1: Recorder-Smoke (5 min live gegen echte Bybit-WS) ---------
 [void](Invoke-Step -Name 'RECORDER_SMOKE' -TimeoutSec 420 -CmdArgs @(
     '-m', 'bybit_edge.recorder', '--duration', '300', '--cap-gb', '5'))
 
-# ── Schritt 2: Parquet-/Row-Count-/Schema-Version-Check je Stream ───────
+# -- Schritt 2: Parquet-/Row-Count-/Schema-Version-Check je Stream -------
 [void](Invoke-Step -Name 'RECORDER_CHECK' -TimeoutSec 120 -CmdArgs @(
     (Join-Path $ScriptDir 'check_recording.py'), '--max-age-min', '30',
     '--json', (Join-Path $RunDir 'recording_check.json')))
 
-# ── Schritt 3: E-15-Auswertung auf echten iter-5-Ergebnissen ────────────
+# -- Schritt 3: E-15-Auswertung auf echten iter-5-Ergebnissen ------------
 if ((-not $DryRun) -and (-not (Test-Path $E15Results))) {
     Record-Step -Name 'E15_EVAL' -Status 'SKIP' -Rc 0 -Dur 0 `
-        -Detail ("iter-5-Ergebnisse fehlen (" + $E15Results + ") — scripts/replay_all.py separat laufen lassen")
+        -Detail ("iter-5-Ergebnisse fehlen (" + $E15Results + ") - scripts/replay_all.py separat laufen lassen")
 } else {
     [void](Invoke-Step -Name 'E15_EVAL' -TimeoutSec 600 -CmdArgs @(
         (Join-Path $RepoRoot 'scripts\evaluate_e15.py'),
@@ -130,10 +130,10 @@ if ((-not $DryRun) -and (-not (Test-Path $E15Results))) {
         '--out', (Join-Path $RunDir 'e15')))
 }
 
-# ── Schritt 4: C-42-Quick-Fit BTCUSDT (HAR, laeuft immer) ───────────────
+# -- Schritt 4: C-42-Quick-Fit BTCUSDT (HAR, laeuft immer) ---------------
 if ((-not $DryRun) -and (-not (Test-Path $DuckDbPath))) {
     Record-Step -Name 'C42_QUICK_HAR' -Status 'SKIP' -Rc 0 -Dur 0 `
-        -Detail ("DuckDB fehlt (" + $DuckDbPath + ") — Pfad oben im Skript / HANDOFF_DUCKDB anpassen")
+        -Detail ("DuckDB fehlt (" + $DuckDbPath + ") - Pfad oben im Skript / HANDOFF_DUCKDB anpassen")
     Record-Step -Name 'C42_QUICK_LGBM' -Status 'SKIP' -Rc 0 -Dur 0 -Detail 'DuckDB fehlt' -OptionalSkip $true
 } else {
     [void](Invoke-Step -Name 'C42_QUICK_HAR' -TimeoutSec 900 -CmdArgs @(
@@ -141,7 +141,7 @@ if ((-not $DryRun) -and (-not (Test-Path $DuckDbPath))) {
         '--symbol', 'BTCUSDT', '--db-path', $DuckDbPath,
         '--out', (Join-Path $RunDir 'c42_quick_har')))
 
-    # ── Schritt 5 (optional): zusaetzlich LightGBM, falls installiert ───
+    # -- Schritt 5 (optional): zusaetzlich LightGBM, falls installiert ---
     $lgbmOk = $false
     if ($DryRun) { $lgbmOk = $true }
     else {
@@ -161,9 +161,9 @@ if ((-not $DryRun) -and (-not (Test-Path $DuckDbPath))) {
     }
 }
 
-# ── Gesamt-Summary: 1 Zeile je Schritt + Exit-Code ──────────────────────
+# -- Gesamt-Summary: 1 Zeile je Schritt + Exit-Code ----------------------
 $nOk = 0; $nFail = 0; $nSkip = 0
-$summaryLines = @('──────── RUN_SHORT SUMMARY ────────')
+$summaryLines = @('-------- RUN_SHORT SUMMARY --------')
 foreach ($r in $Script:Results) {
     $summaryLines += ($r.Name + ': ' + $r.Status + ' (' + $r.Detail + ')')
     if ($r.Status -eq 'OK') { $nOk++ }

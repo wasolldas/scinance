@@ -1,5 +1,5 @@
-# ════════════════════════════════════════════════════════════════════════
-# run_overnight.ps1 — T3 LOCAL_LONG Runner (Scinance 2.0 Welle 1, WP-5)
+﻿# ========================================================================
+# run_overnight.ps1 - T3 LOCAL_LONG Runner (Scinance 2.0 Welle 1, WP-5)
 #
 # Aufruf (keine Pflicht-Parameter, laeuft UNBEAUFSICHTIGT ueber Nacht, ~8h+):
 #   powershell -ExecutionPolicy Bypass -File .\run_overnight.ps1
@@ -15,20 +15,20 @@
 #   C31_CFAR_<sym>   C-31 CFAR auf echten Ticks (DuckDB-trades, 200 Surrogates,
 #                    2 disjunkte Fenster) je Symbol
 #   REPLAY_ITER5     NUR Hinweis: replay_all.py (12h-Replays) wird bewusst
-#                    NICHT automatisch gestartet — User-Entscheidung
+#                    NICHT automatisch gestartet - User-Entscheidung
 #   RECORDER_CHECK   Parquet/Row-Count/Schema-Version + Storage-Deckel
 #   SUMMARY          aggregate_results.py -> results\SUMMARY_<yyyy-mm-dd>.md
 #
-# Exit-Code: 0 = alle OK · 1 = mind. ein FAIL · 2 = kein FAIL, aber SKIP
+# Exit-Code: 0 = alle OK * 1 = mind. ein FAIL * 2 = kein FAIL, aber SKIP
 # Ergebnisse: scinance2-impl\handoff_local\results\overnight_<timestamp>\
 #             + results\SUMMARY_<datum>.md (Morgen-Auswertung gate-auditor)
 #
 # Optionale Env-Overrides: HANDOFF_RECORDER_HOURS, HANDOFF_RECORDER_CAP_GB,
 # HANDOFF_DUCKDB, HANDOFF_DRY_RUN=1 (+HANDOFF_DRY_RC). PS 5.1-kompatibel.
-# ════════════════════════════════════════════════════════════════════════
+# ========================================================================
 $ErrorActionPreference = 'Continue'
 
-# ── Pfade (bei Bedarf HIER anpassen — siehe README_RUN.md) ──────────────
+# -- Pfade (bei Bedarf HIER anpassen - siehe README_RUN.md) --------------
 $ScriptDir = $PSScriptRoot
 $RepoRoot  = (Resolve-Path (Join-Path $ScriptDir '..\..')).Path
 # Lokale DuckDB mit kline_1min/trades. Default = Repo-ueblicher Pfad aus
@@ -45,13 +45,13 @@ $Symbols = @('BTCUSDT', 'ETHUSDT', 'SOLUSDT', 'BNBUSDT', 'XRPUSDT')
 $C31Windows = 2
 $C31Surrogates = 200
 
-# ── Umgebung ─────────────────────────────────────────────────────────────
+# -- Umgebung -------------------------------------------------------------
 $PythonExe = if ($env:PYTHON) { $env:PYTHON } else { 'python' }
 $SrcPath = Join-Path $RepoRoot 'src'
 $env:PYTHONPATH = if ($env:PYTHONPATH) { $SrcPath + ';' + $env:PYTHONPATH } else { $SrcPath }
 if (-not $env:BYBIT_DATA_DIR) { $env:BYBIT_DATA_DIR = Join-Path $RepoRoot 'data' }
 Set-Location $RepoRoot
-# Ressourcen-Disziplin: eigener Prozess niedrig — Kindprozesse erben die Klasse.
+# Ressourcen-Disziplin: eigener Prozess niedrig - Kindprozesse erben die Klasse.
 try { (Get-Process -Id $PID).PriorityClass = 'BelowNormal' } catch { }
 
 $DryRun = ($env:HANDOFF_DRY_RUN -and ($env:HANDOFF_DRY_RUN -ne '0'))
@@ -119,11 +119,11 @@ function Invoke-Step {
     return $rc
 }
 
-Write-Host ("RUN_OVERNIGHT (T3) — Repo: " + $RepoRoot + " — Ergebnisse: " + $RunDir)
+Write-Host ("RUN_OVERNIGHT (T3) - Repo: " + $RepoRoot + " - Ergebnisse: " + $RunDir)
 Write-Host ("Recorder: " + $RecorderHours + "h, Cap " + $RecorderCapGb + " GB | DuckDB: " + $DuckDbPath)
-if ($DryRun) { Write-Host "ACHTUNG: HANDOFF_DRY_RUN aktiv — keine echten Laeufe." }
+if ($DryRun) { Write-Host "ACHTUNG: HANDOFF_DRY_RUN aktiv - keine echten Laeufe." }
 
-# ── Block 1: Recorder-Dauertest im Hintergrund starten ──────────────────
+# -- Block 1: Recorder-Dauertest im Hintergrund starten ------------------
 $RecProc = $null
 $RecT0 = Get-Date
 if (-not $DryRun) {
@@ -143,7 +143,7 @@ if (-not $DryRun) {
     }
 }
 
-# ── Block 2: C-42 Voll-Walk-Forward multi-symbol ─────────────────────────
+# -- Block 2: C-42 Voll-Walk-Forward multi-symbol -------------------------
 $C42Model = 'lightgbm'
 if (-not $DryRun) {
     $lgbmOk = $false
@@ -158,7 +158,7 @@ if (-not $DryRun) {
 }
 if ((-not $DryRun) -and (-not (Test-Path $DuckDbPath))) {
     Record-Step -Name 'C42_WF' -Status 'SKIP' -Rc 0 -Dur 0 `
-        -Detail ("DuckDB fehlt (" + $DuckDbPath + ") — Pfad oben im Skript / HANDOFF_DUCKDB anpassen")
+        -Detail ("DuckDB fehlt (" + $DuckDbPath + ") - Pfad oben im Skript / HANDOFF_DUCKDB anpassen")
 } else {
     foreach ($sym in $Symbols) {
         $rc = Invoke-Step -Name ("C42_WF_" + $sym) -TimeoutSec 7200 -CmdArgs @(
@@ -175,7 +175,7 @@ if ((-not $DryRun) -and (-not (Test-Path $DuckDbPath))) {
     }
 }
 
-# ── Block 3: C-31 CFAR auf echten Ticks (DuckDB-trades) ──────────────────
+# -- Block 3: C-31 CFAR auf echten Ticks (DuckDB-trades) ------------------
 if ((-not $DryRun) -and (-not (Test-Path $DuckDbPath))) {
     Record-Step -Name 'C31_CFAR' -Status 'SKIP' -Rc 0 -Dur 0 -Detail ("DuckDB fehlt (" + $DuckDbPath + ")")
 } else {
@@ -188,16 +188,16 @@ if ((-not $DryRun) -and (-not (Test-Path $DuckDbPath))) {
     }
 }
 
-# ── Block 4: Hinweis iter-5-Replay (bewusst NICHT automatisch starten) ───
+# -- Block 4: Hinweis iter-5-Replay (bewusst NICHT automatisch starten) ---
 if (Test-Path $E15Results) {
     Record-Step -Name 'REPLAY_ITER5' -Status 'INFO' -Rc 0 -Dur 0 `
-        -Detail 'iter-5-Ergebnisse vorhanden — E-15-Auswertung laeuft im run_short (Schritt E15_EVAL)'
+        -Detail 'iter-5-Ergebnisse vorhanden - E-15-Auswertung laeuft im run_short (Schritt E15_EVAL)'
 } else {
     Record-Step -Name 'REPLAY_ITER5' -Status 'INFO' -Rc 0 -Dur 0 `
-        -Detail 'iter-5-Replay fehlt noch: scripts/replay_all.py separat starten (12h) — Runner startet das bewusst NICHT (User-Entscheidung)'
+        -Detail 'iter-5-Replay fehlt noch: scripts/replay_all.py separat starten (12h) - Runner startet das bewusst NICHT (User-Entscheidung)'
 }
 
-# ── Block 5: Auf Recorder warten, dann pruefen (inkl. Storage-Deckel) ────
+# -- Block 5: Auf Recorder warten, dann pruefen (inkl. Storage-Deckel) ----
 if ($DryRun) {
     $st = 'FAIL'; if ($DryRc -eq 0) { $st = 'OK' }
     Record-Step -Name 'RECORDER_LONG' -Status $st -Rc $DryRc -Dur 0 -Detail ("dry-run rc=" + $DryRc)
@@ -210,7 +210,7 @@ if ($DryRun) {
             try { $RecProc.Kill() } catch { }
             Record-Step -Name 'RECORDER_LONG' -Status 'FAIL' -Rc 124 `
                 -Dur ([int]((Get-Date) - $RecT0).TotalSeconds) `
-                -Detail 'TIMEOUT: lief nach duration+600s noch — gekillt'
+                -Detail 'TIMEOUT: lief nach duration+600s noch - gekillt'
         } else {
             $recRc = $RecProc.ExitCode
             $st = 'FAIL'; if ($recRc -eq 0) { $st = 'OK' }
@@ -228,18 +228,18 @@ $RecAgeMin = [int]($RecorderDurationS / 60 + 120)
     (Join-Path $ScriptDir 'check_recording.py'), '--max-age-min', "$RecAgeMin",
     '--cap-gb', "$RecorderCapGb", '--json', (Join-Path $RunDir 'recording_check.json')))
 
-# ── Block 6: SUMMARY_<datum>.md aggregieren (Morgen-Auswertung) ──────────
+# -- Block 6: SUMMARY_<datum>.md aggregieren (Morgen-Auswertung) ----------
 $SummaryDate = (Get-Date).ToUniversalTime().ToString('yyyy-MM-dd')
 $aggRc = Invoke-Step -Name 'SUMMARY' -TimeoutSec 300 -CmdArgs @(
     (Join-Path $ScriptDir 'aggregate_results.py'), '--run-dir', $RunDir,
     '--label', 'overnight', '--date', $SummaryDate)
 if ($aggRc -ne 0) {
-    Write-Host ("WARNUNG: SUMMARY-Aggregation fehlgeschlagen — Roh-JSONs liegen in " + $RunDir)
+    Write-Host ("WARNUNG: SUMMARY-Aggregation fehlgeschlagen - Roh-JSONs liegen in " + $RunDir)
 }
 
-# ── Gesamt-Summary: 1 Zeile je Block + Exit-Code ─────────────────────────
+# -- Gesamt-Summary: 1 Zeile je Block + Exit-Code -------------------------
 $nOk = 0; $nFail = 0; $nSkip = 0
-$summaryLines = @('──────── RUN_OVERNIGHT SUMMARY ────────')
+$summaryLines = @('-------- RUN_OVERNIGHT SUMMARY --------')
 foreach ($r in $Script:Results) {
     $summaryLines += ($r.Name + ': ' + $r.Status + ' (' + $r.Detail + ')')
     if ($r.Status -eq 'OK') { $nOk++ }
