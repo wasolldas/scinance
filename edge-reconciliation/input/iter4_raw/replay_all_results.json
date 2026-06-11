@@ -1,0 +1,565 @@
+{
+  "mode": "single_pass",
+  "symbols": [
+    "BNBUSDT",
+    "BTCUSDT",
+    "ETHUSDT",
+    "SOLUSDT",
+    "XRPUSDT"
+  ],
+  "skipped_symbols": [],
+  "generated_at": "2026-06-10T02:26:03Z",
+  "interval_seconds": 1.0,
+  "inverted_strategies": [],
+  "per_strategy_aggregate": {
+    "S1": {
+      "total_trades": 0,
+      "weighted_sharpe": 0.0,
+      "mean_win_rate": 0.0,
+      "worst_max_dd": 0.0,
+      "total_return": 0.0,
+      "best_symbol": null,
+      "data_limited_symbols": [
+        "BNBUSDT",
+        "BTCUSDT",
+        "ETHUSDT",
+        "SOLUSDT",
+        "XRPUSDT"
+      ]
+    },
+    "S2": {
+      "total_trades": 190,
+      "weighted_sharpe": -17.828451,
+      "mean_win_rate": 0.121053,
+      "worst_max_dd": 1359.11084,
+      "total_return": -1408.648671,
+      "best_symbol": "BNBUSDT",
+      "data_limited_symbols": [
+        "BNBUSDT",
+        "BTCUSDT",
+        "ETHUSDT",
+        "SOLUSDT",
+        "XRPUSDT"
+      ]
+    },
+    "S3": {
+      "total_trades": 213,
+      "weighted_sharpe": -19.606443,
+      "mean_win_rate": 0.093897,
+      "worst_max_dd": 6680.498721,
+      "total_return": -6857.555675,
+      "best_symbol": "BNBUSDT",
+      "data_limited_symbols": []
+    },
+    "S4": {
+      "total_trades": 0,
+      "weighted_sharpe": 0.0,
+      "mean_win_rate": 0.0,
+      "worst_max_dd": 0.0,
+      "total_return": 0.0,
+      "best_symbol": null,
+      "data_limited_symbols": [
+        "BNBUSDT",
+        "BTCUSDT",
+        "ETHUSDT",
+        "SOLUSDT",
+        "XRPUSDT"
+      ]
+    },
+    "S5": {
+      "total_trades": 0,
+      "weighted_sharpe": 0.0,
+      "mean_win_rate": 0.0,
+      "worst_max_dd": 0.0,
+      "total_return": 0.0,
+      "best_symbol": null,
+      "data_limited_symbols": [
+        "BNBUSDT",
+        "BTCUSDT",
+        "ETHUSDT",
+        "SOLUSDT",
+        "XRPUSDT"
+      ]
+    }
+  },
+  "per_symbol": {
+    "BNBUSDT": {
+      "S1": {
+        "sharpe": 0.0,
+        "win_rate": 0.0,
+        "max_drawdown": 0.0,
+        "total_return": 0.0,
+        "n_trades": 0,
+        "data_limited": false,
+        "status": "no-trades"
+      },
+      "S2": {
+        "sharpe": -5.588409,
+        "win_rate": 0.346154,
+        "max_drawdown": 3.36008,
+        "total_return": -2.6017,
+        "n_trades": 26,
+        "data_limited": true,
+        "status": "OK"
+      },
+      "S3": {
+        "sharpe": -13.210083,
+        "win_rate": 0.157895,
+        "max_drawdown": 25.699027,
+        "total_return": -24.641576,
+        "n_trades": 19,
+        "data_limited": false,
+        "status": "OK"
+      },
+      "S4": {
+        "sharpe": 0.0,
+        "win_rate": 0.0,
+        "max_drawdown": 0.0,
+        "total_return": 0.0,
+        "n_trades": 0,
+        "data_limited": true,
+        "status": "no-trades"
+      },
+      "S5": {
+        "sharpe": 0.0,
+        "win_rate": 0.0,
+        "max_drawdown": 0.0,
+        "total_return": 0.0,
+        "n_trades": 0,
+        "data_limited": true,
+        "status": "no-trades"
+      }
+    },
+    "BTCUSDT": {
+      "S1": {
+        "sharpe": 0.0,
+        "win_rate": 0.0,
+        "max_drawdown": 0.0,
+        "total_return": 0.0,
+        "n_trades": 0,
+        "data_limited": false,
+        "status": "no-trades"
+      },
+      "S2": {
+        "sharpe": -17.322871,
+        "win_rate": 0.067797,
+        "max_drawdown": 1359.11084,
+        "total_return": -1359.11084,
+        "n_trades": 59,
+        "data_limited": true,
+        "status": "OK"
+      },
+      "S3": {
+        "sharpe": -23.054716,
+        "win_rate": 0.048387,
+        "max_drawdown": 6680.498721,
+        "total_return": -6680.498721,
+        "n_trades": 62,
+        "data_limited": false,
+        "status": "OK"
+      },
+      "S4": {
+        "sharpe": 0.0,
+        "win_rate": 0.0,
+        "max_drawdown": 0.0,
+        "total_return": 0.0,
+        "n_trades": 0,
+        "data_limited": true,
+        "status": "no-trades"
+      },
+      "S5": {
+        "sharpe": 0.0,
+        "win_rate": 0.0,
+        "max_drawdown": 0.0,
+        "total_return": 0.0,
+        "n_trades": 0,
+        "data_limited": true,
+        "status": "no-trades"
+      }
+    },
+    "ETHUSDT": {
+      "S1": {
+        "sharpe": 0.0,
+        "win_rate": 0.0,
+        "max_drawdown": 0.0,
+        "total_return": 0.0,
+        "n_trades": 0,
+        "data_limited": false,
+        "status": "no-trades"
+      },
+      "S2": {
+        "sharpe": -21.804585,
+        "win_rate": 0.084507,
+        "max_drawdown": 46.62061,
+        "total_return": -46.62061,
+        "n_trades": 71,
+        "data_limited": true,
+        "status": "OK"
+      },
+      "S3": {
+        "sharpe": -22.160888,
+        "win_rate": 0.06,
+        "max_drawdown": 147.679341,
+        "total_return": -147.679341,
+        "n_trades": 50,
+        "data_limited": false,
+        "status": "OK"
+      },
+      "S4": {
+        "sharpe": 0.0,
+        "win_rate": 0.0,
+        "max_drawdown": 0.0,
+        "total_return": 0.0,
+        "n_trades": 0,
+        "data_limited": true,
+        "status": "no-trades"
+      },
+      "S5": {
+        "sharpe": 0.0,
+        "win_rate": 0.0,
+        "max_drawdown": 0.0,
+        "total_return": 0.0,
+        "n_trades": 0,
+        "data_limited": true,
+        "status": "no-trades"
+      }
+    },
+    "SOLUSDT": {
+      "S1": {
+        "sharpe": 0.0,
+        "win_rate": 0.0,
+        "max_drawdown": 0.0,
+        "total_return": 0.0,
+        "n_trades": 0,
+        "data_limited": false,
+        "status": "no-trades"
+      },
+      "S2": {
+        "sharpe": -23.675467,
+        "win_rate": 0.090909,
+        "max_drawdown": 0.307294,
+        "total_return": -0.304224,
+        "n_trades": 11,
+        "data_limited": true,
+        "status": "OK"
+      },
+      "S3": {
+        "sharpe": -14.477075,
+        "win_rate": 0.138889,
+        "max_drawdown": 4.655518,
+        "total_return": -4.655518,
+        "n_trades": 36,
+        "data_limited": false,
+        "status": "OK"
+      },
+      "S4": {
+        "sharpe": 0.0,
+        "win_rate": 0.0,
+        "max_drawdown": 0.0,
+        "total_return": 0.0,
+        "n_trades": 0,
+        "data_limited": true,
+        "status": "no-trades"
+      },
+      "S5": {
+        "sharpe": 0.0,
+        "win_rate": 0.0,
+        "max_drawdown": 0.0,
+        "total_return": 0.0,
+        "n_trades": 0,
+        "data_limited": true,
+        "status": "no-trades"
+      }
+    },
+    "XRPUSDT": {
+      "S1": {
+        "sharpe": 0.0,
+        "win_rate": 0.0,
+        "max_drawdown": 0.0,
+        "total_return": 0.0,
+        "n_trades": 0,
+        "data_limited": false,
+        "status": "no-trades"
+      },
+      "S2": {
+        "sharpe": -17.891391,
+        "win_rate": 0.130435,
+        "max_drawdown": 0.012491,
+        "total_return": -0.011297,
+        "n_trades": 23,
+        "data_limited": true,
+        "status": "OK"
+      },
+      "S3": {
+        "sharpe": -18.838464,
+        "win_rate": 0.130435,
+        "max_drawdown": 0.08204,
+        "total_return": -0.080519,
+        "n_trades": 46,
+        "data_limited": false,
+        "status": "OK"
+      },
+      "S4": {
+        "sharpe": 0.0,
+        "win_rate": 0.0,
+        "max_drawdown": 0.0,
+        "total_return": 0.0,
+        "n_trades": 0,
+        "data_limited": true,
+        "status": "no-trades"
+      },
+      "S5": {
+        "sharpe": 0.0,
+        "win_rate": 0.0,
+        "max_drawdown": 0.0,
+        "total_return": 0.0,
+        "n_trades": 0,
+        "data_limited": true,
+        "status": "no-trades"
+      }
+    }
+  },
+  "diagnostics": {
+    "BNBUSDT": {
+      "S1": {
+        "reason_counts": {
+          "liquidations_below_min_events": 28192,
+          "rho_below_threshold": 56425
+        }
+      },
+      "S2": {
+        "reason_counts": {
+          "entropy_not_collapsed": 81302,
+          "pressure_ofi_misaligned": 117,
+          "ofi_below_q90": 2843,
+          "__enter__": 26,
+          "already_in_trade": 202,
+          "entropy_recovered": 9,
+          "pe_no_greenlight": 101,
+          "ofi_sign_flip": 17
+        }
+      },
+      "S3": {
+        "reason_counts": {
+          "outside_settlement_window": 75763,
+          "pressure_below_q90": 1778,
+          "__enter__": 19,
+          "already_in_trade": 7038,
+          "hard_stop_loss": 6,
+          "pressure_dissipated": 12,
+          "time_stop_exceeded": 1
+        },
+        "n_ticks_total": 84617,
+        "n_in_window": 6417,
+        "n_pressure_extreme": 19,
+        "n_basis_aligned": 19,
+        "n_all_gates_passed": 19
+      },
+      "S4": {
+        "reason_counts": {
+          "insufficient_price_history": 10,
+          "insufficient_models": 84607
+        }
+      },
+      "S5": {
+        "reason_counts": {
+          "single_symbol_replay_unsupported": 84617
+        }
+      }
+    },
+    "BTCUSDT": {
+      "S1": {
+        "reason_counts": {
+          "liquidations_below_min_events": 794,
+          "rho_below_threshold": 83482,
+          "b_value_not_extreme": 4,
+          "rho_not_rising": 111
+        }
+      },
+      "S2": {
+        "reason_counts": {
+          "entropy_not_collapsed": 82391,
+          "ofi_below_q90": 1430,
+          "__enter__": 59,
+          "already_in_trade": 250,
+          "entropy_recovered": 30,
+          "pressure_ofi_misaligned": 144,
+          "ofi_sign_flip": 25,
+          "pe_no_greenlight": 56,
+          "ofi_or_pressure_zero": 2,
+          "pressure_dissipated": 4
+        }
+      },
+      "S3": {
+        "reason_counts": {
+          "outside_settlement_window": 77591,
+          "pressure_below_q90": 2229,
+          "__enter__": 62,
+          "already_in_trade": 4447,
+          "pressure_dissipated": 60,
+          "hard_stop_loss": 2
+        },
+        "n_ticks_total": 84391,
+        "n_in_window": 6720,
+        "n_pressure_extreme": 62,
+        "n_basis_aligned": 62,
+        "n_all_gates_passed": 62
+      },
+      "S4": {
+        "reason_counts": {
+          "insufficient_price_history": 2,
+          "insufficient_models": 84389
+        }
+      },
+      "S5": {
+        "reason_counts": {
+          "single_symbol_replay_unsupported": 84391
+        }
+      }
+    },
+    "ETHUSDT": {
+      "S1": {
+        "reason_counts": {
+          "liquidations_below_min_events": 812,
+          "rho_below_threshold": 80525,
+          "b_value_not_extreme": 1,
+          "rho_not_rising": 24
+        }
+      },
+      "S2": {
+        "reason_counts": {
+          "entropy_not_collapsed": 78912,
+          "ofi_below_q90": 1793,
+          "pressure_ofi_misaligned": 187,
+          "__enter__": 71,
+          "already_in_trade": 215,
+          "entropy_recovered": 52,
+          "pe_no_greenlight": 102,
+          "ofi_or_pressure_zero": 11,
+          "ofi_sign_flip": 17,
+          "pressure_dissipated": 2
+        }
+      },
+      "S3": {
+        "reason_counts": {
+          "outside_settlement_window": 74429,
+          "pressure_below_q90": 3543,
+          "__enter__": 50,
+          "already_in_trade": 3290,
+          "pressure_dissipated": 50
+        },
+        "n_ticks_total": 81362,
+        "n_in_window": 6720,
+        "n_pressure_extreme": 50,
+        "n_basis_aligned": 50,
+        "n_all_gates_passed": 50
+      },
+      "S4": {
+        "reason_counts": {
+          "insufficient_price_history": 4,
+          "insufficient_models": 81358
+        }
+      },
+      "S5": {
+        "reason_counts": {
+          "single_symbol_replay_unsupported": 81362
+        }
+      }
+    },
+    "SOLUSDT": {
+      "S1": {
+        "reason_counts": {
+          "liquidations_below_min_events": 884,
+          "rho_below_threshold": 87379
+        }
+      },
+      "S2": {
+        "reason_counts": {
+          "entropy_not_collapsed": 84785,
+          "ofi_below_q90": 3166,
+          "pressure_ofi_misaligned": 168,
+          "pe_no_greenlight": 68,
+          "__enter__": 11,
+          "already_in_trade": 54,
+          "ofi_sign_flip": 9,
+          "entropy_recovered": 1,
+          "pressure_dissipated": 1
+        }
+      },
+      "S3": {
+        "reason_counts": {
+          "outside_settlement_window": 81267,
+          "pressure_below_q90": 2422,
+          "__enter__": 36,
+          "already_in_trade": 4503,
+          "hard_stop_loss": 3,
+          "pressure_dissipated": 32
+        },
+        "n_ticks_total": 88263,
+        "n_in_window": 6874,
+        "n_pressure_extreme": 36,
+        "n_basis_aligned": 36,
+        "n_all_gates_passed": 36
+      },
+      "S4": {
+        "reason_counts": {
+          "insufficient_price_history": 8,
+          "insufficient_models": 88255
+        }
+      },
+      "S5": {
+        "reason_counts": {
+          "single_symbol_replay_unsupported": 88263
+        }
+      }
+    },
+    "XRPUSDT": {
+      "S1": {
+        "reason_counts": {
+          "liquidations_below_min_events": 2319,
+          "rho_below_threshold": 86088
+        }
+      },
+      "S2": {
+        "reason_counts": {
+          "entropy_not_collapsed": 86523,
+          "__enter__": 23,
+          "already_in_trade": 90,
+          "ofi_sign_flip": 17,
+          "ofi_below_q90": 1552,
+          "pressure_ofi_misaligned": 142,
+          "pe_no_greenlight": 39,
+          "entropy_recovered": 3,
+          "ofi_or_pressure_zero": 15,
+          "pressure_dissipated": 3
+        }
+      },
+      "S3": {
+        "reason_counts": {
+          "outside_settlement_window": 80855,
+          "pressure_below_q90": 3214,
+          "__enter__": 46,
+          "already_in_trade": 4247,
+          "pressure_dissipated": 43,
+          "hard_stop_loss": 2
+        },
+        "n_ticks_total": 88407,
+        "n_in_window": 6925,
+        "n_pressure_extreme": 46,
+        "n_basis_aligned": 46,
+        "n_all_gates_passed": 46
+      },
+      "S4": {
+        "reason_counts": {
+          "insufficient_price_history": 4,
+          "insufficient_models": 88403
+        }
+      },
+      "S5": {
+        "reason_counts": {
+          "single_symbol_replay_unsupported": 88407
+        }
+      }
+    }
+  }
+}
