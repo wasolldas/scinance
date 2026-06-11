@@ -97,6 +97,9 @@ function Invoke-Step {
             }
             $p = Start-Process -FilePath $PythonExe -ArgumentList $quoted -NoNewWindow -PassThru `
                  -RedirectStandardOutput $log -RedirectStandardError $errLog
+            # PS 5.1 quirk: cache the handle BEFORE the process exits,
+            # otherwise $p.ExitCode is $null after WaitForExit().
+            $null = $p.Handle
             try { $p.PriorityClass = 'BelowNormal' } catch { }
             if (-not $p.WaitForExit($TimeoutSec * 1000)) {
                 try { $p.Kill() } catch { }
@@ -104,6 +107,10 @@ function Invoke-Step {
                 $detail = "TIMEOUT nach $TimeoutSec s"
             } else {
                 $rc = $p.ExitCode
+                if ($null -eq $rc) {
+                    $rc = -2
+                    $detail = 'ExitCode war null (Handle-Quirk) - Log pruefen'
+                }
             }
         } catch {
             $rc = -1
@@ -134,6 +141,8 @@ if (-not $DryRun) {
         ) -NoNewWindow -PassThru `
           -RedirectStandardOutput (Join-Path $RunDir 'RECORDER_LONG.log') `
           -RedirectStandardError (Join-Path $RunDir 'RECORDER_LONG.err.log')
+        # PS 5.1 quirk: cache handle so $RecProc.ExitCode is non-null later.
+        $null = $RecProc.Handle
         try { $RecProc.PriorityClass = 'BelowNormal' } catch { }
         Write-Host ("RECORDER_LONG gestartet (PID " + $RecProc.Id + ", " + $RecorderDurationS + "s)")
     } catch {
@@ -213,6 +222,7 @@ if ($DryRun) {
                 -Detail 'TIMEOUT: lief nach duration+600s noch - gekillt'
         } else {
             $recRc = $RecProc.ExitCode
+            if ($null -eq $recRc) { $recRc = -2 }
             $st = 'FAIL'; if ($recRc -eq 0) { $st = 'OK' }
             Record-Step -Name 'RECORDER_LONG' -Status $st -Rc $recRc `
                 -Dur ([int]((Get-Date) - $RecT0).TotalSeconds) -Detail ("rc=" + $recRc)

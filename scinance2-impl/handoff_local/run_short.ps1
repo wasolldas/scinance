@@ -84,6 +84,9 @@ function Invoke-Step {
             }
             $p = Start-Process -FilePath $PythonExe -ArgumentList $quoted -NoNewWindow -PassThru `
                  -RedirectStandardOutput $log -RedirectStandardError $errLog
+            # PS 5.1 quirk: cache the handle BEFORE the process exits,
+            # otherwise $p.ExitCode is $null after WaitForExit().
+            $null = $p.Handle
             try { $p.PriorityClass = 'BelowNormal' } catch { }
             if (-not $p.WaitForExit($TimeoutSec * 1000)) {
                 try { $p.Kill() } catch { }
@@ -91,6 +94,10 @@ function Invoke-Step {
                 $detail = "TIMEOUT nach $TimeoutSec s"
             } else {
                 $rc = $p.ExitCode
+                if ($null -eq $rc) {
+                    $rc = -2
+                    $detail = 'ExitCode war null (Handle-Quirk) - Log pruefen'
+                }
             }
         } catch {
             $rc = -1
