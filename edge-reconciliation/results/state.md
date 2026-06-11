@@ -5,7 +5,7 @@
 
 ## Phase
 
-`INVENTORY` (Phase 1 läuft)
+`EVIDENCE_AUDIT` (Phase 2 läuft)
 
 ## Input-Typologie (Phase-0-Sichtung durch Orchestrator)
 
@@ -32,7 +32,7 @@
 ## Phasen-Log
 
 - [x] Phase 0 INIT — input/ geprüft (11 Dateien + iter4_raw), state.md angelegt
-- [ ] Phase 1 INVENTORY — claims_register.md + repo_map.md
+- [x] Phase 1 INVENTORY — 56 Claims (43 C-xx Module, 13 CS-xx Strategien), 6 Inkonsistenzen (INC-01..06), ID-Mapping, repo_map.md
 - [ ] Phase 2 EVIDENCE_AUDIT — evidence_register.md
 - [ ] Phase 3 ALIGNMENT — alignment_matrix.md
 - [ ] Phase 4 DEBATE — debate_{cluster}.md
