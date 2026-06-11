@@ -1,0 +1,70 @@
+{
+  "mode": "single_pass",
+  "symbols": [
+    "BTCUSDT",
+    "XRPUSDT"
+  ],
+  "skipped_symbols": [],
+  "generated_at": "2026-06-11T00:00:00Z",
+  "interval_seconds": 1.0,
+  "inverted_strategies": [],
+  "per_strategy_aggregate": {
+    "S3": {
+      "total_trades": 6,
+      "weighted_sharpe": -1.0,
+      "mean_win_rate": 0.3,
+      "worst_max_dd": 0.45000000000000007,
+      "total_return": -0.45,
+      "best_symbol": "BTCUSDT",
+      "data_limited_symbols": []
+    }
+  },
+  "per_symbol": {
+    "BTCUSDT": {
+      "S3": {
+        "sharpe": -1.0,
+        "win_rate": 0.3,
+        "max_drawdown": 0.25,
+        "total_return": -0.25,
+        "n_trades": 3,
+        "data_limited": false,
+        "status": "OK"
+      }
+    },
+    "XRPUSDT": {
+      "S3": {
+        "sharpe": -1.0,
+        "win_rate": 0.3,
+        "max_drawdown": 0.19999999999999998,
+        "total_return": -0.2,
+        "n_trades": 3,
+        "data_limited": false,
+        "status": "OK"
+      }
+    }
+  },
+  "diagnostics": {
+    "BTCUSDT": {
+      "S3": {
+        "reason_counts": {
+          "outside_settlement_window": 50000,
+          "already_in_trade": 1000,
+          "time_stop_exceeded": 31,
+          "hard_stop_loss": 0
+        },
+        "n_ticks_total": 60000
+      }
+    },
+    "XRPUSDT": {
+      "S3": {
+        "reason_counts": {
+          "outside_settlement_window": 50000,
+          "already_in_trade": 1000,
+          "time_stop_exceeded": 30,
+          "hard_stop_loss": 1
+        },
+        "n_ticks_total": 60000
+      }
+    }
+  }
+}
