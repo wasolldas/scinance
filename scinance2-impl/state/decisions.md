@@ -56,3 +56,12 @@
 - **Entscheidung:** B. Collector (`ws_collector.py`) und Bestands-Schema (`db.py`-Tabellen) bleiben unangetastet; die Engine wird additiv aufgebaut und ist streamfähig erweiterbar (Welle-2-Andockpunkt für C-39/C-40/C-33-IV).
 - **Begründung:** Schutzgut 1 (laufender Collector) und Schutzgut 3 (Bestands-Parquet) sind nicht verhandelbar; additive Engine + neue Pfade brechen nichts und sind per Datei-/Tabellen-Löschung rückbaubar. Deckt PRD §3-Deckel + Sunset direkt im neuen Modul ab.
 - **Rückbauweg:** `recorder/`-Modul, neue Tabellen-DDL und `data/parquet/recording_f0/` entfernen; Collector/Schema nie verändert.
+
+---
+
+### DEC-07 · Storage-Deckel-Default der Recording-Engine (Ratifizierung)
+- **Kontext:** WP-2. PRD §3 verlangt eine „fixe GB-Obergrenze, ringpuffer-/rotationsbasiert", nennt aber KEINE Zahl. Der builder hat `DEFAULT_CAP_GB=50.0` als dokumentierte Annahme gesetzt, `--cap-gb`-überschreibbar.
+- **Optionen:** A) 50 GB Default (≈ Wochen RPI+IV-Ticks, passt auf übliche Consumer-SSD-Reserven). B) Kleinerer Default (10 GB, konservativer, evtl. zu kurzer Ringpuffer für den Sunset-Review-Horizont 90 Tage). C) Kein Default, Pflicht-Flag (verletzt Ein-Befehl-Runner-Regel der Testpyramide).
+- **Entscheidung:** A — 50 GB Default, ratifiziert.
+- **Begründung:** PRD-stumm → reversibelste sinnvolle Option; CLI-überschreibbar; Sunset-Review (90 Tage) braucht genug Ringpuffer-Tiefe; C verletzt CLAUDE.md-Runner-Regeln.
+- **Rückbauweg:** Konstante ändern oder `--cap-gb` im Runner setzen; kein struktureller Umbau.
