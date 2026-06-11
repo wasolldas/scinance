@@ -145,7 +145,7 @@ if ((-not $DryRun) -and (-not (Test-Path $DuckDbPath))) {
 } else {
     [void](Invoke-Step -Name 'C42_QUICK_HAR' -TimeoutSec 900 -CmdArgs @(
         (Join-Path $RepoRoot 'scripts\c42_repro.py'), '--quick', '--model', 'har',
-        '--symbol', 'BTCUSDT', '--db-path', $DuckDbPath,
+        '--symbol', 'BTCUSDT', '--db-path', $DuckDbPath, '--max-bars', '60000',
         '--out', (Join-Path $RunDir 'c42_quick_har')))
 
     # -- Schritt 5 (optional): zusaetzlich LightGBM, falls installiert ---
@@ -160,7 +160,7 @@ if ((-not $DryRun) -and (-not (Test-Path $DuckDbPath))) {
     if ($lgbmOk) {
         [void](Invoke-Step -Name 'C42_QUICK_LGBM' -TimeoutSec 900 -CmdArgs @(
             (Join-Path $RepoRoot 'scripts\c42_repro.py'), '--quick', '--model', 'lightgbm',
-            '--symbol', 'BTCUSDT', '--db-path', $DuckDbPath,
+            '--symbol', 'BTCUSDT', '--db-path', $DuckDbPath, '--max-bars', '60000',
             '--out', (Join-Path $RunDir 'c42_quick_lightgbm')))
     } else {
         Record-Step -Name 'C42_QUICK_LGBM' -Status 'SKIP' -Rc 0 -Dur 0 `

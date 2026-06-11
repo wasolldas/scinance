@@ -59,18 +59,25 @@ def _load_from_csv(path: Path, symbol: str) -> pd.DataFrame:
     return df[KLINE_COLUMNS].sort_values("ts").reset_index(drop=True)
 
 
-def _load_from_db(db_path: Path, symbol: str) -> pd.DataFrame:
+def _load_from_db(db_path: Path, symbol: str, max_bars: Optional[int] = None) -> pd.DataFrame:
     if not db_path.is_file():
         raise CLIError(f"duckdb file not found: {db_path}")
     try:
         from bybit_edge.persistence.db import PersistenceLayer
     except ImportError as exc:  # pragma: no cover
         raise CLIError(f"cannot import PersistenceLayer: {exc}") from exc
+    print(f"[c42] opening duckdb read-only: {db_path}", file=sys.stderr, flush=True)
     layer = PersistenceLayer(db_path=db_path, read_only=True)
     try:
-        # Full available range for this symbol (read-only).
+        # Full available range; quick mode caps via tail-slice after load
+        # (DuckDB lock-friendly: one short read, no per-bar round-trips).
+        print(f"[c42] loading kline_1min for {symbol}...", file=sys.stderr, flush=True)
         pl_df = layer.query_kline(symbol, 0, 2**63 - 1)
         df = pl_df.to_pandas() if hasattr(pl_df, "to_pandas") else pd.DataFrame(pl_df)
+        print(f"[c42] loaded {len(df)} bars", file=sys.stderr, flush=True)
+        if max_bars is not None and len(df) > max_bars:
+            df = df.sort_values("ts").tail(max_bars).reset_index(drop=True)
+            print(f"[c42] quick-mode: capped to last {max_bars} bars", file=sys.stderr, flush=True)
     finally:
         close = getattr(layer, "close", None)
         if callable(close):
@@ -97,6 +104,10 @@ def _parse_args(argv: Optional[list[str]] = None) -> argparse.Namespace:
     )
     p.add_argument("--n-folds", type=int, default=3, help="Anzahl disjunkter OOS-Fenster (>=2).")
     p.add_argument("--embargo-bars", type=int, default=1440, help="Embargo in Bars (Default 1 Tag).")
+    p.add_argument(
+        "--max-bars", type=int, default=None,
+        help="Cap on bars loaded (default: 60_000 in --quick mode = ~42 days, unlimited otherwise).",
+    )
     p.add_argument("--seed", type=int, default=42, help="Seed (explizit).")
     p.add_argument("--out", type=Path, default=DEFAULT_OUT, help=f"Output-Verzeichnis (Default {DEFAULT_OUT}).")
     return p.parse_args(argv)
@@ -107,11 +118,21 @@ def main(argv: Optional[list[str]] = None) -> int:
     n_folds = 2 if args.quick else max(2, args.n_folds)
     perm_repeats = 8 if args.quick else 20
 
+    # Quick mode: cap bars so the feature build does not chew through years
+    # of 1-min klines. 60_000 bars ~= 42 days, plenty for >=2 OOS folds with
+    # 1-day embargo and the 240-min lookback window.
+    max_bars = args.max_bars
+    if max_bars is None and args.quick:
+        max_bars = 60_000
+
     try:
         if args.csv_path is not None:
             klines = _load_from_csv(args.csv_path, args.symbol)
+            if max_bars is not None and len(klines) > max_bars:
+                klines = klines.sort_values("ts").tail(max_bars).reset_index(drop=True)
+                print(f"[c42] quick-mode: capped csv to last {max_bars} bars", file=sys.stderr, flush=True)
         elif args.db_path is not None:
-            klines = _load_from_db(args.db_path, args.symbol)
+            klines = _load_from_db(args.db_path, args.symbol, max_bars=max_bars)
         else:
             raise CLIError("provide either --csv-path or --db-path")
     except CLIError as exc:

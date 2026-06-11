@@ -126,13 +126,13 @@ if [ "$DRY" = "0" ] && [ ! -f "$DUCKDB_PATH" ]; then
 else
   run_step C42_QUICK_HAR 900 \
     "$PY" "$REPO_ROOT/scripts/c42_repro.py" --quick --model har --symbol BTCUSDT \
-    --db-path "$DUCKDB_PATH" --out "$RUN_DIR/c42_quick_har" || true
+    --db-path "$DUCKDB_PATH" --max-bars 60000 --out "$RUN_DIR/c42_quick_har" || true
 
   # ── Schritt 5 (optional): zusaetzlich LightGBM, falls installiert ─────
   if [ "$DRY" != "0" ] || "$PY" -c "import lightgbm" >/dev/null 2>&1; then
     run_step C42_QUICK_LGBM 900 \
       "$PY" "$REPO_ROOT/scripts/c42_repro.py" --quick --model lightgbm --symbol BTCUSDT \
-      --db-path "$DUCKDB_PATH" --out "$RUN_DIR/c42_quick_lightgbm" || true
+      --db-path "$DUCKDB_PATH" --max-bars 60000 --out "$RUN_DIR/c42_quick_lightgbm" || true
   else
     record C42_QUICK_LGBM SKIP 0 0 "lightgbm nicht installiert (optional; pip install -e .[vol])" 1
   fi
