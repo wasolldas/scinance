@@ -6,7 +6,7 @@
 
 ## Phase
 
-`BUILD/VERIFY` (Phase 3/4 — Schleife läuft)
+`HANDOFF` (Phase 6 — wartet auf lokale T2/T3-Läufe des Users)
 
 ## Welle-1-Piloten (PRD §3)
 
@@ -29,9 +29,9 @@
 - [x] Phase 0 INIT — Framework installiert, FINAL_PRD.md im Root, Branch `scinance2-wave1`, State-Dateien angelegt
 - [x] Phase 1 SURVEY — 616 Tests grün (Baseline), alle 4 Pilot-Integrationspunkte kartiert; Sandbox OHNE Daten + OHNE Bybit-API → alle Live-Smokes nach T2/T3
 - [x] Phase 2 PLAN — 6 WPs, DEC-02..06 gefällt; Reihenfolge WP-0 → WP-2 (Frühstart) → WP-1 → WP-4 ∥ WP-3 → WP-5
-- [ ] Phase 3/4 BUILD/VERIFY — WP-0 ☐ · WP-1 ☐ · WP-2 ☐ · WP-3 ☐ · WP-4 ☐ · WP-5 ☐
+- [x] Phase 3/4 BUILD/VERIFY — alle 6 WPs gebaut+verifiziert; Suite 616 → 752 grün (+136), 0 Bugs in allen Verifies
+- [x] Phase 6 HANDOFF — Runner ausgeliefert (run_short, run_overnight, README_RUN); wartet auf User-Ergebnisse in handoff_local/results/
 - [ ] Phase 5 GATE_CHECK — je Pilot
-- [ ] Phase 6 HANDOFF — handoff_local Runner (T2/T3)
 - [ ] Phase 7 ANALYZE — Morgen-Auswertung, Schleife bis alle Welle-1-Gates entschieden
 
 ## CHANGELOG
