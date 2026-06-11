@@ -5,7 +5,7 @@
 
 ## Phase
 
-`DEBATE` (Phase 4 läuft — 7 Cluster)
+`VERDICT` (Phase 5 läuft)
 
 ## Input-Typologie (Phase-0-Sichtung durch Orchestrator)
 
@@ -35,7 +35,7 @@
 - [x] Phase 1 INVENTORY — 56 Claims (43 C-xx Module, 13 CS-xx Strategien), 6 Inkonsistenzen (INC-01..06), ID-Mapping, repo_map.md
 - [x] Phase 2 EVIDENCE_AUDIT — 18 E-xx (17×L0, 1×PENDING=iter-5), GM-1..6 Rahmenbedingungen, Kostenbaseline 11-15 bps, Widersprüche E-17/E-18
 - [x] Phase 3 ALIGNMENT — 0 CONFIRMED / 5 PARTIAL / 3 REFUTED (C-14, CS-01, CS-02) / 48 UNTESTED; 16 SUSPECT-Module
-- [ ] Phase 4 DEBATE — Cluster: cascade, funding, volstack, crosssectional, microstructure, regime, options
-- [ ] Phase 5 VERDICT — verdict.md
+- [x] Phase 4 DEBATE — 7 Debatten komplett (Advocate + Skeptic je Cluster, Steelman-Pflicht erfüllt)
+- [ ] Phase 5 VERDICT — verdict.md (Judge läuft)
 - [ ] Phase 6 PRD — FINAL_PRD.md
 - [ ] Phase 7 REVIEW — Judge-Review, max. 1 Korrektur-Loop
