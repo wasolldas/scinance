@@ -5,7 +5,7 @@
 
 ## Phase
 
-`REVIEW` (Phase 7 läuft)
+`DONE`
 
 ## Input-Typologie (Phase-0-Sichtung durch Orchestrator)
 
@@ -38,4 +38,4 @@
 - [x] Phase 4 DEBATE — 7 Debatten komplett (Advocate + Skeptic je Cluster, Steelman-Pflicht erfüllt)
 - [x] Phase 5 VERDICT — 0 ADOPT / ~16 PILOT / ~25 PARK / ~70 DROP / 3 REFUTED; Welle-1: E-15-Auswertung, C-42-Repro, C-36 Recording (gedeckelt), C-31 CFAR
 - [x] Phase 6 PRD — FINAL_PRD.md (Welle-1: 4 Pilots, Welle-2+: 13 sequenziert, PARK: 32, REFUTED: 3, ADOPT: 0)
-- [ ] Phase 7 REVIEW — Judge-Review, max. 1 Korrektur-Loop
+- [x] Phase 7 REVIEW — APPROVED (6/6 PASS, 7/7 + 5/5 Stichproben sauber, 0 BLOCKER / 3 MINOR, kein Korrektur-Loop nötig)
