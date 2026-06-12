@@ -1,0 +1,1 @@
+C42-REPRO BASELINE-ONLY | H-02 | symbol=BTCUSDT model=har folds=2 min_oos_r2=0.0126 r2_pass=False qlike<har=False -> E:\Claude\Projects\scinance\scinance2-impl\handoff_local\results\short_20260612_114850\c42_quick_har\c42_results.json, E:\Claude\Projects\scinance\scinance2-impl\handoff_local\results\short_20260612_114850\c42_quick_har\c42_report.md

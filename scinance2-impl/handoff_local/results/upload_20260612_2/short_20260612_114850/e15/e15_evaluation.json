@@ -1,0 +1,335 @@
+{
+  "schema_version": 1,
+  "hypothesis": "H-01",
+  "hypothesis_registry": "scinance2-impl/state/hypothesis_registry.md",
+  "generated_at": "2026-06-12T11:53:52+00:00",
+  "inputs": {
+    "results_path": "E:\\Claude\\Projects\\scinance\\edge_research_framework\\results\\replay_all_results.json",
+    "trades_path": "E:\\Claude\\Projects\\scinance\\edge_research_framework\\results\\trades_iter4\\trades_all.csv",
+    "baseline_results": "E:\\Claude\\Projects\\scinance\\edge-reconciliation\\input\\iter4_raw\\replay_all_results.json",
+    "baseline_trades": "E:\\Claude\\Projects\\scinance\\edge-reconciliation\\input\\iter4_raw\\trades_all.csv"
+  },
+  "gate_verdict": "DROP",
+  "gate_details": [
+    {
+      "id": "fix_time_stop_count",
+      "registry_text": "time_stop_exceeded-Count: 1 -> erwartet ~60-70 (Fix-Wirksamkeit)",
+      "operationalisation": "pass wenn Count in [54, 77] (= 60-70 +-10% fuer '~'); None wenn diagnostics fehlen",
+      "measured": 1,
+      "passed": false
+    },
+    {
+      "id": "fix_n_over_120s",
+      "registry_text": "n>120s-Trades: 68 -> erwartet ~0",
+      "operationalisation": "pass wenn Count <= 2 ('~0' mit Tick-Granularitaets-Toleranz: Time-Stop feuert erst auf dem ersten Tick NACH 120s)",
+      "measured": 68,
+      "passed": false
+    },
+    {
+      "id": "fix_n_below_minus_30bps",
+      "registry_text": "n<-30bps-Trades: 33 -> erwartet ~0",
+      "operationalisation": "pass wenn Count <= 2 ('~0')",
+      "measured": 33,
+      "passed": false
+    },
+    {
+      "id": "weiter_net_edge",
+      "registry_text": "WEITER: aggregierte Netto-Edge >= -5 bps UND E-17-Divergenz geklaert",
+      "operationalisation": "Teilkriterium 1: mean pnl_bps (netto, trade-gewichtet ueber alle S3-Trades) >= -5.0",
+      "measured": -16.808972899638547,
+      "passed": false
+    },
+    {
+      "id": "weiter_e17_resolved",
+      "registry_text": "WEITER: aggregierte Netto-Edge >= -5 bps UND E-17-Divergenz geklaert",
+      "operationalisation": "Teilkriterium 2: E-17-Check resolved == true (false/inconclusive blockieren WEITER)",
+      "measured": true,
+      "passed": true
+    },
+    {
+      "id": "drop_net_edge",
+      "registry_text": "DROP: aggregierte Netto-Edge <= -10 bps",
+      "operationalisation": "DROP wenn mean pnl_bps (netto) <= -10.0",
+      "measured": -16.808972899638547,
+      "passed": true
+    }
+  ],
+  "fix_effectiveness_pass": false,
+  "e17_resolved": true,
+  "e17_reasoning": "Aktueller Lauf und Baseline sind konsistent: n_trades-Ratio 1.00 (Band (0.8, 1.25)), |total_return|-Ratio 1.00 (Band (0.5, 2.0)). Die registrierte ~3.2x-Divergenz reproduziert sich nicht. Endgueltiges E-17-Urteil faellt der gate-auditor gegen die Registry; dieser Check liefert die Datenbasis.",
+  "e17_details": {
+    "registered_divergence": {
+      "iter3_total_return_usd": -2113.26,
+      "iter4_total_return_usd": -6857.555675,
+      "ratio": 3.24
+    },
+    "current": {
+      "total_return": -6857.555675,
+      "n_trades": 213
+    },
+    "current_tail_trades_top5": [
+      {
+        "symbol": "BTCUSDT",
+        "entry_ts": 1780529425665,
+        "exit_ts": 1780529919670,
+        "duration_seconds": 494.005,
+        "pnl_net": -307.5407732099937,
+        "pnl_bps": -47.69634805238774
+      },
+      {
+        "symbol": "BTCUSDT",
+        "entry_ts": 1780559713321,
+        "exit_ts": 1780560013029,
+        "duration_seconds": 299.708,
+        "pnl_net": -287.96549617499784,
+        "pnl_bps": -45.16918203387194
+      },
+      {
+        "symbol": "BTCUSDT",
+        "entry_ts": 1780500722767,
+        "exit_ts": 1780500815367,
+        "duration_seconds": 92.6,
+        "pnl_net": -264.553618127999,
+        "pnl_bps": -39.72388863290152
+      },
+      {
+        "symbol": "BTCUSDT",
+        "entry_ts": 1780530676241,
+        "exit_ts": 1780530892441,
+        "duration_seconds": 216.2,
+        "pnl_net": -229.91023970699098,
+        "pnl_bps": -35.80049945545194
+      },
+      {
+        "symbol": "BTCUSDT",
+        "entry_ts": 1780500816536,
+        "exit_ts": 1780500888834,
+        "duration_seconds": 72.298,
+        "pnl_net": -216.7421128919919,
+        "pnl_bps": -32.62553043320753
+      }
+    ],
+    "current_tail_share_of_total_net": 0.1905507300475497,
+    "heuristics": {
+      "trades_similar_band": [
+        0.8,
+        1.25
+      ],
+      "return_similar_band": [
+        0.5,
+        2.0
+      ],
+      "explained_share_threshold": 0.8
+    },
+    "baseline": {
+      "total_return": -6857.555675,
+      "n_trades": 213
+    },
+    "trades_ratio": 1.0,
+    "return_ratio_abs": 1.0,
+    "total_return_gap": 0.0,
+    "mean_return_per_trade": {
+      "current": -32.1950970657277,
+      "baseline": -32.1950970657277
+    },
+    "per_symbol_return_gap": {
+      "BNBUSDT": 0.0,
+      "BTCUSDT": 0.0,
+      "ETHUSDT": 0.0,
+      "SOLUSDT": 0.0,
+      "XRPUSDT": 0.0
+    },
+    "top_gap_symbol": {
+      "symbol": null,
+      "share_of_abs_gap": 0.0
+    },
+    "baseline_tail_trades_top5": [
+      {
+        "symbol": "BTCUSDT",
+        "entry_ts": 1780529425665,
+        "exit_ts": 1780529919670,
+        "duration_seconds": 494.005,
+        "pnl_net": -307.5407732099937,
+        "pnl_bps": -47.69634805238774
+      },
+      {
+        "symbol": "BTCUSDT",
+        "entry_ts": 1780559713321,
+        "exit_ts": 1780560013029,
+        "duration_seconds": 299.708,
+        "pnl_net": -287.96549617499784,
+        "pnl_bps": -45.16918203387194
+      },
+      {
+        "symbol": "BTCUSDT",
+        "entry_ts": 1780500722767,
+        "exit_ts": 1780500815367,
+        "duration_seconds": 92.6,
+        "pnl_net": -264.553618127999,
+        "pnl_bps": -39.72388863290152
+      },
+      {
+        "symbol": "BTCUSDT",
+        "entry_ts": 1780530676241,
+        "exit_ts": 1780530892441,
+        "duration_seconds": 216.2,
+        "pnl_net": -229.91023970699098,
+        "pnl_bps": -35.80049945545194
+      },
+      {
+        "symbol": "BTCUSDT",
+        "entry_ts": 1780500816536,
+        "exit_ts": 1780500888834,
+        "duration_seconds": 72.298,
+        "pnl_net": -216.7421128919919,
+        "pnl_bps": -32.62553043320753
+      }
+    ],
+    "tail_gap_share": null
+  },
+  "metrics": {
+    "strategy": "S3",
+    "per_symbol": {
+      "BNBUSDT": {
+        "n_trades": 19,
+        "mean_pnl_bps_net": -21.084817587983306,
+        "median_pnl_bps_net": -20.077778528036887,
+        "mean_raw_edge_bps": -10.090367289992804,
+        "median_raw_edge_bps": -9.082774053766457,
+        "sum_pnl_net": -24.641575802999608,
+        "sum_raw_pnl": -11.9244199999996,
+        "n_over_120s": 14,
+        "n_below_minus_30bps": 8,
+        "max_duration_seconds": 2124.9,
+        "mean_duration_seconds": 563.3138421052631,
+        "worst_trade": {
+          "symbol": "BNBUSDT",
+          "entry_ts": 1780559553318,
+          "exit_ts": 1780560757429,
+          "duration_seconds": 1204.111,
+          "pnl_net": -3.398725275000072,
+          "pnl_bps": -56.59636352210024
+        },
+        "time_stop_exceeded_count": 1,
+        "hard_stop_loss_count": 6
+      },
+      "BTCUSDT": {
+        "n_trades": 62,
+        "mean_pnl_bps_net": -16.57436535486087,
+        "median_pnl_bps_net": -16.820323640220536,
+        "mean_raw_edge_bps": -5.577432942979507,
+        "median_raw_edge_bps": -5.823526579839447,
+        "sum_pnl_net": -6680.498721125791,
+        "sum_raw_pnl": -2255.6396399997902,
+        "n_over_120s": 14,
+        "n_below_minus_30bps": 5,
+        "max_duration_seconds": 561.435,
+        "mean_duration_seconds": 102.17967741935485,
+        "worst_trade": {
+          "symbol": "BTCUSDT",
+          "entry_ts": 1780529425665,
+          "exit_ts": 1780529919670,
+          "duration_seconds": 494.005,
+          "pnl_net": -307.5407732099937,
+          "pnl_bps": -47.69634805238774
+        },
+        "time_stop_exceeded_count": 0,
+        "hard_stop_loss_count": 2
+      },
+      "ETHUSDT": {
+        "n_trades": 50,
+        "mean_pnl_bps_net": -16.33741835363709,
+        "median_pnl_bps_net": -15.797243464608062,
+        "mean_raw_edge_bps": -5.340355549189143,
+        "median_raw_edge_bps": -4.7998834004783255,
+        "sum_pnl_net": -147.67934136839693,
+        "sum_raw_pnl": -48.50382399999694,
+        "n_over_120s": 13,
+        "n_below_minus_30bps": 7,
+        "max_duration_seconds": 1099.069,
+        "mean_duration_seconds": 102.75095999999999,
+        "worst_trade": {
+          "symbol": "ETHUSDT",
+          "entry_ts": 1780558997863,
+          "exit_ts": 1780559175578,
+          "duration_seconds": 177.715,
+          "pnl_net": -6.734335446600198,
+          "pnl_bps": -37.721516083804495
+        },
+        "time_stop_exceeded_count": 0,
+        "hard_stop_loss_count": 0
+      },
+      "SOLUSDT": {
+        "n_trades": 36,
+        "mean_pnl_bps_net": -18.199016132546276,
+        "median_pnl_bps_net": -17.77929035050861,
+        "mean_raw_edge_bps": -7.202977770319949,
+        "median_raw_edge_bps": -6.783021012065246,
+        "sum_pnl_net": -4.6555175978999115,
+        "sum_raw_pnl": -1.8941379999999128,
+        "n_over_120s": 13,
+        "n_below_minus_30bps": 9,
+        "max_duration_seconds": 1342.101,
+        "mean_duration_seconds": 167.92594444444444,
+        "worst_trade": {
+          "symbol": "SOLUSDT",
+          "entry_ts": 1780501828064,
+          "exit_ts": 1780501939177,
+          "duration_seconds": 111.113,
+          "pnl_net": -0.36022752749999637,
+          "pnl_bps": -48.92752294534932
+        },
+        "time_stop_exceeded_count": 0,
+        "hard_stop_loss_count": 3
+      },
+      "XRPUSDT": {
+        "n_trades": 46,
+        "mean_pnl_bps_net": -14.783772673835509,
+        "median_pnl_bps_net": -16.22102798733506,
+        "mean_raw_edge_bps": -3.7858548940272216,
+        "median_raw_edge_bps": -5.223901132958186,
+        "sum_pnl_net": -0.0805185749009968,
+        "sum_raw_pnl": -0.02081161999999681,
+        "n_over_120s": 14,
+        "n_below_minus_30bps": 4,
+        "max_duration_seconds": 1998.675,
+        "mean_duration_seconds": 141.46493478260868,
+        "worst_trade": {
+          "symbol": "XRPUSDT",
+          "entry_ts": 1780558559266,
+          "exit_ts": 1780558685880,
+          "duration_seconds": 126.614,
+          "pnl_net": -0.0054636254069999595,
+          "pnl_bps": -46.38699813535899
+        },
+        "time_stop_exceeded_count": 0,
+        "hard_stop_loss_count": 2
+      }
+    },
+    "aggregate": {
+      "n_trades": 213,
+      "mean_pnl_bps_net": -16.808972899638547,
+      "median_pnl_bps_net": -16.458027654485633,
+      "mean_raw_edge_bps": -5.812169592914649,
+      "median_raw_edge_bps": -5.461031221657543,
+      "sum_pnl_net": -6857.555674469989,
+      "sum_raw_pnl": -2317.9828336197847,
+      "n_over_120s": 68,
+      "n_below_minus_30bps": 33,
+      "max_duration_seconds": 2124.9,
+      "mean_duration_seconds": 163.044,
+      "worst_trade": {
+        "symbol": "BNBUSDT",
+        "entry_ts": 1780559553318,
+        "exit_ts": 1780560757429,
+        "duration_seconds": 1204.111,
+        "pnl_net": -3.398725275000072,
+        "pnl_bps": -56.59636352210024
+      },
+      "time_stop_exceeded_count": 1,
+      "hard_stop_loss_count": 13
+    },
+    "diagnostics_available": true,
+    "warnings": []
+  }
+}
