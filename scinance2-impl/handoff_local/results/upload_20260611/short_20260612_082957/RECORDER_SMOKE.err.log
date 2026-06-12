@@ -1,0 +1,44 @@
+2026-06-12 10:29:58.210 | INFO     | bybit_edge.recorder            | Starting RecordingEngine: streams=['rpi_orderbook', 'insurance_pool', 'adl_alerts', 'option_tickers', 'premium_index_kline'] symbols=['BTCUSDT'] options=['BTC', 'ETH'] cap=5.0 GB duration=300.0
+2026-06-12 10:29:59.226 | INFO     | bybit_edge.recorder.recording_engine | [linear] connected to wss://stream.bybit.com/v5/public/linear
+2026-06-12 10:29:59.227 | INFO     | bybit_edge.recorder.recording_engine | Subscribed to 3 topic(s): ['orderbook.rpi.BTCUSDT', 'insurance.USDT', 'adlAlert']
+2026-06-12 10:29:59.385 | INFO     | bybit_edge.recorder.recording_engine | [option] connected to wss://stream.bybit.com/v5/public/option
+2026-06-12 10:29:59.386 | INFO     | bybit_edge.recorder.recording_engine | Subscribed to 2 topic(s): ['tickers.BTC', 'tickers.ETH']
+2026-06-12 10:30:29.332 | INFO     | bybit_edge.recorder.recording_engine | Storage telemetry: {'cap_gb': 5.0, 'used_gb': 0.0043, 'used_pct': 0.09, 'total_bytes': 4666812, 'total_segments': 484, 'evictions': 0, 'bytes_evicted': 0, 'per_stream': {'premium_index_kline': {'bytes': 4666812, 'segments': 484}}}
+2026-06-12 10:30:29.560 | WARNING  | bybit_edge.recorder.recording_engine | [option] connection lost (sent 1011 (internal error) keepalive ping timeout; no close frame received) — reconnecting in 1.0 s
+2026-06-12 10:30:31.336 | INFO     | bybit_edge.recorder.recording_engine | [option] connected to wss://stream.bybit.com/v5/public/option
+2026-06-12 10:30:31.337 | INFO     | bybit_edge.recorder.recording_engine | Subscribed to 2 topic(s): ['tickers.BTC', 'tickers.ETH']
+2026-06-12 10:30:59.504 | INFO     | bybit_edge.recorder.recording_engine | Storage telemetry: {'cap_gb': 5.0, 'used_gb': 0.0044, 'used_pct': 0.09, 'total_bytes': 4676464, 'total_segments': 485, 'evictions': 0, 'bytes_evicted': 0, 'per_stream': {'premium_index_kline': {'bytes': 4676464, 'segments': 485}}}
+2026-06-12 10:31:01.550 | WARNING  | bybit_edge.recorder.recording_engine | [option] connection lost (sent 1011 (internal error) keepalive ping timeout; no close frame received) — reconnecting in 1.0 s
+2026-06-12 10:31:03.334 | INFO     | bybit_edge.recorder.recording_engine | [option] connected to wss://stream.bybit.com/v5/public/option
+2026-06-12 10:31:03.335 | INFO     | bybit_edge.recorder.recording_engine | Subscribed to 2 topic(s): ['tickers.BTC', 'tickers.ETH']
+2026-06-12 10:31:29.639 | INFO     | bybit_edge.recorder.recording_engine | Storage telemetry: {'cap_gb': 5.0, 'used_gb': 0.0044, 'used_pct': 0.09, 'total_bytes': 4676464, 'total_segments': 485, 'evictions': 0, 'bytes_evicted': 0, 'per_stream': {'premium_index_kline': {'bytes': 4676464, 'segments': 485}}}
+2026-06-12 10:31:33.531 | WARNING  | bybit_edge.recorder.recording_engine | [option] connection lost (sent 1011 (internal error) keepalive ping timeout; no close frame received) — reconnecting in 1.0 s
+2026-06-12 10:31:35.301 | INFO     | bybit_edge.recorder.recording_engine | [option] connected to wss://stream.bybit.com/v5/public/option
+2026-06-12 10:31:35.302 | INFO     | bybit_edge.recorder.recording_engine | Subscribed to 2 topic(s): ['tickers.BTC', 'tickers.ETH']
+2026-06-12 10:32:00.139 | INFO     | bybit_edge.recorder.recording_engine | Storage telemetry: {'cap_gb': 5.0, 'used_gb': 0.0044, 'used_pct': 0.09, 'total_bytes': 4686116, 'total_segments': 486, 'evictions': 0, 'bytes_evicted': 0, 'per_stream': {'premium_index_kline': {'bytes': 4686116, 'segments': 486}}}
+2026-06-12 10:32:05.489 | WARNING  | bybit_edge.recorder.recording_engine | [option] connection lost (sent 1011 (internal error) keepalive ping timeout; no close frame received) — reconnecting in 1.0 s
+2026-06-12 10:32:07.242 | INFO     | bybit_edge.recorder.recording_engine | [option] connected to wss://stream.bybit.com/v5/public/option
+2026-06-12 10:32:07.243 | INFO     | bybit_edge.recorder.recording_engine | Subscribed to 2 topic(s): ['tickers.BTC', 'tickers.ETH']
+2026-06-12 10:32:30.358 | INFO     | bybit_edge.recorder.recording_engine | Storage telemetry: {'cap_gb': 5.0, 'used_gb': 0.0044, 'used_pct': 0.09, 'total_bytes': 4686116, 'total_segments': 486, 'evictions': 0, 'bytes_evicted': 0, 'per_stream': {'premium_index_kline': {'bytes': 4686116, 'segments': 486}}}
+2026-06-12 10:32:37.453 | WARNING  | bybit_edge.recorder.recording_engine | [option] connection lost (sent 1011 (internal error) keepalive ping timeout; no close frame received) — reconnecting in 1.0 s
+2026-06-12 10:32:39.238 | INFO     | bybit_edge.recorder.recording_engine | [option] connected to wss://stream.bybit.com/v5/public/option
+2026-06-12 10:32:39.239 | INFO     | bybit_edge.recorder.recording_engine | Subscribed to 2 topic(s): ['tickers.BTC', 'tickers.ETH']
+2026-06-12 10:33:00.506 | INFO     | bybit_edge.recorder.recording_engine | Storage telemetry: {'cap_gb': 5.0, 'used_gb': 0.0044, 'used_pct': 0.09, 'total_bytes': 4695775, 'total_segments': 487, 'evictions': 0, 'bytes_evicted': 0, 'per_stream': {'premium_index_kline': {'bytes': 4695775, 'segments': 487}}}
+2026-06-12 10:33:09.430 | WARNING  | bybit_edge.recorder.recording_engine | [option] connection lost (sent 1011 (internal error) keepalive ping timeout; no close frame received) — reconnecting in 1.0 s
+2026-06-12 10:33:11.226 | INFO     | bybit_edge.recorder.recording_engine | [option] connected to wss://stream.bybit.com/v5/public/option
+2026-06-12 10:33:11.227 | INFO     | bybit_edge.recorder.recording_engine | Subscribed to 2 topic(s): ['tickers.BTC', 'tickers.ETH']
+2026-06-12 10:33:30.665 | INFO     | bybit_edge.recorder.recording_engine | Storage telemetry: {'cap_gb': 5.0, 'used_gb': 0.0044, 'used_pct': 0.09, 'total_bytes': 4695775, 'total_segments': 487, 'evictions': 0, 'bytes_evicted': 0, 'per_stream': {'premium_index_kline': {'bytes': 4695775, 'segments': 487}}}
+2026-06-12 10:33:41.428 | WARNING  | bybit_edge.recorder.recording_engine | [option] connection lost (sent 1011 (internal error) keepalive ping timeout; no close frame received) — reconnecting in 1.0 s
+2026-06-12 10:33:43.205 | INFO     | bybit_edge.recorder.recording_engine | [option] connected to wss://stream.bybit.com/v5/public/option
+2026-06-12 10:33:43.206 | INFO     | bybit_edge.recorder.recording_engine | Subscribed to 2 topic(s): ['tickers.BTC', 'tickers.ETH']
+2026-06-12 10:34:00.789 | INFO     | bybit_edge.recorder.recording_engine | Storage telemetry: {'cap_gb': 5.0, 'used_gb': 0.0044, 'used_pct': 0.09, 'total_bytes': 4705427, 'total_segments': 488, 'evictions': 0, 'bytes_evicted': 0, 'per_stream': {'premium_index_kline': {'bytes': 4705427, 'segments': 488}}}
+2026-06-12 10:34:13.398 | WARNING  | bybit_edge.recorder.recording_engine | [option] connection lost (sent 1011 (internal error) keepalive ping timeout; no close frame received) — reconnecting in 1.0 s
+2026-06-12 10:34:15.138 | INFO     | bybit_edge.recorder.recording_engine | [option] connected to wss://stream.bybit.com/v5/public/option
+2026-06-12 10:34:15.138 | INFO     | bybit_edge.recorder.recording_engine | Subscribed to 2 topic(s): ['tickers.BTC', 'tickers.ETH']
+2026-06-12 10:34:30.964 | INFO     | bybit_edge.recorder.recording_engine | Storage telemetry: {'cap_gb': 5.0, 'used_gb': 0.0044, 'used_pct': 0.09, 'total_bytes': 4705427, 'total_segments': 488, 'evictions': 0, 'bytes_evicted': 0, 'per_stream': {'premium_index_kline': {'bytes': 4705427, 'segments': 488}}}
+2026-06-12 10:34:45.327 | WARNING  | bybit_edge.recorder.recording_engine | [option] connection lost (sent 1011 (internal error) keepalive ping timeout; no close frame received) — reconnecting in 1.0 s
+2026-06-12 10:34:47.110 | INFO     | bybit_edge.recorder.recording_engine | [option] connected to wss://stream.bybit.com/v5/public/option
+2026-06-12 10:34:47.111 | INFO     | bybit_edge.recorder.recording_engine | Subscribed to 2 topic(s): ['tickers.BTC', 'tickers.ETH']
+2026-06-12 10:34:58.222 | INFO     | bybit_edge.recorder.recording_engine | Recording duration 300 s reached — stopping.
+2026-06-12 10:34:58.350 | INFO     | bybit_edge.recorder.recording_engine | Recorder stopped. messages=5 telemetry={'cap_gb': 5.0, 'used_gb': 0.0044, 'used_pct': 0.09, 'total_bytes': 4705427, 'total_segments': 488, 'evictions': 0, 'bytes_evicted': 0, 'per_stream': {'premium_index_kline': {'bytes': 4705427, 'segments': 488}}}
+2026-06-12 10:34:58.416 | INFO     | bybit_edge.recorder            | RecordingEngine finished. Telemetry: {"cap_gb": 5.0, "used_gb": 0.0044, "used_pct": 0.09, "total_bytes": 4705427, "total_segments": 488, "evictions": 0, "bytes_evicted": 0, "per_stream": {"premium_index_kline": {"bytes": 4705427, "segments": 488}}}

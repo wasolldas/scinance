@@ -1,0 +1,51 @@
+{
+  "pass": false,
+  "root": "E:\\Claude\\Projects\\scinance\\data\\parquet\\recording_f0",
+  "max_age_min": 30.0,
+  "expected_schema_version": "1",
+  "streams": [
+    {
+      "stream": "rpi_orderbook",
+      "required": true,
+      "n_files": 0,
+      "n_rows": 0,
+      "schema_versions": [],
+      "status": "NO_DATA"
+    },
+    {
+      "stream": "insurance_pool",
+      "required": true,
+      "n_files": 0,
+      "n_rows": 0,
+      "schema_versions": [],
+      "status": "NO_DATA"
+    },
+    {
+      "stream": "premium_index_kline",
+      "required": true,
+      "n_files": 5,
+      "n_rows": 1000,
+      "schema_versions": [
+        "1"
+      ],
+      "status": "OK"
+    },
+    {
+      "stream": "option_tickers",
+      "required": true,
+      "n_files": 0,
+      "n_rows": 0,
+      "schema_versions": [],
+      "status": "NO_DATA"
+    },
+    {
+      "stream": "adl_alerts",
+      "required": false,
+      "n_files": 0,
+      "n_rows": 0,
+      "schema_versions": [],
+      "status": "EMPTY_OK"
+    }
+  ],
+  "cap": null
+}

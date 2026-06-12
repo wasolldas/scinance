@@ -1,0 +1,6 @@
+rpi_orderbook: NO_DATA files=0 rows=0 schema_version=- (erwartet 1)
+insurance_pool: NO_DATA files=0 rows=0 schema_version=- (erwartet 1)
+premium_index_kline: OK files=5 rows=1000 schema_version=1 (erwartet 1)
+option_tickers: NO_DATA files=0 rows=0 schema_version=- (erwartet 1)
+adl_alerts: EMPTY_OK files=0 rows=0 schema_version=- (erwartet 1)
+RECORDING-CHECK FAIL root=E:\Claude\Projects\scinance\data\parquet\recording_f0

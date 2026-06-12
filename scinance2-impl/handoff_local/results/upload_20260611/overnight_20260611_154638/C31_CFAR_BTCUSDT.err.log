@@ -1,0 +1,25 @@
+Traceback (most recent call last):
+  File "E:\Claude\Projects\scinance\scripts\c31_cfar.py", line 101, in <module>
+    sys.exit(main())
+             ^^^^^^
+  File "E:\Claude\Projects\scinance\scripts\c31_cfar.py", line 74, in main
+    payload = run(
+              ^^^^
+  File "E:\Claude\Projects\scinance\src\bybit_edge\research\c31_cfar\driver.py", line 301, in run
+    win_results = [
+                  ^
+  File "E:\Claude\Projects\scinance\src\bybit_edge\research\c31_cfar\driver.py", line 302, in <listcomp>
+    run_window(
+  File "E:\Claude\Projects\scinance\src\bybit_edge\research\c31_cfar\driver.py", line 203, in run_window
+    sres = surrogate_test(
+           ^^^^^^^^^^^^^^^
+  File "E:\Claude\Projects\scinance\src\bybit_edge\research\c31_cfar\surrogate.py", line 118, in surrogate_test
+    observed_snr = _pipeline_top_snr(
+                   ^^^^^^^^^^^^^^^^^^
+  File "E:\Claude\Projects\scinance\src\bybit_edge\research\c31_cfar\surrogate.py", line 71, in _pipeline_top_snr
+    counts, fs_hz = bin_counts(timestamps_ms, bin_dt_ms, t0_ms=t0_ms, t1_ms=t1_ms)
+                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "E:\Claude\Projects\scinance\src\bybit_edge\research\c31_cfar\cyclic_spectrum.py", line 115, in bin_counts
+    edges = lo + bin_dt_ms * np.arange(n_bins + 1)
+                             ^^^^^^^^^^^^^^^^^^^^^
+numpy._core._exceptions._ArrayMemoryError: Unable to allocate 1.30 TiB for an array with shape (178056061487,) and data type int64

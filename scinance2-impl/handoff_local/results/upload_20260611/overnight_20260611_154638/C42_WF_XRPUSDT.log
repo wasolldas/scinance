@@ -1,0 +1,1 @@
+C42-REPRO DROP/PARK | H-02 | symbol=XRPUSDT model=lightgbm folds=3 min_oos_r2=-0.0346 r2_pass=False qlike<har=False -> E:\Claude\Projects\scinance\scinance2-impl\handoff_local\results\overnight_20260611_154638\c42_XRPUSDT\c42_results.json, E:\Claude\Projects\scinance\scinance2-impl\handoff_local\results\overnight_20260611_154638\c42_XRPUSDT\c42_report.md

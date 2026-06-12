@@ -1,0 +1,16 @@
+-------- RUN_OVERNIGHT SUMMARY --------
+C42_WF_BTCUSDT: FAIL (rc=)
+C42_WF_ETHUSDT: FAIL (rc=)
+C42_WF_SOLUSDT: FAIL (rc=)
+C42_WF_BNBUSDT: FAIL (rc=)
+C42_WF_XRPUSDT: FAIL (rc=)
+C31_CFAR_BTCUSDT: FAIL (rc=)
+C31_CFAR_ETHUSDT: FAIL (rc=)
+C31_CFAR_SOLUSDT: FAIL (rc=)
+C31_CFAR_BNBUSDT: FAIL (rc=)
+C31_CFAR_XRPUSDT: FAIL (rc=)
+REPLAY_ITER5: INFO (iter-5-Ergebnisse vorhanden - E-15-Auswertung laeuft im run_short (Schritt E15_EVAL))
+RECORDER_LONG: FAIL (rc=)
+RECORDER_CHECK: FAIL (rc=)
+SUMMARY: FAIL (rc=)
+RUN_OVERNIGHT GESAMT: ok=0 fail=13 skip=0 -> exit 1 | Ergebnisse: E:\Claude\Projects\scinance\scinance2-impl\handoff_local\results\overnight_20260611_154638

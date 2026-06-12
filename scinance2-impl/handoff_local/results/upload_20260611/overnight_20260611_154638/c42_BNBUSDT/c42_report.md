@@ -1,0 +1,33 @@
+# C-42-Reproduktion (H-02 · Vol-Regression)
+
+- **Hypothese:** H-02 — `scinance2-impl/state/hypothesis_registry.md`
+- **Erzeugt:** 2026-06-11T17:07:43+00:00 (UTC)
+- **Symbol:** BNBUSDT · **Modell:** `lightgbm` · Seed 42
+- **Daten:** 51700 saubere Zeilen, 3 purged-WF-Fenster, Purge=60+Embargo 1440 Bars
+- **Features:** 36 (1 DOCUMENTED, 35 ASSUMED)
+
+## H-02-Kriterien (einzeln; Gate-Urteil faellt der gate-auditor)
+
+| Kriterium (Registry, woertlich) | Operationalisierung | Messwert | erfuellt |
+|---|---|---|---|
+| OOS-R^2 >= 0.15 in ALLEN Fenstern | min Fold-R^2 >= 0.15 | -0.5294 (min) | nein |
+| QLIKE schlaegt HAR-RV in ALLEN Fenstern | model_qlike < har_qlike je Fold | 0.6455 vs 0.6032; 0.4312 vs 0.3887; 0.2674 vs 0.2692 | nein |
+| purged Walk-Forward, >=2 disjunkte OOS-Fenster | Splitter deterministisch-chronologisch | 3 Fenster | ja |
+| FDR BH alpha=0.10 ueber 36 Features (F-VOL) | BH step-up ueber Permutations-p | 0/36 signifikant | n/a (Reporting) |
+
+**Pre-Check (nicht bindend):** DROP/PARK
+
+## Fenster-Metriken
+
+| Fold | n_train | n_test | model R^2 | HAR R^2 | model QLIKE | HAR QLIKE | QLIKE<HAR | R^2>=0.15 |
+|---:|---:|---:|---:|---:|---:|---:|:--:|:--:|
+| 0 | 11425 | 12925 | 0.3429 | 0.3281 | 0.64546 | 0.60317 | nein | ja |
+| 1 | 24350 | 12925 | -0.5294 | 0.1089 | 0.43117 | 0.38871 | nein | nein |
+| 2 | 37275 | 12925 | 0.2172 | 0.3142 | 0.26736 | 0.26915 | ja | ja |
+
+## FDR (F-VOL, BH alpha=0.10) — signifikante Features
+
+- keine Features ueberleben BH alpha=0.10
+
+---
+*Erzeugt von `scripts/c42_repro.py` (WP-4, read-only auf kline_1min). Endgueltiges Gate-Urteil: gate-auditor gegen H-02.*

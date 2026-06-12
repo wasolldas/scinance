@@ -1,0 +1,7 @@
+-------- RUN_SHORT SUMMARY --------
+RECORDER_SMOKE: OK (rc=0)
+RECORDER_CHECK: FAIL (rc=1)
+E15_EVAL: FAIL (rc=1)
+C42_QUICK_HAR: FAIL (TIMEOUT nach 900 s)
+C42_QUICK_LGBM: FAIL (TIMEOUT nach 900 s)
+RUN_SHORT GESAMT: ok=1 fail=4 skip=0 -> exit 1 | Ergebnisse: E:\Claude\Projects\scinance\scinance2-impl\handoff_local\results\short_20260612_082957
