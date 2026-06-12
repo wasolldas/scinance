@@ -16,6 +16,7 @@ driver only reports each criterion individually.
 from __future__ import annotations
 
 import json
+import sys
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
@@ -26,6 +27,7 @@ import numpy as np
 from .cfar_detector import CfarConfig, detect_peaks
 from .cyclic_spectrum import (
     DEFAULT_BIN_GRID_MS,
+    MAX_BINS,
     bin_counts,
     spectral_correlation_density,
 )
@@ -37,6 +39,16 @@ HYPOTHESIS_ID = "H-03"
 REGISTRY_PATH = "scinance2-impl/state/hypothesis_registry.md"
 SURROGATE_P_MAX = 0.05  # registered (PRD §3 Pilot 4)
 MIN_WINDOWS = 2         # registered (>= 2 disjoint windows)
+
+# Plausibility window for epoch-ms trade timestamps in the existing DuckDB
+# ``trades`` table (collector contract: ``TradeEvent.timestamp_ms``). The T3
+# run of 2026-06-11 crashed with a 1.3 TiB bin grid because the table contains
+# at least one row with ts ≈ 0 (window span = the whole epoch). Rows outside
+# this range (ts=0 defaults, seconds-epoch strays, far-future garbage) are
+# dropped by ``load_trades_duckdb`` with a warning. CSV/Parquet fixtures are
+# NOT filtered — synthetic fixtures may use relative timestamps.
+TS_PLAUSIBLE_MIN_MS = 1_262_304_000_000  # 2010-01-01 UTC
+TS_PLAUSIBLE_MAX_MS = 4_102_444_800_000  # 2100-01-01 UTC
 
 
 class DataError(RuntimeError):
@@ -71,13 +83,31 @@ def load_trades_duckdb(
         if end_ts is not None:
             where += " AND ts <= ?"
             params.append(int(end_ts))
+        n_total = layer.conn.execute(
+            f"SELECT COUNT(*) FROM trades WHERE {where}", params
+        ).fetchone()[0]
+        # Plausibility filter: corrupt timestamps (ts=0 / wrong unit) would
+        # stretch the bin grid over the whole epoch (T3 crash 2026-06-11).
+        where += " AND ts >= ? AND ts <= ?"
+        params.extend([TS_PLAUSIBLE_MIN_MS, TS_PLAUSIBLE_MAX_MS])
         rows = layer.conn.execute(
             f"SELECT ts, price FROM trades WHERE {where} ORDER BY ts", params
         ).fetchall()
     finally:
         layer.close()
+    n_dropped = int(n_total) - len(rows)
+    if n_dropped > 0:
+        print(
+            f"[c31] WARN: dropped {n_dropped} trades row(s) for {symbol} with "
+            f"implausible ts (outside [{TS_PLAUSIBLE_MIN_MS}, "
+            f"{TS_PLAUSIBLE_MAX_MS}] ms epoch) — corrupt rows in {db_path}",
+            file=sys.stderr,
+        )
     if not rows:
-        raise DataError(f"no trades for symbol={symbol} in {db_path}")
+        raise DataError(
+            f"no trades with plausible epoch-ms timestamps for symbol={symbol} "
+            f"in {db_path} ({n_dropped} implausible row(s) dropped)"
+        )
     ts = np.array([r[0] for r in rows], dtype=np.float64)
     px = np.array([r[1] for r in rows], dtype=np.float64)
     return ts, px
@@ -297,6 +327,21 @@ def run(
 ) -> dict[str, Any]:
     """Run the full C-31 pipeline over >= 2 windows and assemble the payload."""
     fam = family if family is not None else default_family()
+    # Span sanity check BEFORE any binning: a single corrupt timestamp (ts=0
+    # among epoch-ms data) makes the finest bin grid explode (1.3 TiB alloc in
+    # the T3 run of 2026-06-11). Fail fast with a DataError instead.
+    if ts.size >= 2 and fam:
+        min_dt = min(v.bin_dt_ms for v in fam)
+        t_lo, t_hi = float(np.min(ts)), float(np.max(ts))
+        est_bins = (t_hi - t_lo) / min_dt
+        if est_bins > MAX_BINS:
+            raise DataError(
+                f"timestamp span {t_hi - t_lo:.0f} ms (t0={t_lo:.0f}, "
+                f"t1={t_hi:.0f}) needs ~{est_bins:.3g} bins at the finest "
+                f"family dt={min_dt:g} ms (> MAX_BINS={MAX_BINS}). Input "
+                "almost certainly contains corrupt timestamps (ts=0 rows / "
+                "wrong unit) — clean or filter the source data."
+            )
     windows = split_windows(ts, px, n_windows)
     win_results = [
         run_window(

@@ -28,7 +28,19 @@ REPO_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 DUCKDB_PATH="${HANDOFF_DUCKDB:-$REPO_ROOT/data/bybit_edge.duckdb}"
 # iter-5-Replay-Artefakte (DEC-02-Default-Pfade von replay_all.py).
 E15_RESULTS="$REPO_ROOT/edge_research_framework/results/replay_all_results.json"
-E15_TRADES="$REPO_ROOT/edge_research_framework/results/trades_all.csv"
+# trades_all.csv: Pfad-Kaskade — der iter-5-Lauf exportierte nach
+# results/trades_iter5/ (T2-Defekt 2026-06-12: fester Pfad fand nichts).
+# (1) results/trades_all.csv  (2) results/trades_iter5/trades_all.csv
+# (3) neuester results/trades_*/trades_all.csv — erster Treffer gewinnt.
+E15_TRADES=""
+for cand in \
+  "$REPO_ROOT/edge_research_framework/results/trades_all.csv" \
+  "$REPO_ROOT/edge_research_framework/results/trades_iter5/trades_all.csv"; do
+  if [ -f "$cand" ]; then E15_TRADES="$cand"; break; fi
+done
+if [ -z "$E15_TRADES" ]; then
+  E15_TRADES="$(ls -t "$REPO_ROOT"/edge_research_framework/results/trades_*/trades_all.csv 2>/dev/null | head -n 1 || true)"
+fi
 # iter-4-Baseline fuer den E-17-Divergenz-Check.
 E15_BASE_RESULTS="$REPO_ROOT/edge-reconciliation/input/iter4_raw/replay_all_results.json"
 E15_BASE_TRADES="$REPO_ROOT/edge-reconciliation/input/iter4_raw/trades_all.csv"
@@ -111,7 +123,11 @@ run_step RECORDER_CHECK 120 \
 # ── Schritt 3: E-15-Auswertung auf echten iter-5-Ergebnissen ────────────
 if [ "$DRY" = "0" ] && [ ! -f "$E15_RESULTS" ]; then
   record E15_EVAL SKIP 0 0 "iter-5-Ergebnisse fehlen ($E15_RESULTS) — scripts/replay_all.py separat laufen lassen"
+elif [ "$DRY" = "0" ] && [ -z "$E15_TRADES" ]; then
+  record E15_EVAL SKIP 0 0 "trades_all.csv nicht gefunden (gesucht: results/, results/trades_iter5/, results/trades_*/) — Replay mit --export-trades laufen lassen"
 else
+  # Dry-Run ohne gefundene Datei: Default-Pfad nur fuer die Kommandozeile.
+  [ -z "$E15_TRADES" ] && E15_TRADES="$REPO_ROOT/edge_research_framework/results/trades_all.csv"
   run_step E15_EVAL 600 \
     "$PY" "$REPO_ROOT/scripts/evaluate_e15.py" \
     --results-path "$E15_RESULTS" --trades-path "$E15_TRADES" \
@@ -124,15 +140,17 @@ if [ "$DRY" = "0" ] && [ ! -f "$DUCKDB_PATH" ]; then
   record C42_QUICK_HAR SKIP 0 0 "DuckDB fehlt ($DUCKDB_PATH) — Pfad oben im Skript / HANDOFF_DUCKDB anpassen"
   record C42_QUICK_LGBM SKIP 0 0 "DuckDB fehlt" 1
 else
+  # --db-copy: liest eine Temp-Kopie der DuckDB, damit der T2-Lauf nie am
+  # RW-Lock des laufenden 1.0-Collectors haengt (T2-Defekt 2026-06-12).
   run_step C42_QUICK_HAR 900 \
     "$PY" "$REPO_ROOT/scripts/c42_repro.py" --quick --model har --symbol BTCUSDT \
-    --db-path "$DUCKDB_PATH" --max-bars 60000 --out "$RUN_DIR/c42_quick_har" || true
+    --db-path "$DUCKDB_PATH" --db-copy --max-bars 60000 --out "$RUN_DIR/c42_quick_har" || true
 
   # ── Schritt 5 (optional): zusaetzlich LightGBM, falls installiert ─────
   if [ "$DRY" != "0" ] || "$PY" -c "import lightgbm" >/dev/null 2>&1; then
     run_step C42_QUICK_LGBM 900 \
       "$PY" "$REPO_ROOT/scripts/c42_repro.py" --quick --model lightgbm --symbol BTCUSDT \
-      --db-path "$DUCKDB_PATH" --max-bars 60000 --out "$RUN_DIR/c42_quick_lightgbm" || true
+      --db-path "$DUCKDB_PATH" --db-copy --max-bars 60000 --out "$RUN_DIR/c42_quick_lightgbm" || true
   else
     record C42_QUICK_LGBM SKIP 0 0 "lightgbm nicht installiert (optional; pip install -e .[vol])" 1
   fi

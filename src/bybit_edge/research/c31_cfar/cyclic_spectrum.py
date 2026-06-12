@@ -32,6 +32,13 @@ from scipy.signal import get_window
 # Default Δt grids the driver sweeps as the F-CFAR parameter family.
 DEFAULT_BIN_GRID_MS: tuple[float, ...] = (10.0, 50.0, 100.0)
 
+# Hard safety cap on the bin-grid size. Legitimate windows stay far below this
+# (60 days at Δt = 10 ms ≈ 5.2e8 bins); anything above signals corrupt input —
+# e.g. a single ts ≈ 0 row among epoch-ms timestamps stretches the grid to
+# ~1.8e11 bins (a 1.3 TiB histogram, the T3 crash of 2026-06-11). Guarding
+# here turns a runaway allocation into a clear ValueError.
+MAX_BINS: int = 1_000_000_000
+
 
 @dataclass(slots=True)
 class CyclicSpectrum:
@@ -112,6 +119,13 @@ def bin_counts(
     if hi <= lo:
         return np.zeros(1, dtype=np.int64), 1000.0 / bin_dt_ms
     n_bins = int(np.ceil((hi - lo) / bin_dt_ms))
+    if n_bins > MAX_BINS:
+        raise ValueError(
+            f"bin grid would need {n_bins} bins (span {hi - lo:.0f} ms at "
+            f"dt={bin_dt_ms:g} ms) — exceeds MAX_BINS={MAX_BINS}. This almost "
+            "always means corrupt timestamps (e.g. a ts=0 row among epoch-ms "
+            "data) or a wrong timestamp unit."
+        )
     edges = lo + bin_dt_ms * np.arange(n_bins + 1)
     counts, _ = np.histogram(ts, bins=edges)
     fs_hz = 1000.0 / bin_dt_ms

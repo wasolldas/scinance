@@ -503,6 +503,104 @@ class TestMalformedFrames:
 
 
 # ══════════════════════════════════════════════════════════════════════
+# 5) Keepalive + control-frame diagnosis (NO_DATA runs 2026-06-11/12)
+# ══════════════════════════════════════════════════════════════════════
+class TestKeepaliveAndAcks:
+    def test_keepalive_kwargs_disable_protocol_ping_for_option_ws(self) -> None:
+        """Option WS never answers protocol pings (log evidence: client-side
+        '1011 keepalive ping timeout' every ~31 s) -> library keepalive off.
+        Linear WS keeps the 1.0-collector protocol-ping behaviour."""
+        opt = engine_mod._ws_keepalive_kwargs("wss://stream.bybit.com/v5/public/option")
+        assert opt == {"ping_interval": None, "ping_timeout": None}
+        lin = engine_mod._ws_keepalive_kwargs("wss://stream.bybit.com/v5/public/linear")
+        assert lin["ping_interval"] is not None
+        assert lin["ping_timeout"] is not None
+
+    async def test_rejected_subscribe_ack_is_logged_as_error(
+        self, tmp_path, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        """A success=false subscribe ack MUST surface in the log — it is the
+        only evidence that a topic (e.g. orderbook.rpi.*) does not exist."""
+        frames = [
+            json.dumps({
+                "success": False,
+                "op": "subscribe",
+                "ret_msg": "error:handler not found",
+                "conn_id": "abc123",
+            }),
+            json.dumps(_rpi_frame()),  # engine must keep running afterwards
+        ]
+        factory = FakeConnectFactory({"linear": frames})
+        engine = _make_engine(
+            tmp_path, enabled_streams=["rpi_orderbook"], ws_connect=factory
+        )
+        with caplog.at_level(
+            logging.INFO, logger="bybit_edge.recorder.recording_engine"
+        ):
+            task = asyncio.create_task(engine.run())
+            assert await _wait_for(lambda: engine.messages_recorded >= 1)
+            await engine.stop()
+            await asyncio.wait_for(task, timeout=2.0)
+
+        assert task.exception() is None
+        rejected = [
+            r for r in caplog.records
+            if r.levelno == logging.ERROR and "REJECTED" in r.message
+        ]
+        assert rejected, "success=false ack was not logged as ERROR"
+        assert "handler not found" in rejected[0].message
+
+    async def test_successful_ack_logged_info_not_error(
+        self, tmp_path, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        frames = [
+            json.dumps({"success": True, "op": "subscribe", "conn_id": "ok1"}),
+            json.dumps(_rpi_frame()),
+        ]
+        factory = FakeConnectFactory({"linear": frames})
+        engine = _make_engine(
+            tmp_path, enabled_streams=["rpi_orderbook"], ws_connect=factory
+        )
+        with caplog.at_level(
+            logging.INFO, logger="bybit_edge.recorder.recording_engine"
+        ):
+            task = asyncio.create_task(engine.run())
+            assert await _wait_for(lambda: engine.messages_recorded >= 1)
+            await engine.stop()
+            await asyncio.wait_for(task, timeout=2.0)
+        acks = [r for r in caplog.records if "ack: op=subscribe" in r.message]
+        assert acks and all(r.levelno == logging.INFO for r in acks)
+
+    async def test_app_level_ping_sent_on_ws_connections(
+        self, tmp_path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """Every WS connection gets the Bybit app-level {"op": "ping"}
+        heartbeat (the option endpoint dies without it)."""
+        monkeypatch.setattr(engine_mod, "APP_PING_INTERVAL_SECONDS", 0.01)
+        factory = FakeConnectFactory({"option": [json.dumps(_option_ticker_frame())]})
+        engine = _make_engine(
+            tmp_path, enabled_streams=["option_tickers"], ws_connect=factory
+        )
+        task = asyncio.create_task(engine.run())
+
+        def _ping_seen() -> bool:
+            return any(
+                json.loads(m).get("op") == "ping"
+                for _url, ws in factory.connections
+                for m in list(ws.sent)
+                if m
+            )
+
+        assert await _wait_for(_ping_seen)
+        await engine.stop()
+        await asyncio.wait_for(task, timeout=2.0)
+        assert task.exception() is None
+        # First message on the wire stays the subscribe request.
+        first_ws = factory.connections[0][1]
+        assert json.loads(first_ws.sent[0])["op"] == "subscribe"
+
+
+# ══════════════════════════════════════════════════════════════════════
 # Spec wiring sanity: StreamSpec names must match the storage schemas
 # ══════════════════════════════════════════════════════════════════════
 def test_default_stream_specs_cover_all_schemas() -> None:

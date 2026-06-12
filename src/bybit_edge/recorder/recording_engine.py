@@ -63,17 +63,35 @@ REST_PREMIUM_INDEX_KLINE: str = "/v5/market/premium-index-price-kline"
 # How often the storage cap is enforced and telemetry is logged (seconds).
 CAP_ENFORCE_INTERVAL_SECONDS: float = 30.0
 
+# Application-level heartbeat ({"op": "ping"}) interval per Bybit v5 docs
+# (recommended every 20 s). The OPTION public WS does NOT answer RFC-6455
+# protocol pings — the T3/T2 runs of 2026-06-11/12 show the client itself
+# closing that connection every ~31 s with "1011 keepalive ping timeout"
+# while the linear WS stayed up for 8 h. App-level pings keep both alive.
+APP_PING_INTERVAL_SECONDS: float = 20.0
+
+
+def _ws_keepalive_kwargs(url: str) -> dict[str, Any]:
+    """Per-endpoint keepalive kwargs for ``websockets.connect``.
+
+    Linear public WS answers protocol pings (1.0-collector behaviour kept).
+    The option endpoint never sends protocol pongs, so the library keepalive
+    must be disabled there — liveness comes from the app-level ping loop.
+    """
+    if url.rstrip("/").endswith("/option"):
+        return {"ping_interval": None, "ping_timeout": None}
+    return {
+        "ping_interval": WS_PING_INTERVAL_SECONDS,
+        "ping_timeout": WS_PING_TIMEOUT_SECONDS,
+    }
+
 
 # Production WS-connect callable. Imported lazily so the module (and the tests
 # that inject a fake) never require ``websockets`` to be installed.
 async def _default_ws_connect(url: str) -> Any:  # pragma: no cover - thin shim
     import websockets
 
-    return await websockets.connect(
-        url,
-        ping_interval=WS_PING_INTERVAL_SECONDS,
-        ping_timeout=WS_PING_TIMEOUT_SECONDS,
-    )
+    return await websockets.connect(url, **_ws_keepalive_kwargs(url))
 
 
 @dataclass
@@ -387,7 +405,17 @@ class RecordingEngine:
                 logger.info("[%s] connected to %s", transport, url)
                 delay = WS_RECONNECT_DELAY_SECONDS  # reset backoff on success
                 await self._subscribe(ws, topics)
-                await self._consume(ws, transport)
+                ping_task = asyncio.create_task(
+                    self._app_ping_loop(ws, transport)
+                )
+                try:
+                    await self._consume(ws, transport)
+                finally:
+                    ping_task.cancel()
+                    try:
+                        await ping_task
+                    except (asyncio.CancelledError, Exception):
+                        pass
                 # ``_consume`` returned without raising = the stream ended
                 # cleanly (server closed, or — in tests — the fake transport
                 # exhausted its frames). Yield + small pause so we neither busy-
@@ -414,7 +442,61 @@ class RecordingEngine:
             return
         msg = json.dumps({"op": "subscribe", "args": topics})
         await ws.send(msg)
-        logger.info("Subscribed to %d topic(s): %s", len(topics), topics)
+        logger.info("Subscribe request sent for %d topic(s): %s", len(topics), topics)
+
+    async def _app_ping_loop(self, ws: Any, transport: str) -> None:
+        """Send the Bybit application-level heartbeat ({"op": "ping"}).
+
+        Required on the option WS (no protocol pongs there — INC: NO_DATA runs
+        2026-06-11/12); harmless on the linear WS. A failed send means the
+        connection is gone: close it so ``_consume`` unblocks and the
+        transport loop reconnects (important once protocol keepalive is off).
+        """
+        while self._running:
+            try:
+                await asyncio.sleep(APP_PING_INTERVAL_SECONDS)
+                await ws.send(json.dumps({"op": "ping"}))
+            except asyncio.CancelledError:
+                raise
+            except Exception as exc:
+                logger.warning(
+                    "[%s] app-level ping failed (%s) — closing for reconnect",
+                    transport, exc,
+                )
+                close = getattr(ws, "close", None)
+                if callable(close):
+                    try:
+                        await close()
+                    except Exception:
+                        pass
+                return
+
+    def _log_control_frame(self, transport: str, payload: dict) -> None:
+        """Log subscribe acks / pongs. Bybit answers a subscribe request with
+        ``{"op": "subscribe", "success": bool, "ret_msg": ...}`` — a rejected
+        topic (success=false) is the ONLY place the server says so. The
+        NO_DATA diagnosis of 2026-06-11 was blind here because these frames
+        were silently dropped."""
+        op = str(payload.get("op", ""))
+        ret_msg = str(payload.get("ret_msg", ""))
+        if op == "pong" or ret_msg == "pong":
+            logger.debug("[%s] pong received", transport)
+            return
+        if "success" in payload:
+            if payload.get("success"):
+                logger.info(
+                    "[%s] ack: op=%s success=true ret_msg=%r conn_id=%s",
+                    transport, op, ret_msg, payload.get("conn_id", ""),
+                )
+            else:
+                logger.error(
+                    "[%s] SUBSCRIBE/REQUEST REJECTED: op=%s ret_msg=%r "
+                    "payload=%s — topic likely does not exist on this endpoint",
+                    transport, op, ret_msg,
+                    json.dumps(payload, separators=(",", ":")),
+                )
+            return
+        logger.debug("[%s] control frame: %s", transport, payload)
 
     async def _consume(self, ws: Any, transport: str) -> None:
         """Iterate inbound frames and route them to writers until stop."""
@@ -428,7 +510,11 @@ class RecordingEngine:
                 continue
             topic = payload.get("topic")
             if not topic:
-                continue  # subscription ack / heartbeat
+                # Subscription ack / heartbeat — log it (rejections are the
+                # only evidence a topic does not exist).
+                if isinstance(payload, dict):
+                    self._log_control_frame(transport, payload)
+                continue
             spec = self._spec_for_topic(topic)
             if spec is None or spec.transport != transport:
                 continue

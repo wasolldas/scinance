@@ -29,7 +29,21 @@ $RepoRoot  = (Resolve-Path (Join-Path $ScriptDir '..\..')).Path
 $DuckDbPath = if ($env:HANDOFF_DUCKDB) { $env:HANDOFF_DUCKDB } else { Join-Path $RepoRoot 'data\bybit_edge.duckdb' }
 # iter-5-Replay-Artefakte (DEC-02-Default-Pfade von replay_all.py).
 $E15Results     = Join-Path $RepoRoot 'edge_research_framework\results\replay_all_results.json'
-$E15Trades      = Join-Path $RepoRoot 'edge_research_framework\results\trades_all.csv'
+# trades_all.csv: Pfad-Kaskade - der iter-5-Lauf exportierte nach
+# results\trades_iter5\ (T2-Defekt 2026-06-12: fester Pfad fand nichts).
+# (1) results\trades_all.csv  (2) results\trades_iter5\trades_all.csv
+# (3) neuester results\trades_*\trades_all.csv - erster Treffer gewinnt.
+$E15Trades = $null
+foreach ($cand in @(
+    (Join-Path $RepoRoot 'edge_research_framework\results\trades_all.csv'),
+    (Join-Path $RepoRoot 'edge_research_framework\results\trades_iter5\trades_all.csv'))) {
+    if (Test-Path $cand) { $E15Trades = $cand; break }
+}
+if (-not $E15Trades) {
+    $tradeGlob = Get-ChildItem -Path (Join-Path $RepoRoot 'edge_research_framework\results\trades_*\trades_all.csv') `
+        -ErrorAction SilentlyContinue | Sort-Object LastWriteTime -Descending | Select-Object -First 1
+    if ($tradeGlob) { $E15Trades = $tradeGlob.FullName }
+}
 # iter-4-Baseline fuer den E-17-Divergenz-Check.
 $E15BaseResults = Join-Path $RepoRoot 'edge-reconciliation\input\iter4_raw\replay_all_results.json'
 $E15BaseTrades  = Join-Path $RepoRoot 'edge-reconciliation\input\iter4_raw\trades_all.csv'
@@ -129,7 +143,12 @@ if ($DryRun) { Write-Host "ACHTUNG: HANDOFF_DRY_RUN aktiv - keine echten Laeufe.
 if ((-not $DryRun) -and (-not (Test-Path $E15Results))) {
     Record-Step -Name 'E15_EVAL' -Status 'SKIP' -Rc 0 -Dur 0 `
         -Detail ("iter-5-Ergebnisse fehlen (" + $E15Results + ") - scripts/replay_all.py separat laufen lassen")
+} elseif ((-not $DryRun) -and (-not $E15Trades)) {
+    Record-Step -Name 'E15_EVAL' -Status 'SKIP' -Rc 0 -Dur 0 `
+        -Detail 'trades_all.csv nicht gefunden (gesucht: results\, results\trades_iter5\, results\trades_*\) - Replay mit --export-trades laufen lassen'
 } else {
+    # Dry-Run ohne gefundene Datei: Default-Pfad nur fuer die Kommandozeile.
+    if (-not $E15Trades) { $E15Trades = Join-Path $RepoRoot 'edge_research_framework\results\trades_all.csv' }
     [void](Invoke-Step -Name 'E15_EVAL' -TimeoutSec 600 -CmdArgs @(
         (Join-Path $RepoRoot 'scripts\evaluate_e15.py'),
         '--results-path', $E15Results, '--trades-path', $E15Trades,
@@ -143,9 +162,11 @@ if ((-not $DryRun) -and (-not (Test-Path $DuckDbPath))) {
         -Detail ("DuckDB fehlt (" + $DuckDbPath + ") - Pfad oben im Skript / HANDOFF_DUCKDB anpassen")
     Record-Step -Name 'C42_QUICK_LGBM' -Status 'SKIP' -Rc 0 -Dur 0 -Detail 'DuckDB fehlt' -OptionalSkip $true
 } else {
+    # --db-copy: liest eine Temp-Kopie der DuckDB, damit der T2-Lauf nie am
+    # RW-Lock des laufenden 1.0-Collectors haengt (T2-Defekt 2026-06-12).
     [void](Invoke-Step -Name 'C42_QUICK_HAR' -TimeoutSec 900 -CmdArgs @(
         (Join-Path $RepoRoot 'scripts\c42_repro.py'), '--quick', '--model', 'har',
-        '--symbol', 'BTCUSDT', '--db-path', $DuckDbPath, '--max-bars', '60000',
+        '--symbol', 'BTCUSDT', '--db-path', $DuckDbPath, '--db-copy', '--max-bars', '60000',
         '--out', (Join-Path $RunDir 'c42_quick_har')))
 
     # -- Schritt 5 (optional): zusaetzlich LightGBM, falls installiert ---
@@ -160,7 +181,7 @@ if ((-not $DryRun) -and (-not (Test-Path $DuckDbPath))) {
     if ($lgbmOk) {
         [void](Invoke-Step -Name 'C42_QUICK_LGBM' -TimeoutSec 900 -CmdArgs @(
             (Join-Path $RepoRoot 'scripts\c42_repro.py'), '--quick', '--model', 'lightgbm',
-            '--symbol', 'BTCUSDT', '--db-path', $DuckDbPath, '--max-bars', '60000',
+            '--symbol', 'BTCUSDT', '--db-path', $DuckDbPath, '--db-copy', '--max-bars', '60000',
             '--out', (Join-Path $RunDir 'c42_quick_lightgbm')))
     } else {
         Record-Step -Name 'C42_QUICK_LGBM' -Status 'SKIP' -Rc 0 -Dur 0 `

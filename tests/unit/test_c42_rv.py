@@ -544,3 +544,98 @@ def test_cli_missing_input_exits_1(tmp_path: Path) -> None:
     proc = _run_cli(["--model", "har", "--out", str(tmp_path)])
     assert proc.returncode == 1
     assert "Traceback" not in proc.stderr
+
+
+# --------------------------------------------------------------------------- #
+# 10) DuckDB lock robustness: open timeout + --db-copy                        #
+#     (T2 defect 2026-06-12: 900 s hang at "opening duckdb read-only" while   #
+#     the 1.0 collector held the RW lock)                                     #
+# --------------------------------------------------------------------------- #
+
+def test_open_db_with_timeout_hung_opener_raises_clierror() -> None:
+    """A blocking DuckDB open must become a CLIError with the --db-copy hint
+    after the hard timeout — never an unbounded hang."""
+    import threading
+    import time as _time
+
+    import scripts.c42_repro as c42_cli
+
+    started = threading.Event()
+
+    def hung_opener():
+        started.set()
+        _time.sleep(30)  # daemon thread; abandoned after the timeout
+
+    with pytest.raises(c42_cli.CLIError, match="--db-copy"):
+        c42_cli._open_db_with_timeout(hung_opener, timeout_s=0.2)
+    assert started.wait(1.0)
+
+
+def test_open_db_with_timeout_maps_lock_error_to_clierror() -> None:
+    """A DuckDB lock error surfaces as CLIError carrying the --db-copy hint."""
+    import scripts.c42_repro as c42_cli
+
+    def lock_opener():
+        raise RuntimeError(
+            'IO Error: Could not set lock on file "bybit_edge.duckdb": '
+            "Conflicting lock is held"
+        )
+
+    with pytest.raises(c42_cli.CLIError, match="--db-copy"):
+        c42_cli._open_db_with_timeout(lock_opener, timeout_s=5.0)
+
+
+def test_open_db_with_timeout_passes_through_unrelated_errors() -> None:
+    """Non-lock errors keep their type (no blanket CLIError masking)."""
+    import scripts.c42_repro as c42_cli
+
+    def boom():
+        raise ValueError("unrelated failure")
+
+    with pytest.raises(ValueError, match="unrelated failure"):
+        c42_cli._open_db_with_timeout(boom, timeout_s=5.0)
+
+
+def test_db_copy_reads_temp_copy_and_cleans_up(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, garch_klines: pd.DataFrame
+) -> None:
+    """--db-copy: loads klines from a temp copy of the .duckdb file and deletes
+    the copy afterwards; the original stays untouched."""
+    import tempfile
+
+    import duckdb
+
+    import scripts.c42_repro as c42_cli
+
+    db_path = tmp_path / "bybit_edge.duckdb"
+    conn = duckdb.connect(str(db_path))
+    conn.execute(
+        "CREATE TABLE kline_1min (ts BIGINT NOT NULL, symbol VARCHAR NOT NULL, "
+        "open DOUBLE, high DOUBLE, low DOUBLE, close DOUBLE, "
+        "volume DOUBLE, turnover DOUBLE)"
+    )
+    df = garch_klines.head(2000)
+    conn.execute(
+        "INSERT INTO kline_1min "
+        "SELECT ts, 'BTCUSDT', open, high, low, close, volume, turnover FROM df"
+    )
+    conn.close()
+    original_bytes = db_path.read_bytes()
+
+    made_dirs: list[str] = []
+    real_mkdtemp = tempfile.mkdtemp
+
+    def tracking_mkdtemp(*args, **kwargs):
+        d = real_mkdtemp(*args, **kwargs)
+        made_dirs.append(d)
+        return d
+
+    monkeypatch.setattr(tempfile, "mkdtemp", tracking_mkdtemp)
+
+    klines = c42_cli._load_from_db(db_path, "BTCUSDT", max_bars=500, db_copy=True)
+
+    assert len(klines) == 500
+    assert list(klines.columns) == KLINE_COLUMNS
+    assert made_dirs, "no temp copy directory was created"
+    assert not Path(made_dirs[0]).exists(), "temp copy not cleaned up"
+    assert db_path.read_bytes() == original_bytes  # original untouched

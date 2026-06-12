@@ -481,6 +481,69 @@ def test_driver_cli_missing_file_exits_nonzero(tmp_path: Path) -> None:
 
 
 # ---------------------------------------------------------------------------
+# 9. Regression: corrupt timestamps must fail fast, never allocate TiBs
+#    (T3 crash 2026-06-11: ts=0 row in the trades table -> 1.3 TiB bin grid)
+# ---------------------------------------------------------------------------
+
+def test_run_corrupt_zero_timestamp_raises_dataerror_fast() -> None:
+    """One ts=0 row among epoch-ms ticks: run() must raise DataError BEFORE
+    binning (regression for the 1.3 TiB _ArrayMemoryError on all 5 symbols)."""
+    ts, px = _ticks_with_prices(seed=5)
+    ts = ts.copy()
+    ts[0] = 0.0  # corrupt row, sorts first -> window 0 spans the whole epoch
+    order = np.argsort(ts)
+    with pytest.raises(DataError, match="corrupt timestamps"):
+        run(ts[order], px[order], n_windows=2, n_surrogates=5,
+            segment_len=64, n_alpha=8)
+
+
+def test_bin_counts_rejects_absurd_bin_grid() -> None:
+    """bin_counts must refuse grids beyond MAX_BINS with a clear ValueError
+    instead of attempting a terabyte-scale histogram allocation."""
+    from bybit_edge.research.c31_cfar.cyclic_spectrum import MAX_BINS, bin_counts
+
+    ts = np.array([0.0, 1.78e12])  # epoch-span at dt=10ms -> 1.78e11 bins
+    with pytest.raises(ValueError, match="MAX_BINS"):
+        bin_counts(ts, 10.0)
+    assert MAX_BINS >= 600_000_000  # 60d at 10ms (legit T3 windows) stay legal
+
+
+def test_load_trades_duckdb_filters_implausible_timestamps(tmp_path: Path) -> None:
+    """The DuckDB loader drops ts=0 / seconds-epoch / far-future rows and
+    keeps the plausible epoch-ms rows (read-only on the trades schema)."""
+    import duckdb
+
+    from bybit_edge.research.c31_cfar.driver import load_trades_duckdb
+
+    db_path = tmp_path / "trades.duckdb"
+    conn = duckdb.connect(str(db_path))
+    conn.execute(
+        "CREATE TABLE trades (ts BIGINT NOT NULL, symbol VARCHAR NOT NULL, "
+        "price DOUBLE, volume DOUBLE, side VARCHAR, is_block BOOLEAN, "
+        "recv_ts DOUBLE)"
+    )
+    good_ts = [1_780_000_000_000 + i * 100 for i in range(20)]
+    rows = [(t, "BTCUSDT", 50_000.0 + i, 1.0, "Buy", False, 0.0)
+            for i, t in enumerate(good_ts)]
+    rows += [
+        (0, "BTCUSDT", 1.0, 1.0, "Buy", False, 0.0),               # ts=0 default
+        (1_780_000_000, "BTCUSDT", 2.0, 1.0, "Buy", False, 0.0),   # seconds epoch
+        (9_999_999_999_999, "BTCUSDT", 3.0, 1.0, "Buy", False, 0.0),  # far future
+    ]
+    conn.executemany("INSERT INTO trades VALUES (?, ?, ?, ?, ?, ?, ?)", rows)
+    conn.close()
+
+    ts, px = load_trades_duckdb(db_path, "BTCUSDT")
+    assert ts.size == len(good_ts)
+    assert float(ts[0]) == float(good_ts[0])
+    assert float(ts[-1]) == float(good_ts[-1])
+    assert not np.any(ts < 1_262_304_000_000)
+
+    with pytest.raises(DataError, match="plausible"):
+        load_trades_duckdb(db_path, "NOSYMBOL")
+
+
+# ---------------------------------------------------------------------------
 # 8. Determinism (registry reproducibility duty)
 # ---------------------------------------------------------------------------
 

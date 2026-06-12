@@ -8,7 +8,10 @@ aus (scinance2-impl/state/hypothesis_registry.md).
 Datenzugriff rein lesend: entweder die Bestands-DuckDB (``--db-path`` ->
 ``PersistenceLayer.query_kline``) ODER eine CSV-Fixture (``--csv-path``;
 Spalten ts,open,high,low,close,volume,turnover). Das Bestands-Schema und der
-Collector werden nicht beruehrt.
+Collector werden nicht beruehrt. Haelt der laufende 1.0-Collector den
+RW-Lock, schlaegt das Open nach ``DB_OPEN_TIMEOUT_S`` mit klarer Meldung fehl;
+``--db-copy`` liest stattdessen eine temporaere Kopie der .duckdb-Datei
+(lock-frei, Kopie wird nach dem Lesen geloescht).
 
 Modelle (DEC-04): ``--model lightgbm`` (reproduktions-treu; braucht
 ``pip install -e .[vol]``), ``histgbm`` (sklearn-Fallback, DEC-04a),
@@ -40,9 +43,54 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_OUT = REPO_ROOT / "scinance2-impl" / "state"
 KLINE_COLUMNS = ["ts", "open", "high", "low", "close", "volume", "turnover"]
 
+# Hard timeout for the read-only DuckDB open. If the 1.0 collector holds the
+# RW lock, ``duckdb.connect(read_only=True)`` can block indefinitely (T2 run
+# 2026-06-12: 900 s hang after "[c42] opening duckdb read-only"). After this
+# timeout we fail fast with a clear hint instead of eating the runner budget.
+DB_OPEN_TIMEOUT_S = 30.0
+
+DB_LOCKED_HINT = (
+    "DuckDB gesperrt (laeuft der 1.0-Collector?) — Workaround: --db-copy "
+    "(liest eine temporaere Kopie der .duckdb-Datei)"
+)
+
 
 class CLIError(RuntimeError):
     """Bad / missing input -> exit code 1."""
+
+
+def _open_db_with_timeout(opener, timeout_s: float = DB_OPEN_TIMEOUT_S):
+    """Run ``opener()`` (the DuckDB open) in a daemon thread with a hard timeout.
+
+    DuckDB allows exactly one RW process; a concurrent read-only open can
+    either fail with a lock error or block. Both cases are mapped to a
+    ``CLIError`` carrying the --db-copy hint. The opener thread is a daemon so
+    a hung open never keeps the process alive past sys.exit().
+    """
+    import threading
+
+    box: dict = {}
+
+    def _work() -> None:
+        try:
+            box["layer"] = opener()
+        except Exception as exc:  # noqa: BLE001 - re-raised below
+            box["error"] = exc
+
+    t = threading.Thread(target=_work, name="c42-db-open", daemon=True)
+    t.start()
+    t.join(timeout_s)
+    if t.is_alive():
+        raise CLIError(
+            f"DuckDB-Open haengt seit {timeout_s:.0f}s — {DB_LOCKED_HINT}"
+        )
+    if "error" in box:
+        exc = box["error"]
+        msg = str(exc)
+        if "lock" in msg.lower() or "Conflicting" in msg:
+            raise CLIError(f"DuckDB-Open fehlgeschlagen ({msg}) — {DB_LOCKED_HINT}")
+        raise exc
+    return box["layer"]
 
 
 def _load_from_csv(path: Path, symbol: str) -> pd.DataFrame:
@@ -59,15 +107,47 @@ def _load_from_csv(path: Path, symbol: str) -> pd.DataFrame:
     return df[KLINE_COLUMNS].sort_values("ts").reset_index(drop=True)
 
 
-def _load_from_db(db_path: Path, symbol: str, max_bars: Optional[int] = None) -> pd.DataFrame:
+def _load_from_db(
+    db_path: Path,
+    symbol: str,
+    max_bars: Optional[int] = None,
+    db_copy: bool = False,
+) -> pd.DataFrame:
     if not db_path.is_file():
         raise CLIError(f"duckdb file not found: {db_path}")
     try:
         from bybit_edge.persistence.db import PersistenceLayer
     except ImportError as exc:  # pragma: no cover
         raise CLIError(f"cannot import PersistenceLayer: {exc}") from exc
+
+    copy_dir: Optional[Path] = None
+    if db_copy:
+        # Lock-safe path: read a snapshot copy so a collector holding the RW
+        # lock on the original can never block or be disturbed. The copy is
+        # deleted again right after the (single, short) read.
+        import shutil
+        import tempfile
+
+        copy_dir = Path(tempfile.mkdtemp(prefix="c42_dbcopy_"))
+        copied = copy_dir / db_path.name
+        print(f"[c42] --db-copy: copying {db_path} -> {copied}", file=sys.stderr, flush=True)
+        shutil.copy2(db_path, copied)
+        wal = db_path.with_name(db_path.name + ".wal")
+        if wal.is_file():
+            shutil.copy2(wal, copy_dir / wal.name)
+        db_path = copied
+
     print(f"[c42] opening duckdb read-only: {db_path}", file=sys.stderr, flush=True)
-    layer = PersistenceLayer(db_path=db_path, read_only=True)
+    try:
+        layer = _open_db_with_timeout(
+            lambda: PersistenceLayer(db_path=db_path, read_only=True)
+        )
+    except CLIError:
+        if copy_dir is not None:
+            import shutil
+
+            shutil.rmtree(copy_dir, ignore_errors=True)
+        raise
     try:
         # Full available range; quick mode caps via tail-slice after load
         # (DuckDB lock-friendly: one short read, no per-bar round-trips).
@@ -82,6 +162,11 @@ def _load_from_db(db_path: Path, symbol: str, max_bars: Optional[int] = None) ->
         close = getattr(layer, "close", None)
         if callable(close):
             close()
+        if copy_dir is not None:
+            import shutil
+
+            shutil.rmtree(copy_dir, ignore_errors=True)
+            print(f"[c42] --db-copy: removed temp copy {copy_dir}", file=sys.stderr, flush=True)
     if df.empty:
         raise CLIError(f"no kline_1min rows for {symbol} in {db_path}")
     return df[KLINE_COLUMNS].sort_values("ts").reset_index(drop=True)
@@ -93,6 +178,11 @@ def _parse_args(argv: Optional[list[str]] = None) -> argparse.Namespace:
     )
     p.add_argument("--symbol", default="BTCUSDT", help="Symbol (Default BTCUSDT).")
     p.add_argument("--db-path", type=Path, default=None, help="DuckDB-Datei (read-only).")
+    p.add_argument(
+        "--db-copy", action="store_true",
+        help="DuckDB vor dem Lesen in ein Temp-Verzeichnis kopieren (umgeht den "
+             "RW-Lock des laufenden 1.0-Collectors; Kopie wird danach geloescht).",
+    )
     p.add_argument("--csv-path", type=Path, default=None, help="CSV-Fixture als Daten-Alternative.")
     p.add_argument(
         "--model", choices=["lightgbm", "histgbm", "har"], default="har",
@@ -132,7 +222,9 @@ def main(argv: Optional[list[str]] = None) -> int:
                 klines = klines.sort_values("ts").tail(max_bars).reset_index(drop=True)
                 print(f"[c42] quick-mode: capped csv to last {max_bars} bars", file=sys.stderr, flush=True)
         elif args.db_path is not None:
-            klines = _load_from_db(args.db_path, args.symbol, max_bars=max_bars)
+            klines = _load_from_db(
+                args.db_path, args.symbol, max_bars=max_bars, db_copy=args.db_copy
+            )
         else:
             raise CLIError("provide either --csv-path or --db-path")
     except CLIError as exc:
