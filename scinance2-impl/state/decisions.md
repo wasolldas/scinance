@@ -65,3 +65,16 @@
 - **Entscheidung:** A — 50 GB Default, ratifiziert.
 - **Begründung:** PRD-stumm → reversibelste sinnvolle Option; CLI-überschreibbar; Sunset-Review (90 Tage) braucht genug Ringpuffer-Tiefe; C verletzt CLAUDE.md-Runner-Regeln.
 - **Rückbauweg:** Konstante ändern oder `--cap-gb` im Runner setzen; kein struktureller Umbau.
+
+---
+
+### DEC-08 · Recorder-Streams: Per-Spec-Subscribe + Phantom-Markierung statt Löschung
+- **Kontext:** DIAG2 (2026-06-12). Der T2-Retest des Recorders zeigt im Log eindeutig: `[linear] SUBSCRIBE/REQUEST REJECTED: ret_msg='error:handler not found,topic:adlAlert'`. Bybit lehnt die GESAMTE Subscribe-Request auf der Linear-WS ab, weil ein einziges Topic (`adlAlert`) auf diesem Endpoint nicht existiert (PRD-fable5-Phantom, INC-04/INC-06-Lektion bestätigt). Folge: `rpi_orderbook` und `insurance.USDT` verlieren als Kollateral ihre Subscription, obwohl die Topics vermutlich gültig sind. Ursachen-Code: `recording_engine.run()` bündelte alle Topics einer Transport-Gruppe in EINE Subscribe-Request (all-or-nothing).
+- **Optionen:**
+  - A) `adl_alerts`-StreamSpec komplett aus `default_stream_specs` entfernen (klein, aber löscht Wissen, kein Audit-Trail; Rückbau bedeutet Re-Implementierung inkl. Normaliser/Schema).
+  - B) `phantom: bool = False`-Feld auf `StreamSpec`; phantom-Specs werden beim Run mit WARN geskippt, Schema/Writer/Normaliser bleiben als Wissensspeicher; zusätzlich JEDE StreamSpec als EIGENE Subscribe-Request senden (per-spec subscribe) → ein abgelehntes Topic killt nur seinen eigenen Stream.
+  - C) Nur per-spec subscribe, `adl_alerts` unverändert lassen — das Log würde den ERROR weiterhin alle 10 s liefern, ohne Audit-Trail-Entscheidung.
+- **Entscheidung:** B. `StreamSpec.phantom: bool = False` eingeführt; `adl_alerts` mit `phantom=True` markiert (Bezug auf Bybit-Antwort 2026-06-12). Die Subscribe-Logik in `_run_ws_transport` sendet jetzt eine Request pro StreamSpec (`_subscribe_per_spec`); phantom-Specs werden mit WARN geskippt. Transports, deren Specs ALLE phantom sind, öffnen gar nicht erst eine Verbindung.
+- **Begründung:** Reversibelste Option mit Audit-Trail. Schema (`STREAM_SCHEMAS["adl_alerts"]`), Normaliser (`_norm_adl_alert`), Writer und Tests bleiben unangetastet — falls Bybit das Topic je dokumentiert oder ein anderer Endpoint es liefert, reicht ein `phantom=False` zur Re-Aktivierung. Per-spec subscribe ist die strukturelle Behebung der Kollateral-Klasse von Bugs: kein einzelner abgelehnter Topic-Name kann mehr Sibling-Streams mitreißen. Beide Schritte sind isoliert testbar (siehe `TestPerSpecSubscribeAndPhantom`).
+- **Rückbauweg:** `phantom=True` auf `adl_alerts` entfernen → Stream wird wieder subscribed. `_subscribe_per_spec` wieder durch `_subscribe(ws, all_topics)` ersetzen → all-or-nothing-Verhalten zurück. Beides 1-Zeilen-Reverts.
+- **Was DEC-08 NICHT entscheidet:** Den Status der Options-WS (`tickers.BTC`/`tickers.ETH`). Die Subscribe-Form ist im Code als korrekt dokumentiert (`repo_survey §2.P3`: Underlying-Topic auf der Option-WS liefert ALLE lebenden Kontrakte für dieses Underlying). Beobachtung: success=true im T2-Log, aber 0 Frames in 5 min. Hypothese: kein Trading-Volume in dem Fenster, oder die Push-Frequenz ist event-getrieben. → braucht eigenen T2-Retest mit verlängertem `RECORDER_SMOKE` (20 min statt 5 min) und ist KEINE DEC-08-Sache.

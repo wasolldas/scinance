@@ -389,15 +389,28 @@ class TestAsyncRun:
             segs = list((root / stream).rglob("*.parquet"))
             assert segs, f"no segment flushed for {stream} on shutdown"
 
-        # Subscriptions were sent on each WS connection that carried topics.
+        # Subscriptions are sent PER-SPEC (DEC-08 isolation fix): each
+        # subscribe request carries exactly one stream's topics so a rejected
+        # topic only kills its own stream. ``adlAlert`` is phantom — never on
+        # the wire — so the linear connection sends two subscribes only.
         first_linear_ws = next(
             ws for url, ws in factory.connections if "linear" in url
         )
-        sub = json.loads(first_linear_ws.sent[0])
-        assert sub["op"] == "subscribe"
-        assert "orderbook.rpi.BTCUSDT" in sub["args"]
-        assert "insurance.USDT" in sub["args"]
-        assert "adlAlert" in sub["args"]
+        linear_subs = [
+            json.loads(m) for m in first_linear_ws.sent
+            if json.loads(m).get("op") == "subscribe"
+        ]
+        all_linear_topics = {t for s in linear_subs for t in s["args"]}
+        assert "orderbook.rpi.BTCUSDT" in all_linear_topics
+        assert "insurance.USDT" in all_linear_topics
+        assert "adlAlert" not in all_linear_topics  # phantom, skipped
+        # Each subscribe carries a SINGLE spec's topics.
+        assert all(len(s["args"]) >= 1 for s in linear_subs)
+        rpi_sub = next(s for s in linear_subs if any(
+            t.startswith("orderbook.rpi.") for t in s["args"]
+        ))
+        ins_sub = next(s for s in linear_subs if "insurance.USDT" in s["args"])
+        assert rpi_sub is not ins_sub  # separate requests
 
     async def test_symbolless_topics_dispatch(self, tmp_path) -> None:
         """insurance.USDT / adlAlert resolve without a {symbol} suffix."""
@@ -601,6 +614,171 @@ class TestKeepaliveAndAcks:
 
 
 # ══════════════════════════════════════════════════════════════════════
+# 6) Per-spec subscribe (DEC-08): isolation + phantom-skip
+# ══════════════════════════════════════════════════════════════════════
+class TestPerSpecSubscribeAndPhantom:
+    async def test_per_spec_subscribe_isolates_failures(
+        self, tmp_path, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        """A rejected subscribe for ONE spec must not kill its siblings.
+
+        Reproduces the 2026-06-12 T2 failure mode in isolation: the engine
+        sends one subscribe request per StreamSpec; the fake server rejects
+        the rpi_orderbook subscribe with success=false, then keeps streaming
+        the insurance frame. The sibling stream must still record data, the
+        ERROR must be logged, and the engine must keep running.
+        """
+        # Two specs share the linear transport. We watch what the engine
+        # sends, then return a REJECT for rpi and a valid insurance frame.
+        rejected_subs: list[dict[str, Any]] = []
+
+        class IsolatingFakeWS:
+            def __init__(self) -> None:
+                self.sent: list[str] = []
+                self._inbox: asyncio.Queue[str] = asyncio.Queue()
+                self._stopped = False
+
+            async def send(self, msg: str) -> None:
+                self.sent.append(msg)
+                payload = json.loads(msg)
+                if payload.get("op") != "subscribe":
+                    return
+                args = payload.get("args", [])
+                if any(t.startswith("orderbook.rpi.") for t in args):
+                    ack = {
+                        "success": False,
+                        "op": "subscribe",
+                        "ret_msg": f"error:handler not found,topic:{args[0]}",
+                        "conn_id": "iso-1",
+                    }
+                    rejected_subs.append(ack)
+                    await self._inbox.put(json.dumps(ack))
+                else:
+                    await self._inbox.put(json.dumps({
+                        "success": True, "op": "subscribe", "conn_id": "iso-1",
+                    }))
+                    # After acking insurance, push one valid insurance frame.
+                    await self._inbox.put(json.dumps(_insurance_frame()))
+
+            def __aiter__(self) -> "IsolatingFakeWS":
+                return self
+
+            async def __anext__(self) -> str:
+                if self._stopped:
+                    raise StopAsyncIteration
+                try:
+                    msg = await asyncio.wait_for(self._inbox.get(), timeout=5.0)
+                except asyncio.TimeoutError:
+                    await asyncio.Event().wait()  # hang until cancel
+                    raise StopAsyncIteration  # pragma: no cover
+                return msg
+
+            async def close(self) -> None:
+                self._stopped = True
+
+        served: list[IsolatingFakeWS] = []
+
+        async def fake_connect(url: str) -> IsolatingFakeWS:
+            ws = IsolatingFakeWS() if not served else IsolatingFakeWS()
+            served.append(ws)
+            return ws
+
+        engine = _make_engine(
+            tmp_path,
+            enabled_streams=["rpi_orderbook", "insurance_pool"],
+            ws_connect=fake_connect,
+        )
+        with caplog.at_level(
+            logging.INFO, logger="bybit_edge.recorder.recording_engine"
+        ):
+            task = asyncio.create_task(engine.run())
+            # Sibling stream MUST still receive data despite rpi rejection
+            # (messages_recorded ticks on append; rows_written ticks on flush).
+            assert await _wait_for(
+                lambda: engine.messages_recorded >= 1,
+                timeout=8.0,
+            )
+            await engine.stop()
+            await asyncio.wait_for(task, timeout=2.0)
+
+        assert task.exception() is None
+        # The engine sent TWO subscribe requests on the linear transport
+        # (one per spec), not one bundled "all-or-nothing" request.
+        first_ws = served[0]
+        subs = [
+            json.loads(m) for m in first_ws.sent
+            if json.loads(m).get("op") == "subscribe"
+        ]
+        assert len(subs) == 2, f"expected per-spec subscribes, got {subs}"
+        rpi_sub = next(s for s in subs if any(
+            t.startswith("orderbook.rpi.") for t in s["args"]
+        ))
+        ins_sub = next(s for s in subs if "insurance.USDT" in s["args"])
+        # Each request is single-spec (the isolation property).
+        assert "insurance.USDT" not in rpi_sub["args"]
+        assert not any(t.startswith("orderbook.rpi.") for t in ins_sub["args"])
+        # The rejection landed in the log as ERROR with "handler not found".
+        errors = [r for r in caplog.records if r.levelno == logging.ERROR]
+        assert any("handler not found" in r.message for r in errors)
+        assert rejected_subs, "fake server should have answered with success=false"
+        # The sibling stream actually wrote its row.
+        assert engine.writers["insurance_pool"].rows_written == 1
+        assert engine.writers["rpi_orderbook"].rows_written == 0
+
+    async def test_phantom_spec_skipped(
+        self, tmp_path, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        """phantom=True specs are never subscribed, never receive data,
+        and emit a single WARN on start so the skip is auditable."""
+        # Inject a synthetic phantom spec by overriding default_stream_specs:
+        # the engine path is what we want to verify, not just the default set.
+        # The default adl_alerts spec is already phantom — exercise THAT.
+        # rpi_orderbook stays as a non-phantom sibling so the connection stays
+        # up and we can observe that the phantom spec NEVER appears on wire.
+        linear_frames = [
+            json.dumps(_rpi_frame()),
+        ]
+        factory = FakeConnectFactory({"linear": linear_frames})
+        engine = _make_engine(
+            tmp_path,
+            enabled_streams=["rpi_orderbook", "adl_alerts"],
+            ws_connect=factory,
+        )
+        # Sanity: the default-spec set marks adl_alerts phantom.
+        assert _spec(engine, "adl_alerts").phantom is True
+        assert _spec(engine, "rpi_orderbook").phantom is False
+
+        with caplog.at_level(
+            logging.WARNING, logger="bybit_edge.recorder.recording_engine"
+        ):
+            task = asyncio.create_task(engine.run())
+            assert await _wait_for(lambda: engine.messages_recorded >= 1)
+            await engine.stop()
+            await asyncio.wait_for(task, timeout=2.0)
+
+        assert task.exception() is None
+        # Subscribe traffic: only rpi_orderbook, never adlAlert.
+        first_ws = next(ws for url, ws in factory.connections if "linear" in url)
+        all_subs = [
+            json.loads(m) for m in first_ws.sent
+            if json.loads(m).get("op") == "subscribe"
+        ]
+        all_topics = {t for s in all_subs for t in s["args"]}
+        assert "orderbook.rpi.BTCUSDT" in all_topics
+        assert "adlAlert" not in all_topics, "phantom topic must not be on wire"
+        # WARN log emitted exactly once per phantom spec per connect.
+        phantom_warns = [
+            r for r in caplog.records
+            if r.levelno == logging.WARNING
+            and "phantom" in r.message
+            and "adl_alerts" in r.message
+        ]
+        assert phantom_warns, "phantom-skip WARN was not logged"
+        # No data was recorded for the phantom stream.
+        assert engine.writers["adl_alerts"].rows_written == 0
+
+
+# ══════════════════════════════════════════════════════════════════════
 # Spec wiring sanity: StreamSpec names must match the storage schemas
 # ══════════════════════════════════════════════════════════════════════
 def test_default_stream_specs_cover_all_schemas() -> None:
@@ -615,3 +793,10 @@ def test_default_stream_specs_cover_all_schemas() -> None:
     assert by_name["option_tickers"].topics == ["tickers.BTC", "tickers.ETH"]
     assert by_name["premium_index_kline"].transport == "rest"
     assert by_name["premium_index_kline"].topics == []
+    # DEC-08: adlAlert is rejected by the linear endpoint (Bybit T2 evidence
+    # 2026-06-12 ``error:handler not found,topic:adlAlert``). The spec stays
+    # as an audit trail but is marked phantom so it is never put on the wire.
+    assert by_name["adl_alerts"].phantom is True
+    # All others must NOT be phantom (regression guard).
+    for name in ("rpi_orderbook", "insurance_pool", "option_tickers", "premium_index_kline"):
+        assert by_name[name].phantom is False, f"{name} should not be phantom"

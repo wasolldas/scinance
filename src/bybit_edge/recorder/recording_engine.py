@@ -111,12 +111,19 @@ class StreamSpec:
     premium-index kline). ``transport`` selects which connection carries it.
     ``normalise`` maps a raw Bybit payload dict to a list of flat rows that
     match ``STREAM_SCHEMAS[stream]``.
+
+    ``phantom``: if True, the spec is registered (writer + schema kept as an
+    audit trail) but NEVER subscribed on the wire — used for PRD topics that
+    the Bybit endpoint rejects with ``error:handler not found`` (DEC-08).
+    Phantom specs are also skipped by the REST poll loop, and the engine logs
+    a single WARN per phantom spec on start so the skip is auditable.
     """
 
     stream: str
     transport: str                              # "linear" | "option" | "rest"
     topics: list[str] = field(default_factory=list)
     normalise: Optional[Callable[[dict, float], list[dict[str, Any]]]] = None
+    phantom: bool = False
 
 
 # ══════════════════════════════════════════════════════════════════════
@@ -270,7 +277,16 @@ def default_stream_specs(
     return [
         StreamSpec("rpi_orderbook", "linear", rpi_topics, _norm_rpi_orderbook),
         StreamSpec("insurance_pool", "linear", ["insurance.USDT"], _norm_insurance),
-        StreamSpec("adl_alerts", "linear", ["adlAlert"], _norm_adl_alert),
+        # ``adlAlert`` was REJECTED by the linear public WS during the T2 run
+        # of 2026-06-12 with ``ret_msg='error:handler not found,topic:adlAlert'``
+        # — i.e. the topic does not exist on this endpoint (DEC-08, also
+        # consistent with the INC-04/INC-06 PRD-fable5-phantom-topic lesson).
+        # Keep the spec as an audit trail (schema + writer + normaliser intact)
+        # but mark it phantom so it is never put on the wire and never blocks
+        # its sibling streams' subscribe request.
+        StreamSpec(
+            "adl_alerts", "linear", ["adlAlert"], _norm_adl_alert, phantom=True,
+        ),
         StreamSpec("option_tickers", "option", opt_topics, _norm_option_ticker),
         StreamSpec("premium_index_kline", "rest", [], _norm_premium_index_kline),
     ]
@@ -396,15 +412,26 @@ class RecordingEngine:
     # ------------------------------------------------------------------
     # WS consumption loop (one per transport connection)
     # ------------------------------------------------------------------
-    async def _run_ws_transport(self, transport: str, url: str, topics: list[str]) -> None:
-        """Connect, subscribe, consume — with reconnect/backoff. Runs until stop."""
+    async def _run_ws_transport(
+        self, transport: str, url: str, specs: list[StreamSpec]
+    ) -> None:
+        """Connect, subscribe, consume — with reconnect/backoff. Runs until stop.
+
+        ``specs`` are the StreamSpecs that share this transport's single WS
+        connection. Each spec is sent as its OWN subscribe request so a
+        rejected topic (Bybit answers ``success=false`` and refuses the
+        ENTIRE request) only kills its own stream, not its siblings. This is
+        the fix for the 2026-06-12 T2 failure mode where the phantom
+        ``adlAlert`` topic took ``orderbook.rpi.*`` and ``insurance.USDT``
+        down with it (DEC-08).
+        """
         delay = WS_RECONNECT_DELAY_SECONDS
         while self._running:
             try:
                 ws = await self._ws_connect(url)
                 logger.info("[%s] connected to %s", transport, url)
                 delay = WS_RECONNECT_DELAY_SECONDS  # reset backoff on success
-                await self._subscribe(ws, topics)
+                await self._subscribe_per_spec(ws, transport, specs)
                 ping_task = asyncio.create_task(
                     self._app_ping_loop(ws, transport)
                 )
@@ -443,6 +470,35 @@ class RecordingEngine:
         msg = json.dumps({"op": "subscribe", "args": topics})
         await ws.send(msg)
         logger.info("Subscribe request sent for %d topic(s): %s", len(topics), topics)
+
+    async def _subscribe_per_spec(
+        self, ws: Any, transport: str, specs: list[StreamSpec]
+    ) -> None:
+        """Send ONE subscribe request per StreamSpec.
+
+        Bybit's WS API rejects the WHOLE request if any single arg is invalid
+        (T2 evidence 2026-06-12: ``error:handler not found,topic:adlAlert``
+        killed sibling streams that were almost certainly valid). Sending one
+        request per spec isolates failures: a rejected spec only kills its own
+        stream, the others still ack with ``success=true`` and start
+        streaming. Phantom specs (DEC-08) are skipped here with a WARN.
+        """
+        for spec in specs:
+            if spec.phantom:
+                logger.warning(
+                    "[%s] stream %r is marked phantom — skipping subscribe "
+                    "(topics=%s). See DEC-08 / state/decisions.md.",
+                    transport, spec.stream, spec.topics,
+                )
+                continue
+            if not spec.topics:
+                continue
+            msg = json.dumps({"op": "subscribe", "args": list(spec.topics)})
+            await ws.send(msg)
+            logger.info(
+                "[%s] subscribe request sent for stream=%s topics=%s",
+                transport, spec.stream, spec.topics,
+            )
 
     async def _app_ping_loop(self, ws: Any, transport: str) -> None:
         """Send the Bybit application-level heartbeat ({"op": "ping"}).
@@ -574,19 +630,32 @@ class RecordingEngine:
         self._stop_event = asyncio.Event()
         self._install_signal_handlers()
 
-        # Group WS topics by transport so each transport opens ONE connection.
-        by_transport: dict[str, list[str]] = {}
+        # Group SPECS by transport so each transport opens ONE connection,
+        # but each spec is subscribed independently (see _subscribe_per_spec).
+        by_transport: dict[str, list[StreamSpec]] = {}
         for spec in self.specs:
             if spec.transport in ("linear", "option"):
-                by_transport.setdefault(spec.transport, []).extend(spec.topics)
+                by_transport.setdefault(spec.transport, []).append(spec)
 
         self._tasks = []
-        for transport, topics in by_transport.items():
+        for transport, specs in by_transport.items():
+            # Skip the transport entirely if every spec on it is phantom —
+            # opening a WS just to send zero subscribes would only waste
+            # reconnect cycles. Audit-WARN already emitted in default_specs.
+            if all(s.phantom for s in specs):
+                logger.warning(
+                    "[%s] all specs phantom — skipping transport entirely.",
+                    transport,
+                )
+                continue
             url = self.linear_ws_url if transport == "linear" else self.option_ws_url
             self._tasks.append(
-                asyncio.create_task(self._run_ws_transport(transport, url, topics))
+                asyncio.create_task(self._run_ws_transport(transport, url, specs))
             )
-        if any(s.stream == "premium_index_kline" for s in self.specs):
+        if any(
+            s.stream == "premium_index_kline" and not s.phantom
+            for s in self.specs
+        ):
             self._tasks.append(asyncio.create_task(self._run_premium_index_poll()))
         self._tasks.append(asyncio.create_task(self._run_housekeeping()))
 
