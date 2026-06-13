@@ -166,3 +166,51 @@ ist noch nicht entschieden. rpi/insurance/option könnten falsche Topic-Namen se
 **Konsequenz:** Kein Gate-Urteil (kein Alpha-Gate). **Reparatur-/Diagnose-WP** (Topic-Namen gegen Bybit-v5-Doc
 verifizieren; Option-WS-Keepalive/ping fixen; 1 kurzer Live-Probe-Subscribe je Topic) → siehe morning_report.
 Zeitkritisch: C-36 ist Vorbedingung aller recording-abhängigen Welle-2-Pilots; premium_index_kline läuft bereits.
+
+---
+
+## GL-004 · 2026-06-13 · H-01 · E-15 / CS-03 (S3 Pre-Settlement, iter-5) — **DROP**
+
+**Status:** Geurteilt. Löst GL-002 (PENDING) ab — der konfirmatorische iter-5-Lauf liegt jetzt vor
+(`replay_all_results.json` generated 2026-06-13T01:11:24Z; `trades_iter5/trades_all.csv`; E15_EVAL rc=0).
+Datenquelle korrekt: trades_path = `…/trades_iter5/trades_all.csv` (Pfad-Kaskade aus DIAG hat gegriffen).
+
+**Gate-Urteil gegen die vorregistrierten H-01-Tore (Registry §H-01):**
+
+| Kriterium (Registry wörtlich) | Schwelle | Messwert iter-5 | iter-4 | Bestanden |
+|---|---|---|---|---|
+| WEITER · Netto-Edge ≥ −5 bps | ≥ −5.0 | **−15.47** | −16.81 | nein |
+| WEITER · E-17 geklärt | true | ja (Ratio 1.50 Trades / 0.83 per-Trade) | — | ja |
+| DROP · Netto-Edge ≤ −10 bps | ≤ −10.0 | **−15.47** | −16.81 | **ja → DROP** |
+
+**Urteil: DROP.** Aggregierte S3-Netto-Edge −15.47 bps liegt klar unterhalb der −10-bps-DROP-Schwelle.
+Kein GRAUBEREICH (der greift nur zwischen −10 und −5). Endgültig, keine Wiederholung nötig.
+
+**Mechanik des iter-5-Fixes — funktionierte wie entworfen, rettete die Edge aber NICHT:**
+
+| Metrik | iter-4 (Bug) | iter-5 (Fix) | Bewertung |
+|---|---|---|---|
+| time_stop_exceeded | 1 | **128** | Tick-Zeit-Fix wirkt |
+| max Haltedauer (s) | 2124.9 | **178.4** | Monster-Tails eliminiert |
+| worst trade (bps) | −56.60 | **−38.10** | gekappt |
+| n<−30bps | 33 | **25** | friction-aware Hard-Stop hilft |
+| Trades gesamt | 213 | **320** | +50% (frühe Exits → mehr Re-Entries) |
+| mean Netto-Edge (bps) | −16.81 | **−15.47** | praktisch unverändert |
+| mean RAW-Edge (bps) | −5.81 | **−4.48** | bleibt negativ |
+
+**Mechanistische Schlussfolgerung (forensisch, nicht spekulativ):** Die iter-4-Hypothese „S3 ist
+friction-bound + tail-driven; bounded-loss-Exits legen die Edge frei" ist damit **widerlegt**. Die Tails
+wurden sauber gekappt (max Hold 178 s statt 2125 s, worst −38 statt −57 bps), aber die Aggregat-Edge bewegte
+sich nur um +1.34 bps (netto). Grund: Die Tail-Reduktion (~1.3 bps Gewinn) wird durch die zusätzliche Friktion
+aus 107 Mehr-Trades fast exakt aufgehoben. Entscheidend ist die **RAW-Edge von −4.48 bps**: Selbst bei NULL
+Gebühren verliert S3 — der Pre-Settlement-Pressure-Release-Entry trifft die Richtung nicht. Das Problem war nie
+der Exit, sondern das Entry-Signal. Konsistent über alle 5 Symbole (RAW-Edge −3.07 bis −5.65 bps, kein Symbol
+positiv).
+
+**FDR-Familie F-S3:** Einzelner konfirmatorischer Test, keine Korrektur nötig (Registry).
+
+**Konsequenz:** S3 fällt auf DROP. Damit sind ALLE Strategien des ursprünglichen Scinance-1.0-Portfolios
+empirisch erledigt: S1 (GL/iter-4: ρ-Estimator gebrochen), S2 (3 Forensiken refuted), **S3 (jetzt: bounded-loss
+definitiv getestet, Entry hat keine Edge)**, S4/S5 (nie gelaufen, loader-/harness-bound). Der letzte Eintrag aus
+dem Original-PRD ist gefallen. PRD §6: S3 wird in der Live-Config deaktiviert (kein Kapital), Code bleibt als
+Archiv. Folge-Arbeit ausschließlich an Scinance-2.0-Piloten (Recording-Fundament + neue Hypothesen), nicht an S3.

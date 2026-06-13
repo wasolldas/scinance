@@ -1,0 +1,1 @@
+C42-REPRO DROP/PARK | H-02 | symbol=BTCUSDT model=lightgbm folds=2 min_oos_r2=-0.2035 r2_pass=False qlike<har=True -> E:\Claude\Projects\scinance\scinance2-impl\handoff_local\results\short_20260613_011125\c42_quick_lightgbm\c42_results.json, E:\Claude\Projects\scinance\scinance2-impl\handoff_local\results\short_20260613_011125\c42_quick_lightgbm\c42_report.md

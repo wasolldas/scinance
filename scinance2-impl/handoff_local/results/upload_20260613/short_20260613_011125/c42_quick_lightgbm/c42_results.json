@@ -1,0 +1,311 @@
+{
+  "schema_version": 1,
+  "hypothesis": "H-02",
+  "hypothesis_registry": "scinance2-impl/state/hypothesis_registry.md",
+  "generated_at": "2026-06-13T01:17:48+00:00",
+  "symbol": "BTCUSDT",
+  "model": "lightgbm",
+  "seed": 42,
+  "n_rows": 51700,
+  "n_folds": 2,
+  "embargo_bars": 1440,
+  "purge_horizon_bars": 60,
+  "feature_provenance": {
+    "DOCUMENTED": 1,
+    "ASSUMED": 35
+  },
+  "features": [
+    {
+      "name": "atr_60",
+      "provenance": "DOCUMENTED",
+      "description": "Average True Range over 60 bars (research_notes #1, 35.8% gain)."
+    },
+    {
+      "name": "rv_5m",
+      "provenance": "ASSUMED",
+      "description": "Trailing realised vol over 5 bars (HAR-RV style lagged RV)."
+    },
+    {
+      "name": "rv_15m",
+      "provenance": "ASSUMED",
+      "description": "Trailing realised vol over 15 bars (HAR-RV style lagged RV)."
+    },
+    {
+      "name": "rv_30m",
+      "provenance": "ASSUMED",
+      "description": "Trailing realised vol over 30 bars (HAR-RV style lagged RV)."
+    },
+    {
+      "name": "rv_60m",
+      "provenance": "ASSUMED",
+      "description": "Trailing realised vol over 60 bars (HAR-RV style lagged RV)."
+    },
+    {
+      "name": "rv_120m",
+      "provenance": "ASSUMED",
+      "description": "Trailing realised vol over 120 bars (HAR-RV style lagged RV)."
+    },
+    {
+      "name": "rv_240m",
+      "provenance": "ASSUMED",
+      "description": "Trailing realised vol over 240 bars (HAR-RV style lagged RV)."
+    },
+    {
+      "name": "log_rv_5m",
+      "provenance": "ASSUMED",
+      "description": "log of trailing realised vol over 5 bars."
+    },
+    {
+      "name": "log_rv_15m",
+      "provenance": "ASSUMED",
+      "description": "log of trailing realised vol over 15 bars."
+    },
+    {
+      "name": "log_rv_30m",
+      "provenance": "ASSUMED",
+      "description": "log of trailing realised vol over 30 bars."
+    },
+    {
+      "name": "log_rv_60m",
+      "provenance": "ASSUMED",
+      "description": "log of trailing realised vol over 60 bars."
+    },
+    {
+      "name": "log_rv_120m",
+      "provenance": "ASSUMED",
+      "description": "log of trailing realised vol over 120 bars."
+    },
+    {
+      "name": "log_rv_240m",
+      "provenance": "ASSUMED",
+      "description": "log of trailing realised vol over 240 bars."
+    },
+    {
+      "name": "bipower_30m",
+      "provenance": "ASSUMED",
+      "description": "Bipower variation over 30 bars (jump-robust IV estimator)."
+    },
+    {
+      "name": "jump_30m",
+      "provenance": "ASSUMED",
+      "description": "Jump component RV^2-BV^2 over 30 bars (truncated at 0)."
+    },
+    {
+      "name": "bipower_60m",
+      "provenance": "ASSUMED",
+      "description": "Bipower variation over 60 bars (jump-robust IV estimator)."
+    },
+    {
+      "name": "jump_60m",
+      "provenance": "ASSUMED",
+      "description": "Jump component RV^2-BV^2 over 60 bars (truncated at 0)."
+    },
+    {
+      "name": "ret_skew_30m",
+      "provenance": "ASSUMED",
+      "description": "Realised return skewness over 30 bars."
+    },
+    {
+      "name": "ret_kurt_30m",
+      "provenance": "ASSUMED",
+      "description": "Realised return kurtosis over 30 bars."
+    },
+    {
+      "name": "ret_skew_60m",
+      "provenance": "ASSUMED",
+      "description": "Realised return skewness over 60 bars."
+    },
+    {
+      "name": "ret_kurt_60m",
+      "provenance": "ASSUMED",
+      "description": "Realised return kurtosis over 60 bars."
+    },
+    {
+      "name": "ret_mean_60m",
+      "provenance": "ASSUMED",
+      "description": "Mean log return over 60 bars (drift / trend proxy)."
+    },
+    {
+      "name": "abs_ret_mean_60m",
+      "provenance": "ASSUMED",
+      "description": "Mean absolute log return over 60 bars."
+    },
+    {
+      "name": "ret_1m",
+      "provenance": "ASSUMED",
+      "description": "Last 1-minute log return (current shock)."
+    },
+    {
+      "name": "parkinson_range_1m",
+      "provenance": "ASSUMED",
+      "description": "Parkinson log high-low range of the current bar."
+    },
+    {
+      "name": "volume_mean_60m",
+      "provenance": "ASSUMED",
+      "description": "Trade-flow family: mean volume over 60 bars."
+    },
+    {
+      "name": "volume_std_60m",
+      "provenance": "ASSUMED",
+      "description": "Trade-flow family: volume std over 60 bars."
+    },
+    {
+      "name": "volume_ratio_60m",
+      "provenance": "ASSUMED",
+      "description": "Trade-flow family: current volume / 60-bar mean volume."
+    },
+    {
+      "name": "turnover_mean_60m",
+      "provenance": "ASSUMED",
+      "description": "Trade-flow family: mean turnover over 60 bars."
+    },
+    {
+      "name": "avg_trade_price_60m",
+      "provenance": "ASSUMED",
+      "description": "Trade-flow family: mean turnover/volume (VWAP-like) over 60 bars."
+    },
+    {
+      "name": "ofi_proxy_60m",
+      "provenance": "ASSUMED",
+      "description": "Trade-flow family: order-flow-imbalance proxy (sum signed volume / sum volume, sign from close-open)."
+    },
+    {
+      "name": "bar_sign_mean_30m",
+      "provenance": "ASSUMED",
+      "description": "Trade-flow family: mean bar direction over 30 bars."
+    },
+    {
+      "name": "tod_sin",
+      "provenance": "ASSUMED",
+      "description": "Intraday seasonality: sin(minute-of-day)."
+    },
+    {
+      "name": "tod_cos",
+      "provenance": "ASSUMED",
+      "description": "Intraday seasonality: cos(minute-of-day)."
+    },
+    {
+      "name": "rv_ratio_60_240",
+      "provenance": "ASSUMED",
+      "description": "RV term-structure slope: rv_60m / rv_240m."
+    },
+    {
+      "name": "vol_of_vol_60m",
+      "provenance": "ASSUMED",
+      "description": "Vol-of-vol: 60-bar std of trailing 5m realised vol."
+    }
+  ],
+  "folds": [
+    {
+      "fold_id": 0,
+      "n_train": 15733,
+      "n_test": 17233,
+      "model_r2": 0.265905587815354,
+      "model_qlike": 0.45237331606578174,
+      "har_r2": 0.07953219220800412,
+      "har_qlike": 0.7254838509714142,
+      "qlike_beats_har": true,
+      "r2_passes": true
+    },
+    {
+      "fold_id": 1,
+      "n_train": 32966,
+      "n_test": 17234,
+      "model_r2": -0.20353026920706196,
+      "model_qlike": 0.3472868391108049,
+      "har_r2": 0.13160411183883947,
+      "har_qlike": 0.3507472967748862,
+      "qlike_beats_har": true,
+      "r2_passes": false
+    }
+  ],
+  "fdr": {
+    "family": "F-VOL",
+    "alpha": 0.1,
+    "n_features": 36,
+    "n_significant": 0,
+    "threshold_p": 0.0,
+    "significant_features": [],
+    "p_values": {
+      "atr_60": 0.1111111111111111,
+      "rv_5m": 1.0,
+      "rv_15m": 1.0,
+      "rv_30m": 1.0,
+      "rv_60m": 0.5555555555555556,
+      "rv_120m": 0.1111111111111111,
+      "rv_240m": 0.5555555555555556,
+      "log_rv_5m": 0.5555555555555556,
+      "log_rv_15m": 0.5555555555555556,
+      "log_rv_30m": 1.0,
+      "log_rv_60m": 1.0,
+      "log_rv_120m": 0.1111111111111111,
+      "log_rv_240m": 0.6111111111111112,
+      "bipower_30m": 0.5555555555555556,
+      "jump_30m": 0.5555555555555556,
+      "bipower_60m": 1.0,
+      "jump_60m": 0.8888888888888888,
+      "ret_skew_30m": 1.0,
+      "ret_kurt_30m": 0.38888888888888884,
+      "ret_skew_60m": 0.2222222222222222,
+      "ret_kurt_60m": 0.1111111111111111,
+      "ret_mean_60m": 0.5555555555555556,
+      "abs_ret_mean_60m": 0.5555555555555556,
+      "ret_1m": 1.0,
+      "parkinson_range_1m": 0.5555555555555556,
+      "volume_mean_60m": 0.5555555555555556,
+      "volume_std_60m": 0.1111111111111111,
+      "volume_ratio_60m": 0.1111111111111111,
+      "turnover_mean_60m": 0.1111111111111111,
+      "avg_trade_price_60m": 1.0,
+      "ofi_proxy_60m": 0.4444444444444444,
+      "bar_sign_mean_30m": 0.1111111111111111,
+      "tod_sin": 0.1111111111111111,
+      "tod_cos": 0.1111111111111111,
+      "rv_ratio_60_240": 1.0,
+      "vol_of_vol_60m": 0.5555555555555556
+    },
+    "importances": {
+      "atr_60": 0.13714873694743482,
+      "rv_5m": -0.002389600615216557,
+      "rv_15m": -0.01011034640382489,
+      "rv_30m": -0.031911562741774833,
+      "rv_60m": -0.0037679409809749653,
+      "rv_120m": 0.03352868509244957,
+      "rv_240m": -0.039150077218420114,
+      "log_rv_5m": 0.0006222970731817323,
+      "log_rv_15m": -0.0006165771408005866,
+      "log_rv_30m": -0.01704990317055377,
+      "log_rv_60m": -0.0020652462503781555,
+      "log_rv_120m": 0.0036086343348843003,
+      "log_rv_240m": -0.015176366680098571,
+      "bipower_30m": -0.013740194295227763,
+      "jump_30m": 0.0005045309353320787,
+      "bipower_60m": -0.0195711173303365,
+      "jump_60m": -0.0038604358599394414,
+      "ret_skew_30m": -0.002285029120146581,
+      "ret_kurt_30m": 0.000204750923382159,
+      "ret_skew_60m": 0.007254454115664617,
+      "ret_kurt_60m": 0.005774717082114661,
+      "ret_mean_60m": -0.0014104476896463977,
+      "abs_ret_mean_60m": 0.008881213997843078,
+      "ret_1m": -0.0009271212018233943,
+      "parkinson_range_1m": -0.0033357092444542408,
+      "volume_mean_60m": 0.012464101730748765,
+      "volume_std_60m": 0.04184373535902377,
+      "volume_ratio_60m": 0.001587615232423234,
+      "turnover_mean_60m": 0.04880510153265995,
+      "avg_trade_price_60m": -0.025591539097736676,
+      "ofi_proxy_60m": 9.680149948490535e-05,
+      "bar_sign_mean_30m": 0.0008870109884808949,
+      "tod_sin": 0.03093760528938702,
+      "tod_cos": 0.19835541163718165,
+      "rv_ratio_60_240": -0.01271103770560994,
+      "vol_of_vol_60m": -0.005005156959686098
+    }
+  },
+  "gate_oos_r2_min": 0.15,
+  "precheck_verdict": "DROP/PARK",
+  "all_folds_r2_pass": false,
+  "all_folds_qlike_beats_har": true
+}

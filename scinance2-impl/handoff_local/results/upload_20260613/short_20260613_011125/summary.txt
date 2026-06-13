@@ -1,0 +1,7 @@
+-------- RUN_SHORT SUMMARY --------
+RECORDER_SMOKE: OK (rc=0)
+RECORDER_CHECK: FAIL (rc=1)
+E15_EVAL: OK (rc=0)
+C42_QUICK_HAR: OK (rc=0)
+C42_QUICK_LGBM: OK (rc=0)
+RUN_SHORT GESAMT: ok=4 fail=1 skip=0 -> exit 1 | Ergebnisse: E:\Claude\Projects\scinance\scinance2-impl\handoff_local\results\short_20260613_011125
