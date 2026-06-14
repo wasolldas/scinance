@@ -1,0 +1,2 @@
+[c42] opening duckdb read-only: E:\Claude\Projects\scinance\data\bybit_edge.duckdb
+C42-REPRO DATENDEFEKT: DuckDB-Open haengt seit 30s — DuckDB gesperrt (laeuft der 1.0-Collector?) — Workaround: --db-copy (liest eine temporaere Kopie der .duckdb-Datei)
