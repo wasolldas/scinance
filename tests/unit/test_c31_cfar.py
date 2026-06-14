@@ -544,6 +544,137 @@ def test_load_trades_duckdb_filters_implausible_timestamps(tmp_path: Path) -> No
 
 
 # ---------------------------------------------------------------------------
+# 10. DuckDB Open-Timeout + --db-copy lock-free fallback
+#     (regression for the overnight 2026-06-13 hang at the C42/C31 RW-lock)
+# ---------------------------------------------------------------------------
+
+def test_load_trades_duckdb_open_timeout_raises_dataerror_with_lock_hint(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """If the DuckDB open hangs (collector holds the RW lock), the loader must
+    raise a DataError with the --db-copy hint within ~timeout seconds, NOT
+    block the subprocess forever (overnight 2026-06-13: no C31 log existed
+    -> the main runner died between blocks because the subprocess hung).
+    """
+    import time
+
+    from bybit_edge.research.c31_cfar import driver as c31_driver
+
+    # Real file so the existence guard passes; the persistence import inside
+    # the loader is overridden before the open is attempted.
+    db_path = tmp_path / "trades.duckdb"
+    db_path.write_bytes(b"")
+
+    class _BlockingPersistenceLayer:
+        def __init__(self, *args, **kwargs) -> None:
+            # Block well past the timeout so the daemon thread is forced.
+            time.sleep(60.0)
+
+    import bybit_edge.persistence.db as db_mod
+    monkeypatch.setattr(db_mod, "PersistenceLayer", _BlockingPersistenceLayer)
+    # Tighten the timeout so the test stays fast (mirrors the production
+    # mechanism — we are testing the timeout PATH, not the literal 30 s).
+    monkeypatch.setattr(c31_driver, "DB_OPEN_TIMEOUT_S", 0.5)
+
+    t0 = time.monotonic()
+    with pytest.raises(DataError, match="db-copy"):
+        c31_driver.load_trades_duckdb(db_path, "BTCUSDT")
+    elapsed = time.monotonic() - t0
+    # Hard ceiling: <= 35 s (the registered DB_OPEN_TIMEOUT_S + slack), but in
+    # practice ~0.5 s thanks to the monkeypatched timeout.
+    assert elapsed < 35.0, f"loader did not honour open timeout ({elapsed:.1f}s)"
+
+
+def test_load_trades_duckdb_db_copy_uses_tempdir_and_cleans_up(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """--db-copy must (a) copy the .duckdb to a tempdir BEFORE opening,
+    (b) open the COPY (not the original), and (c) remove the tempdir after
+    the read — regardless of success or failure. Verifies the lock-free
+    workaround for the collector RW lock (mirrors c42_repro mechanism)."""
+    import shutil
+
+    import duckdb
+
+    from bybit_edge.research.c31_cfar.driver import load_trades_duckdb
+
+    db_path = tmp_path / "trades.duckdb"
+    conn = duckdb.connect(str(db_path))
+    conn.execute(
+        "CREATE TABLE trades (ts BIGINT NOT NULL, symbol VARCHAR NOT NULL, "
+        "price DOUBLE, volume DOUBLE, side VARCHAR, is_block BOOLEAN, "
+        "recv_ts DOUBLE)"
+    )
+    good_ts = [1_780_000_000_000 + i * 100 for i in range(20)]
+    rows = [(t, "BTCUSDT", 50_000.0 + i, 1.0, "Buy", False, 0.0)
+            for i, t in enumerate(good_ts)]
+    conn.executemany("INSERT INTO trades VALUES (?, ?, ?, ?, ?, ?, ?)", rows)
+    conn.close()
+
+    copy_calls: list[tuple[Path, Path]] = []
+    rmtree_calls: list[Path] = []
+    real_copy2 = shutil.copy2
+    real_rmtree = shutil.rmtree
+
+    def _spy_copy2(src, dst, *a, **kw):
+        copy_calls.append((Path(src), Path(dst)))
+        return real_copy2(src, dst, *a, **kw)
+
+    def _spy_rmtree(path, *a, **kw):
+        rmtree_calls.append(Path(path))
+        return real_rmtree(path, *a, **kw)
+
+    monkeypatch.setattr(shutil, "copy2", _spy_copy2)
+    monkeypatch.setattr(shutil, "rmtree", _spy_rmtree)
+
+    ts, px = load_trades_duckdb(db_path, "BTCUSDT", db_copy=True)
+
+    assert ts.size == len(good_ts)
+    # (a) the .duckdb was copied at least once, source = original DB
+    assert any(src == db_path for src, _ in copy_calls), (
+        f"original DB was not copied; copy_calls={copy_calls}"
+    )
+    # (b) the copy lived in a tempdir whose prefix marks it as the c31 fallback
+    tempdir = copy_calls[0][1].parent
+    assert tempdir.name.startswith("c31_dbcopy_"), tempdir
+    # (c) the tempdir was removed after the read
+    assert tempdir in rmtree_calls, (
+        f"tempdir {tempdir} was not cleaned up (rmtree_calls={rmtree_calls})"
+    )
+    assert not tempdir.exists()
+
+
+# ---------------------------------------------------------------------------
+# 11. Runner static lint: both PowerShell + bash standalone runners must
+#     stay ASCII (German strings written as ae/oe/ue) and the PS1 must have
+#     a UTF-8 BOM so PowerShell 5.1 parses them correctly. Mirrors the
+#     mechanic that the long-running run_short.ps1 / run_overnight.ps1 rely
+#     on.
+# ---------------------------------------------------------------------------
+
+def test_runner_ps1_is_utf8_bom_and_ascii_body() -> None:
+    """run_cfar_only.ps1 must start with a UTF-8 BOM and contain no non-ASCII
+    bytes in its body (PS 5.1 compat + parser robustness)."""
+    repo_root = Path(__file__).resolve().parents[2]
+    ps1 = repo_root / "scinance2-impl" / "handoff_local" / "run_cfar_only.ps1"
+    data = ps1.read_bytes()
+    assert data.startswith(b"\xef\xbb\xbf"), "run_cfar_only.ps1 missing UTF-8 BOM"
+    body = data[3:]
+    bad = [(i, b) for i, b in enumerate(body) if b > 0x7F]
+    assert not bad, f"non-ASCII bytes in run_cfar_only.ps1 body: {bad[:5]}"
+
+
+def test_runner_sh_is_ascii_body() -> None:
+    """run_cfar_only.sh must stay ASCII (no BOM, no UTF-8 box-drawing chars)."""
+    repo_root = Path(__file__).resolve().parents[2]
+    sh = repo_root / "scinance2-impl" / "handoff_local" / "run_cfar_only.sh"
+    data = sh.read_bytes()
+    assert not data.startswith(b"\xef\xbb\xbf"), "run_cfar_only.sh has unexpected BOM"
+    bad = [(i, b) for i, b in enumerate(data) if b > 0x7F]
+    assert not bad, f"non-ASCII bytes in run_cfar_only.sh: {bad[:5]}"
+
+
+# ---------------------------------------------------------------------------
 # 8. Determinism (registry reproducibility duty)
 # ---------------------------------------------------------------------------
 

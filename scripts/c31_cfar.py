@@ -50,6 +50,11 @@ def _parse_args(argv: Optional[list[str]] = None) -> argparse.Namespace:
     src.add_argument("--file", type=Path, help="CSV/Parquet mit ts+price (Fixtures/Replay-Export)")
     src.add_argument("--db", type=Path, help="DuckDB-Datei mit trades-Tabelle (read-only)")
     p.add_argument("--symbol", type=str, default="BTCUSDT", help="Symbol fuer den DuckDB-Pfad")
+    p.add_argument(
+        "--db-copy", action="store_true",
+        help="DuckDB vor dem Lesen in ein Temp-Verzeichnis kopieren (umgeht den "
+             "RW-Lock des laufenden 1.0-Collectors; Kopie wird danach geloescht).",
+    )
     p.add_argument("--windows", type=int, default=2, help="Anzahl disjunkter Fenster (>= 2, H-03)")
     p.add_argument("--surrogates", type=int, default=200, help="Surrogate-N (Default 200)")
     p.add_argument("--seed", type=int, default=42, help="RNG-Seed (Pflicht-Default 42, reproduzierbar)")
@@ -67,7 +72,7 @@ def main(argv: Optional[list[str]] = None) -> int:
             source = str(args.file)
             symbol = ""
         else:
-            ts, px = load_trades_duckdb(args.db, args.symbol)
+            ts, px = load_trades_duckdb(args.db, args.symbol, db_copy=args.db_copy)
             source = f"{args.db}::trades"
             symbol = args.symbol
 

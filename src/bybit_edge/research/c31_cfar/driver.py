@@ -40,6 +40,18 @@ REGISTRY_PATH = "scinance2-impl/state/hypothesis_registry.md"
 SURROGATE_P_MAX = 0.05  # registered (PRD §3 Pilot 4)
 MIN_WINDOWS = 2         # registered (>= 2 disjoint windows)
 
+# Hard timeout for the read-only DuckDB open. If the 1.0 collector holds the
+# RW lock, ``PersistenceLayer(..., read_only=True)`` can block indefinitely
+# (overnight 2026-06-13: 0 C31 logs -> main runner died between blocks). After
+# this timeout we fail fast with a clear hint instead of hanging the subprocess.
+# Mirrors the c42_repro mechanism (DB_OPEN_TIMEOUT_S=30.0).
+DB_OPEN_TIMEOUT_S = 30.0
+
+DB_LOCKED_HINT = (
+    "DuckDB gesperrt — --db-copy nutzen oder Collector kurz stoppen "
+    "(liest eine temporaere Kopie der .duckdb-Datei, lock-frei)"
+)
+
 # Plausibility window for epoch-ms trade timestamps in the existing DuckDB
 # ``trades`` table (collector contract: ``TradeEvent.timestamp_ms``). The T3
 # run of 2026-06-11 crashed with a 1.3 TiB bin grid because the table contains
@@ -59,13 +71,58 @@ class DataError(RuntimeError):
 # Read-only loaders
 # ----------------------------------------------------------------------------
 
+def _open_db_with_timeout(opener, timeout_s: float = DB_OPEN_TIMEOUT_S):
+    """Run ``opener()`` (the DuckDB open) in a daemon thread with a hard timeout.
+
+    DuckDB allows exactly one RW process; a concurrent read-only open can either
+    fail with a lock error or block indefinitely. Both cases are mapped to a
+    ``DataError`` carrying the --db-copy hint. The opener thread is a daemon so a
+    hung open never keeps the process alive past sys.exit(). Mirrors the
+    c42_repro mechanism (scripts/c42_repro.py).
+    """
+    import threading
+
+    box: dict = {}
+
+    def _work() -> None:
+        try:
+            box["layer"] = opener()
+        except Exception as exc:  # noqa: BLE001 - re-raised below
+            box["error"] = exc
+
+    t = threading.Thread(target=_work, name="c31-db-open", daemon=True)
+    t.start()
+    t.join(timeout_s)
+    if t.is_alive():
+        raise DataError(
+            f"DuckDB-Open haengt seit {timeout_s:.0f}s — {DB_LOCKED_HINT}"
+        )
+    if "error" in box:
+        exc = box["error"]
+        msg = str(exc)
+        if "lock" in msg.lower() or "Conflicting" in msg:
+            raise DataError(f"DuckDB-Open fehlgeschlagen ({msg}) — {DB_LOCKED_HINT}")
+        raise exc
+    return box["layer"]
+
+
 def load_trades_duckdb(
-    db_path: Path, symbol: str, start_ts: int | None = None, end_ts: int | None = None
+    db_path: Path,
+    symbol: str,
+    start_ts: int | None = None,
+    end_ts: int | None = None,
+    db_copy: bool = False,
 ) -> tuple[np.ndarray, np.ndarray]:
     """Load (ts_ms, price) from the existing DuckDB ``trades`` table, read-only.
 
     Uses ``PersistenceLayer(read_only=True)`` so it can attach concurrently to a
-    DB held by the live runner without fighting the writer lock.
+    DB held by the live runner without fighting the writer lock. The open is
+    guarded by a 30s timeout (``DB_OPEN_TIMEOUT_S``); a hung/locked open raises
+    a ``DataError`` with the ``--db-copy`` hint instead of stalling the runner.
+
+    ``db_copy=True`` copies the .duckdb (+ .wal sidecar if present) to a temp
+    directory BEFORE opening so a collector holding the RW lock on the original
+    can never block us. The copy is deleted again right after the read.
     """
     try:
         from bybit_edge.persistence.db import PersistenceLayer
@@ -73,7 +130,36 @@ def load_trades_duckdb(
         raise DataError(f"cannot import PersistenceLayer: {exc}") from exc
     if not Path(db_path).exists():
         raise DataError(f"DuckDB file not found: {db_path}")
-    layer = PersistenceLayer(Path(db_path), read_only=True)
+
+    db_path = Path(db_path)
+    copy_dir: Path | None = None
+    if db_copy:
+        import shutil
+        import tempfile
+
+        copy_dir = Path(tempfile.mkdtemp(prefix="c31_dbcopy_"))
+        copied = copy_dir / db_path.name
+        print(
+            f"[c31] --db-copy: copying {db_path} -> {copied}",
+            file=sys.stderr, flush=True,
+        )
+        shutil.copy2(db_path, copied)
+        wal = db_path.with_name(db_path.name + ".wal")
+        if wal.is_file():
+            shutil.copy2(wal, copy_dir / wal.name)
+        db_path = copied
+
+    print(f"[c31] opening duckdb read-only: {db_path}", file=sys.stderr, flush=True)
+    try:
+        layer = _open_db_with_timeout(
+            lambda: PersistenceLayer(db_path, read_only=True)
+        )
+    except DataError:
+        if copy_dir is not None:
+            import shutil
+
+            shutil.rmtree(copy_dir, ignore_errors=True)
+        raise
     try:
         where = "symbol = ?"
         params: list[Any] = [symbol]
@@ -95,6 +181,14 @@ def load_trades_duckdb(
         ).fetchall()
     finally:
         layer.close()
+        if copy_dir is not None:
+            import shutil
+
+            shutil.rmtree(copy_dir, ignore_errors=True)
+            print(
+                f"[c31] --db-copy: removed temp copy {copy_dir}",
+                file=sys.stderr, flush=True,
+            )
     n_dropped = int(n_total) - len(rows)
     if n_dropped > 0:
         print(

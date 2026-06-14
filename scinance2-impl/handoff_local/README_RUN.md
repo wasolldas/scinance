@@ -76,6 +76,25 @@ try/catch + `$LASTEXITCODE`/ExitCode); ein fehlgeschlagener Block wird geloggt
 und der Lauf **faehrt fort**. Es gibt keinerlei interaktive Prompts. Die
 Prozess-Prioritaet ist niedrig (nice/BelowNormal).
 
+## run_cfar_only (H-03-Notausgang, ~1–2 h)
+
+Wenn der nächtliche Lauf wieder kippt (z. B. OS-Sleep zwischen den Blöcken),
+bleibt H-03 unbeschieden. Der **Standalone-CFAR-Runner** holt das auf einem
+1–2-h-Pfad nach — er macht NUR C-31 über alle fünf Symbole, mit `--db-copy`
+gegen den DuckDB-Lock und 30 min Pro-Symbol-Timeout:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File scinance2-impl\handoff_local\run_cfar_only.ps1
+```
+```bash
+bash scinance2-impl/handoff_local/run_cfar_only.sh
+```
+
+Ergebnisse: `results/cfar_<timestamp>/` (Roh-JSONs + Logs je Symbol,
+`SUMMARY.md` als Mini-Aufstellung für den gate-auditor). Exit-Code-Semantik
+wie bei den anderen Runnern. Default-Parameter spiegeln den Overnight-Block
+(`--windows 2 --surrogates 200 --seed 42`); Override über `HANDOFF_DUCKDB`.
+
 ## Ergebnisse & Morgen-Auswertung
 
 - Alles landet in **`scinance2-impl/handoff_local/results/`**:

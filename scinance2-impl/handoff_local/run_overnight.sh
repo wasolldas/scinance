@@ -128,15 +128,19 @@ if [ "$DRY" = "0" ] && [ ! -f "$DUCKDB_PATH" ]; then
   record C42_WF SKIP 0 0 "DuckDB fehlt ($DUCKDB_PATH) — Pfad oben im Skript / HANDOFF_DUCKDB anpassen"
 else
   for sym in $SYMBOLS; do
+    # --db-copy: liest eine Temp-Kopie der DuckDB, damit der Voll-WF nie am
+    # RW-Lock des laufenden 1.0-Collectors haengt (overnight-Defekt 2026-06-13:
+    # 5x C42_WF FAIL nach 31s am _open_db_with_timeout). Kopier-Overhead ist
+    # trivial gegen das 7200s-Budget.
     run_step "C42_WF_${sym}" 7200 \
       "$PY" "$REPO_ROOT/scripts/c42_repro.py" --model "$C42_MODEL" --symbol "$sym" \
-      --n-folds 3 --db-path "$DUCKDB_PATH" --out "$RUN_DIR/c42_${sym}"
+      --n-folds 3 --db-path "$DUCKDB_PATH" --db-copy --out "$RUN_DIR/c42_${sym}"
     rc=$?
     if [ "$rc" -eq 2 ] && [ "$C42_MODEL" != "har" ]; then
       # Modell-Dependency fehlte zur Laufzeit doch -> einmaliger har-Fallback.
       run_step "C42_WF_${sym}_HARFB" 7200 \
         "$PY" "$REPO_ROOT/scripts/c42_repro.py" --model har --symbol "$sym" \
-        --n-folds 3 --db-path "$DUCKDB_PATH" --out "$RUN_DIR/c42_${sym}" || true
+        --n-folds 3 --db-path "$DUCKDB_PATH" --db-copy --out "$RUN_DIR/c42_${sym}" || true
     fi
   done
 fi
@@ -146,9 +150,13 @@ if [ "$DRY" = "0" ] && [ ! -f "$DUCKDB_PATH" ]; then
   record C31_CFAR SKIP 0 0 "DuckDB fehlt ($DUCKDB_PATH)"
 else
   for sym in $SYMBOLS; do
+    # --db-copy: Temp-Kopie der DuckDB lesen (lock-frei, wie C42). Der CFAR-
+    # Driver hat zusaetzlich einen 30s-Open-Timeout (DataError mit Lock-Hinweis),
+    # damit ein blockierter Open den Subprozess nicht haengen laesst (overnight-
+    # Defekt 2026-06-13: kein C31-Log -> Hauptrunner starb).
     run_step "C31_CFAR_${sym}" 5400 \
       "$PY" "$REPO_ROOT/scripts/c31_cfar.py" --db "$DUCKDB_PATH" --symbol "$sym" \
-      --windows "$C31_WINDOWS" --surrogates "$C31_SURROGATES" \
+      --windows "$C31_WINDOWS" --surrogates "$C31_SURROGATES" --db-copy \
       --out "$RUN_DIR/c31_${sym}" || true
   done
 fi
