@@ -1,0 +1,7 @@
+rpi_orderbook: OK files=3378 rows=4987255 schema_version=1 (erwartet 1)
+insurance_pool: OK files=27 rows=58 schema_version=1 (erwartet 1)
+premium_index_kline: OK files=478 rows=95600 schema_version=1 (erwartet 1)
+option_tickers: NO_DATA files=0 rows=0 schema_version=- (erwartet 1)
+adl_alerts: EMPTY_OK files=0 rows=0 schema_version=- (erwartet 1)
+storage_cap: OK used=0.08 GB cap=50.0 GB
+RECORDING-CHECK FAIL root=E:\Claude\Projects\scinance\data\parquet\recording_f0

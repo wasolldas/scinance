@@ -1,0 +1,16 @@
+-------- RUN_OVERNIGHT SUMMARY --------
+C42_WF_BTCUSDT: OK (rc=0)
+C42_WF_ETHUSDT: OK (rc=0)
+C42_WF_SOLUSDT: OK (rc=0)
+C42_WF_BNBUSDT: OK (rc=0)
+C42_WF_XRPUSDT: OK (rc=0)
+C31_CFAR_BTCUSDT: FAIL (TIMEOUT nach 5400 s)
+C31_CFAR_ETHUSDT: FAIL (TIMEOUT nach 5400 s)
+C31_CFAR_SOLUSDT: FAIL (TIMEOUT nach 5400 s)
+C31_CFAR_BNBUSDT: FAIL (TIMEOUT nach 5400 s)
+C31_CFAR_XRPUSDT: FAIL (TIMEOUT nach 5400 s)
+REPLAY_ITER5: INFO (iter-5-Ergebnisse vorhanden - E-15-Auswertung laeuft im run_short (Schritt E15_EVAL))
+RECORDER_LONG: OK (rc=0)
+RECORDER_CHECK: FAIL (rc=1)
+SUMMARY: OK (rc=0)
+RUN_OVERNIGHT GESAMT: ok=7 fail=6 skip=0 -> exit 1 | Ergebnisse: E:\Claude\Projects\scinance\scinance2-impl\handoff_local\results\overnight_20260614_150830
