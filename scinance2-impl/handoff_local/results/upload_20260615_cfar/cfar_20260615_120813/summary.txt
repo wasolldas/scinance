@@ -1,0 +1,7 @@
+-------- RUN_CFAR_ONLY SUMMARY --------
+C31_CFAR_BTCUSDT: OK (rc=0, 712s)
+C31_CFAR_ETHUSDT: OK (rc=0, 661s)
+C31_CFAR_SOLUSDT: FAIL (TIMEOUT nach 1800 s, 1800s)
+C31_CFAR_BNBUSDT: FAIL (TIMEOUT nach 1800 s, 1800s)
+C31_CFAR_XRPUSDT: FAIL (TIMEOUT nach 1800 s, 1800s)
+RUN_CFAR_ONLY GESAMT: ok=2 fail=3 skip=0 -> exit 1 | Ergebnisse: E:\Claude\Projects\scinance\scinance2-impl\handoff_local\results\cfar_20260615_120813

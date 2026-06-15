@@ -1,0 +1,43 @@
+[c31] --db-copy: copying E:\Claude\Projects\scinance\data\bybit_edge.duckdb -> C:\Users\wguen\AppData\Local\Temp\c31_dbcopy_8s3ffpyo\bybit_edge.duckdb
+[c31] opening duckdb read-only: C:\Users\wguen\AppData\Local\Temp\c31_dbcopy_8s3ffpyo\bybit_edge.duckdb
+[c31] --db-copy: removed temp copy C:\Users\wguen\AppData\Local\Temp\c31_dbcopy_8s3ffpyo
+[c31] WARN: dropped 4850 trades row(s) for ETHUSDT with implausible ts (outside [1262304000000, 4102444800000] ms epoch) — corrupt rows in C:\Users\wguen\AppData\Local\Temp\c31_dbcopy_8s3ffpyo\bybit_edge.duckdb
+[c31] symbol=ETHUSDT: 5278059 ticks loaded, using newest 300000 in 2 window(s) (cap 150000/window, family=3 variant(s), surrogates=200)
+[c31] window 1/2: 150000 ticks, span 3191.9s, 3 variant(s) x 200 surrogates
+[c31] window 1/2 variant 1/3: dt10ms_T6 — surrogate test (200 surrogates)...
+[c31] window 1/2 variant 1/3: surrogate 50/200
+[c31] window 1/2 variant 1/3: surrogate 100/200
+[c31] window 1/2 variant 1/3: surrogate 150/200
+[c31] window 1/2 variant 1/3: surrogate 200/200
+[c31] window 1/2 variant 1/3: dt10ms_T6 done — observed_snr=26.656 p=1.0000
+[c31] window 1/2 variant 2/3: dt50ms_T6 — surrogate test (200 surrogates)...
+[c31] window 1/2 variant 2/3: surrogate 50/200
+[c31] window 1/2 variant 2/3: surrogate 100/200
+[c31] window 1/2 variant 2/3: surrogate 150/200
+[c31] window 1/2 variant 2/3: surrogate 200/200
+[c31] window 1/2 variant 2/3: dt50ms_T6 done — observed_snr=26.152 p=0.9652
+[c31] window 1/2 variant 3/3: dt100ms_T6 — surrogate test (200 surrogates)...
+[c31] window 1/2 variant 3/3: surrogate 50/200
+[c31] window 1/2 variant 3/3: surrogate 100/200
+[c31] window 1/2 variant 3/3: surrogate 150/200
+[c31] window 1/2 variant 3/3: surrogate 200/200
+[c31] window 1/2 variant 3/3: dt100ms_T6 done — observed_snr=13.421 p=1.0000
+[c31] window 2/2: 150000 ticks, span 4560.4s, 3 variant(s) x 200 surrogates
+[c31] window 2/2 variant 1/3: dt10ms_T6 — surrogate test (200 surrogates)...
+[c31] window 2/2 variant 1/3: surrogate 50/200
+[c31] window 2/2 variant 1/3: surrogate 100/200
+[c31] window 2/2 variant 1/3: surrogate 150/200
+[c31] window 2/2 variant 1/3: surrogate 200/200
+[c31] window 2/2 variant 1/3: dt10ms_T6 done — observed_snr=18.660 p=1.0000
+[c31] window 2/2 variant 2/3: dt50ms_T6 — surrogate test (200 surrogates)...
+[c31] window 2/2 variant 2/3: surrogate 50/200
+[c31] window 2/2 variant 2/3: surrogate 100/200
+[c31] window 2/2 variant 2/3: surrogate 150/200
+[c31] window 2/2 variant 2/3: surrogate 200/200
+[c31] window 2/2 variant 2/3: dt50ms_T6 done — observed_snr=20.639 p=1.0000
+[c31] window 2/2 variant 3/3: dt100ms_T6 — surrogate test (200 surrogates)...
+[c31] window 2/2 variant 3/3: surrogate 50/200
+[c31] window 2/2 variant 3/3: surrogate 100/200
+[c31] window 2/2 variant 3/3: surrogate 150/200
+[c31] window 2/2 variant 3/3: surrogate 200/200
+[c31] window 2/2 variant 3/3: dt100ms_T6 done — observed_snr=25.547 p=0.8010

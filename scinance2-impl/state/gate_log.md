@@ -214,3 +214,41 @@ empirisch erledigt: S1 (GL/iter-4: ρ-Estimator gebrochen), S2 (3 Forensiken ref
 definitiv getestet, Entry hat keine Edge)**, S4/S5 (nie gelaufen, loader-/harness-bound). Der letzte Eintrag aus
 dem Original-PRD ist gefallen. PRD §6: S3 wird in der Live-Config deaktiviert (kein Kapital), Code bleibt als
 Archiv. Folge-Arbeit ausschließlich an Scinance-2.0-Piloten (Recording-Fundament + neue Hypothesen), nicht an S3.
+
+---
+
+## GL-005 · 2026-06-15 · H-03 · C-31 CFAR (Cyclostationary Footprint, Pilot 4) — **DROP**
+
+**Status:** Geurteilt. Löst GL-003 (PENDING) ab.
+Datenquelle: `handoff_local/results/cfar_20260615_120813/` (Standalone-Runner; --db-copy, --max-ticks-per-window 150000, --windows 2, --surrogates 200, seed 42, F-CFAR-Familie 3 Varianten).
+
+**Lauf-Status je Symbol:**
+
+| Symbol | Status | Dauer | n_ticks gesamt (genutzt) | gemessene Fenster |
+|---|---|---|---|---|
+| BTCUSDT | OK | 712 s | (300 000 jüngste Ticks) | 2/2 final |
+| ETHUSDT | OK | 661 s | (300 000 jüngste Ticks) | 2/2 final |
+| SOLUSDT | TIMEOUT | 1800 s | 300 000 genutzt | 1/2 final, Fenster 0 ALLE Varianten gemessen (Teil-Logs) |
+| BNBUSDT | TIMEOUT | 1800 s | 300 000 genutzt | partial |
+| XRPUSDT | TIMEOUT | 1800 s | — | partial |
+
+**Gate-Urteil gegen die vorregistrierten H-03-Tore (BTCUSDT — repräsentativ; ETHUSDT analog):**
+
+| Kriterium (Registry wörtlich) | Schwelle | BTC F0 | BTC F1 | ETH F0 | ETH F1 | Status |
+|---|---|---|---|---|---|---|
+| Surrogate p (FDR-korrigiert, F-CFAR) | ≤ 0.05 | **0.871** | **1.000** | **0.965** | **0.801** | ALLE 4 verfehlt |
+| Lead > 50 ms | > 50 | 100.0 | 100.0 | 100.0 | 100.0 | ja |
+| Edge > 11 bps | > 11 | **0.04** | **0.01** | **0.04** | **0.01** | ALLE 4 verfehlt (3 Größenordnungen darunter) |
+
+**Anwendung des Ein-Fenster-DROP-Kriteriums (PRD §8.5, Registry §6):**
+„Schwelle in EINEM disjunkten Fenster verfehlt → DROP, kein Nachverhandeln. **Kein GRAUBEREICH.**"
+
+BTC Fenster 0 verfehlt p-Kriterium (0.871 ≫ 0.05) UND Edge-Kriterium (0.04 ≪ 11). Damit ist H-03 bereits hier definitiv DROP. Die übrigen drei gemessenen Fenster (BTC F1, ETH F0, ETH F1) bestätigen das Muster auf BTC und ETH unabhängig. **Urteil: DROP.**
+
+**Zu den 3 Timeouts (SOL/BNB/XRP):** Methodisch nicht entscheidungsrelevant, weil das Gate auf je-Symbol-Ebene operiert und BTC/ETH bereits DROP-konstitutiv sind. Plus: Die Progress-Logs in `C31_CFAR_SOLUSDT.err.log` zeigen für SOL Fenster 0 ALLE drei Varianten gemessen — alle p=1.0000 (z.B. dt100ms_T6: observed_snr=13.200 p=1.0000). Hätten SOL/BNB/XRP perfekte Treffer geliefert (taten sie nicht), würden sie das je-Symbol-DROP für BTC und ETH nicht aufheben. Die Timeouts sind Performance-Hinweis für Welle 2 (Bin-Grid 10ms ist auf 150k Ticks rechenintensiv), nicht inhaltlich offen.
+
+**FDR-Familie F-CFAR:** BH α=0.10 über drei Varianten (dt10/50/100ms × Schwellenfaktor 6), p_crit = 0.000 — kein Test überlebt die Korrektur, konsistent mit der unkorrigierten p≈1 auf jedem Fenster.
+
+**Mechanistische Schlussfolgerung:** Die Hypothese „zyklostationäres Spektrum der Inter-Arrival-Zeiten enthält CFAR-detektierbare, prädiktive periodische Struktur mit handelbarer Edge oberhalb der Friction-Wand" ist auf den 4 unabhängig gemessenen Fenstern (BTC × 2 + ETH × 2) **deutlich widerlegt**: Die p-Werte sind statistisch nicht von der geshuffelten Inter-Arrival-Null zu unterscheiden (≈ 1.0), und die geschätzte Edge ist ~250× UNTER der 11-bps-Friction-Wand. Selbst wenn die Spektral-Detektion irgendwann ein signifikantes p liefern würde, wäre die handelbare Edge inhaltlich tot. Konsistent mit der Skeptic-Argumentation im iter-3-Verdict: HFT-abgegraste Anomalie, adaptiver Gegner, keine Retail-überlebende Edge.
+
+**Konsequenz:** H-03 fällt auf DROP. **Damit sind alle vier Welle-1-Piloten entschieden:** H-01 DROP (S3), H-02 DROP (Vol-Stack-Anker), H-03 DROP (CFAR), C-36 Recording-Fundament steht (~5 Mio RPI-Zeilen, kein Alpha-Gate).

@@ -6,7 +6,7 @@
 
 ## Phase
 
-`HANDOFF` (Phase 6 — wartet auf lokale T2/T3-Läufe des Users)
+`DONE (Wave 1)` — alle 4 Pilot-Gates entschieden, alle 3 Hypothesen DROP
 
 ## Welle-1-Piloten (PRD §3)
 
@@ -31,8 +31,8 @@
 - [x] Phase 2 PLAN — 6 WPs, DEC-02..06 gefällt; Reihenfolge WP-0 → WP-2 (Frühstart) → WP-1 → WP-4 ∥ WP-3 → WP-5
 - [x] Phase 3/4 BUILD/VERIFY — alle 6 WPs gebaut+verifiziert; Suite 616 → 752 grün (+136), 0 Bugs in allen Verifies
 - [x] Phase 6 HANDOFF — Runner ausgeliefert (run_short, run_overnight, README_RUN); wartet auf User-Ergebnisse in handoff_local/results/
-- [ ] Phase 5 GATE_CHECK — je Pilot
-- [ ] Phase 7 ANALYZE — Morgen-Auswertung, Schleife bis alle Welle-1-Gates entschieden
+- [x] Phase 5 GATE_CHECK — H-01/H-02/H-03 alle gegen Registry ge-AUDIT-tet
+- [x] Phase 7 ANALYZE — Welle 1 DONE: H-01 DROP (GL-004), H-02 DROP (GL-001), H-03 DROP (GL-005); C-36 Fundament steht
 
 ## CHANGELOG
 
@@ -51,3 +51,4 @@
 - ANALYZE (2026-06-13): H-02 (C-42) DROP auf diesem Lauf erneut bestätigt (HAR fold-0 r2 +0.013 < 0.15, qlike schlägt HAR nicht). H-03 (CFAR) bleibt PENDING bis Overnight-Lauf mit dem 1.3-TiB-Fix.
 - CFAR-TIMEOUT-FIX (2026-06-15, DEC-09): C-31 lief overnight 2026-06-14 auf allen 5 Symbolen in den 5400s-Timeout — `split_windows()` teilte die GESAMTE tage-/wochentiefe `trades`-Serie, also spannte jedes Fenster Tage → Millionen Bins × F-CFAR-Familie (3 Varianten) × 200 Surrogates ≈ 1206 SCD. Fix 1: deterministische Tick-Obergrenze `WINDOW_MAX_TICKS=150_000` (jüngste `windows × max_ticks` Ticks, in ≥2 disjunkte Fenster) + CLI `--max-ticks-per-window`; methodisch korrekter (Stationarität innerhalb Fenster) UND rechenbar.
 - CFAR-TIMEOUT-FIX (2026-06-15): Fix 2 Progress-Logging je Fenster/Variante/Surrogate-Schub auf stderr (Hang jetzt diagnostizierbar) + Runner-Timeout 5400→1800s. Fix 4: `--max-ticks-per-window 150000` in run_cfar_only/run_overnight (.sh/.ps1). Gate-Schwellen p≤0.05/Lead>50ms/Edge>11bps, n_surrogates=200, BH-FDR α=0.10 EXAKT unverändert (Registry §8.3) — H-03-Nachtrag append-only ergänzt. c31-Suite 29→36 grün (Poisson-Null + Periodik-Detektion weiterhin korrekt). Nicht committet.
+- ANALYZE (2026-06-15): H-03 (CFAR) GEURTEILT → **DROP** (GL-005). Standalone-Runner: BTC 712s OK, ETH 661s OK, SOL/BNB/XRP TIMEOUT. BTC+ETH liefern 4 unabhängig gemessene Fenster — auf ALLEN ist p ∈ [0.80, 1.00] (≫ 0.05) und Edge ∈ [0.01, 0.04] bps (~250× unter 11-bps-Wand). Hartes Ein-Fenster-DROP (PRD §8.5) bereits durch BTC F0 ausgelöst. Timeouts methodisch nicht entscheidungs-relevant (Gate je Symbol). **Welle 1 formal abgeschlossen: H-01/H-02/H-03 alle DROP, C-36 als Fundament tragfähig.**

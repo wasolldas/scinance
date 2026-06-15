@@ -1,0 +1,281 @@
+{
+  "schema_version": 1,
+  "hypothesis": "H-03",
+  "hypothesis_registry": "scinance2-impl/state/hypothesis_registry.md",
+  "generated_at": "2026-06-15T12:31:07+00:00",
+  "source": "E:\\Claude\\Projects\\scinance\\data\\bybit_edge.duckdb::trades",
+  "symbol": "ETHUSDT",
+  "n_windows": 2,
+  "n_surrogates": 200,
+  "seed": 42,
+  "fdr_alpha": 0.1,
+  "family": [
+    "dt10ms_T6",
+    "dt50ms_T6",
+    "dt100ms_T6"
+  ],
+  "max_ticks_per_window": 150000,
+  "n_ticks_total": 5278059,
+  "n_ticks_used": 300000,
+  "gate_thresholds": {
+    "surrogate_p_max": 0.05,
+    "lead_min_ms": 50.0,
+    "edge_min_bps": 11.0,
+    "min_windows": 2
+  },
+  "all_windows_pass": false,
+  "per_window_pass": [
+    false,
+    false
+  ],
+  "windows": [
+    {
+      "index": 0,
+      "n_ticks": 150000,
+      "t0_ms": 1780611314512.0,
+      "t1_ms": 1780614506435.0,
+      "best_variant": "dt50ms_T6",
+      "criteria": {
+        "surrogate_p": {
+          "value": 0.9651741293532339,
+          "threshold": 0.05,
+          "fdr_significant": false,
+          "passed": false,
+          "registry_text": "Surrogate p <= 0.05 (FDR-korrigiert, F-CFAR)"
+        },
+        "lead_ms": {
+          "value": 100.0,
+          "threshold": 50.0,
+          "passed": true,
+          "registry_text": "Lead-Zeit > 50 ms (ueber Retail-Latenz)"
+        },
+        "edge_bps": {
+          "value": 0.036846619045165334,
+          "threshold": 11.0,
+          "passed": false,
+          "registry_text": "Edge > 11 bps (ueber der Friction-Wand)"
+        },
+        "fdr_p_crit": 0.0,
+        "lead_edge": {
+          "alpha_hz": 0.07936507936507936,
+          "period_ms": 12600.0,
+          "lead_ms": 100.0,
+          "edge_bps": 0.036846619045165334,
+          "n_events": 146302,
+          "n_phase_buckets": 8,
+          "best_bucket_return_bps": 0.036846619045165334
+        }
+      },
+      "variants": [
+        {
+          "variant": "dt10ms_T6",
+          "bin_dt_ms": 10.0,
+          "threshold_factor": 6.0,
+          "n_peaks": 193,
+          "top_alpha_hz": 0.3968253968253968,
+          "top_peak": {
+            "alpha_hz": 0.3968253968253968,
+            "freq_hz": 42.578125,
+            "alpha_idx": 1,
+            "freq_idx": 109,
+            "scd": 5.960647677444049,
+            "noise_floor": 0.22361316753561822,
+            "snr": 26.656067454053694,
+            "p_local": 2.651044363710879e-12
+          },
+          "surrogate": {
+            "observed_snr": 26.656067454053694,
+            "p_value": 1.0,
+            "n_surrogates": 200,
+            "surrogate_snr_mean": 56.05798909386318,
+            "surrogate_snr_p95": 76.51695359165309,
+            "bin_dt_ms": 10.0,
+            "threshold_factor": 6.0
+          },
+          "nominal_pfa": 0.006125715592809232,
+          "fdr_significant": false
+        },
+        {
+          "variant": "dt50ms_T6",
+          "bin_dt_ms": 50.0,
+          "threshold_factor": 6.0,
+          "n_peaks": 128,
+          "top_alpha_hz": 0.07936507936507936,
+          "top_peak": {
+            "alpha_hz": 0.07936507936507936,
+            "freq_hz": 9.84375,
+            "alpha_idx": 1,
+            "freq_idx": 126,
+            "scd": 40.44942459416959,
+            "noise_floor": 1.5467289592216698,
+            "snr": 26.151591946997726,
+            "p_local": 4.390438766619235e-12
+          },
+          "surrogate": {
+            "observed_snr": 26.151591946997726,
+            "p_value": 0.9651741293532339,
+            "n_surrogates": 200,
+            "surrogate_snr_mean": 32.91193311876871,
+            "surrogate_snr_p95": 41.18897366674849,
+            "bin_dt_ms": 50.0,
+            "threshold_factor": 6.0
+          },
+          "nominal_pfa": 0.006125715592809232,
+          "fdr_significant": false
+        },
+        {
+          "variant": "dt100ms_T6",
+          "bin_dt_ms": 100.0,
+          "threshold_factor": 6.0,
+          "n_peaks": 87,
+          "top_alpha_hz": 0.03968253968253968,
+          "top_peak": {
+            "alpha_hz": 0.03968253968253968,
+            "freq_hz": 0.234375,
+            "alpha_idx": 1,
+            "freq_idx": 6,
+            "scd": 200.49777552718987,
+            "noise_floor": 14.939258516853048,
+            "snr": 13.420865252516206,
+            "p_local": 1.4838577812982517e-06
+          },
+          "surrogate": {
+            "observed_snr": 13.420865252516206,
+            "p_value": 1.0,
+            "n_surrogates": 200,
+            "surrogate_snr_mean": 25.28391840193779,
+            "surrogate_snr_p95": 33.84547407839418,
+            "bin_dt_ms": 100.0,
+            "threshold_factor": 6.0
+          },
+          "nominal_pfa": 0.006125715592809232,
+          "fdr_significant": false
+        }
+      ]
+    },
+    {
+      "index": 1,
+      "n_ticks": 150000,
+      "t0_ms": 1780614506435.0,
+      "t1_ms": 1780619066873.0,
+      "best_variant": "dt100ms_T6",
+      "criteria": {
+        "surrogate_p": {
+          "value": 0.8009950248756219,
+          "threshold": 0.05,
+          "fdr_significant": false,
+          "passed": false,
+          "registry_text": "Surrogate p <= 0.05 (FDR-korrigiert, F-CFAR)"
+        },
+        "lead_ms": {
+          "value": 100.0,
+          "threshold": 50.0,
+          "passed": true,
+          "registry_text": "Lead-Zeit > 50 ms (ueber Retail-Latenz)"
+        },
+        "edge_bps": {
+          "value": 0.01107793434585176,
+          "threshold": 11.0,
+          "passed": false,
+          "registry_text": "Edge > 11 bps (ueber der Friction-Wand)"
+        },
+        "fdr_p_crit": 0.0,
+        "lead_edge": {
+          "alpha_hz": 0.03968253968253968,
+          "period_ms": 25200.0,
+          "lead_ms": 100.0,
+          "edge_bps": 0.01107793434585176,
+          "n_events": 145682,
+          "n_phase_buckets": 8,
+          "best_bucket_return_bps": -0.01107793434585176
+        }
+      },
+      "variants": [
+        {
+          "variant": "dt10ms_T6",
+          "bin_dt_ms": 10.0,
+          "threshold_factor": 6.0,
+          "n_peaks": 129,
+          "top_alpha_hz": 0.3968253968253968,
+          "top_peak": {
+            "alpha_hz": 0.3968253968253968,
+            "freq_hz": 46.875,
+            "alpha_idx": 1,
+            "freq_idx": 120,
+            "scd": 4.780182190250416,
+            "noise_floor": 0.25616907918382953,
+            "snr": 18.660262220094523,
+            "p_local": 7.869571524970064e-09
+          },
+          "surrogate": {
+            "observed_snr": 18.660262220094523,
+            "p_value": 1.0,
+            "n_surrogates": 200,
+            "surrogate_snr_mean": 63.41929469728702,
+            "surrogate_snr_p95": 84.946709267225,
+            "bin_dt_ms": 10.0,
+            "threshold_factor": 6.0
+          },
+          "nominal_pfa": 0.006125715592809232,
+          "fdr_significant": false
+        },
+        {
+          "variant": "dt50ms_T6",
+          "bin_dt_ms": 50.0,
+          "threshold_factor": 6.0,
+          "n_peaks": 129,
+          "top_alpha_hz": 0.07936507936507936,
+          "top_peak": {
+            "alpha_hz": 0.07936507936507936,
+            "freq_hz": 5.9375,
+            "alpha_idx": 1,
+            "freq_idx": 76,
+            "scd": 32.39184361856851,
+            "noise_floor": 1.5694591826774955,
+            "snr": 20.63885698722541,
+            "p_local": 1.0880736614939896e-09
+          },
+          "surrogate": {
+            "observed_snr": 20.63885698722541,
+            "p_value": 1.0,
+            "n_surrogates": 200,
+            "surrogate_snr_mean": 37.842505373330596,
+            "surrogate_snr_p95": 48.40833202199005,
+            "bin_dt_ms": 50.0,
+            "threshold_factor": 6.0
+          },
+          "nominal_pfa": 0.006125715592809232,
+          "fdr_significant": false
+        },
+        {
+          "variant": "dt100ms_T6",
+          "bin_dt_ms": 100.0,
+          "threshold_factor": 6.0,
+          "n_peaks": 125,
+          "top_alpha_hz": 0.03968253968253968,
+          "top_peak": {
+            "alpha_hz": 0.03968253968253968,
+            "freq_hz": 4.765625,
+            "alpha_idx": 1,
+            "freq_idx": 122,
+            "scd": 72.57503439650424,
+            "noise_floor": 2.840851099316824,
+            "snr": 25.546933598159118,
+            "p_local": 8.037254282959278e-12
+          },
+          "surrogate": {
+            "observed_snr": 25.546933598159118,
+            "p_value": 0.8009950248756219,
+            "n_surrogates": 200,
+            "surrogate_snr_mean": 29.507047700851707,
+            "surrogate_snr_p95": 38.76806482539764,
+            "bin_dt_ms": 100.0,
+            "threshold_factor": 6.0
+          },
+          "nominal_pfa": 0.006125715592809232,
+          "fdr_significant": false
+        }
+      ]
+    }
+  ]
+}
