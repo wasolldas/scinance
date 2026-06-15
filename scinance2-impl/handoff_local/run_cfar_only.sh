@@ -33,7 +33,8 @@ DUCKDB_PATH="${HANDOFF_DUCKDB:-$REPO_ROOT/data/bybit_edge.duckdb}"
 SYMBOLS="BTCUSDT ETHUSDT SOLUSDT BNBUSDT XRPUSDT"
 C31_WINDOWS=2
 C31_SURROGATES=200
-C31_TIMEOUT_SEC=1800   # 30 min/Symbol - mit --db-copy reichlich
+C31_MAX_TICKS=150000   # DEC-09: deterministische Tick-Obergrenze je Fenster
+C31_TIMEOUT_SEC=1800   # 30 min/Symbol - mit Tick-Cap + --db-copy reichlich
 
 PY="${PYTHON:-}"
 if [ -z "$PY" ]; then
@@ -109,9 +110,12 @@ if [ "$DRY" = "0" ] && [ ! -f "$DUCKDB_PATH" ]; then
   done
 else
   for sym in $SYMBOLS; do
+    # --max-ticks-per-window (DEC-09): juengste windows x max-ticks Ticks je
+    # Symbol -> rechenbar + stationaer (Gate-Schwellen UNVERAENDERT).
     run_step "C31_CFAR_${sym}" "$C31_TIMEOUT_SEC" \
       "$PY" "$REPO_ROOT/scripts/c31_cfar.py" --db "$DUCKDB_PATH" --symbol "$sym" \
-      --windows "$C31_WINDOWS" --surrogates "$C31_SURROGATES" --db-copy \
+      --windows "$C31_WINDOWS" --surrogates "$C31_SURROGATES" \
+      --max-ticks-per-window "$C31_MAX_TICKS" --db-copy \
       --out "$RUN_DIR/c31_${sym}" || true
   done
 fi

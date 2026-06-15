@@ -41,6 +41,8 @@ RECORDER_DURATION_S=$(( RECORDER_HOURS * 3600 ))
 SYMBOLS="BTCUSDT ETHUSDT SOLUSDT BNBUSDT XRPUSDT"
 C31_WINDOWS=2
 C31_SURROGATES=200
+C31_MAX_TICKS=150000   # DEC-09: deterministische Tick-Obergrenze je Fenster
+C31_TIMEOUT_SEC=1800   # mit Tick-Cap reichlich (vorher 5400s -> 5/5 TIMEOUT)
 
 # ── Umgebung ─────────────────────────────────────────────────────────────
 PY="${PYTHON:-}"
@@ -154,9 +156,14 @@ else
     # Driver hat zusaetzlich einen 30s-Open-Timeout (DataError mit Lock-Hinweis),
     # damit ein blockierter Open den Subprozess nicht haengen laesst (overnight-
     # Defekt 2026-06-13: kein C31-Log -> Hauptrunner starb).
-    run_step "C31_CFAR_${sym}" 5400 \
+    # --max-ticks-per-window (DEC-09): nimmt die JUENGSTEN windows x max-ticks
+    # Ticks je Symbol -> rechenbar + stationaer. Behebt den 5400s-TIMEOUT 5/5
+    # vom 2026-06-14 (die trades-Tabelle ist tage-/wochentief; ungebremst
+    # spannte jedes Fenster Tage). Gate-Schwellen UNVERAENDERT.
+    run_step "C31_CFAR_${sym}" "$C31_TIMEOUT_SEC" \
       "$PY" "$REPO_ROOT/scripts/c31_cfar.py" --db "$DUCKDB_PATH" --symbol "$sym" \
-      --windows "$C31_WINDOWS" --surrogates "$C31_SURROGATES" --db-copy \
+      --windows "$C31_WINDOWS" --surrogates "$C31_SURROGATES" \
+      --max-ticks-per-window "$C31_MAX_TICKS" --db-copy \
       --out "$RUN_DIR/c31_${sym}" || true
   done
 fi

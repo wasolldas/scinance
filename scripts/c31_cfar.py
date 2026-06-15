@@ -29,6 +29,7 @@ import sys
 from pathlib import Path
 from typing import Optional
 
+from bybit_edge.research.c31_cfar.cyclic_spectrum import WINDOW_MAX_TICKS
 from bybit_edge.research.c31_cfar.driver import (
     DataError,
     default_family,
@@ -56,6 +57,16 @@ def _parse_args(argv: Optional[list[str]] = None) -> argparse.Namespace:
              "RW-Lock des laufenden 1.0-Collectors; Kopie wird danach geloescht).",
     )
     p.add_argument("--windows", type=int, default=2, help="Anzahl disjunkter Fenster (>= 2, H-03)")
+    p.add_argument(
+        "--max-ticks-per-window", type=int, default=WINDOW_MAX_TICKS,
+        help=(
+            "Deterministische Tick-Obergrenze je Fenster (DEC-09, Default "
+            f"{WINDOW_MAX_TICKS}). Es werden die JUENGSTEN windows x max-ticks "
+            "Ticks genommen und in disjunkte Fenster geteilt. Reines Daten-"
+            "Scoping (Stationaritaet + Rechenbarkeit) — die H-03-Gate-Schwellen "
+            "(p/Lead/Edge/Surrogates/FDR) bleiben UNVERAENDERT."
+        ),
+    )
     p.add_argument("--surrogates", type=int, default=200, help="Surrogate-N (Default 200)")
     p.add_argument("--seed", type=int, default=42, help="RNG-Seed (Pflicht-Default 42, reproduzierbar)")
     p.add_argument("--segment-len", type=int, default=256, help="FFT-Segmentlaenge")
@@ -84,6 +95,7 @@ def main(argv: Optional[list[str]] = None) -> int:
             seed=args.seed,
             segment_len=args.segment_len,
             n_alpha=args.n_alpha,
+            max_ticks_per_window=args.max_ticks_per_window,
             source=source,
             symbol=symbol,
         )

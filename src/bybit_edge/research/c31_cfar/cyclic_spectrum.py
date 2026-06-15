@@ -39,6 +39,23 @@ DEFAULT_BIN_GRID_MS: tuple[float, ...] = (10.0, 50.0, 100.0)
 # here turns a runaway allocation into a clear ValueError.
 MAX_BINS: int = 1_000_000_000
 
+# Deterministic per-window tick budget (DEC-09). The live ``trades`` table is
+# DAYS/WEEKS deep, far older than the 8 h recording window; binning a window
+# that spans days at Δt = 10 ms blows the count process up to millions of bins
+# and the F-CFAR family (3 grids × 200 surrogates) recomputes the full SCD over
+# it ~1200×, which hung the C-31 T3 run for 5400 s on all 5 symbols
+# (overnight 2026-06-14). It is ALSO methodically wrong: cyclostationarity
+# assumes (quasi-)stationarity WITHIN the window, and the H-03 hypothesis
+# targets HFT-scale cycles (gate: Lead > 50 ms, sub-second). ~150k ticks span
+# tens of minutes on liquid symbols — ample for sub-second cyclicity — whereas
+# a multi-day window VIOLATES the stationarity assumption and is intractable.
+# So the cap is a correctness AND a tractability bound, not just a speed hack.
+# The driver keeps the MOST RECENT n_windows × WINDOW_MAX_TICKS ticks and splits
+# them into n_windows disjoint contiguous windows of <= WINDOW_MAX_TICKS each
+# (deterministic-chronological — newest ticks, no discretionary choice). The
+# H-03 gate thresholds (p / Lead / Edge / surrogates / FDR) are UNCHANGED.
+WINDOW_MAX_TICKS: int = 150_000
+
 
 @dataclass(slots=True)
 class CyclicSpectrum:

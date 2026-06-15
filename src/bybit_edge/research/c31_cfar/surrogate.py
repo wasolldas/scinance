@@ -19,6 +19,7 @@ bin grids / CFAR thresholds / spectral params are one family.
 """
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import dataclass
 
 import numpy as np
@@ -90,6 +91,8 @@ def surrogate_test(
     seed: int = 42,
     segment_len: int = 256,
     n_alpha: int = 64,
+    progress_cb: Callable[[int, int], None] | None = None,
+    progress_every: int = 50,
 ) -> SurrogateResult:
     """Permutation surrogate null test for one parameter variant.
 
@@ -100,6 +103,11 @@ def surrogate_test(
     The window bounds are held fixed (t0 = first tick, t1 = original last tick)
     across all surrogates so the count-process length — and therefore the SCD
     frequency grid — is identical, making the SNRs directly comparable.
+
+    ``progress_cb(done, total)`` (if given) is called every ``progress_every``
+    surrogates so a caller can surface progress and a future hang is visible
+    (overnight 2026-06-14: 5400 s silent). It is purely observational and never
+    touches the statistic.
     """
     ts = np.sort(np.asarray(timestamps_ms, dtype=np.float64))
     gaps = inter_arrivals(ts)
@@ -122,6 +130,7 @@ def surrogate_test(
 
     rng = np.random.default_rng(seed)
     surrogate_snrs = np.empty(n_surrogates, dtype=np.float64)
+    every = max(1, int(progress_every))
     for k in range(n_surrogates):
         shuffled = rng.permutation(gaps)
         surro_ts = _rebuild_from_gaps(t0, shuffled)
@@ -132,6 +141,8 @@ def surrogate_test(
             segment_len=segment_len, n_alpha=n_alpha,
             t0_ms=t0, t1_ms=float(surro_ts[-1]),
         )
+        if progress_cb is not None and ((k + 1) % every == 0 or k + 1 == n_surrogates):
+            progress_cb(k + 1, n_surrogates)
 
     n_ge = int(np.sum(surrogate_snrs >= observed_snr))
     p_value = (n_ge + 1) / (n_surrogates + 1)

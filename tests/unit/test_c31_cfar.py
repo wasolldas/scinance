@@ -49,6 +49,7 @@ from bybit_edge.research.c31_cfar import (
     split_windows,
     surrogate_test,
 )
+from bybit_edge.research.c31_cfar.cyclic_spectrum import WINDOW_MAX_TICKS
 from bybit_edge.research.c31_cfar import surrogate as surrogate_mod
 from bybit_edge.research.c31_cfar.lead_edge import _phase_at
 
@@ -695,3 +696,175 @@ def test_run_same_seed_identical_json_payload() -> None:
     payload_a.pop("generated_at")
     payload_b.pop("generated_at")
     assert json.dumps(payload_a, sort_keys=True) == json.dumps(payload_b, sort_keys=True)
+
+
+# ---------------------------------------------------------------------------
+# 12. WINDOW_MAX_TICKS cap (DEC-09): the live trades table is days/weeks deep;
+#     an uncapped split spans days -> intractable + non-stationary. The cap
+#     keeps the NEWEST n_windows x max_ticks ticks, deterministically. The
+#     H-03 gate thresholds (p/Lead/Edge/surrogates/FDR) are NOT touched.
+# ---------------------------------------------------------------------------
+
+def _huge_multiday_ticks(
+    n: int = 1_000_000, span_days: float = 5.0, seed: int = 17
+) -> tuple[np.ndarray, np.ndarray]:
+    """A days-deep tick series (like the real ``trades`` table) + prices.
+
+    Models the real ``trades`` table: ~1M ticks whose OVERALL span is several
+    days, but with an HFT-realistic local tick rate (~20 ms mean gap, so the
+    newest 150k ticks span only ~tens of minutes). The bulk of the series is
+    OLD (the leading ~700k ticks are pushed back to fill the multi-day span);
+    only the newest ~300k ticks form the dense recent tail the cap keeps.
+
+    Uncapped, window 0 would start at T0 and span ~2.5 days -> a 10 ms bin grid
+    of ~2.1e7 bins per surrogate recomputed ~600x -> the 5400 s hang. With the
+    cap each kept window spans minutes and is tractable.
+    """
+    rng = np.random.default_rng(seed)
+    budget = 2 * WINDOW_MAX_TICKS  # newest ticks the cap will keep
+    n_old = n - budget
+    span_ms = span_days * 24 * 3600 * 1000.0
+    # Dense recent tail: HFT-realistic ~20 ms mean inter-arrival.
+    recent_gaps = rng.exponential(20.0, size=budget)
+    recent = np.cumsum(recent_gaps)
+    recent_span = float(recent[-1])
+    # Old bulk: spread across the rest of the multi-day span, all BEFORE the
+    # recent tail so the tail is genuinely the newest data.
+    old = np.sort(rng.uniform(0.0, span_ms - recent_span, size=n_old))
+    ts = T0_MS + np.concatenate([old, (span_ms - recent_span) + recent])
+    px = 50_000.0 * np.exp(np.cumsum(rng.normal(0.0, 1e-6, size=n)))
+    return ts, px
+
+
+def test_split_windows_caps_to_newest_ticks_per_window() -> None:
+    """A 1M-tick days-deep series -> 2 windows of <= WINDOW_MAX_TICKS, taken
+    from the NEWEST tail (Fix 1: deterministic tick budget, DEC-09)."""
+    ts, px = _huge_multiday_ticks()
+    windows = split_windows(ts, px, n_windows=2)
+
+    assert len(windows) == 2
+    for w_ts, w_px in windows:
+        assert w_ts.size <= WINDOW_MAX_TICKS
+        assert w_ts.size == w_px.size
+    # The cap keeps the most recent 2 x 150k ticks: window 0 must start AFTER
+    # the bulk of the (discarded) older series, and the last window must end at
+    # the very last original tick.
+    budget = 2 * WINDOW_MAX_TICKS
+    assert float(windows[0][0][0]) == pytest.approx(float(ts[-budget]))
+    assert float(windows[-1][0][-1]) == pytest.approx(float(ts[-1]))
+    # Disjoint + chronological across the kept windows.
+    assert float(windows[0][0][-1]) < float(windows[1][0][0])
+
+
+def test_split_windows_below_budget_uses_full_even_split() -> None:
+    """Below the budget the original even split is used unchanged (no cap)."""
+    ts, px = _ticks_with_prices(seed=11, n=900)
+    windows = split_windows(ts, px, n_windows=2, max_ticks_per_window=10_000)
+    # All 900 ticks are kept (below 2 x 10k budget).
+    assert sum(w_ts.size for w_ts, _ in windows) == ts.size
+    assert float(windows[0][0][0]) == pytest.approx(float(ts[0]))
+
+
+def test_split_windows_custom_cap_is_respected() -> None:
+    """An explicit small --max-ticks-per-window bounds each window exactly."""
+    ts, px = _ticks_with_prices(seed=11, n=5000)
+    windows = split_windows(ts, px, n_windows=2, max_ticks_per_window=1000)
+    assert len(windows) == 2
+    for w_ts, _ in windows:
+        assert w_ts.size <= 1000
+    assert sum(w_ts.size for w_ts, _ in windows) == 2000  # 2 x 1000 kept
+    assert float(windows[-1][0][-1]) == pytest.approx(float(ts[-1]))
+
+
+def test_run_huge_series_with_cap_is_tractable_and_correct(capsys) -> None:
+    """The cap makes a 1M-tick days-deep series run() in seconds with >= 2
+    windows, each <= WINDOW_MAX_TICKS (Fix 1). Asserts the data-scoping record
+    in the payload and that the gate thresholds are UNCHANGED."""
+    import time
+
+    ts, px = _huge_multiday_ticks()
+    t0 = time.monotonic()
+    payload = run(
+        ts, px,
+        n_windows=2,
+        n_surrogates=3,      # tiny: this test measures the CAP, not the stat
+        seed=42,
+        segment_len=64,
+        n_alpha=16,
+        symbol="HUGE",
+    )
+    elapsed = time.monotonic() - t0
+
+    # Tractability: with the cap this is seconds, not the 5400 s hang. Generous
+    # ceiling so the assertion is about ORDER OF MAGNITUDE, not CI jitter.
+    assert elapsed < 120.0, f"capped run too slow ({elapsed:.1f}s)"
+    assert payload["n_windows"] == 2
+    for window in payload["windows"]:
+        assert window["n_ticks"] <= WINDOW_MAX_TICKS
+    # Data-scoping record present; gate thresholds untouched.
+    assert payload["max_ticks_per_window"] == WINDOW_MAX_TICKS
+    assert payload["n_ticks_total"] == ts.size
+    assert payload["n_ticks_used"] == 2 * WINDOW_MAX_TICKS
+    assert payload["gate_thresholds"] == {
+        "surrogate_p_max": 0.05,
+        "lead_min_ms": 50.0,
+        "edge_min_bps": 11.0,
+        "min_windows": 2,
+    }
+
+
+def test_run_with_cap_is_deterministic() -> None:
+    """Same seed + same days-deep data + same (small explicit) cap -> identical
+    window bounds and identical JSON payload (registry reproducibility duty,
+    Fix 1). A small explicit cap exercises the SAME capped split-aware run()
+    path as the 150k default without the multi-minute fixture cost."""
+    ts, px = _huge_multiday_ticks()
+    kwargs = dict(
+        n_windows=2, n_surrogates=3, seed=42, segment_len=64, n_alpha=16,
+        max_ticks_per_window=4_000, source="cap-determinism", symbol="HUGE",
+    )
+    a = run(ts, px, **kwargs)
+    b = run(ts, px, **kwargs)
+    # The cap engaged (data days-deep, far above the 2 x 4000 budget).
+    assert a["n_ticks_used"] == 2 * 4_000 < a["n_ticks_total"]
+    # Identical window boundaries.
+    assert [w["t0_ms"] for w in a["windows"]] == [w["t0_ms"] for w in b["windows"]]
+    assert [w["t1_ms"] for w in a["windows"]] == [w["t1_ms"] for w in b["windows"]]
+    a.pop("generated_at")
+    b.pop("generated_at")
+    assert json.dumps(a, sort_keys=True) == json.dumps(b, sort_keys=True)
+
+
+def test_progress_logging_emits_window_line(capsys) -> None:
+    """Fix 2: at least one '[c31] window k/N' progress line must reach stderr
+    so a future hang is localisable (overnight 2026-06-14: 5400 s silent)."""
+    ts, px = _ticks_with_prices(seed=5, n=1200)
+    run(ts, px, n_windows=2, n_surrogates=5, seed=42, segment_len=64,
+        n_alpha=16, symbol="LOGTEST")
+    err = capsys.readouterr().err
+    assert "[c31] window 1/2" in err, f"no per-window progress line on stderr:\n{err}"
+    # Per-variant progress and surrogate progress are also surfaced.
+    assert "variant 1/" in err
+    assert "surrogate" in err
+
+
+def test_cap_does_not_break_detection_or_null_below_budget() -> None:
+    """Below the cap the core statistics are UNCHANGED (Fix 1 must not move the
+    torpfosten): a sub-budget Poisson series stays null and a sub-budget
+    injected periodicity stays significant — the exact contracts of tests 1+2,
+    re-checked through the capped split-aware run() path."""
+    # Poisson background (no cycle) -> not significant.
+    poisson = _poisson_ts(seed=23)
+    null_res = surrogate_test(
+        poisson, bin_dt_ms=10.0, cfar=CfarConfig(threshold_factor=6.0),
+        n_surrogates=50, seed=23, segment_len=128, n_alpha=32,
+    )
+    assert null_res.p_value > 0.05
+    # Injected 100 ms cycle -> significant.
+    cyclic = _cyclic_ts(seed=23)
+    assert cyclic.size < WINDOW_MAX_TICKS  # fixture stays under the cap
+    sig_res = surrogate_test(
+        cyclic, bin_dt_ms=10.0, cfar=CfarConfig(threshold_factor=6.0, min_alpha_hz=2.0),
+        n_surrogates=50, seed=23, segment_len=100, n_alpha=26,
+    )
+    assert sig_res.p_value < 0.05

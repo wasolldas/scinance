@@ -28,6 +28,7 @@ from .cfar_detector import CfarConfig, detect_peaks
 from .cyclic_spectrum import (
     DEFAULT_BIN_GRID_MS,
     MAX_BINS,
+    WINDOW_MAX_TICKS,
     bin_counts,
     spectral_correlation_density,
 )
@@ -237,18 +238,50 @@ def load_trades_file(path: Path) -> tuple[np.ndarray, np.ndarray]:
 
 
 def split_windows(
-    ts: np.ndarray, px: np.ndarray, n_windows: int
+    ts: np.ndarray,
+    px: np.ndarray,
+    n_windows: int,
+    *,
+    max_ticks_per_window: int = WINDOW_MAX_TICKS,
 ) -> list[tuple[np.ndarray, np.ndarray]]:
-    """Split chronologically into ``n_windows`` disjoint, contiguous windows."""
+    """Split chronologically into ``n_windows`` disjoint, contiguous windows.
+
+    Tick-budget cap (DEC-09): the live ``trades`` table is days/weeks deep, far
+    older than the recording window. An uncapped split makes each window span
+    days, which (a) blows the count-process bin grid up so the F-CFAR family
+    (3 grids × 200 surrogates) hangs for ~5400 s and (b) VIOLATES the
+    within-window stationarity assumption cyclostationarity rests on. To bound
+    BOTH problems deterministically we keep the MOST RECENT
+    ``n_windows × max_ticks_per_window`` ticks of the (chronologically sorted)
+    series and slice them into ``n_windows`` disjoint contiguous windows of
+    <= ``max_ticks_per_window`` ticks each. The choice is purely
+    deterministic-chronological (newest ticks, no discretionary selection), so
+    the registry wording ("deterministisch-chronologisch, >= 2 disjunkte
+    Fenster") still holds. If the series is shorter than the budget, the
+    original even split is used unchanged. The H-03 gate thresholds
+    (p / Lead / Edge / surrogates / FDR) are NOT affected by this scoping.
+    """
     if n_windows < MIN_WINDOWS:
         raise DataError(
             f"H-03 requires >= {MIN_WINDOWS} disjoint windows, got {n_windows}"
+        )
+    if max_ticks_per_window < 8:
+        raise DataError(
+            f"max_ticks_per_window must be >= 8, got {max_ticks_per_window}"
         )
     n = ts.size
     if n < n_windows * 8:
         raise DataError(
             f"too few ticks ({n}) to form {n_windows} usable windows"
         )
+    # Cap: keep only the most recent n_windows × max_ticks_per_window ticks.
+    # ts/px are already chronologically sorted by the loaders, so the tail is
+    # the newest data. Below the budget we fall through to the even split.
+    budget = n_windows * int(max_ticks_per_window)
+    if n > budget:
+        ts = ts[-budget:]
+        px = px[-budget:]
+        n = ts.size
     bounds = np.linspace(0, n, n_windows + 1, dtype=int)
     out: list[tuple[np.ndarray, np.ndarray]] = []
     for k in range(n_windows):
@@ -306,12 +339,17 @@ def run_window(
     seed: int,
     segment_len: int,
     n_alpha: int,
+    n_windows: int | None = None,
 ) -> WindowResult:
     """Run the full pipeline over one window across the F-CFAR family.
 
     BH-FDR (alpha = 0.10) is applied across the family's surrogate p-values.
     The window's "best" variant is the FDR-surviving variant with the lowest
     p-value (ties broken by SNR); lead/edge are measured on its top peak.
+
+    Emits ``[c31] window k/N variant i/M: ...`` progress lines to stderr so a
+    future hang is immediately localisable (overnight 2026-06-14: the err.log
+    was silent for 5400 s with no way to tell whether anything was running).
     """
     wr = WindowResult(
         index=index, n_ticks=int(ts.size),
@@ -319,10 +357,33 @@ def run_window(
         t1_ms=float(ts[-1]) if ts.size else 0.0,
     )
 
+    n_win = n_windows if n_windows is not None else (index + 1)
+    span_ms = (wr.t1_ms - wr.t0_ms) if ts.size else 0.0
+    print(
+        f"[c31] window {index + 1}/{n_win}: {wr.n_ticks} ticks, "
+        f"span {span_ms / 1000.0:.1f}s, {len(family)} variant(s) x "
+        f"{n_surrogates} surrogates",
+        file=sys.stderr, flush=True,
+    )
+
     p_values: list[float] = []
     per_variant: list[dict[str, Any]] = []
+    n_variants = len(family)
     for vi, variant in enumerate(family):
+        print(
+            f"[c31] window {index + 1}/{n_win} variant {vi + 1}/{n_variants}: "
+            f"{variant.label} — surrogate test ({n_surrogates} surrogates)...",
+            file=sys.stderr, flush=True,
+        )
         cfar = CfarConfig(threshold_factor=variant.threshold_factor)
+
+        def _surrogate_progress(done: int, total: int, _vi: int = vi) -> None:
+            print(
+                f"[c31] window {index + 1}/{n_win} variant {_vi + 1}/"
+                f"{n_variants}: surrogate {done}/{total}",
+                file=sys.stderr, flush=True,
+            )
+
         # Deterministic per-variant seed offset (reproducible).
         sres = surrogate_test(
             ts,
@@ -332,6 +393,13 @@ def run_window(
             seed=seed + vi,
             segment_len=segment_len,
             n_alpha=n_alpha,
+            progress_cb=_surrogate_progress,
+        )
+        print(
+            f"[c31] window {index + 1}/{n_win} variant {vi + 1}/{n_variants}: "
+            f"{variant.label} done — observed_snr={sres.observed_snr:.3f} "
+            f"p={sres.p_value:.4f}",
+            file=sys.stderr, flush=True,
         )
         # Recover the top peak (alpha) for lead/edge measurement.
         counts, fs_hz = bin_counts(ts, variant.bin_dt_ms)
@@ -416,32 +484,58 @@ def run(
     seed: int = 42,
     segment_len: int = 256,
     n_alpha: int = 64,
+    max_ticks_per_window: int = WINDOW_MAX_TICKS,
     source: str = "",
     symbol: str = "",
 ) -> dict[str, Any]:
-    """Run the full C-31 pipeline over >= 2 windows and assemble the payload."""
+    """Run the full C-31 pipeline over >= 2 windows and assemble the payload.
+
+    ``max_ticks_per_window`` (DEC-09) caps each window at its most recent
+    ``max_ticks_per_window`` ticks (see :func:`split_windows`); it scopes the
+    DATA, never the H-03 gate thresholds.
+    """
     fam = family if family is not None else default_family()
-    # Span sanity check BEFORE any binning: a single corrupt timestamp (ts=0
-    # among epoch-ms data) makes the finest bin grid explode (1.3 TiB alloc in
-    # the T3 run of 2026-06-11). Fail fast with a DataError instead.
-    if ts.size >= 2 and fam:
+    # Split FIRST so the corrupt-timestamp span check below runs against the
+    # capped windows (DEC-09): the live trades table spans days, so the finest
+    # bin grid only stays sane once the tick budget has trimmed the series to
+    # its newest <= n_windows × max_ticks_per_window ticks per symbol.
+    windows = split_windows(
+        ts, px, n_windows, max_ticks_per_window=max_ticks_per_window
+    )
+    # Span sanity check on each capped window BEFORE binning: a single corrupt
+    # timestamp (ts=0 among epoch-ms data) still makes the finest bin grid
+    # explode (1.3 TiB alloc in the T3 run of 2026-06-11) even within a capped
+    # window. Fail fast with a DataError instead.
+    if fam:
         min_dt = min(v.bin_dt_ms for v in fam)
-        t_lo, t_hi = float(np.min(ts)), float(np.max(ts))
-        est_bins = (t_hi - t_lo) / min_dt
-        if est_bins > MAX_BINS:
-            raise DataError(
-                f"timestamp span {t_hi - t_lo:.0f} ms (t0={t_lo:.0f}, "
-                f"t1={t_hi:.0f}) needs ~{est_bins:.3g} bins at the finest "
-                f"family dt={min_dt:g} ms (> MAX_BINS={MAX_BINS}). Input "
-                "almost certainly contains corrupt timestamps (ts=0 rows / "
-                "wrong unit) — clean or filter the source data."
-            )
-    windows = split_windows(ts, px, n_windows)
+        for w_ts, _w_px in windows:
+            if w_ts.size < 2:
+                continue
+            t_lo, t_hi = float(np.min(w_ts)), float(np.max(w_ts))
+            est_bins = (t_hi - t_lo) / min_dt
+            if est_bins > MAX_BINS:
+                raise DataError(
+                    f"timestamp span {t_hi - t_lo:.0f} ms (t0={t_lo:.0f}, "
+                    f"t1={t_hi:.0f}) needs ~{est_bins:.3g} bins at the finest "
+                    f"family dt={min_dt:g} ms (> MAX_BINS={MAX_BINS}). Input "
+                    "almost certainly contains corrupt timestamps (ts=0 rows / "
+                    "wrong unit) — clean or filter the source data."
+                )
+    n_total = int(ts.size)
+    n_used = sum(int(w_ts.size) for w_ts, _ in windows)
+    print(
+        f"[c31] symbol={symbol or 'n/a'}: {n_total} ticks loaded, "
+        f"using newest {n_used} in {len(windows)} window(s) "
+        f"(cap {max_ticks_per_window}/window, family={len(fam)} variant(s), "
+        f"surrogates={n_surrogates})",
+        file=sys.stderr, flush=True,
+    )
     win_results = [
         run_window(
             i, w_ts, w_px, fam,
             n_surrogates=n_surrogates, seed=seed,
             segment_len=segment_len, n_alpha=n_alpha,
+            n_windows=len(windows),
         )
         for i, (w_ts, w_px) in enumerate(windows)
     ]
@@ -470,6 +564,11 @@ def run(
         "seed": seed,
         "fdr_alpha": FDR_ALPHA,
         "family": [v.label for v in fam],
+        # Data-scoping record (DEC-09): NOT a gate threshold. The newest
+        # n_ticks_used of n_ticks_total were split into the windows below.
+        "max_ticks_per_window": int(max_ticks_per_window),
+        "n_ticks_total": n_total,
+        "n_ticks_used": n_used,
         "gate_thresholds": {
             "surrogate_p_max": SURROGATE_P_MAX,
             "lead_min_ms": LEAD_MIN_MS,

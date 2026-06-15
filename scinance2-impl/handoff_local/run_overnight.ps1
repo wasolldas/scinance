@@ -44,6 +44,8 @@ $RecorderDurationS = [int]($RecorderHours * 3600)
 $Symbols = @('BTCUSDT', 'ETHUSDT', 'SOLUSDT', 'BNBUSDT', 'XRPUSDT')
 $C31Windows = 2
 $C31Surrogates = 200
+$C31MaxTicks = 150000   # DEC-09: deterministische Tick-Obergrenze je Fenster
+$C31TimeoutSec = 1800   # mit Tick-Cap reichlich (vorher 5400s -> 5/5 TIMEOUT)
 
 # -- Umgebung -------------------------------------------------------------
 $PythonExe = if ($env:PYTHON) { $env:PYTHON } else { 'python' }
@@ -197,10 +199,14 @@ if ((-not $DryRun) -and (-not (Test-Path $DuckDbPath))) {
         # Der CFAR-Driver hat zusaetzlich einen 30s-Open-Timeout (DataError mit
         # Lock-Hinweis), damit ein blockierter Open den Subprozess nicht haengen
         # laesst (overnight-Defekt 2026-06-13: kein C31-Log -> Hauptrunner starb).
-        [void](Invoke-Step -Name ("C31_CFAR_" + $sym) -TimeoutSec 5400 -CmdArgs @(
+        # --max-ticks-per-window (DEC-09): juengste windows x max-ticks Ticks je
+        # Symbol -> rechenbar + stationaer. Behebt den 5400s-TIMEOUT 5/5 vom
+        # 2026-06-14. Gate-Schwellen UNVERAENDERT.
+        [void](Invoke-Step -Name ("C31_CFAR_" + $sym) -TimeoutSec $C31TimeoutSec -CmdArgs @(
             (Join-Path $RepoRoot 'scripts\c31_cfar.py'), '--db', $DuckDbPath,
             '--symbol', $sym, '--windows', "$C31Windows",
-            '--surrogates', "$C31Surrogates", '--db-copy',
+            '--surrogates', "$C31Surrogates",
+            '--max-ticks-per-window', "$C31MaxTicks", '--db-copy',
             '--out', (Join-Path $RunDir ('c31_' + $sym))))
     }
 }
