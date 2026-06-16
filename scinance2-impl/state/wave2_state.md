@@ -44,7 +44,7 @@ Alle drei DROP-Verdikte sind **endgültig und kaskaden-wirksam** (Vol-Stack gesp
 - [~] Phase 2 PLAN — läuft (WP-0 H-04/H-05/H-06 registriert 2026-06-15; Pilot-Auswahl A umgesetzt: C-17/C-41, C-01-Vorzeichen, C-07-PE; effektives Welle-2-Alpha-Test-Budget = 3, alle kapitalfrei, F-LEADLAG/F-OFI/F-ENTROPY je BH-FDR α=0.10 + Welle-2-Über-Familie F-WAVE2 BH-FDR α=0.10)
 - [x] Phase 3/4 BUILD/VERIFY — WP-1 ✓ · WP-2 ✓ · WP-3 ✓ — alle 3 Welle-2-Pilots gebaut+verifiziert, Suite 776→872 grün (+96), 0 Modul-Bugs
 - [ ] Phase 5 GATE_CHECK — je Pilot
-- [ ] Phase 6 HANDOFF — Runner-Update für Wave 2
+- [x] Phase 6 HANDOFF — run_wave2.{ps1,sh} + aggregate_wave2_fdr.py + README_WAVE2.md (T3, 2-4h, F-WAVE2 zweistufige BH-FDR)
 - [ ] Phase 7 ANALYZE — Gate-Auswertung
 
 ## CHANGELOG (Welle 2)
@@ -56,3 +56,6 @@ Alle drei DROP-Verdikte sind **endgültig und kaskaden-wirksam** (Vol-Stack gesp
 
 - W2-WP3 (2026-06-16): H-06 Permutation Entropy gebaut — research/c07_pe/ (Bandt-Pompe m=4/τ=1 fix, PRE-Gate Spearman-ρ PE-Drop↔Vol-Cluster, Haupt-Gate MI + Block-Shift-Surrogat + AUC-Lift in G1, ~1500 LoC) + scripts/c07_pe.py. WINDOW_MAX_BARS=43200 (30 Tage, Stationarität) als append-only H-06-Nachtrag + DEC-12. Verify: 39 Tests, Suite 833→872 grün, 0 Modul-Bugs. PE-Korrektheit + Null + Positiv (ρ≥0.36, p=0.0196, AUC-Lift≥0.057) + PRE-Gate-Blocker + Kausalität + halb-offene Fenster. Datenbasis kline_1min. Kapitalfrei. Lauf NICHT gestartet (T3 beim User).
 - W2 BUILD-PHASE KOMPLETT (2026-06-16): Alle 3 kapitalfreien Mess-Gates H-04/H-05/H-06 gebaut+verifiziert. Suite 776→872 (+96), 0 Modul-Bugs. Nächster Schritt: WP-4 Handoff (Welle-2-Runner + zweistufige F-WAVE2-FDR).
+
+- W2-WP4 (2026-06-16): Handoff-Paket gebaut — `scinance2-impl/handoff_local/run_wave2.{ps1,sh}` (220+199 LoC, sequenziell H-04→H-05→H-06→Aggregation, PS-5.1 BOM+ASCII+handle-cache+BelowNormal, --db-copy default, try/except je Schritt, dry-run via HANDOFF_DRY_RUN), `aggregate_wave2_fdr.py` (551 LoC, KRITISCH: zweistufige F-WAVE2-BH-FDR — Stage 1 aus Driver-Flag `family_fdr_significant` verbatim, Stage 2 BH-FDR α=0.10 über alle Stage-1-Survivor-p gemeinsam aus H-04∪H-05∪H-06; H-06-PRE-Gate + H-05 inverse_significant separat ausgewiesen, NICHT in F-WAVE2), `README_WAVE2.md` (85 LoC). Verify: 13 Tests, Suite 872→885 grün (Stage-1-Survivor verbatim, Stage-2-Kill-Pfad, Schema-Robustheit, Determinismus, Runner-Statik-Lint). Dry-Run-Mechanik bestätigt (HANDOFF_DRY_RUN OK, HANDOFF_DRY_RC=1 FAIL-Pfad). Lauf NICHT gestartet (T3 beim User).
+- W2 HANDOFF-PHASE KOMPLETT (2026-06-16): Welle 2 bereit für lokalen Lauf. Drei kapitalfreie Mess-Gates + zweistufige F-WAVE2-FDR-Aggregation. Suite 776→885 (+109 Tests gesamt Welle 2), 0 Modul-Bugs. Nächster Schritt: User-Lauf, dann Phase 5 GATE_CHECK + Phase 7 ANALYZE durch gate-auditor.
