@@ -42,7 +42,7 @@ Alle drei DROP-Verdikte sind **endgültig und kaskaden-wirksam** (Vol-Stack gesp
 - [x] Phase 0 INIT — Branch + State-Datei
 - [x] Phase 1 SURVEY — Wave-2-Survey vorhanden (`scinance2-impl/state/wave2_survey.md`, 2026-06-15)
 - [~] Phase 2 PLAN — läuft (WP-0 H-04/H-05/H-06 registriert 2026-06-15; Pilot-Auswahl A umgesetzt: C-17/C-41, C-01-Vorzeichen, C-07-PE; effektives Welle-2-Alpha-Test-Budget = 3, alle kapitalfrei, F-LEADLAG/F-OFI/F-ENTROPY je BH-FDR α=0.10 + Welle-2-Über-Familie F-WAVE2 BH-FDR α=0.10)
-- [ ] Phase 3/4 BUILD/VERIFY — je gewähltem Pilot
+- [~] Phase 3/4 BUILD/VERIFY — WP-1 (H-04 Lead-Lag) gebaut+verifiziert ✓; WP-2 (H-05 OFI) ☐ · WP-3 (H-06 PE) ☐
 - [ ] Phase 5 GATE_CHECK — je Pilot
 - [ ] Phase 6 HANDOFF — Runner-Update für Wave 2
 - [ ] Phase 7 ANALYZE — Gate-Auswertung
@@ -51,3 +51,4 @@ Alle drei DROP-Verdikte sind **endgültig und kaskaden-wirksam** (Vol-Stack gesp
 
 - W2-INIT (2026-06-15): Branch `scinance2-wave2` von `scinance2-wave1` @ `e13bae6` abgezweigt. Welle-1-state-Dateien als Audit-Trail erhalten, separate `wave2_state.md` für Welle-2-Tracking. Welle-1-Endstand: 3 Alpha-DROPs, C-36 Fundament steht, ~5 Mio RPI-Zeilen aufgezeichnet.
 - W2-WP0 (2026-06-15): WP-0 Welle 2 abgeschlossen — Pre-Registration der drei Welle-2-Pilots VOR Lauf-Start in `state/hypothesis_registry.md`: **H-04** (C-17/C-41 Cross-Sectional Lead-Lag, 2-Symbol-Mess-Gate BTC/ETH, kapitalfrei, Familie F-LEADLAG), **H-05** (C-01 OFI-Vorzeichen-Test, INC-02-Anker, kapitalfrei, Familie F-OFI), **H-06** (C-07 Permutation Entropy, m=4/τ=1 vorab fixiert, ρ≥0.3 PRE-Gate, kapitalfrei, Familie F-ENTROPY). Registry-Disziplin um Welle-2-FDR-Nachtrag erweitert: drei neue Familien + Welle-2-Über-Familie F-WAVE2 (zweistufige BH-FDR α=0.10). Alle Gates aus PRD §4 wörtlich übernommen wo konkret, sonst konservativ aus verdict.md/claims_register abgeleitet und als solche markiert. Keine Code-/Test-Änderungen. Lauf für keinen der drei Pilots gestartet — gate-auditor-Veto würde sonst greifen.
+- W2-WP1 (2026-06-16): H-04 Lead-Lag gebaut — `src/bybit_edge/research/c17_c41_lead_lag/` (TE + Wavelet-Coherence + Circular-Shift-Surrogate, 1410 LoC) + `scripts/c17_c41_lead_lag.py`. DEC-10 (Achsen/Surrogate/Grid/WINDOW_MAX). Verify: 24 Tests, Suite 776→800 grün. Falsch-Positiv-Kontrolle (3 Seeds) + Detektions-Power (Lag-3 exakt, Lead=X) + Richtungs-Asymmetrie bestanden. 1 Modul-Bug gefixt (split_pair_windows doppelt-inklusive Grenzen → halb-offen). Kapitalfreiheit im Output bestätigt (capital_free:true, keine bps/Edge/PnL). Lauf NICHT gestartet (T2/T3 beim User).
