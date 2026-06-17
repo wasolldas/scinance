@@ -1,0 +1,8 @@
+-------- RUN_WAVE2 SUMMARY --------
+H04: OK (rc=0)
+H05: OK (rc=0)
+H06: OK (rc=0)
+WAVE2_FDR: OK (rc=0)
+SUMMARY: OK (rc=0)
+RUN_WAVE2 GESAMT: ok=5 fail=0 skip=0 -> exit 0 | Ergebnisse: E:\Claude\Projects\scinance\scinance2-impl\handoff_local\results\wave2_20260617_090618
+F-WAVE2-Aggregat: E:\Claude\Projects\scinance\scinance2-impl\handoff_local\results\wave2_20260617_090618\WAVE2_SUMMARY.md (Morgen-Auswertung gate-auditor)

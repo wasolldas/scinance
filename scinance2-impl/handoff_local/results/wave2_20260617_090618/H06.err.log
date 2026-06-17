@@ -1,0 +1,62 @@
+[c07] --db-copy: copying E:\Claude\Projects\scinance\data\bybit_edge.duckdb -> C:\Users\wguen\AppData\Local\Temp\c07_dbcopy_iq_7uoq4\bybit_edge.duckdb
+[c07] opening duckdb read-only: C:\Users\wguen\AppData\Local\Temp\c07_dbcopy_iq_7uoq4\bybit_edge.duckdb (symbol=BTCUSDT)
+[c07] opening duckdb read-only: C:\Users\wguen\AppData\Local\Temp\c07_dbcopy_iq_7uoq4\bybit_edge.duckdb (symbol=ETHUSDT)
+[c07] opening duckdb read-only: C:\Users\wguen\AppData\Local\Temp\c07_dbcopy_iq_7uoq4\bybit_edge.duckdb (symbol=SOLUSDT)
+[c07] opening duckdb read-only: C:\Users\wguen\AppData\Local\Temp\c07_dbcopy_iq_7uoq4\bybit_edge.duckdb (symbol=BNBUSDT)
+[c07] opening duckdb read-only: C:\Users\wguen\AppData\Local\Temp\c07_dbcopy_iq_7uoq4\bybit_edge.duckdb (symbol=XRPUSDT)
+[c07] --db-copy: removed temp copy C:\Users\wguen\AppData\Local\Temp\c07_dbcopy_iq_7uoq4
+[c07] BTCUSDT: 52000 klines loaded, 2 window(s) (cap 43200/window, PE m=4/tau=1 window=240, deltas=[1, 5, 15, 60]min, n_bins=4, surrogates=200)
+[c07] BTCUSDT window 1/2 PRE-Gate: n=25744 rho=+0.0044 floor_met=False
+[c07] BTCUSDT window 1/2 delta=1min: n=25759 mi=0.00051 surr_p=0.7214 auc_lift=-0.0085 n_g1=6457
+[c07] BTCUSDT window 1/2 delta=5min: n=25755 mi=0.00364 surr_p=0.1841 auc_lift=-0.0077 n_g1=6421
+[c07] BTCUSDT window 1/2 delta=15min: n=25745 mi=0.00469 surr_p=0.2786 auc_lift=-0.0077 n_g1=6429
+[c07] BTCUSDT window 1/2 delta=60min: n=25700 mi=0.00617 surr_p=0.3085 auc_lift=-0.0083 n_g1=6438
+[c07] BTCUSDT window 2/2 PRE-Gate: n=25744 rho=-0.0059 floor_met=False
+[c07] BTCUSDT window 2/2 delta=1min: n=25759 mi=0.00047 surr_p=0.6368 auc_lift=-0.0021 n_g1=6440
+[c07] BTCUSDT window 2/2 delta=5min: n=25755 mi=0.00301 surr_p=0.2488 auc_lift=-0.0010 n_g1=6427
+[c07] BTCUSDT window 2/2 delta=15min: n=25745 mi=0.00674 surr_p=0.1592 auc_lift=-0.0015 n_g1=6431
+[c07] BTCUSDT window 2/2 delta=60min: n=25700 mi=0.00531 surr_p=0.5771 auc_lift=-0.0011 n_g1=6426
+[c07] ETHUSDT: 52000 klines loaded, 2 window(s) (cap 43200/window, PE m=4/tau=1 window=240, deltas=[1, 5, 15, 60]min, n_bins=4, surrogates=200)
+[c07] ETHUSDT window 1/2 PRE-Gate: n=25744 rho=+0.0111 floor_met=False
+[c07] ETHUSDT window 1/2 delta=1min: n=25759 mi=0.00103 surr_p=0.4826 auc_lift=-0.0014 n_g1=6432
+[c07] ETHUSDT window 1/2 delta=5min: n=25755 mi=0.00311 surr_p=0.5522 auc_lift=-0.0014 n_g1=6442
+[c07] ETHUSDT window 1/2 delta=15min: n=25745 mi=0.00396 surr_p=0.5871 auc_lift=-0.0017 n_g1=6427
+[c07] ETHUSDT window 1/2 delta=60min: n=25700 mi=0.01091 surr_p=0.2338 auc_lift=-0.0014 n_g1=6470
+[c07] ETHUSDT window 2/2 PRE-Gate: n=25744 rho=+0.0025 floor_met=False
+[c07] ETHUSDT window 2/2 delta=1min: n=25759 mi=0.00045 surr_p=0.6915 auc_lift=-0.0071 n_g1=6433
+[c07] ETHUSDT window 2/2 delta=5min: n=25755 mi=0.00149 surr_p=0.6866 auc_lift=-0.0066 n_g1=6423
+[c07] ETHUSDT window 2/2 delta=15min: n=25745 mi=0.00352 surr_p=0.4428 auc_lift=-0.0071 n_g1=6431
+[c07] ETHUSDT window 2/2 delta=60min: n=25700 mi=0.00585 surr_p=0.4577 auc_lift=-0.0072 n_g1=6414
+[c07] SOLUSDT: 52000 klines loaded, 2 window(s) (cap 43200/window, PE m=4/tau=1 window=240, deltas=[1, 5, 15, 60]min, n_bins=4, surrogates=200)
+[c07] SOLUSDT window 1/2 PRE-Gate: n=25744 rho=-0.0001 floor_met=False
+[c07] SOLUSDT window 1/2 delta=1min: n=25759 mi=0.00031 surr_p=0.7662 auc_lift=-0.0039 n_g1=6443
+[c07] SOLUSDT window 1/2 delta=5min: n=25755 mi=0.00108 surr_p=0.7065 auc_lift=-0.0041 n_g1=6445
+[c07] SOLUSDT window 1/2 delta=15min: n=25745 mi=0.00260 surr_p=0.6567 auc_lift=-0.0040 n_g1=6433
+[c07] SOLUSDT window 1/2 delta=60min: n=25700 mi=0.00730 surr_p=0.2139 auc_lift=-0.0030 n_g1=6462
+[c07] SOLUSDT window 2/2 PRE-Gate: n=25744 rho=-0.0004 floor_met=False
+[c07] SOLUSDT window 2/2 delta=1min: n=25759 mi=0.00070 surr_p=0.2438 auc_lift=+0.0088 n_g1=6433
+[c07] SOLUSDT window 2/2 delta=5min: n=25755 mi=0.00238 surr_p=0.2239 auc_lift=+0.0089 n_g1=6439
+[c07] SOLUSDT window 2/2 delta=15min: n=25745 mi=0.00335 surr_p=0.3731 auc_lift=+0.0093 n_g1=6468
+[c07] SOLUSDT window 2/2 delta=60min: n=25700 mi=0.00708 surr_p=0.1791 auc_lift=+0.0088 n_g1=6445
+[c07] BNBUSDT: 52000 klines loaded, 2 window(s) (cap 43200/window, PE m=4/tau=1 window=240, deltas=[1, 5, 15, 60]min, n_bins=4, surrogates=200)
+[c07] BNBUSDT window 1/2 PRE-Gate: n=25744 rho=-0.0002 floor_met=False
+[c07] BNBUSDT window 1/2 delta=1min: n=25759 mi=0.00064 surr_p=0.4627 auc_lift=-0.0078 n_g1=6436
+[c07] BNBUSDT window 1/2 delta=5min: n=25755 mi=0.00231 surr_p=0.3234 auc_lift=-0.0088 n_g1=6426
+[c07] BNBUSDT window 1/2 delta=15min: n=25745 mi=0.00495 surr_p=0.1244 auc_lift=-0.0071 n_g1=6448
+[c07] BNBUSDT window 1/2 delta=60min: n=25700 mi=0.00472 surr_p=0.5274 auc_lift=-0.0076 n_g1=6433
+[c07] BNBUSDT window 2/2 PRE-Gate: n=25744 rho=+0.0145 floor_met=False
+[c07] BNBUSDT window 2/2 delta=1min: n=25759 mi=0.00089 surr_p=0.3035 auc_lift=+0.0010 n_g1=6406
+[c07] BNBUSDT window 2/2 delta=5min: n=25755 mi=0.00279 surr_p=0.1990 auc_lift=+0.0010 n_g1=6426
+[c07] BNBUSDT window 2/2 delta=15min: n=25745 mi=0.00601 surr_p=0.1343 auc_lift=+0.0011 n_g1=6410
+[c07] BNBUSDT window 2/2 delta=60min: n=25700 mi=0.01232 surr_p=0.0846 auc_lift=+0.0005 n_g1=6439
+[c07] XRPUSDT: 52000 klines loaded, 2 window(s) (cap 43200/window, PE m=4/tau=1 window=240, deltas=[1, 5, 15, 60]min, n_bins=4, surrogates=200)
+[c07] XRPUSDT window 1/2 PRE-Gate: n=25744 rho=-0.0006 floor_met=False
+[c07] XRPUSDT window 1/2 delta=1min: n=25759 mi=0.00095 surr_p=0.3731 auc_lift=+0.0028 n_g1=6453
+[c07] XRPUSDT window 1/2 delta=5min: n=25755 mi=0.00374 surr_p=0.2587 auc_lift=+0.0027 n_g1=6423
+[c07] XRPUSDT window 1/2 delta=15min: n=25745 mi=0.00553 surr_p=0.2736 auc_lift=+0.0030 n_g1=6455
+[c07] XRPUSDT window 1/2 delta=60min: n=25700 mi=0.00926 surr_p=0.1841 auc_lift=+0.0027 n_g1=6466
+[c07] XRPUSDT window 2/2 PRE-Gate: n=25744 rho=+0.0081 floor_met=False
+[c07] XRPUSDT window 2/2 delta=1min: n=25759 mi=0.00223 surr_p=0.0149 auc_lift=+0.0075 n_g1=6420
+[c07] XRPUSDT window 2/2 delta=5min: n=25755 mi=0.00735 surr_p=0.0100 auc_lift=+0.0081 n_g1=6404
+[c07] XRPUSDT window 2/2 delta=15min: n=25745 mi=0.01379 surr_p=0.0050 auc_lift=+0.0072 n_g1=6440
+[c07] XRPUSDT window 2/2 delta=60min: n=25700 mi=0.01949 surr_p=0.0050 auc_lift=+0.0072 n_g1=6451

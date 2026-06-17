@@ -1,0 +1,1 @@
+C17-C41 H-04 | pair=BTCUSDT/ETHUSDT windows=2 all_pass=True (2/2 Fenster Existenz, lead_stable=True, leads=['BTCUSDT', 'BTCUSDT']) surrogates=200 seed=42 -> E:\Claude\Projects\scinance\scinance2-impl\handoff_local\results\wave2_20260617_090618\h04\c17_c41_results.json, E:\Claude\Projects\scinance\scinance2-impl\handoff_local\results\wave2_20260617_090618\h04\c17_c41_results.md
