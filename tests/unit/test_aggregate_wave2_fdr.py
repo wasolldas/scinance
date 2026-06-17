@@ -383,3 +383,83 @@ def test_run_wave2_sh_passes_bash_n() -> None:
     sh = HANDOFF_DIR / "run_wave2.sh"
     r = subprocess.run(["bash", "-n", str(sh)], capture_output=True, text=True)
     assert r.returncode == 0, f"bash -n failed: {r.stderr}"
+
+
+# ---------------------------------------------------------------------------
+# 7. H-04b runner static lint (run_h04b.{ps1,sh}, T2 Tradability handoff).
+#    Same constraints as the Welle-2 runners: PS1 needs a UTF-8 BOM + ASCII
+#    body so the PowerShell 5.1 parser is happy; SH stays pure ASCII; both
+#    must balance braces/parens, never block on input, and pass `bash -n`.
+# ---------------------------------------------------------------------------
+
+
+def test_run_h04b_ps1_is_utf8_bom_and_ascii_body() -> None:
+    """run_h04b.ps1 must start with a UTF-8 BOM and contain no non-ASCII
+    bytes in its body (PowerShell 5.1 parser depends on it; mirrors the
+    constraint enforced for run_wave2.ps1 / run_cfar_only.ps1)."""
+    ps1 = HANDOFF_DIR / "run_h04b.ps1"
+    data = ps1.read_bytes()
+    assert data.startswith(b"\xef\xbb\xbf"), "run_h04b.ps1 missing UTF-8 BOM"
+    body = data[3:]
+    bad = [(i, b) for i, b in enumerate(body) if b > 0x7F]
+    assert not bad, f"non-ASCII bytes in run_h04b.ps1 body: {bad[:5]}"
+
+
+def test_run_h04b_sh_is_ascii_body() -> None:
+    """run_h04b.sh must be pure ASCII (no BOM, no UTF-8 dashes/paragraph signs)."""
+    sh = HANDOFF_DIR / "run_h04b.sh"
+    data = sh.read_bytes()
+    assert not data.startswith(b"\xef\xbb\xbf"), "run_h04b.sh has unexpected BOM"
+    bad = [(i, b) for i, b in enumerate(data) if b > 0x7F]
+    assert not bad, f"non-ASCII bytes in run_h04b.sh: {bad[:5]}"
+
+
+def test_run_h04b_ps1_brace_and_paren_balance() -> None:
+    """Strip comments and string literals, then check brace/paren balance.
+    Mirrors the lint the Welle-1/Welle-2 runners passed during hardening."""
+    import re
+    ps1 = HANDOFF_DIR / "run_h04b.ps1"
+    text = ps1.read_bytes()[3:].decode("ascii")  # strip BOM
+    no_comments = re.sub(r"(?m)#.*$", "", text)
+    no_strings = re.sub(r"'(?:[^'\\]|\\.)*'", "''", no_comments)
+    no_strings = re.sub(r'"(?:[^"\\]|\\.)*"', '""', no_strings)
+    assert no_strings.count("{") == no_strings.count("}"), "PS1 brace imbalance"
+    assert no_strings.count("(") == no_strings.count(")"), "PS1 paren imbalance"
+
+
+def test_run_h04b_runners_have_no_interactive_prompts() -> None:
+    """A handoff runner must NEVER block on user input (T2/T3 rule, same
+    interaction-free guarantee the overnight runner relies on)."""
+    for name in ("run_h04b.ps1", "run_h04b.sh"):
+        text = (HANDOFF_DIR / name).read_bytes().decode("ascii", errors="ignore")
+        for forbidden in ("Read-Host", "input(", "\nPause\n", "Pause "):
+            assert forbidden not in text, (
+                f"{name} contains interactive prompt token '{forbidden}'"
+            )
+
+
+def test_run_h04b_sh_passes_bash_n() -> None:
+    """`bash -n run_h04b.sh` must succeed (syntactic-only check)."""
+    import subprocess
+    sh = HANDOFF_DIR / "run_h04b.sh"
+    r = subprocess.run(["bash", "-n", str(sh)], capture_output=True, text=True)
+    assert r.returncode == 0, f"bash -n failed: {r.stderr}"
+
+
+def test_run_h04b_primary_is_judgment_bearing_and_sensitivity_is_marked() -> None:
+    """Anti-Gaming-Klausel: the urteilstragende run is the 300ms/11bps/Taker
+    H04B_PRIMARY block; the latency-sensitivity and maker runs must be present
+    AND explicitly marked as NICHT urteilstragend in both runners."""
+    for name in ("run_h04b.ps1", "run_h04b.sh"):
+        text = (HANDOFF_DIR / name).read_bytes().decode("ascii", errors="ignore")
+        # The four named blocks all exist.
+        for block in ("H04B_PRIMARY", "H04B_LAT100", "H04B_LAT500", "H04B_MAKER"):
+            assert block in text, f"{name} missing block {block}"
+        # The judgment-bearing defaults (300ms latency, 11bps wall) are present.
+        assert "300" in text and "11" in text, f"{name} missing 300ms/11bps defaults"
+        # The maker secondary flag is wired.
+        assert "--maker-secondary" in text, f"{name} missing --maker-secondary"
+        # Sensitivity runs are flagged as not judgment-bearing (Anti-Gaming).
+        assert "NICHT urteilstragend" in text, (
+            f"{name} does not mark sensitivity/maker runs as NICHT urteilstragend"
+        )
