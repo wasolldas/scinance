@@ -252,3 +252,133 @@ BTC Fenster 0 verfehlt p-Kriterium (0.871 ≫ 0.05) UND Edge-Kriterium (0.04 ≪
 **Mechanistische Schlussfolgerung:** Die Hypothese „zyklostationäres Spektrum der Inter-Arrival-Zeiten enthält CFAR-detektierbare, prädiktive periodische Struktur mit handelbarer Edge oberhalb der Friction-Wand" ist auf den 4 unabhängig gemessenen Fenstern (BTC × 2 + ETH × 2) **deutlich widerlegt**: Die p-Werte sind statistisch nicht von der geshuffelten Inter-Arrival-Null zu unterscheiden (≈ 1.0), und die geschätzte Edge ist ~250× UNTER der 11-bps-Friction-Wand. Selbst wenn die Spektral-Detektion irgendwann ein signifikantes p liefern würde, wäre die handelbare Edge inhaltlich tot. Konsistent mit der Skeptic-Argumentation im iter-3-Verdict: HFT-abgegraste Anomalie, adaptiver Gegner, keine Retail-überlebende Edge.
 
 **Konsequenz:** H-03 fällt auf DROP. **Damit sind alle vier Welle-1-Piloten entschieden:** H-01 DROP (S3), H-02 DROP (Vol-Stack-Anker), H-03 DROP (CFAR), C-36 Recording-Fundament steht (~5 Mio RPI-Zeilen, kein Alpha-Gate).
+
+---
+
+## GL-006 · 2026-06-17 · H-04 · C-17/C-41 Cross-Sectional Lead-Lag (Welle-2-Pilot 1, KAPITALFREI) — **WEITER (Mess-Existenz; Kapital-Status bleibt PARK)**
+
+**Quelle:** `handoff_local/results/wave2_20260617_090618/h04/c17_c41_results.{json,md}` + `WAVE2_SUMMARY.md` (F-WAVE2 zweistufig) + `wave2_summary.json`.
+Lauf: BTCUSDT/ETHUSDT-Paar aus `trades`, 2 disjunkte Fenster (F0: 3874 Bars, 1780611314526..1780615189170 ms; F1: 3875 Bars, 1780615190990..1780619066816 ms), Grid 1000 ms, Lags [1,2,3,5,10] Bars, Achsen TE (C-17) + WCOH (C-41), n_surrogates 200, seed 42, BH-FDR α=0.10 über F-LEADLAG. Runner 5/5 OK (rc=0).
+
+### Registriertes Gate (H-04, wörtlich) — vier Kriterien
+1. Konditionale gerichtete Info signifikant > Surrogate-Null, p ≤ 0.05 NACH BH-FDR α=0.10 über F-LEADLAG.
+2. Existenz in ≥ 2 disjunkten Fenstern.
+3. Lead-Symbol-Stabilität: Vorzeichen/Lead-Symbol über beide Fenster konsistent.
+4. Hartes Ein-Fenster-DROP: Surrogate-Signifikanz in EINEM Fenster verfehlt ODER Lead-Symbol kippt. Kein GRAUBEREICH.
+
+### Je-Kriterium-Tabelle (Messwert vs. Schwelle vs. bestanden)
+
+| Kriterium (Registry wörtlich) | Schwelle | Messwert | Bestanden |
+|---|---|---|---|
+| Surrogate-p FDR-sig (F-LEADLAG) Fenster 0 | ≤ 0.05 nach BH-FDR | beste Variante WCOH p=0.0050 (FDR-sig); 8 Varianten FDR-sig, p_crit=0.0697 | **ja** |
+| Surrogate-p FDR-sig (F-LEADLAG) Fenster 1 | ≤ 0.05 nach BH-FDR | beste Variante WCOH p=0.0050 (FDR-sig); 4 Varianten FDR-sig, p_crit=0.0199 | **ja** |
+| Existenz in ≥ 2 disjunkten Fenstern | ≥ 2 | 2/2 Fenster mit ≥1 FDR-sig Variante | **ja** |
+| Lead-Symbol-Stabilität über beide Fenster | konsistent | Lead je Fenster = [BTCUSDT, BTCUSDT] (stabil) | **ja** |
+| Ein-Fenster-DROP ausgelöst? | nein-Fall = Pass | kein Fenster ohne Surrogate-Signifikanz; Lead kippt nicht | **nicht ausgelöst** |
+
+### Zentrale Bewertungsfrage: Verletzt bidirektionale Signifikanz in Fenster 0 die Lead-Symbol-Stabilität?
+
+In Fenster 0 sind BEIDE TE-Richtungen FDR-signifikant (BTC→ETH: lag1/2/3/5; ETH→BTC: lag3 mit p=0.0199 FDR-sig, lag1/lag2 nur unkorrigiert grenzwertig p=0.0647/0.0697 = NICHT FDR-sig bei p_crit 0.0697 für lag2 genau auf der Grenze). In Fenster 1 ist die Rückrichtung ETH→BTC NICHT FDR-sig (lag1 ETH→BTC p=0.0050 ist hier zwar sig, aber WCOH+BTC→ETH dominieren). Es gibt also bidirektionale Kopplung mindestens in F0.
+
+**Beide Lesarten dokumentiert:**
+- **Lesart A (strenge „bidirektional = Kippen"):** Wenn „Lead-Symbol kippt" so verstanden wird, dass NUR eine gerichtete Achse signifikant sein darf, dann ist bidirektionale Signifikanz in F0 ein Verstoß → DROP.
+- **Lesart B (Registry-Wortlaut „Lead-Symbol bleibt über beide Fenster konsistent"):** Das Kriterium fragt nach der KONSISTENZ des dominanten Lead-Symbols über die Fenster, nicht nach Ausschließlichkeit einer Richtung pro Fenster.
+
+**Entscheidung (streng aus dem Registry-Wortlaut, nicht aus Wunschdenken): Lesart B.** Begründung exakt am Text:
+- Der Registry-Text definiert das Kriterium als „Lag-Stabilität (das **Vorzeichen/Lead-Symbol bleibt über beide Fenster konsistent**)" und das Abbruchkriterium als „Lead-Symbol **kippt**". „Kippt" = das dominante Lead-Symbol wechselt zwischen den Fenstern (BTC→ETH in F0, ETH→BTC in F1). Das ist hier NICHT der Fall.
+- Die Stabilität ist in beiden Fenstern eindeutig durch BTCUSDT getragen: (a) Auf der WCOH-Achse (C-41) ist Lead=BTCUSDT in BEIDEN Fenstern (F0 +0.9028 p=0.0050; F1 +0.9076 p=0.0050). (b) Auf der TE-Achse (C-17) ist BTC→ETH bei JEDEM gematchten Lag STÄRKER als ETH→BTC — F0 lag1 +0.0054>+0.0040, lag2 +0.0074>+0.0046, lag3 +0.0059=+0.0046, lag5 +0.0048>+0.0029; F1 lag1 +0.0087>+0.0055, lag2 +0.0049>+0.0028. Die dominante (höchste obs-Stat) gerichtete Achse ist in beiden Fenstern BTC→ETH.
+- Bidirektionale Kopplung bei zwei eng korrelierten Perp-Märkten im Sekunden-Takt ist physikalisch erwartbar (gemeinsamer Order-Flow, ETH reagiert nicht latenzfrei auf BTC); das Registry verlangt NICHT, dass die Rückrichtung null ist, sondern dass das Lead-Symbol nicht kippt. Die registrierte Hypothese lautet „BTC führt, Alt folgt" — genau das ist messbar erfüllt (BTC dominiert in beiden Fenstern auf beiden Achsen).
+- Lesart A würde de facto einen Schwellwert nachregistrieren („Rückrichtung muss insignifikant sein"), der im Registry NICHT steht — das wäre Torpfosten-Verschiebung (§2). Daher abgelehnt.
+
+→ Kriterium 3 (Lead-Symbol-Stabilität) ist **erfüllt**. Kriterium 4 ist **nicht ausgelöst** (kein Fenster ohne Surrogate-Signifikanz; kein Kippen). Alle vier Kriterien bestanden.
+
+### Anwendung der zweistufigen F-WAVE2-FDR
+Stage 1 (F-LEADLAG-intern, BH α=0.10): 12 von 22 Varianten überleben. Stage 2 (Über-Familie, gemeinsam mit F-OFI/F-ENTROPY-Survivorn, p_crit=0.0697): **12/12 überleben auch Stage 2 — 0 verloren.** Insbesondere die beiden WCOH-Survivors (p=0.0050) und die BTC→ETH-TE-Survivors bleiben in Stage 2 signifikant. Stage 2 ändert das Urteil NICHT.
+
+### Mechanistische Schlussfolgerung
+Auf dem BTC/ETH-Perp-Paar existiert über beide disjunkten Fenster ein robust messbarer, surrogat-signifikanter gerichteter Informationsfluss mit BTCUSDT als stabilem Lead-Symbol, sowohl auf der Transfer-Entropy-Achse (C-17) als auch auf der Wavelet-Coherence-Phasen-Achse (C-41). Die signifikanten gerichteten Lags liegen bei 1–3 s (TE lag1–lag3 sind die FDR-Survivor; ab lag5/lag10 zerfällt die Signifikanz in beiden Fenstern). Die Existenz von gerichteter Information ist damit messbar bestätigt — H-04 als reines Mess-Gate ist WEITER.
+
+### KAPITALFREIHEIT (verbindliche Pflichtnotiz — Registry H-04, PRD §4 Z.133)
+**WEITER heißt AUSSCHLIESSLICH: gerichtete Information existiert messbar. NICHT handelbar.** Die signifikanten Lags sind 1–3 s — tiefes HFT-Territorium. PRD §4 wörtlich: „keine handelbare Kante (abgegraste 30–60s-HFT-Anomalie) → bleibt PARK." Es wird KEINE Edge-/bps-/Sharpe-/Tradability-Aussage nachregistriert; das Gate trägt keine. Konsequenz: **Kapital-Status bleibt PARK** (kein Kapitaleinsatz, kein Friction-Wand-Vergleich). Tradability wäre eine **NEUE H-04b** (eigener Registry-Eintrag, eigener Lauf, L2-Tiefen-Stream) und ist WP-0-Arbeit — hier NICHT registriert. Das Mess-WEITER entsperrt keinerlei Kapitalmodul.
+
+### URTEIL: **WEITER (Mess-Existenz bestätigt)** — Kapital-Status PARK, Tradability = offene NEUE H-04b.
+Erster nicht-trivialer Nicht-DROP des Frameworks: ein Gate, das tatsächlich bestanden wird — aber bewusst als kapitalfreies Mess-Gate konstruiert, sodass „bestanden" keine handelbare Behauptung impliziert.
+
+---
+
+## GL-007 · 2026-06-17 · H-05 · C-01 OFI-Vorzeichen-Test (INC-02-Anker, Welle-2-Pilot 2, KAPITALFREI) — **DROP für C-01 + C-09-OFI-Bein + C-14-OFI-Erbe**
+
+**Quelle:** `handoff_local/results/wave2_20260617_090618/h05/c01_ofi_sign_results.{json,md}` + `WAVE2_SUMMARY.md`.
+Lauf: 5 Symbole (BTC/ETH/SOL/BNB/XRP) aus `trades`, 2 disjunkte Fenster, δ ∈ {1,5,15,60,300} s, n_surrogates 200, seed 42, BH-FDR α=0.10 über F-OFI (50 Varianten), Tick-Cap 150000/Fenster, eigener OFI-Schätzer (m2_ofi.py unberührt, DEC-11). Runner OK (rc=0).
+
+### Registriertes Gate (H-05, wörtlich)
+- **WEITER:** sign(corr)=+ (Aggression-Folge) UND p ≤ 0.05 nach BH-FDR (F-OFI) UND Konsistenz in ≥ 2 disjunkten Fenstern UND Magnitude (|corr| ≥ 0.05 ODER Hit-Rate ≥ 0.53).
+- **DROP (INC-02-bestätigend):** sign ≤ 0 in ≥ 1 Fenster ODER Magnitude verfehlt ODER FDR-p > 0.05 → DROP für C-01 + C-09-OFI-Bein + C-14-OFI-Erbe.
+- **Inverse These = NEUE H-05b** (kein H-05-Bestehen, kein Torpfosten-Verschieben). Hartes Ein-Fenster-Kriterium, kein GRAUBEREICH.
+
+### Je-Kriterium-Tabelle — gesucht: irgendein Symbol/δ mit FDR-sig POSITIVEM Vorzeichen in BEIDEN Fenstern?
+
+| Kriterium (Registry wörtlich) | Schwelle | Messwert | Bestanden |
+|---|---|---|---|
+| FDR-sig POSITIVE Vorzeichen-Varianten (F-OFI, p_crit=0.0050) | p ≤ 0.05 nach BH-FDR UND sign=+ | nur **BNBUSDT w0 d1s** (corr +0.0441, p=0.0050) und **BNBUSDT w0 d5s** (corr +0.0204, p=0.0050) | nur Fenster 0 |
+| dieselbe Variante FDR-sig + positiv AUCH in Fenster 1 | ≥ 2 disjunkte Fenster | BNB w1 d1s p=0.0597 (NICHT FDR-sig); BNB w1 d5s sign− p=0.1393; BNB w1 d15s sign− | **nein** |
+| ≥ 2-Fenster-Konsistenz (positiv) für IRGENDEIN Symbol/δ | beide Fenster | **kein** Symbol×δ ist in beiden Fenstern FDR-sig + positiv | **nein** |
+| Magnitude |corr| ≥ 0.05 ODER Hit-Rate ≥ 0.53 | einer reicht | BNB w0 d1s erfüllt (HR 0.601); aber Fenster-Konsistenz fehlt | n/a |
+| Hartes Ein-Fenster: sign ≤ 0 in ≥ 1 Fenster | kein neg./null-Vorzeichen | BTC F0 alle δ negativ; ETH beide Fenster fast durchgängig negativ; SOL/XRP gemischt negativ | **verletzt → DROP** |
+
+**Befund zur Kernfrage:** Es gibt **KEIN einziges** Symbol/δ mit FDR-signifikant positivem Vorzeichen in BEIDEN Fenstern. Der einzige positive FDR-Survivor (BNBUSDT, w0 d1s/d5s) bricht in Fenster 1 zusammen (d1s nicht FDR-sig, d5s/d15s kippen sogar ins Negative). Das harte Ein-Fenster-Kriterium ist mehrfach verletzt (BTC, ETH negativ).
+
+### ETH-Befund: signifikant INVERSES Vorzeichen → H-05b-Trigger
+**ETHUSDT w0 d1s: corr = −0.0550, p = 0.0050 (FDR-sig in F-OFI, inverse_significant=true), Hit-Rate 0.490.** Das ist die MM-Replenishment-Lesart: OFI markiert nicht die aggressive Folge-Seite, sondern die nachfüllende Market-Maker-Seite (Vorzeichen invertiert). |corr| 0.055 ≥ Magnitude-Floor und p FDR-sig — also ein echtes, signifikantes inverses Signal, kein Rauschen.
+
+**Bestätigt das die iter-3/S2-2023-Forensik (E-04, OFI-Vorzeichen invertiert)?** Ja, konsistent. Der INC-02-Anker (E-04 hit_sum 0.179 = fälschlich invertiertes Vorzeichen der S2-Implementierung) wird durch dieses unabhängige read-only-Mess-Gate REPRODUZIERT: auf ETH ist das OFI-Vorzeichen signifikant negativ (inverse/MM-Replenishment-Richtung), nicht positiv (Aggression-Folge). Die ETH-Spalte ist über BEIDE Fenster durchgängig negativ (w0 alle δ negativ, w1 alle δ negativ), was die Robustheit der Inversion unterstreicht — auch wenn nur w0 d1s FDR-sig ist.
+
+### Anwendung der zweistufigen F-WAVE2-FDR
+Stage 1 (F-OFI, p_crit=0.0050): 3 Survivor (BNB w0 d1s, BNB w0 d5s, ETH w0 d1s-invers). Stage 2 (Über-Familie): **3/3 überleben — 0 verloren.** Stage 2 ändert NICHTS: Die 3 Survivor erfüllen das H-05-Pass-Kriterium ohnehin nicht (BNB scheitert an ≥2-Fenster-Konsistenz; ETH ist invers = H-05b, kein Pass). Die zweistufige FDR ist damit für das H-05-Urteil nicht entscheidungstragend — das Urteil folgt aus Vorzeichen-Konsistenz + Ein-Fenster-Kriterium, die strenger greifen als die reine FDR-Survivorschaft.
+
+### Mechanistische Schlussfolgerung
+Die PRD-v1/CS-02-Behauptung „sign(OFI)=+ (Aggression-Folge)" ist auf dem Bestands-`trades`-Stream **widerlegt**: kein Symbol zeigt FDR-sig positive Vorzeichen-Konsistenz über ≥ 2 Fenster; die einzige robuste, FDR-signifikante Struktur ist ein INVERSES Vorzeichen auf ETH (MM-Replenishment) — exakt die E-04/INC-02-Lesart. Das ist KEIN H-05-Bestehen, sondern Falsifikation der ursprünglichen Richtung + Bestätigung des Falsifikators.
+
+### URTEIL: **DROP** für C-01 + C-09-OFI-Bein + C-14-OFI-Erbe (PRD §4 Z.131 wörtlich, kaskaden-wirksam).
+Hartes Ein-Fenster-Kriterium verletzt (negatives Vorzeichen in ≥ 1 Fenster auf mehreren Symbolen) UND keine ≥2-Fenster-positive-Konsistenz UND der einzige robuste FDR-Effekt ist invers.
+
+### Empfehlung (KEINE Selbst-Registrierung — WP-0-Arbeit)
+Der inverse ETH-Befund (corr −0.0550, p=0.0050, FDR-sig) ist der Auslöser für eine **NEUE H-05b-Pre-Registration** (MM-Replenishment-Lesart von INC-02). Registry-Disziplin §2: kein Verschieben der Torpfosten — H-05b ist ein eigener Eintrag mit eigenem vorregistrierten Gate (inverse Richtung als Haupt-These, ≥2-Fenster-Konsistenz, FDR, kapitalfrei). **Ich registriere H-05b NICHT selbst** (das ist WP-0/Orchestrator-Arbeit); ich empfehle es als Folge-WP. Hinweis: Auch ein H-05b müsste die ≥2-Fenster-Konsistenz erst zeigen (ETH-Inversion ist bislang nur in w0 d1s FDR-sig, wenngleich das Vorzeichen über beide Fenster konsistent negativ ist).
+
+---
+
+## GL-008 · 2026-06-17 · H-06 · C-07 Permutation Entropy (Welle-2-Pilot 3, KAPITALFREI) — **DROP (PRE-Gate in ALLEN Fenstern verfehlt)**
+
+**Quelle:** `handoff_local/results/wave2_20260617_090618/h06/c07_pe_results.{json,md}` + `WAVE2_SUMMARY.md`.
+Lauf: 5 Symbole aus `kline_1min` (NICHT trades), 2 disjunkte Fenster, m=4/τ=1 vorab fixiert (DEC-12, read-only Konstanten), Rolling-PE 240 Bars, δ ∈ {1,5,15,60} min, Vol-Cluster=RV über 15-min-Forward, n_surrogates 200, seed 42, BH-FDR α=0.10 über F-ENTROPY (40 Varianten), Bar-Cap 43200/Fenster (= 30 Tage, Stationaritäts-Cap). Runner OK (rc=0).
+
+### Registriertes Gate (H-06, wörtlich)
+- **PRE-Gate (Vorbedingung):** ρ ≥ 0.30 zwischen PE-Drop und 15-min-Vol-Cluster in ≥ 2 disjunkten Fenstern. **ρ < 0.30 in EINEM Fenster → DROP, kein Voll-Lauf** (hartes Ein-Fenster-Kriterium, PRD §8.5).
+- **Haupt-Gate:** PRE-Gate bestanden UND Surrogate-p ≤ 0.05 nach BH-FDR (F-ENTROPY) in ≥ 2 Fenstern UND bedingter AUC-Lift ≥ +0.03 in G1-Fenstern. Kein GRAUBEREICH.
+
+### Je-Kriterium-Tabelle
+
+| Kriterium (Registry wörtlich) | Schwelle | Messwert | Bestanden |
+|---|---|---|---|
+| PRE-Gate ρ ≥ 0.30 in ≥ 2 Fenstern | ρ ≥ 0.30 | alle 10 Symbol×Fenster: ρ ∈ [−0.0059, +0.0145], **max +0.0145** (BNB w1); alle ≈ 0 | **nein — in ALLEN Fenstern verfehlt** |
+| PRE-Gate ρ < 0.30 in EINEM Fenster → DROP | DROP-Auslöser | in JEDEM der 10 Fenster ρ ≪ 0.30 | **DROP ausgelöst** |
+| Haupt-Gate Surrogate-p FDR-sig (F-ENTROPY) in ≥ 2 Fenstern | ≤ 0.05 BH-FDR | nur 2 Survivor, beide XRP w1 (d15min, d60min), p=0.0050 — nur EIN Fenster (w1), nicht ≥ 2 | nein |
+| Haupt-Gate AUC-Lift ≥ +0.03 in G1 | ≥ +0.03 | beste Werte XRP w1 d15/d60: **+0.0072 / +0.0072**; alle 40 Varianten < +0.03 (viele negativ) | **nein — doppelt verfehlt** |
+
+### Anwendung des Ein-Fenster-DROP-Kriteriums (PRD §8.5, Registry H-06)
+Das PRE-Gate ist ein harter Reproduktions-Filter VOR dem Haupt-Gate. ρ ≥ 0.30 ist in **keinem einzigen** der 10 Symbol×Fenster-Paare erreicht (Maximum +0.0145, ~20× unter der Schwelle; mehrere ρ sind sogar negativ). Damit ist „ρ < 0.30 in EINEM Fenster" massiv erfüllt → **hartes DROP**, unabhängig von Stage 2 (das PRE-Gate ist explizit NICHT Teil von F-WAVE2 — es ist ein Korrelations-Floor, kein p-Wert-Test).
+
+### Zweite, unabhängige Verfehlung (Haupt-Gate)
+Selbst wenn man das PRE-Gate ignorierte: Die 2 Haupt-Gate-FDR-Survivor (XRP w1 d15min, w1 d60min) liefern AUC-Lift **+0.0072 / +0.0072 — beide < +0.03-Schwelle** (4× zu klein). Zudem liegen beide Survivor im SELBEN Fenster (w1), die ≥2-Fenster-Existenz für das Haupt-Gate ist also auch nicht erfüllt. H-06 ist damit **doppelt** verfehlt (PRE-Gate UND Haupt-Gate).
+
+### Anwendung der zweistufigen F-WAVE2-FDR
+Stage 1 (F-ENTROPY, p_crit=0.0050): 2 Survivor (XRP w1 d15/d60). Stage 2: **2/2 überleben — 0 verloren.** Stage 2 ändert NICHTS: Die FDR-Survivorschaft ist für H-06 irrelevant, weil (a) das PRE-Gate bereits hart auf DROP steht und (b) die Survivor das AUC-Lift-Kriterium und die ≥2-Fenster-Forderung verfehlen.
+
+### Mechanistische Schlussfolgerung
+Die PRE-Gate-Vorbedingung (PRD §4 Z.130 wörtlich: „ρ-Vorprüfung ≥ 0.3 … ρ < 0.3 → DROP") ist auf allen 5 Symbolen über beide Fenster eindeutig nicht erfüllt: Es gibt praktisch keine lineare Kopplung zwischen PE-Drop und nachgelagertem 15-min-Vol-Cluster (ρ ≈ 0). Die Hypothese, PE trage bedingte prädiktive Vol-Information oberhalb des ρ-Floors, ist widerlegt. Auch die schwache FDR-Signifikanz auf XRP w1 ist ohne handelbare/diagnostische Relevanz (AUC-Lift ~0.007, weit unter +0.03).
+
+### URTEIL: **DROP.**
+PRE-Gate in ALLEN Fenstern verfehlt (max ρ +0.0145 ≪ 0.30) → hartes Ein-Fenster-DROP. Zusätzlich Haupt-Gate-AUC-Lift +0.0072 < +0.03 doppelt verfehlt. Kein GRAUBEREICH. KAPITALFREIHEIT bleibt gewahrt (kein Edge-/bps-/Sharpe-Bezug) — hier ohnehin müßig, da DROP.
+
+### Welle-2-Bilanz (nach GL-006/007/008)
+H-04 **WEITER (Mess-Existenz, Kapital PARK)**; H-05 **DROP** (+ C-09-OFI-Bein/C-14-OFI-Erbe, inverser ETH-Befund → H-05b-Empfehlung); H-06 **DROP**. F-WAVE2 Stage 2 hat in keiner der drei Hypothesen einen Stage-1-Survivor gekillt (0 verloren) und damit kein Urteil verändert.

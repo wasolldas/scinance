@@ -18,7 +18,7 @@ Alle drei DROP-Verdikte sind **endgültig und kaskaden-wirksam** (Vol-Stack gesp
 
 ## Phase
 
-`PLAN` (Phase 2 — läuft; WP-0 Welle 2 H-04/H-05/H-06 in `hypothesis_registry.md` registriert 2026-06-15, VOR Lauf-Start; Pilot-Auswahl A umgesetzt: C-17/C-41 Lead-Lag, C-01 OFI-Vorzeichen-Test, C-07 Permutation Entropy)
+`DONE (Welle 2)` — alle 3 Gates entschieden: H-04 WEITER (kapitalfrei/PARK), H-05 DROP, H-06 DROP
 
 ## Welle-2-Pilot-Universum (aus FINAL_PRD §4 + WAVE1_FINAL_REPORT §6)
 
@@ -43,9 +43,9 @@ Alle drei DROP-Verdikte sind **endgültig und kaskaden-wirksam** (Vol-Stack gesp
 - [x] Phase 1 SURVEY — Wave-2-Survey vorhanden (`scinance2-impl/state/wave2_survey.md`, 2026-06-15)
 - [~] Phase 2 PLAN — läuft (WP-0 H-04/H-05/H-06 registriert 2026-06-15; Pilot-Auswahl A umgesetzt: C-17/C-41, C-01-Vorzeichen, C-07-PE; effektives Welle-2-Alpha-Test-Budget = 3, alle kapitalfrei, F-LEADLAG/F-OFI/F-ENTROPY je BH-FDR α=0.10 + Welle-2-Über-Familie F-WAVE2 BH-FDR α=0.10)
 - [x] Phase 3/4 BUILD/VERIFY — WP-1 ✓ · WP-2 ✓ · WP-3 ✓ — alle 3 Welle-2-Pilots gebaut+verifiziert, Suite 776→872 grün (+96), 0 Modul-Bugs
-- [ ] Phase 5 GATE_CHECK — je Pilot
+- [x] Phase 5 GATE_CHECK — H-04/H-05/H-06 gegen Registry ge-AUDIT-tet (GL-006/007/008)
 - [x] Phase 6 HANDOFF — run_wave2.{ps1,sh} + aggregate_wave2_fdr.py + README_WAVE2.md (T3, 2-4h, F-WAVE2 zweistufige BH-FDR)
-- [ ] Phase 7 ANALYZE — Gate-Auswertung
+- [x] Phase 7 ANALYZE — Welle 2 DONE: H-04 WEITER (Mess-Existenz, Kapital PARK, GL-006), H-05 DROP (GL-007, + ETH inverse → H-05b empfohlen), H-06 DROP (GL-008, PRE-Gate-Fail)
 
 ## CHANGELOG (Welle 2)
 
@@ -59,3 +59,5 @@ Alle drei DROP-Verdikte sind **endgültig und kaskaden-wirksam** (Vol-Stack gesp
 
 - W2-WP4 (2026-06-16): Handoff-Paket gebaut — `scinance2-impl/handoff_local/run_wave2.{ps1,sh}` (220+199 LoC, sequenziell H-04→H-05→H-06→Aggregation, PS-5.1 BOM+ASCII+handle-cache+BelowNormal, --db-copy default, try/except je Schritt, dry-run via HANDOFF_DRY_RUN), `aggregate_wave2_fdr.py` (551 LoC, KRITISCH: zweistufige F-WAVE2-BH-FDR — Stage 1 aus Driver-Flag `family_fdr_significant` verbatim, Stage 2 BH-FDR α=0.10 über alle Stage-1-Survivor-p gemeinsam aus H-04∪H-05∪H-06; H-06-PRE-Gate + H-05 inverse_significant separat ausgewiesen, NICHT in F-WAVE2), `README_WAVE2.md` (85 LoC). Verify: 13 Tests, Suite 872→885 grün (Stage-1-Survivor verbatim, Stage-2-Kill-Pfad, Schema-Robustheit, Determinismus, Runner-Statik-Lint). Dry-Run-Mechanik bestätigt (HANDOFF_DRY_RUN OK, HANDOFF_DRY_RC=1 FAIL-Pfad). Lauf NICHT gestartet (T3 beim User).
 - W2 HANDOFF-PHASE KOMPLETT (2026-06-16): Welle 2 bereit für lokalen Lauf. Drei kapitalfreie Mess-Gates + zweistufige F-WAVE2-FDR-Aggregation. Suite 776→885 (+109 Tests gesamt Welle 2), 0 Modul-Bugs. Nächster Schritt: User-Lauf, dann Phase 5 GATE_CHECK + Phase 7 ANALYZE durch gate-auditor.
+
+- W2-GATE (2026-06-17): Welle-2-T3-Lauf wave2_20260617_090618 ausgewertet (gate-auditor, GL-006/007/008). **H-04 WEITER** — erstes Nicht-DROP des Programms: gerichtete Info BTC→ETH FDR-sig in beiden Fenstern (WCOH p=0.0050), Lead=BTC stabil, beide F-WAVE2-Stufen überlebt. KAPITALFREI: Lags 1-3s = HFT, Kapital bleibt PARK, Tradability = NEUE H-04b. Lead-Stabilitäts-Frage nach Registry-Wortlaut (Lesart B) entschieden — bidirektionale Signifikanz ≠ Lead-Kippen; Lesart A verworfen als Torpfosten-Verschiebung (§2). **H-05 DROP** (C-01 + C-09-OFI-Bein + C-14-OFI-Erbe) — keine ≥2-Fenster-positive-Konsistenz; ETHUSDT signifikant INVERS (corr -0.0550, p=0.0050) → repliziert INC-02/S2-2023, H-05b empfohlen (NICHT registriert, WP-0). **H-06 DROP** — PRE-Gate ρ≥0.3 in ALLEN 10 Symbol×Fenster verfehlt (ρ∈[-0.006,+0.015]); XRP-Survivor AUC-Lift +0.0072 < +0.03. F-WAVE2 Stage 2 änderte nichts (0 Survivor verloren). Details: gate_log.md GL-006/007/008 + morning_report.md.

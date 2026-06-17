@@ -1,89 +1,60 @@
-# Morning Report — 2026-06-12 (ANALYZE, Welle 1)
+# Morning Report — 2026-06-17 (ANALYZE, Welle 2)
 
-**Auswertung:** gate-auditor gegen `state/hypothesis_registry.md` (H-01/H-02/H-03) + PRD §3/§8.
-**Upload:** `handoff_local/results/upload_20260611/` (3 Läufe + SUMMARY_2026-06-11.md).
-**Formale Gate-Urteile:** `state/gate_log.md` (GL-001…GL-004).
+**Auswertung:** gate-auditor gegen `state/hypothesis_registry.md` (H-04/H-05/H-06 + WINDOW_MAX_BARS-Nachtrag DEC-12 + F-WAVE2-Nachtrag) + PRD §4/§8.
+**Lauf:** `handoff_local/results/wave2_20260617_090618/` (User-T3, 5/5 OK, rc=0; zweistufige F-WAVE2-BH-FDR sauber durchgelaufen).
+**Formale Gate-Urteile:** `state/gate_log.md` (GL-006/007/008, append-only).
 
----
-
-## 1. Was lief, was nicht (Upload-Übersicht)
-
-| Lauf | Typ | Ergebnis |
-|---|---|---|
-| `overnight_20260611_154638` | T3 (vor Runner-Fixes) | **C-42 voll durchgelaufen, 5/5 Symbole** (Daten vollständig). C-31 crashte (5/5). Recorder-Dauertest 8 h OK, aber 3 Streams NO_DATA. Der „FAIL (rc=)" in summary.txt = PS-5.1-ExitCode-Bug, nicht der Inhalt. |
-| `short_20260611_143537` | T2 (vor Fixes) | rc-Bug, C42-Quick-Timeouts, E15-Pfaddefekt. Überholt. |
-| `short_20260612_082957` | T2 (nach Fixes) | RECORDER_SMOKE rc=0 OK. RECORDER_CHECK rc=1 echt (3 Streams NO_DATA). E15_EVAL rc=1 echt (trades_all.csv fehlt). C42-Quick beide TIMEOUT (DuckDB-Open-Hang, Lock-Verdacht). |
-
-**Kernbotschaft:** Der einzige Lauf mit verwertbaren Gate-Daten ist der T3-Overnight — und der reicht für ein
-**vollständiges, eindeutiges H-02-Urteil**. H-01 und H-03 sind durch Werkzeug-Defekte blockiert, nicht durch
-inhaltliche Befunde.
+> Hinweis: Dieser Report löst den Welle-1-Morgen-Report (2026-06-12) ab. Die Welle-1-Urteile bleiben vollständig in `gate_log.md` GL-001…GL-005 dokumentiert.
 
 ---
 
-## 2. Gate-Urteile
+## 1. Management-Summary — die drei Welle-2-Urteile
 
-### H-02 · C-42-Reproduktion → **DROP/PARK** (Gate verfehlt, 0/5 Symbole) — Kernbefund des Uploads
-Registriertes Gate: OOS-R² ≥ 0.15 UND QLIKE < HAR-RV in ALLEN ≥2 Fenstern. **Kein Symbol** besteht.
+| Gate | Hypothese | Urteil | Kern |
+|---|---|---|---|
+| **GL-006** | H-04 · C-17/C-41 Lead-Lag | **WEITER (Mess-Existenz)** | gerichtete Info BTC→ETH existiert messbar, Lead=BTC stabil über beide Fenster — **NICHT handelbar, Kapital bleibt PARK** |
+| **GL-007** | H-05 · C-01 OFI-Vorzeichen | **DROP** | keine ≥2-Fenster-positive-Konsistenz; einziger robuster Effekt ist INVERS (ETH) → C-01 + C-09-OFI-Bein + C-14-OFI-Erbe fallen |
+| **GL-008** | H-06 · C-07 Permutation Entropy | **DROP** | PRE-Gate ρ ≥ 0.30 in ALLEN Fenstern verfehlt (max +0.0145); zusätzlich AUC-Lift +0.0072 < +0.03 |
 
-| Symbol | min OOS-R² (3 Folds) | R²≥0.15 alle Folds | QLIKE<HAR alle Folds | Urteil |
-|---|---:|:--:|:--:|:--:|
-| BTCUSDT | −0.3212 | nein | nein (Fold 2) | FAIL |
-| ETHUSDT | −0.1470 | nein | nein (Fold 0) | FAIL |
-| SOLUSDT | −0.0849 | nein | nein (Fold 0) | FAIL |
-| BNBUSDT | −0.5294 | nein | nein (Fold 0,1) | FAIL |
-| XRPUSDT | −0.0346 | nein | nein (Fold 0) | FAIL |
-
-- Aggregation: Gate je Symbol, Gesamturteil = strengste Lesart (Ein-Fenster-Abbruch §6 wirkt pro Fenster).
-  Hier müßig — alle 5 fallen durch beide Kriterien.
-- FDR (F-VOL, BH α=0.10): **0/36 Features signifikant** in jedem Symbol. Der Vol-Anker trägt nicht.
-- Testdesign konform (purged WF, 3 disjunkte Fenster, Purge 60 + Embargo 1440 Bars, deterministisch, 5/5 Symbole).
-- **Reproduktions-Vorbehalt:** Feature-Set 1 DOCUMENTED / 35 ASSUMED → Best-Effort-Repro, kein bit-genaues
-  Kestrel-Replikat. Urteil gilt für diese Repro; bit-genaue Original-Features wären eine neue Hypothese (H-02b).
-- **Der dokumentierte Test-R²≈0.249-Befund überlebt purged WF + FDR nicht — L1-Selbstauskunfts-Artefakt bestätigt.**
-
-**Kaskade (PRD §3):** Vol-Stack verliert den Anker, gesperrt bleiben **C-10 / C-35 / C-11 / C-12 / C-34 / VRP-RV-Bein.**
-
-### H-01 · E-15 → **PENDING** (nicht geurteilt)
-Blocker: `E15_EVAL` rc=1, `trades_all.csv` am Default-Pfad nicht gefunden; iter-5-Export liegt vermutlich unter
-`trades_iter5/`. Reiner Pfad-/Export-Defekt, keine `e15_evaluation.json`. Kein Urteil, keine Vorwegnahme.
-
-### H-03 · C-31-CFAR → **PENDING** (nicht geurteilt)
-Blocker: Crash in `cyclic_spectrum.py:115 bin_counts` — `numpy ArrayMemoryError` (1.30 TiB, n_bins explodiert),
-alle 5 Symbole identisch. Implementierungs-Bug (Bin-/Zeitfenster-Parameter), keine `c31_cfar_results.json`.
-Kein Urteil, KEINE inhaltliche Vorwegnahme (Traceback wird parallel diagnostiziert).
-
-### C-36 Recording → **PILOT-STATUS** (kein Alpha-Gate, F0-Gate noch nicht fällig)
-premium_index_kline OK (96600 rows, REST-Pfad). adl_alerts EMPTY_OK (event-getrieben). **rpi_orderbook +
-insurance_pool + option_tickers = NO_DATA über 5-min-Smoke UND 8-h-Dauertest.** Subscribe wird bestätigt,
-liefert aber nichts; Option-WS bricht zusätzlich alle ~30 s mit `1011 keepalive ping timeout`. Offene Frage
-(INC-06): Subscribe-Fehler/falscher Keepalive vs. nicht-existentes/falsch benanntes Topic. Storage 0.004/50 GB OK.
+**F-WAVE2 Stage 2 (Über-Familie):** in keiner Hypothese wurde ein Stage-1-Survivor gekillt (H-04 12/12, H-05 3/3, H-06 2/2 — 0 verloren). Stage 2 hat **kein** Urteil verändert; die Urteile folgen aus den Registry-Kriterien jenseits der reinen FDR-Survivorschaft (Lead-Stabilität bei H-04; Vorzeichen-Konsistenz/Inversion bei H-05; PRE-Gate/AUC bei H-06).
 
 ---
 
-## 3. Empfohlene Folge-WPs (Prioritätsreihenfolge)
+## 2. H-04 — der erste nicht-triviale Nicht-DROP des Frameworks (mit Kapitalfreiheits-Caveat)
 
-1. **WP-A · H-02-Konsequenz formalisieren + Vol-Stack sperren (sofort, kein Lauf).**
-   C-42 → PARK im State; C-10/C-35/C-11/C-12/C-34/VRP-RV-Bein als „gesperrt (kein Anker)" markieren.
-   Entscheidung PARK-vs-DROP dokumentieren (DEC-xx): PARK empfohlen, da ein verifizierter-Feature-Re-Run der
-   einzige Rettungspfad ist.
+Nach fünf vorangegangenen Negativ-/PENDING-Urteilen (GL-001..GL-005: H-01/H-02/H-03 alle DROP) ist **H-04 das erste Gate, das tatsächlich besteht** — und es ist bewusst als **kapitalfreies Mess-Gate** konstruiert, sodass „bestanden" KEINE handelbare Behauptung ist.
 
-2. **WP-B · C-31-Crash-Fix (höchste Reparatur-Prio — einziger echter Alpha-Test der Welle 1).**
-   `bin_counts`-Guard gegen n_bins-Explosion + Sanity-Check `bin_dt_ms` vs. (t1−t0); dann Surrogate-Lauf auf
-   Echt-Ticks (≥2 disjunkte Fenster) erneut via handoff_local. Gate H-03 unverändert.
+**Was bestanden ist:** Auf BTC/ETH-Perp existiert über 2 disjunkte Fenster ein surrogat-signifikanter (p=0.0050 WCOH, FDR-sig + Stage-2-sig), reproduzierbarer gerichteter Informationsfluss mit BTCUSDT als stabilem Lead-Symbol — bestätigt auf BEIDEN registrierten Achsen (TE/C-17 und WCOH/C-41).
 
-3. **WP-C · C-36 Stream-Diagnose (zeitkritisch — Recording-Vorlauf für ganze Welle 2).**
-   (a) Topic-Namen `orderbook.rpi.*`, `insurance.USDT`, `adlAlert`, `tickers.{BTC,ETH}` gegen aktuelle
-   Bybit-v5-WS-Doc verifizieren (INC-06: PRD-Endpoints können falsch sein); (b) Option-WS-Keepalive/ping-Intervall
-   fixen; (c) je Topic ein kurzer Live-Probe-Subscribe in Sandbox. premium_index_kline läuft bereits — nicht anfassen.
+**Heikle Bewertung — bidirektionale Signifikanz in Fenster 0:** In F0 sind beide TE-Richtungen FDR-sig (Kopplung in beiden Richtungen). Entschieden wurde streng nach Registry-Wortlaut (Lesart B): Das Kriterium verlangt „Lead-Symbol bleibt konsistent / kippt nicht", NICHT „Rückrichtung muss insignifikant sein". BTC ist in beiden Fenstern dominant — WCOH-Lead=BTC in F0+F1, und BTC→ETH-TE hat bei jedem gematchten Lag höhere obs-Stat als ETH→BTC. Lead-Symbol = [BTC, BTC], kippt nicht. Lesart A (bidirektional=Kippen) würde einen nicht-registrierten Schwellwert nachschieben (Torpfosten-Verschiebung §2) und wird verworfen. Beide Lesarten sind in GL-006 dokumentiert.
 
-4. **WP-D · E-15-Pfad-Fix (entsperrt H-01-Urteil).**
-   `trades_all.csv`-Default ↔ `trades_iter5/`-Export angleichen; E15_EVAL erneut. Danach H-01-Gate-Urteil
-   gegen die §3-Korridore. Entscheidet über den gesamten Funding-Cluster (C-37/CS-12/C-08).
+**Kapitalfreiheits-Caveat (verbindlich):** Die signifikanten Lags sind **1–3 s** = tiefes HFT-Territorium. PRD §4 Z.133 wörtlich: „keine handelbare Kante (abgegraste 30–60s-HFT-Anomalie) → bleibt PARK." WEITER heißt **ausschließlich**: gerichtete Information existiert messbar. Es wurde KEINE Edge-/bps-/Sharpe-/Tradability-Aussage nachregistriert. **Kapital-Status bleibt PARK**; das Mess-WEITER entsperrt KEIN Kapitalmodul. Tradability wäre eine **NEUE H-04b** (eigener Eintrag, eigener Lauf, L2-Tiefen-Stream).
 
-5. **WP-E · Runner-Härtung (Begleitfix, niedrige Prio).**
-   PS-5.1-ExitCode-Capture reparieren (rc= → echter rc), damit summary.txt den Schritt-Status korrekt zeigt;
-   C42-Quick-DuckDB-Open-Hang (Lock-Konflikt mit laufendem Collector → read-only/Retry/Copy-on-open prüfen).
+---
 
-**Heute Nacht laufen sollte:** nach WP-B/WP-C/WP-D — neuer Overnight mit (1) C-31-Surrogate (gefixt),
-(2) Recorder-Dauertest mit verifizierten Topics, (3) E-15-Eval auf korrektem Pfad. C-42 NICHT erneut (Urteil steht;
-Re-Run nur als neue Hypothese H-02b mit verifizierten Features).
+## 3. H-05 — DROP + INC-02-Bestätigung + H-05b-Empfehlung
+
+Die PRD-v1/CS-02-Richtung „sign(OFI)=+ (Aggression-Folge)" ist **widerlegt**: KEIN Symbol/δ ist in BEIDEN Fenstern FDR-sig + positiv. Der einzige positive FDR-Survivor (BNBUSDT w0 d1s/d5s) bricht in Fenster 1 zusammen (kippt teils ins Negative). Das harte Ein-Fenster-Kriterium (negatives Vorzeichen in ≥ 1 Fenster) ist auf mehreren Symbolen verletzt → **DROP für C-01 + C-09-OFI-Bein + C-14-OFI-Erbe** (PRD §4 Z.131, kaskaden-wirksam).
+
+**INC-02/E-04 reproduziert:** Der einzige robuste, FDR-signifikante OFI-Effekt ist **INVERS** — ETHUSDT w0 d1s: corr **−0.0550**, p=0.0050, inverse_significant. Das ist die MM-Replenishment-Lesart und bestätigt die iter-3/S2-2023-Forensik (E-04 hit_sum 0.179, fälschlich invertiertes Vorzeichen) unabhängig auf read-only-Bestandsdaten. Die ETH-Spalte ist über beide Fenster durchgängig negativ.
+
+**Empfehlung (NICHT selbst registriert):** Der inverse ETH-Befund ist Auslöser für eine **NEUE H-05b-Pre-Registration** (MM-Replenishment als Haupt-These, ≥2-Fenster-Konsistenz, FDR, kapitalfrei). Registry-Disziplin §2: kein Torpfosten-Verschieben — H-05b ist eigener Eintrag/eigener Lauf, **WP-0/Orchestrator-Arbeit**. Caveat: Auch H-05b müsste ≥2-Fenster-Konsistenz erst nachweisen (ETH-Inversion bislang nur in w0 d1s FDR-sig, Vorzeichen aber über beide Fenster konsistent negativ).
+
+---
+
+## 4. H-06 — PRE-Gate-Fail (hartes DROP)
+
+PRE-Gate ρ ≥ 0.30 ist in **keinem** der 10 Symbol×Fenster-Paare erreicht: ρ ∈ [−0.0059, +0.0145], Maximum +0.0145 (BNB w1) — ~20× unter der Schwelle, mehrere negativ. „ρ < 0.30 in EINEM Fenster → DROP" ist massiv erfüllt → **hartes DROP**. Das PRE-Gate ist ein Korrelations-Floor außerhalb F-WAVE2 — Stage 2 irrelevant.
+
+Doppelt verfehlt: Selbst die 2 Haupt-Gate-FDR-Survivor (XRP w1 d15/d60min) liefern AUC-Lift **+0.0072 / +0.0072 < +0.03** und liegen beide im selben Fenster (≥2-Fenster-Existenz auch nicht erfüllt). PE trägt keine bedingte Vol-Information oberhalb des ρ-Floors.
+
+---
+
+## 5. Nächste Schritte (Folge-WPs, Prioritätsreihenfolge)
+
+1. **WP-W2-A · H-05-Konsequenz formalisieren (sofort, kein Lauf).** C-01 → DROP im State; **C-09-OFI-Bein** und **C-14-OFI-Erbe** als „gesperrt (OFI-Vorzeichen falsifiziert)" markieren. Kaskade aus PRD §4 Z.131 dokumentieren.
+2. **WP-W2-B · H-05b-Pre-Registration (WP-0/Orchestrator).** Inverse MM-Replenishment-These als neuer Registry-Eintrag H-05b mit vorregistriertem Gate (inverse Richtung Haupt-These, ≥2-Fenster-Konsistenz, FDR α=0.10 über neue/gleiche F-OFI-Erweiterung, kapitalfrei). NICHT vom gate-auditor registriert. Danach eigener read-only-Lauf.
+3. **WP-W2-C · H-04 als Mess-Befund einfrieren + H-04b-Entscheidung (DEC-xx).** H-04 WEITER (Mess-Existenz) im State festhalten; Kapital-Status PARK explizit markieren. Entscheiden, ob eine Tradability-Hypothese H-04b überhaupt sinnvoll vorregistriert wird — angesichts 1–3s-Lags (HFT, PRD §4 „bleibt PARK") ist die reversibelste Option, KEINE H-04b zu starten und H-04 als kapitalfreien Existenz-Befund zu archivieren. Begründung als DEC-xx.
+4. **WP-W2-D · H-06-DROP formalisieren.** C-07 → DROP; PE-Stack ohne Anker (PRE-Gate-Fail). Kein Folge-Lauf.
+
+**Heute Nacht laufen sollte:** kein neuer Pflicht-Lauf zwingend — die drei Welle-2-Gates sind entschieden. Falls H-05b registriert wird (WP-W2-B), kann der nächste Overnight den H-05b-Inversions-Lauf (≥2 Fenster, FDR) tragen. H-04/H-05/H-06 NICHT erneut (Urteile stehen; Re-Runs nur als neue Hypothesen mit neuen Registry-Einträgen).
