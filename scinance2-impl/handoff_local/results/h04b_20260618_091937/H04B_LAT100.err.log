@@ -1,0 +1,15 @@
+[c17] --db-copy: copying E:\Claude\Projects\scinance\data\bybit_edge.duckdb -> C:\Users\wguen\AppData\Local\Temp\c17_dbcopy_ck950b16\bybit_edge.duckdb
+[c17] opening duckdb read-only: C:\Users\wguen\AppData\Local\Temp\c17_dbcopy_ck950b16\bybit_edge.duckdb (symbol=BTCUSDT)
+[c17] WARN: dropped 5150 trades row(s) for BTCUSDT with implausible ts (outside [1262304000000, 4102444800000] ms epoch) — corrupt rows in C:\Users\wguen\AppData\Local\Temp\c17_dbcopy_ck950b16\bybit_edge.duckdb
+[c17] opening duckdb read-only: C:\Users\wguen\AppData\Local\Temp\c17_dbcopy_ck950b16\bybit_edge.duckdb (symbol=ETHUSDT)
+[c17] WARN: dropped 4850 trades row(s) for ETHUSDT with implausible ts (outside [1262304000000, 4102444800000] ms epoch) — corrupt rows in C:\Users\wguen\AppData\Local\Temp\c17_dbcopy_ck950b16\bybit_edge.duckdb
+[c17] --db-copy: removed temp copy C:\Users\wguen\AppData\Local\Temp\c17_dbcopy_ck950b16
+[c17b] pair BTCUSDT/ETHUSDT: 5313259/5278059 ticks, 2 window(s) (cap 150000/window, lags=[1, 2, 3], grid=1000ms, latency=100ms, wall=15bps, maker=False, gate_valid_assumptions=False)
+[c17b] window 1/2: btc_ticks=159524 eth_ticks=176103 lags=[1, 2, 3] latency=100ms wall=15bps (maker=False) bootstrap=200
+[c17b] window 1/2 lag=1 (horizon=1): 2910 trips brutto=-0.08bps wall=15.0bps netto=-15.08bps boot_p=1.0000 surr_p=0.9801
+[c17b] window 1/2 lag=2 (horizon=2): 3433 trips brutto=0.04bps wall=15.0bps netto=-14.96bps boot_p=1.0000 surr_p=0.1990
+[c17b] window 1/2 lag=3 (horizon=3): 3641 trips brutto=0.07bps wall=15.0bps netto=-14.93bps boot_p=1.0000 surr_p=0.1343
+[c17b] window 2/2: btc_ticks=124418 eth_ticks=123897 lags=[1, 2, 3] latency=100ms wall=15bps (maker=False) bootstrap=200
+[c17b] window 2/2 lag=1 (horizon=1): 2770 trips brutto=0.04bps wall=15.0bps netto=-14.96bps boot_p=1.0000 surr_p=0.0896
+[c17b] window 2/2 lag=2 (horizon=2): 3322 trips brutto=0.11bps wall=15.0bps netto=-14.89bps boot_p=1.0000 surr_p=0.0050
+[c17b] window 2/2 lag=3 (horizon=3): 3527 trips brutto=0.18bps wall=15.0bps netto=-14.82bps boot_p=1.0000 surr_p=0.0050

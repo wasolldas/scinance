@@ -1,0 +1,7 @@
+-------- RUN_H04B SUMMARY --------
+H04B_PRIMARY: OK (rc=0, 44s)
+H04B_LAT100: OK (rc=0, 41s)
+H04B_LAT500: OK (rc=0, 40s)
+H04B_MAKER: OK (rc=0, 39s)
+RUN_H04B GESAMT: ok=4 fail=0 skip=0 -> exit 0 | Ergebnisse: E:\Claude\Projects\scinance\scinance2-impl\handoff_local\results\h04b_20260618_091937
+URTEIL: NUR H04B_PRIMARY (300ms/11bps/Taker). Robustheit/Maker NICHT urteilstragend.

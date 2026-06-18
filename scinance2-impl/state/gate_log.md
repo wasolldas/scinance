@@ -382,3 +382,47 @@ PRE-Gate in ALLEN Fenstern verfehlt (max ρ +0.0145 ≪ 0.30) → hartes Ein-Fen
 
 ### Welle-2-Bilanz (nach GL-006/007/008)
 H-04 **WEITER (Mess-Existenz, Kapital PARK)**; H-05 **DROP** (+ C-09-OFI-Bein/C-14-OFI-Erbe, inverser ETH-Befund → H-05b-Empfehlung); H-06 **DROP**. F-WAVE2 Stage 2 hat in keiner der drei Hypothesen einen Stage-1-Survivor gekillt (0 verloren) und damit kein Urteil verändert.
+
+---
+
+## GL-009 · 2026-06-18 · H-04b · C-17/C-41 Lead-Lag-TRADABILITY (Folge nach GL-006, **capital_free=FALSE**) — **PARK**
+
+**Quelle:** `handoff_local/results/h04b_20260618_091937/h04b/c17_c41_tradability_results.{json,md}` (urteilstragender PRIMARY-Block) + `h04b_{lat100,lat500,maker}/c17_c41_tradability_results.{json,md}` (Robustheits-/Sekundär-Spanne, NICHT urteilstragend per Anti-Gaming-Klausel) + `SUMMARY_2026-06-18.md`.
+Lauf: BTCUSDT→ETHUSDT auf `trades`, 2 disjunkte Fenster (F0: 9 984 Round-Trips, 1 780 611 314 526..1 780 615 189 170 ms; F1: 9 619 RT, 1 780 615 190 990..1 780 619 066 816 ms), Grid 1 000 ms, Lags [1,2,3] s (H-04-Survivor-Set), `horizon = lag` (DEC-13 Default), `WINDOW_MAX_TICKS=150 000`, `n_bootstrap=200`, `seed=42`, BH-FDR α=0.10 über **F-LEADLAG-TRADE**. Runner 4/4 OK (rc=0).
+
+### Registriertes Gate (H-04b, wörtlich)
+- **WEITER:** Netto-Edge/Round-Trip = (Brutto-Einfang über `[t+latenz, t+lag+horizon]` − Friction-Wand 11 bps − Slippage) **> 0 UND statistisch > 0** (Bootstrap `p ≤ 0.05` nach BH-FDR α=0.10 über F-LEADLAG-TRADE) auf **≥ 2 disjunkten Fenstern**.
+- **DROP/PARK (hartes Ein-Fenster-Kriterium, kein GRAUBEREICH):** Netto-Edge **≤ 0 in ≥ 1 Fenster** ODER nicht statistisch > 0 (FDR-`p > 0.05`).
+- **Anti-Gaming-Klausel:** WEITER nur gültig bei `latenz ≥ 300 ms` UND `Friction-Wand ≥ 11 bps` UND Latenz-Haircut angewandt UND **Taker** (nicht Maker). Abweichung → `gate_valid_assumptions=false` → ein WEITER ist ungültig (Registry H-04b Z.132).
+
+### Urteilstragender Punkt (PRIMARY-Block, gate_valid_assumptions=TRUE)
+Latenz 300 ms, Friction-Wand 11 bps, Slippage 4 bps (Gesamt-Wand 15 bps), Taker, Latenz-Haircut angewandt (`[t+latenz, t+lag+horizon]`). Das ist der EINZIGE urteilstragende Punkt der Klausel.
+
+| Kriterium (Registry wörtlich) | Schwelle | Messwert (PRIMARY) | Bestanden |
+|---|---|---|---|
+| Netto-Edge > 0 in Fenster 0 | > 0 bps | beste Variante `lag3/h3` **-14.95 bps** (Brutto-Einfang +0.05, Brutto-voll +0.08 < 15-bps-Wand); Bootstrap p = 1.0000 | **nein** |
+| Netto-Edge > 0 in Fenster 1 | > 0 bps | beste Variante `lag3/h3` **-14.83 bps** (Brutto-Einfang +0.17, Brutto-voll +0.19 < 15-bps-Wand); Bootstrap p = 1.0000 | **nein** |
+| Statistisch > 0 (Bootstrap p ≤ 0.05 nach BH-FDR F-LEADLAG-TRADE) | ≤ 0.05 | beide Fenster Bootstrap p = 1.0000; **0 FDR-Survivor** je Fenster und global, p_crit = 0.0000 | **nein** |
+| Existenz in ≥ 2 disjunkten Fenstern | ≥ 2 | 0/2 Fenster mit Pass | **nein** |
+| Hartes Ein-Fenster-Kriterium ausgelöst | ja-Fall = PARK | beide Fenster verfehlen → schon F0 löst PARK aus (PRD §8.5) | **PARK ausgelöst** |
+
+### Anti-Gaming-Prüfung gegen die Robustheits-/Sekundär-Blöcke
+Die Robustheits-/Sekundär-Spanne wird MIT-berichtet (Registry-Erlaubnis Z.128), darf das Urteil aber **NICHT** drehen (Anti-Gaming-Klausel Z.132).
+
+| Block | latency_ms | Maker? | gate_valid_assumptions | F0 Netto (bps) | F1 Netto (bps) | per_window_pass |
+|---|---:|---|---|---:|---:|---|
+| **PRIMARY (urteilstragend)** | **300** | **nein (Taker)** | **TRUE** | **-14.95** | **-14.83** | **[False, False]** |
+| LAT100 (Robustheit) | 100 | nein | FALSE | -14.94 | -14.82 | [False, False] |
+| LAT500 (Robustheit) | 500 | nein | TRUE | -14.95 | -14.84 | [False, False] |
+| MAKER (Sekundär, adverse-selection-vorbehaltlich Z.127) | 300 | ja | FALSE | -5.95 | -5.83 | [False, False] |
+
+Selbst der adverse-selection-vorbehaltliche MAKER-Block (kleinere effektive Wand) bleibt Netto **negativ** (-5.9 / -5.8 bps) — die Trading-Regel verfehlt das Gate auch unter dieser registry-fremden, ehrlich markierten Annahme. Es existiert **keine** zulässige Annahme-Variante (Anti-Gaming-Klausel), unter der das Gate ein WEITER zulassen würde.
+
+### Mechanistische Schlussfolgerung
+H-04 hat in GL-006 die Mess-Existenz des gerichteten Informationsflusses BTC→ETH auf Lags 1–3 s bestätigt (`capital_free:true`). H-04b prüft jetzt die im H-04-Gate ausdrücklich antizipierte härtere Frage: *Ist die gemessene Information nach realistischer Friktion und Latenz handelbar?* Die Antwort der vorregistrierten Trading-Regel über 19 603 Round-Trips ist eindeutig **nein**: Der maximale Brutto-Einfang (nach Latenz-Haircut über `[t+300 ms, t+lag+horizon]`) erreicht **+0.19 bps** (F1, lag3) — das ist ~80× **unter** der 15-bps-Gesamt-Wand. Die Asymmetrie zwischen H-04 (WEITER kapitalfrei, gerichtete Information existiert) und H-04b (PARK nicht handelbar) ist exakt der PRD-§4-Z.133-A-priori: „abgegraste 30–60s-HFT-Anomalie → bleibt PARK". H-04b reproduziert diese Vorhersage empirisch.
+
+### URTEIL: **PARK.**
+Hartes Ein-Fenster-PARK-Kriterium (Registry H-04b Z.131) durch F0 ausgelöst (Netto -14.95 bps ≪ 0; Bootstrap p 1.0000), in F1 reproduziert (Netto -14.83 bps). Kein GRAUBEREICH. **Anti-Gaming-Klausel respektiert:** Robustheits-/Sekundär-Blöcke (LAT100/LAT500/MAKER) sind MIT-berichtet, kein WEITER auf einem Nicht-PRIMARY-Punkt erzwungen — alle vier Blöcke führen am PRIMARY-Punkt zum selben PARK. **CLAUDE.md §4 / Autonomie-Protokoll Z.30:** Keine Live-Order, kein Kapitaleinsatz — historischer Backtest mit Kostenmodell auf read-only `trades`. **Kapital-Status:** PARK bestätigt. **Welle-2-Anschluss:** keine Erweiterung der Welle-2-Über-Familie F-WAVE2 (append-only, GL-006/007/008 abgeschlossen); F-LEADLAG-TRADE ist als eigenständige H-04b-Familie geführt. Eine andere Latenz/Wand-Annahme wäre eine NEUE Hypothese H-04c (Registry-Disziplin §2) — hier NICHT nachregistriert.
+
+### Welle-2-Bilanz (nach GL-006/007/008/009)
+**H-04 WEITER (Mess-Existenz, capital_free=true, Kapital PARK)** · **H-04b PARK** (Tradability nicht handelbar, capital_free=false, Anti-Gaming respektiert) · **H-05 DROP** (+ C-09-OFI-Bein/C-14-OFI-Erbe; inverser ETH-Befund → H-05b registriert, OOS-pending) · **H-06 DROP**. **Welle 2 inhaltlich abgeschlossen.** Offene Folge-Sache: H-05b wartet auf frische OOS-Daten (C-36 Recording läuft weiter — keine Codearbeit nötig, kein Lauf jetzt). H-04c (alternative Latenz/Wand) NICHT registriert. Tragendes Ergebnis der Welle 2: ein einziges Mess-WEITER (H-04), das in der gleich-vorregistrierten Tradability-Prüfung (H-04b) ehrlich PARK wird — die methodische Trennung „Mess-Gate vs. Tradability-Gate" hat den S2-2023-Trap (Mess-Existenz mit Handelbarkeit verwechseln) erfolgreich abgefangen.
