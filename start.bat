@@ -28,19 +28,21 @@ echo.
 echo Was moechtest du tun?
 echo.
 echo   1 = Tests laufen lassen (pytest unit/)
-echo   2 = Recorder-Status pruefen (Schutzgut #1)
-echo   3 = Welle-2-Lauf (run_wave2.ps1)
-echo   4 = Python Shell (interaktiv)
-echo   5 = Beenden
+echo   2 = Recorder STARTEN (Schutzgut #1, laeuft dauerhaft)
+echo   3 = Recorder-Status pruefen (read-only)
+echo   4 = Welle-2-Lauf (run_wave2.ps1)
+echo   5 = Python Shell (interaktiv)
+echo   6 = Beenden
 echo.
 set "choice="
-set /p choice="Auswahl [1-5]: "
+set /p choice="Auswahl [1-6]: "
 
 if "%choice%"=="1" goto opt_tests
-if "%choice%"=="2" goto opt_recorder
-if "%choice%"=="3" goto opt_wave2
-if "%choice%"=="4" goto opt_pyshell
-if "%choice%"=="5" goto opt_end
+if "%choice%"=="2" goto opt_recorder_start
+if "%choice%"=="3" goto opt_recorder_status
+if "%choice%"=="4" goto opt_wave2
+if "%choice%"=="5" goto opt_pyshell
+if "%choice%"=="6" goto opt_end
 echo Ungueltige Auswahl.
 echo.
 goto menu
@@ -53,7 +55,18 @@ echo.
 pause
 goto menu
 
-:opt_recorder
+:opt_recorder_start
+echo.
+echo --- Recorder STARTEN (in neuem Fenster, Ctrl+C dort zum Stoppen) ---
+echo Logs unter logs\recorder\recorder_*.log
+echo.
+start "Scinance C-36 Recorder" powershell.exe -ExecutionPolicy Bypass -NoExit -File "%~dp0start_recorder.ps1"
+echo Recorder-Fenster gestartet. Diese Konsole bleibt frei.
+echo.
+pause
+goto menu
+
+:opt_recorder_status
 echo.
 echo --- Recorder-Status (read-only Schutzgut-Check) ---
 python scinance2-impl/handoff_local/check_recording.py
