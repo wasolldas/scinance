@@ -1,3 +1,9 @@
+# DEPRECATED (2026-06-23): Scinance-1.0-Legacy.
+# Siehe scinance2-impl/state/CLEANUP_PLAN.md - Live-Pipeline gestoppt (TODO-2),
+# Strategien S1-S5 sind empirisch DROP (WAVE1_FINAL_REPORT.md), Modul folgt der
+# LiveRunner-Deprecation. Aufruf gilt als Anti-Pattern; Code bleibt nur als
+# Audit-Trail im Repo. Reaktivierung ware eine neue, vorregistrierte Hypothese.
+
 """
 Live-Runner — verbindet WebSocket-Collector, State-Engines, Pipeline und
 Executor zu einem lauffähigen System.

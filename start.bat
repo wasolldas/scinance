@@ -3,7 +3,7 @@ title Bybit Edge System
 cd /d "%~dp0"
 
 echo ============================================
-echo   Bybit Edge System
+echo   Scinance 2.0 - Falsifikations-Pipeline
 echo ============================================
 echo.
 
@@ -15,37 +15,32 @@ REM ---- bybit_edge installiert? ----
 python -c "import bybit_edge" 2>nul
 if errorlevel 1 call :install
 
-REM ---- .env pruefen ----
-if not exist .env goto no_env
-
 REM ---- Status ----
 echo [OK] venv aktiv: %VIRTUAL_ENV%
-python -c "from bybit_edge.config import rest_base_url, BYBIT_DEMO, BYBIT_TESTNET, PRIMARY_SYMBOL; m='DEMO' if BYBIT_DEMO else ('TESTNET' if BYBIT_TESTNET else 'LIVE'); print('[OK] Modus:', m); print('[OK] URL:', rest_base_url()); print('[OK] Symbol:', PRIMARY_SYMBOL)"
+echo [OK] Branch:
+git -C "%~dp0" rev-parse --abbrev-ref HEAD 2>nul
+echo.
+echo [INFO] Scinance-1.0-Live-Pipeline ist DEPRECATED (CLEANUP_PLAN.md).
+echo [INFO] Daten kommen aus Harvester (extern) + C-36-Recorder (lokal).
 echo.
 
 :menu
 echo Was moechtest du tun?
 echo.
-echo   1 = Tests laufen lassen (pytest)
-echo   2 = System starten (Collector + Pipeline)
-echo   3 = Monitor (Position + PnL + Equity)
-echo   4 = Backtest (Strategie-Vergleich auf Historie)
-echo   5 = Quick-Check (alle Module importieren)
-echo   6 = Python Shell (interaktiv)
-echo   7 = Dashboard (Streamlit)
-echo   8 = Beenden
+echo   1 = Tests laufen lassen (pytest unit/)
+echo   2 = Recorder-Status pruefen (Schutzgut #1)
+echo   3 = Welle-2-Lauf (run_wave2.ps1)
+echo   4 = Python Shell (interaktiv)
+echo   5 = Beenden
 echo.
 set "choice="
-set /p choice="Auswahl [1-8]: "
+set /p choice="Auswahl [1-5]: "
 
 if "%choice%"=="1" goto opt_tests
-if "%choice%"=="2" goto opt_system
-if "%choice%"=="3" goto opt_monitor
-if "%choice%"=="4" goto opt_backtest
-if "%choice%"=="5" goto opt_quickcheck
-if "%choice%"=="6" goto opt_pyshell
-if "%choice%"=="7" goto opt_dashboard
-if "%choice%"=="8" goto opt_end
+if "%choice%"=="2" goto opt_recorder
+if "%choice%"=="3" goto opt_wave2
+if "%choice%"=="4" goto opt_pyshell
+if "%choice%"=="5" goto opt_end
 echo Ungueltige Auswahl.
 echo.
 goto menu
@@ -58,37 +53,21 @@ echo.
 pause
 goto menu
 
-:opt_system
+:opt_recorder
 echo.
-echo --- Starte Bybit Edge System (Ctrl+C zum Beenden, dann N) ---
-echo.
-python -m bybit_edge
-echo.
-goto menu
-
-:opt_monitor
-echo.
-echo --- Monitor (Ctrl+C zum Zurueck, dann N) ---
-echo.
-python -m bybit_edge.monitor --interval 10
-echo.
-goto menu
-
-:opt_backtest
-echo.
-set "months="
-set /p months="Wie viele Monate Historie? [6]: "
-if "%months%"=="" set months=6
-echo --- Backtest (%months% Monate) ---
-python scripts/backtest.py --symbol BTCUSDT --interval 5 --months %months%
+echo --- Recorder-Status (read-only Schutzgut-Check) ---
+python scinance2-impl/handoff_local/check_recording.py
 echo.
 pause
 goto menu
 
-:opt_quickcheck
+:opt_wave2
 echo.
-echo --- Quick-Check ---
-python -c "from bybit_edge.pipeline import Pipeline; from bybit_edge.strategies import Strategy3PreSettlement; from bybit_edge.decision_aggregator import DecisionAggregator; print('Alle Module OK')"
+echo --- Welle-2-Lauf (run_wave2.ps1) ---
+echo Voll-Lauf: H-04 (Lead-Lag) + H-05 (OFI) + H-06 (PE) + F-WAVE2-Aggregator.
+echo Dauer: ca. 2-4h. Bricht NIE mit offenem Prompt ab.
+echo.
+powershell.exe -ExecutionPolicy Bypass -File scinance2-impl\handoff_local\run_wave2.ps1
 echo.
 pause
 goto menu
@@ -97,14 +76,6 @@ goto menu
 echo.
 echo --- Python Shell (exit() zum Zurueck) ---
 python
-goto menu
-
-:opt_dashboard
-echo.
-echo --- Dashboard (Streamlit, Ctrl+C zum Zurueck) ---
-echo URL: http://localhost:8501
-python scripts/dashboard.py
-echo.
 goto menu
 
 :opt_end
@@ -122,18 +93,5 @@ echo [ERROR] Kein .venv gefunden! Erstelle es zuerst:
 echo   python -m venv .venv
 echo   .venv\Scripts\activate.bat
 echo   pip install -e ".[dev]"
-pause
-exit /b 1
-
-:no_env
-echo [WARNUNG] Keine .env Datei gefunden!
-echo Erstelle .env mit deinen Bybit Demo API-Keys:
-echo.
-echo   BYBIT_API_KEY=dein_key
-echo   BYBIT_API_SECRET=dein_secret
-echo   BYBIT_DEMO=true
-echo   BYBIT_TESTNET=false
-echo   LOG_LEVEL=INFO
-echo.
 pause
 exit /b 1
