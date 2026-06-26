@@ -32,17 +32,19 @@ echo   2 = Recorder STARTEN (Schutzgut #1, laeuft dauerhaft)
 echo   3 = Recorder-Status pruefen (read-only)
 echo   4 = Welle-2-Lauf (run_wave2.ps1)
 echo   5 = Python Shell (interaktiv)
-echo   6 = Beenden
+echo   6 = Autostart einrichten/entfernen (Task Scheduler)
+echo   7 = Beenden
 echo.
 set "choice="
-set /p choice="Auswahl [1-6]: "
+set /p choice="Auswahl [1-7]: "
 
 if "%choice%"=="1" goto opt_tests
 if "%choice%"=="2" goto opt_recorder_start
 if "%choice%"=="3" goto opt_recorder_status
 if "%choice%"=="4" goto opt_wave2
 if "%choice%"=="5" goto opt_pyshell
-if "%choice%"=="6" goto opt_end
+if "%choice%"=="6" goto opt_autostart
+if "%choice%"=="7" goto opt_end
 echo Ungueltige Auswahl.
 echo.
 goto menu
@@ -89,6 +91,39 @@ goto menu
 echo.
 echo --- Python Shell (exit() zum Zurueck) ---
 python
+goto menu
+
+:opt_autostart
+echo.
+echo --- Autostart fuer Recorder (Windows Task Scheduler) ---
+echo.
+echo   I = Installieren (startet Recorder bei jeder Anmeldung)
+echo   D = Deinstallieren
+echo   S = Status anzeigen
+echo   Z = Zurueck
+echo.
+set "asc="
+set /p asc="Auswahl [I/D/S/Z]: "
+if /i "%asc%"=="I" goto as_install
+if /i "%asc%"=="D" goto as_uninstall
+if /i "%asc%"=="S" goto as_status
+if /i "%asc%"=="Z" goto menu
+echo Ungueltige Auswahl.
+goto opt_autostart
+
+:as_install
+powershell -ExecutionPolicy Bypass -File "%~dp0install_recorder_autostart.ps1"
+pause
+goto menu
+
+:as_uninstall
+powershell -ExecutionPolicy Bypass -File "%~dp0uninstall_recorder_autostart.ps1"
+pause
+goto menu
+
+:as_status
+powershell -Command "Get-ScheduledTask -TaskName 'Scinance C-36 Recorder' -ErrorAction SilentlyContinue | Select-Object TaskName, State; Get-ScheduledTaskInfo -TaskName 'Scinance C-36 Recorder' -ErrorAction SilentlyContinue | Select-Object LastRunTime, LastTaskResult, NextRunTime"
+pause
 goto menu
 
 :opt_end
