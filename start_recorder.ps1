@@ -30,6 +30,26 @@ $ErrorActionPreference = "Stop"
 # An Repo-Root wechseln (das Skript steht im Root)
 Set-Location -LiteralPath $PSScriptRoot
 
+# ----------------------------------------------------------------------
+# Single-Instance-Guard (Schutzgut #1: NIE zwei Writer auf recording_f0).
+# Verhindert, dass ein manueller Start + der Autostart-Task (oder zwei
+# manuelle Starts) gleichzeitig in denselben Parquet-Pfad schreiben und
+# den Audit-Bestand mit Duplikaten verschmutzen.
+# Pruefung gegen die Kommandozeile aller python.exe-Prozesse; der eigene
+# Kind-Prozess existiert zu diesem Zeitpunkt noch nicht -> kein Selbst-Treffer.
+# ----------------------------------------------------------------------
+$running = Get-CimInstance Win32_Process -Filter "Name='python.exe'" -ErrorAction SilentlyContinue |
+    Where-Object { $_.CommandLine -like "*bybit_edge.recorder*" }
+if ($running) {
+    $pids = ($running | ForEach-Object { $_.ProcessId }) -join ", "
+    Write-Host ""
+    Write-Host "Recorder laeuft bereits (PID(s): $pids)." -ForegroundColor Yellow
+    Write-Host "Kein zweiter Start - Schutzgut #1 (ein Writer pro recording_f0)." -ForegroundColor Yellow
+    Write-Host "Stoppen mit:  Get-CimInstance Win32_Process -Filter \"Name='python.exe'\" |" -ForegroundColor DarkGray
+    Write-Host "              ? { \$_.CommandLine -like '*bybit_edge.recorder*' } | %% { Stop-Process \$_.ProcessId -Force }" -ForegroundColor DarkGray
+    exit 0
+}
+
 # venv aktivieren falls vorhanden (Idiom aus start.bat)
 if (Test-Path .\.venv\Scripts\Activate.ps1) {
     & .\.venv\Scripts\Activate.ps1
