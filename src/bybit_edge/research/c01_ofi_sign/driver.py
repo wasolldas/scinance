@@ -251,7 +251,7 @@ def load_trades_file(path: Path, symbol: str = "FILE") -> dict[str, TradeArrays]
         df = pd.read_parquet(p)
     else:
         df = pd.read_csv(p)
-    ts_col = next((c for c in ("ts", "timestamp_ms", "T", "timestamp") if c in df.columns), None)
+    ts_col = next((c for c in ("ts", "ts_exchange_ms", "timestamp_ms", "T", "timestamp") if c in df.columns), None)
     px_col = next((c for c in ("price", "p", "last_price") if c in df.columns), None)
     vol_col = next((c for c in ("volume", "v", "qty", "size") if c in df.columns), None)
     side_col = next((c for c in ("side", "S") if c in df.columns), None)
