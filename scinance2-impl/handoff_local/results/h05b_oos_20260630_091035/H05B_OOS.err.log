@@ -1,0 +1,69 @@
+[h05b] base-dir=E:\Claude\Projects\Data Harvest\data-harvest\data symbols=['BTCUSDT', 'ETHUSDT', 'SOLUSDT', 'BNBUSDT', 'XRPUSDT'] windows=['2026-04-15', '2026-05-15'] max_ticks=300000
+[h05b] BTCUSDT@2026-04-15: 300000 ticks (cap 300000), buy=150864 sell=149136, span 1776211200079..1776231894200 ms
+[h05b] BTCUSDT@2026-05-15: 300000 ticks (cap 300000), buy=148109 sell=151891, span 1778803200024..1778819108992 ms
+[h05b] ETHUSDT@2026-04-15: 300000 ticks (cap 300000), buy=154898 sell=145102, span 1776211200029..1776230095587 ms
+[h05b] ETHUSDT@2026-05-15: 300000 ticks (cap 300000), buy=150715 sell=149285, span 1778803200035..1778813556508 ms
+[h05b] SOLUSDT@2026-04-15: 300000 ticks (cap 300000), buy=155398 sell=144602, span 1776211200641..1776267045493 ms
+[h05b] SOLUSDT@2026-05-15: 300000 ticks (cap 300000), buy=141323 sell=158677, span 1778803200005..1778851877322 ms
+[h05b] BNBUSDT@2026-04-15: 143594 ticks (cap 300000), buy=80042 sell=63552, span 1776211202819..1776383995468 ms
+[h05b] BNBUSDT@2026-05-15: 200434 ticks (cap 300000), buy=99415 sell=101019, span 1778803200080..1778975990845 ms
+[h05b] XRPUSDT@2026-04-15: 300000 ticks (cap 300000), buy=152282 sell=147718, span 1776211200276..1776280187988 ms
+[h05b] XRPUSDT@2026-05-15: 300000 ticks (cap 300000), buy=152638 sell=147362, span 1778803200260..1778846541681 ms
+[h05b] BTCUSDT: 2 explicit window(s) (deltas=[1, 5, 15, 60, 300]s, grid=1000ms, surrogates=200)
+[c01] BTCUSDT window 1/2 delta=1s: n=20693 corr=-0.0438 sign=-1 |corr|=0.0438 hit=0.461 surr_p=0.0050
+[c01] BTCUSDT window 1/2 delta=5s: n=20689 corr=-0.0391 sign=-1 |corr|=0.0391 hit=0.502 surr_p=0.0050
+[c01] BTCUSDT window 1/2 delta=15s: n=20679 corr=-0.0261 sign=-1 |corr|=0.0261 hit=0.510 surr_p=0.0050
+[c01] BTCUSDT window 1/2 delta=60s: n=20634 corr=+0.0134 sign=+1 |corr|=0.0134 hit=0.503 surr_p=0.0547
+[c01] BTCUSDT window 1/2 delta=300s: n=20394 corr=+0.0194 sign=+1 |corr|=0.0194 hit=0.496 surr_p=0.0100
+[c01] BTCUSDT window 2/2 delta=1s: n=15907 corr=-0.0022 sign=-1 |corr|=0.0022 hit=0.508 surr_p=0.7662
+[c01] BTCUSDT window 2/2 delta=5s: n=15903 corr=-0.0133 sign=-1 |corr|=0.0133 hit=0.525 surr_p=0.1194
+[c01] BTCUSDT window 2/2 delta=15s: n=15893 corr=-0.0065 sign=-1 |corr|=0.0065 hit=0.524 surr_p=0.4627
+[c01] BTCUSDT window 2/2 delta=60s: n=15848 corr=-0.0048 sign=-1 |corr|=0.0048 hit=0.512 surr_p=0.5473
+[c01] BTCUSDT window 2/2 delta=300s: n=15608 corr=-0.0057 sign=-1 |corr|=0.0057 hit=0.505 surr_p=0.4776
+[h05b] ETHUSDT: 2 explicit window(s) (deltas=[1, 5, 15, 60, 300]s, grid=1000ms, surrogates=200)
+[c01] ETHUSDT window 1/2 delta=1s: n=18894 corr=-0.0419 sign=-1 |corr|=0.0419 hit=0.541 surr_p=0.0050
+[c01] ETHUSDT window 1/2 delta=5s: n=18890 corr=-0.0510 sign=-1 |corr|=0.0510 hit=0.518 surr_p=0.0050
+[c01] ETHUSDT window 1/2 delta=15s: n=18880 corr=-0.0270 sign=-1 |corr|=0.0270 hit=0.508 surr_p=0.0050
+[c01] ETHUSDT window 1/2 delta=60s: n=18835 corr=-0.0052 sign=-1 |corr|=0.0052 hit=0.505 surr_p=0.4925
+[c01] ETHUSDT window 1/2 delta=300s: n=18595 corr=-0.0002 sign=-1 |corr|=0.0002 hit=0.499 surr_p=0.9751
+[c01] ETHUSDT window 2/2 delta=1s: n=10355 corr=-0.0193 sign=-1 |corr|=0.0193 hit=0.507 surr_p=0.0846
+[c01] ETHUSDT window 2/2 delta=5s: n=10351 corr=-0.0111 sign=-1 |corr|=0.0111 hit=0.518 surr_p=0.2985
+[c01] ETHUSDT window 2/2 delta=15s: n=10341 corr=-0.0015 sign=-1 |corr|=0.0015 hit=0.513 surr_p=0.8507
+[c01] ETHUSDT window 2/2 delta=60s: n=10296 corr=-0.0174 sign=-1 |corr|=0.0174 hit=0.498 surr_p=0.1144
+[c01] ETHUSDT window 2/2 delta=300s: n=10056 corr=-0.0028 sign=-1 |corr|=0.0028 hit=0.511 surr_p=0.7960
+[h05b] SOLUSDT: 2 explicit window(s) (deltas=[1, 5, 15, 60, 300]s, grid=1000ms, surrogates=200)
+[c01] SOLUSDT window 1/2 delta=1s: n=55843 corr=-0.0102 sign=-1 |corr|=0.0102 hit=0.410 surr_p=0.0199
+[c01] SOLUSDT window 1/2 delta=5s: n=55839 corr=-0.0172 sign=-1 |corr|=0.0172 hit=0.444 surr_p=0.0050
+[c01] SOLUSDT window 1/2 delta=15s: n=55829 corr=-0.0132 sign=-1 |corr|=0.0132 hit=0.470 surr_p=0.0050
+[c01] SOLUSDT window 1/2 delta=60s: n=55784 corr=-0.0074 sign=-1 |corr|=0.0074 hit=0.481 surr_p=0.1045
+[c01] SOLUSDT window 1/2 delta=300s: n=55544 corr=-0.0062 sign=-1 |corr|=0.0062 hit=0.485 surr_p=0.1692
+[c01] SOLUSDT window 2/2 delta=1s: n=48676 corr=-0.0505 sign=-1 |corr|=0.0505 hit=0.421 surr_p=0.0050
+[c01] SOLUSDT window 2/2 delta=5s: n=48672 corr=-0.0215 sign=-1 |corr|=0.0215 hit=0.460 surr_p=0.0050
+[c01] SOLUSDT window 2/2 delta=15s: n=48662 corr=-0.0045 sign=-1 |corr|=0.0045 hit=0.484 surr_p=0.3234
+[c01] SOLUSDT window 2/2 delta=60s: n=48617 corr=+0.0099 sign=+1 |corr|=0.0099 hit=0.492 surr_p=0.0199
+[c01] SOLUSDT window 2/2 delta=300s: n=48377 corr=+0.0004 sign=+1 |corr|=0.0004 hit=0.497 surr_p=0.9403
+[h05b] BNBUSDT: 2 explicit window(s) (deltas=[1, 5, 15, 60, 300]s, grid=1000ms, surrogates=200)
+[c01] BNBUSDT window 1/2 delta=1s: n=172791 corr=-0.0004 sign=-1 |corr|=0.0004 hit=0.559 surr_p=0.8756
+[c01] BNBUSDT window 1/2 delta=5s: n=172787 corr=+0.0078 sign=+1 |corr|=0.0078 hit=0.536 surr_p=0.0100
+[c01] BNBUSDT window 1/2 delta=15s: n=172777 corr=+0.0067 sign=+1 |corr|=0.0067 hit=0.523 surr_p=0.0050
+[c01] BNBUSDT window 1/2 delta=60s: n=172732 corr=-0.0020 sign=-1 |corr|=0.0020 hit=0.510 surr_p=0.3085
+[c01] BNBUSDT window 1/2 delta=300s: n=172492 corr=-0.0009 sign=-1 |corr|=0.0009 hit=0.501 surr_p=0.7363
+[c01] BNBUSDT window 2/2 delta=1s: n=172789 corr=+0.0016 sign=+1 |corr|=0.0016 hit=0.510 surr_p=0.4627
+[c01] BNBUSDT window 2/2 delta=5s: n=172785 corr=-0.0016 sign=-1 |corr|=0.0016 hit=0.496 surr_p=0.5274
+[c01] BNBUSDT window 2/2 delta=15s: n=172775 corr=+0.0030 sign=+1 |corr|=0.0030 hit=0.495 surr_p=0.1741
+[c01] BNBUSDT window 2/2 delta=60s: n=172730 corr=-0.0036 sign=-1 |corr|=0.0036 hit=0.499 surr_p=0.0896
+[c01] BNBUSDT window 2/2 delta=300s: n=172490 corr=-0.0081 sign=-1 |corr|=0.0081 hit=0.495 surr_p=0.0050
+[h05b] XRPUSDT: 2 explicit window(s) (deltas=[1, 5, 15, 60, 300]s, grid=1000ms, surrogates=200)
+[c01] XRPUSDT window 1/2 delta=1s: n=68986 corr=+0.0074 sign=+1 |corr|=0.0074 hit=0.427 surr_p=0.0746
+[c01] XRPUSDT window 1/2 delta=5s: n=68982 corr=+0.0079 sign=+1 |corr|=0.0079 hit=0.429 surr_p=0.0597
+[c01] XRPUSDT window 1/2 delta=15s: n=68972 corr=-0.0028 sign=-1 |corr|=0.0028 hit=0.463 surr_p=0.3881
+[c01] XRPUSDT window 1/2 delta=60s: n=68927 corr=+0.0087 sign=+1 |corr|=0.0087 hit=0.492 surr_p=0.0448
+[c01] XRPUSDT window 1/2 delta=300s: n=68687 corr=-0.0069 sign=-1 |corr|=0.0069 hit=0.492 surr_p=0.0746
+[c01] XRPUSDT window 2/2 delta=1s: n=43340 corr=+0.0074 sign=+1 |corr|=0.0074 hit=0.438 surr_p=0.1045
+[c01] XRPUSDT window 2/2 delta=5s: n=43336 corr=+0.0081 sign=+1 |corr|=0.0081 hit=0.479 surr_p=0.0647
+[c01] XRPUSDT window 2/2 delta=15s: n=43326 corr=+0.0075 sign=+1 |corr|=0.0075 hit=0.499 surr_p=0.1244
+[c01] XRPUSDT window 2/2 delta=60s: n=43281 corr=+0.0082 sign=+1 |corr|=0.0082 hit=0.507 surr_p=0.0846
+[c01] XRPUSDT window 2/2 delta=300s: n=43041 corr=+0.0037 sign=+1 |corr|=0.0037 hit=0.505 surr_p=0.4229
+[h05b] wrote E:\Claude\Projects\scinance\scinance2-impl\handoff_local\results\h05b_oos_20260630_091035\h05b\h05b_oos_results.json
+[h05b] wrote E:\Claude\Projects\scinance\scinance2-impl\handoff_local\results\h05b_oos_20260630_091035\h05b\h05b_oos_results.md
+[h05b] DONE: symbols=5 fdr_p_crit=0.0199 n_fdr_sig=16 inverse_consistent_cells=2 any_inverse_consistent=True
