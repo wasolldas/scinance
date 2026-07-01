@@ -1,0 +1,9 @@
+[h05c] base-dir=E:\Claude\Projects\Data Harvest\data-harvest\data symbol=SOLUSDT windows=['2026-04-15', '2026-05-15'] deltas=[1, 5] latency=500.0ms friction=11.0bps maker=False
+[h05b] SOLUSDT@2026-04-15: 300000 ticks (cap 300000), buy=155398 sell=144602, span 1776211200641..1776267045493 ms
+[h05b] SOLUSDT@2026-05-15: 300000 ticks (cap 300000), buy=141323 sell=158677, span 1778803200005..1778851877322 ms
+[h05c] window 0 delta=1s: n_trips=29813 gross_capture=+0.030bps wall=15.0 net=-14.970bps boot_p=1.0000
+[h05c] window 0 delta=5s: n_trips=29809 gross_capture=+0.081bps wall=15.0 net=-14.919bps boot_p=1.0000
+[h05c] window 1 delta=1s: n_trips=25523 gross_capture=+0.020bps wall=15.0 net=-14.980bps boot_p=1.0000
+[h05c] window 1 delta=5s: n_trips=25519 gross_capture=+0.051bps wall=15.0 net=-14.949bps boot_p=1.0000
+[h05c] wrote E:\Claude\Projects\scinance\scinance2-impl\handoff_local\results\h05c_20260701_153543\h05c_lat500\h05c_results.json
+[h05c] DONE: n_windows=2 fdr_p_crit=0.0000 any_tradable=False gate_valid=True weiter_indication=False

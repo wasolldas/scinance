@@ -1,0 +1,123 @@
+{
+  "schema_version": 1,
+  "hypothesis": "H-05c",
+  "hypothesis_registry": "scinance2-impl/state/hypothesis_registry.md",
+  "capital_free": false,
+  "generated_at": "2026-07-01T15:36:04+00:00",
+  "source": "E:\\Claude\\Projects\\scinance\\data\\harvest/raw/bybit/publicTrade/SOLUSDT (windows 2026-04-15 + 2026-05-15)",
+  "symbol": "SOLUSDT",
+  "n_windows": 2,
+  "deltas_s": [
+    1,
+    5
+  ],
+  "grid_ms": 1000.0,
+  "horizon_rule": "horizon = delta (DEC-16 default)",
+  "friction_wall_bps": 11.0,
+  "slippage_bps": 4.0,
+  "latency_ms": 500.0,
+  "wall_bps_total": 15.0,
+  "maker_secondary": false,
+  "latenz_haircut_applied": true,
+  "latenz_haircut_window": "[t+latenz, t+delta] (SOL capture, causal, no lookahead)",
+  "registered_friction_wall_bps": 11.0,
+  "registered_latency_ms": 300.0,
+  "pass_cells": [
+    "SOLUSDT-d1s",
+    "SOLUSDT-d5s"
+  ],
+  "gate_valid_assumptions": true,
+  "gate_valid_assumptions_note": "WEITER nur gueltig bei latency>=300ms UND friction>=11bps UND Latenz-Haircut angewandt UND Taker UND Pass-Zelle in {SOL-d1s,SOL-d5s}. Abweichung -> gate_valid_assumptions=false (Anti-Gaming, registry H-05c/DEC-16; andere Annahme = NEUE H-05d).",
+  "fdr_alpha": 0.1,
+  "fdr_family": "F-OFI-INV-TRADE",
+  "fdr_p_crit": 0.0,
+  "net_edge_p_max": 0.05,
+  "any_tradable_consistent": false,
+  "weiter_indication": false,
+  "tradability_consistency": [
+    {
+      "delta_s": 1,
+      "n_windows_measured": 2,
+      "n_windows_pass": 0,
+      "passing_windows": [],
+      "tradable_consistent": false
+    },
+    {
+      "delta_s": 5,
+      "n_windows_measured": 2,
+      "n_windows_pass": 0,
+      "passing_windows": [],
+      "tradable_consistent": false
+    }
+  ],
+  "variants": [
+    {
+      "delta_s": 1,
+      "n_trips": 29813,
+      "gross_capture_bps_mean": 0.029928918144129953,
+      "gross_full_bps_mean": 0.07617094888036724,
+      "wall_bps": 15.0,
+      "net_edge_bps_mean": -14.97007108185587,
+      "bootstrap_p": 1.0,
+      "surrogate_p": 0.004975124378109453,
+      "n_bootstrap": 200,
+      "window_index": 0,
+      "t0_ms": 1776211200641.0,
+      "t1_ms": 1776267045493.0,
+      "fdr_significant": false,
+      "net_positive": false,
+      "variant_pass": false
+    },
+    {
+      "delta_s": 5,
+      "n_trips": 29809,
+      "gross_capture_bps_mean": 0.08097948092318417,
+      "gross_full_bps_mean": 0.1271876727044465,
+      "wall_bps": 15.0,
+      "net_edge_bps_mean": -14.919020519076815,
+      "bootstrap_p": 1.0,
+      "surrogate_p": 0.004975124378109453,
+      "n_bootstrap": 200,
+      "window_index": 0,
+      "t0_ms": 1776211200641.0,
+      "t1_ms": 1776267045493.0,
+      "fdr_significant": false,
+      "net_positive": false,
+      "variant_pass": false
+    },
+    {
+      "delta_s": 1,
+      "n_trips": 25523,
+      "gross_capture_bps_mean": 0.019857737208874644,
+      "gross_full_bps_mean": 0.056526775892937656,
+      "wall_bps": 15.0,
+      "net_edge_bps_mean": -14.980142262791126,
+      "bootstrap_p": 1.0,
+      "surrogate_p": 0.004975124378109453,
+      "n_bootstrap": 200,
+      "window_index": 1,
+      "t0_ms": 1778803200005.0,
+      "t1_ms": 1778851877322.0,
+      "fdr_significant": false,
+      "net_positive": false,
+      "variant_pass": false
+    },
+    {
+      "delta_s": 5,
+      "n_trips": 25519,
+      "gross_capture_bps_mean": 0.05064590644971225,
+      "gross_full_bps_mean": 0.08771340867008512,
+      "wall_bps": 15.0,
+      "net_edge_bps_mean": -14.949354093550289,
+      "bootstrap_p": 1.0,
+      "surrogate_p": 0.004975124378109453,
+      "n_bootstrap": 200,
+      "window_index": 1,
+      "t0_ms": 1778803200005.0,
+      "t1_ms": 1778851877322.0,
+      "fdr_significant": false,
+      "net_positive": false,
+      "variant_pass": false
+    }
+  ]
+}
