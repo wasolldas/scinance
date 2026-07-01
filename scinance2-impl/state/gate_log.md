@@ -493,3 +493,54 @@ Die registrierten WEITER-Kriterien sind durch SOLUSDT δ1s/δ5s literal erfüllt
 - **F-WAVE2 NICHT erweitert** (append-only, GL-006/007/008/009 abgeschlossen). H-05b lief allein → nur Familien-interne BH-FDR über **F-OFI-INV** (p_crit 0.0199); keine Über-Familien-zweite-Stufe nötig (Registry H-05b FDR-Familie).
 - **H-05 bleibt DROP** (GL-007, C-01 + C-09-OFI-Bein + C-14-OFI-Erbe gefallen) — H-05b dreht das NICHT zurück; es bestätigt die zu H-05 konkurrierende inverse These als kapitalfreie Mess-Existenz, nicht die ursprüngliche Aggression-Folge-Richtung.
 - **H-05c (handelbare inverse Kante) NICHT registriert, NICHT impliziert.** Falls je gewünscht: eigener Registry-Eintrag, L2-Tiefen-Stream über Wochen, eigenes Tradability-Gate (analog der H-04→H-04b-Trennung). Das ist WP-0/Orchestrator-Arbeit; **ich registriere H-05c NICHT selbst.**
+
+---
+
+## GL-011 · 2026-07-01 · H-05c · C-01 OFI-Fade-TRADABILITY (Folge nach GL-010, **capital_free=FALSE**) — **PARK**
+
+**Quelle:** `handoff_local/results/h05c_20260701_153543/h05c/h05c_results.{json,md}` (urteilstragender PRIMARY-Block) + `h05c_{lat100,lat500,maker}/h05c_results.{json,md}` (Robustheits-/Sekundär-Spanne, NICHT urteilstragend per Anti-Gaming-Klausel) + `SUMMARY_2026-07-01.md`.
+Lauf: SOLUSDT auf Harvester-Backfill (read-only Junction `data/harvest`, DEC-15-Fenster A@2026-04-15 + B@2026-05-15), 2 disjunkte Fenster (F0: 29 813 / F1: 25 523 Round-Trips je δ1s), Grid 1000 ms, δ ∈ {1,5}s (GL-010-Survivor), Fade-Regel (Position entgegen OFI-Vorzeichen, glatt nach horizon=δ), `n_bootstrap=200`, `seed=42`, BH-FDR α=0.10 über **F-OFI-INV-TRADE**. Runner 4/4 OK (rc=0).
+
+### Registriertes Gate (H-05c, wörtlich / DEC-16)
+- **WEITER:** Netto-Edge/Round-Trip = (Brutto-Einfang des inversen SOL-Moves über `[t+latenz, t+δ]` − Friction-Wand 11 bps − Slippage) **> 0 UND statistisch > 0** (Bootstrap `p ≤ 0.05` nach BH-FDR über F-OFI-INV-TRADE) auf **≥ 2 disjunkten Fenstern** für ≥ 1 Zelle ∈ {SOL-δ1s, SOL-δ5s}.
+- **DROP/PARK:** Netto-Edge **≤ 0 in ≥ 1 Fenster** ODER nicht statistisch > 0 (FDR-`p > 0.05`). **Hartes Ein-Fenster-Kriterium (PRD §8.5), kein GRAUBEREICH.**
+- **Anti-Gaming-Klausel:** WEITER nur gültig bei `latenz ≥ 300 ms` UND `Wand ≥ 11 bps` UND Latenz-Haircut angewandt UND Taker UND Pass-Zelle ∈ {SOL-δ1s, SOL-δ5s}.
+
+### Urteilstragender Punkt (PRIMARY-Block, gate_valid_assumptions=TRUE)
+Latenz 300 ms, Friction-Wand 11 bps, Slippage 4 bps (Gesamt-Wand 15 bps), Taker, Latenz-Haircut angewandt, Symbol SOLUSDT. EINZIGER urteilstragender Punkt.
+
+| Zelle | Round-Trips | Brutto-Einfang (bps) | Brutto-voll (bps) | Wand (bps) | Netto-Edge (bps) | bootstrap p | surrogate p | FDR-sig | bestanden |
+|---|---:|---:|---:|---:|---:|---:|---:|---|---|
+| SOL w0 δ1s | 29 813 | +0.048 | +0.076 | 15.0 | **-14.952** | 1.0000 | 0.0050 | nein | nein |
+| SOL w0 δ5s | 29 809 | +0.099 | +0.127 | 15.0 | **-14.901** | 1.0000 | 0.0050 | nein | nein |
+| SOL w1 δ1s | 25 523 | +0.031 | +0.057 | 15.0 | **-14.969** | 1.0000 | 0.0050 | nein | nein |
+| SOL w1 δ5s | 25 519 | +0.062 | +0.088 | 15.0 | **-14.938** | 1.0000 | 0.0050 | nein | nein |
+
+**Tradability-Konsistenz:** δ1s 0/2 Fenster bestanden, δ5s 0/2 Fenster bestanden. `any_tradable_consistent=False`, `weiter_indication=False`, BH-FDR p_crit=0.0000 (0 Survivor).
+
+### Je-Kriterium-Tabelle
+| Kriterium (Registry wörtlich) | Schwelle | Messwert (PRIMARY) | Bestanden |
+|---|---|---|---|
+| Netto-Edge > 0 in ≥ 2 Fenstern (≥1 Pass-Zelle) | > 0 bps | beste Zelle SOL-δ5s w0 **-14.90 bps**; ALLE 4 Zellen ∈ [-14.97, -14.90] bps | **nein** |
+| Statistisch > 0 (Bootstrap p ≤ 0.05, BH-FDR F-OFI-INV-TRADE) | ≤ 0.05 | alle 4 Bootstrap p = 1.0000; **0 FDR-Survivor**, p_crit 0.0000 | **nein** |
+| ≥ 2-Fenster-Konsistenz für ≥ 1 Zelle | ≥ 2 | δ1s 0/2, δ5s 0/2 | **nein** |
+| Hartes Ein-Fenster-Kriterium ausgelöst | ja-Fall = PARK | jede Zelle Netto ≪ 0 → schon F0 löst PARK aus | **PARK ausgelöst** |
+
+### Anti-Gaming-Prüfung gegen die Robustheits-/Sekundär-Blöcke (MIT-berichtet, NICHT urteilstragend)
+| Block | latency_ms | Maker? | gate_valid_assumptions | Netto-Spanne (bps) | any_tradable |
+|---|---:|---|---|---|---|
+| **PRIMARY (urteilstragend)** | **300** | **nein (Taker)** | **TRUE** | **[-14.97, -14.90]** | **nein** |
+| LAT100 (Robustheit) | 100 | nein | FALSE | [-14.95, -14.88] | nein |
+| LAT500 (Robustheit) | 500 | nein | TRUE | [-14.98, -14.92] | nein |
+| MAKER (Sekundär, adverse-selection-vorbehaltlich) | 300 | ja | FALSE | [-5.97, -5.90] | nein |
+
+Selbst der adverse-selection-vorbehaltliche MAKER-Block (kleinere effektive Wand 6 bps) bleibt Netto **-5.9 bps** — keine zulässige Annahme-Variante lässt das Gate WEITER zu (Anti-Gaming respektiert).
+
+### Mechanistische Schlussfolgerung — die H-05b→H-05c-Lehre in Reinform
+Die Fade-Richtung ist **real und nicht-zufällig**: der Surrogate-p (Fade-Vorzeichen-Permutation) ist auf allen 4 Zellen 0.0050, d.h. der inverse OFI-Effekt aus GL-010 reproduziert sich als gerichtetes Signal auch hier (konsistent mit dem H-05b-WEITER). ABER: der handelbare **Brutto-Einfang nach 300-ms-Latenz-Haircut ist +0.03…+0.10 bps** — ~150–500× **unter** der 15-bps-Gesamt-Wand. Selbst der volle Move ohne Haircut liegt bei +0.06…+0.13 bps. Das inverse OFI-Signal existiert messbar (H-05b), trägt aber **keine handelbare Netto-Kante** (H-05c). Exakt die H-04→H-04b-Lehre, hier mit noch größerem Abstand zur Wand (das Mess-Signal war schwächer).
+
+### URTEIL: **PARK.**
+Hartes Ein-Fenster-PARK-Kriterium (Registry H-05c / DEC-16) durch F0 ausgelöst (Netto -14.95 bps ≪ 0, Bootstrap p 1.0000), in allen 4 Zellen reproduziert. Kein GRAUBEREICH. **Anti-Gaming respektiert** — kein WEITER auf einem Nicht-PRIMARY-Punkt erzwungen; alle vier Blöcke PARK. **CLAUDE.md §4:** kein Live-Order, kein Kapitaleinsatz — historischer Backtest mit Kostenmodell auf read-only Harvester-Backfill. **Kapital-Status:** PARK bestätigt. **Symmetrie/Erschöpfung:** Der OFI-Vorzeichen-Komplex ist damit vollständig abgearbeitet — H-05 (positiv) DROP, H-05b (invers) kapitalfreies Mess-WEITER, H-05c (inverse Tradability) PARK. Eine andere Latenz/Wand-Annahme wäre eine NEUE H-05d (Registry-Disziplin §2) — hier NICHT nachregistriert und durch dieses PARK NICHT nahegelegt.
+
+### Programm-Bilanz (nach GL-011)
+Welle 1: H-01/H-02/H-03 alle DROP. Welle 2: H-04 WEITER (kapitalfrei) · H-04b PARK · H-05 DROP · H-06 DROP. Welle 3: H-05b WEITER (kapitalfrei, GL-010) · **H-05c PARK (GL-011)**. **Zwei kapitalfreie Mess-WEITER (H-04, H-05b), beide in der gleich-vorregistrierten Tradability-Prüfung (H-04b, H-05c) ehrlich PARK — 0 handelbare Kanten.** Die Mess-Gate-vs-Tradability-Gate-Trennung hat den S2-2023-Trap (Signal mit Handelbarkeit verwechseln) in BEIDEN Fällen abgefangen.
