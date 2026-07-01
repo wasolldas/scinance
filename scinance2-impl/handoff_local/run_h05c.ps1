@@ -107,7 +107,7 @@ Write-Host ("URTEILSTRAGEND: latency=" + $LatPrimary + "ms friction=" + $Frictio
 Write-Host ("ROBUSTHEIT (NICHT urteilstragend): latency=" + $LatLow + "ms, " + $LatHigh + "ms, --maker-secondary")
 if ($DryRun) { Write-Host "ACHTUNG: HANDOFF_DRY_RUN aktiv." }
 
-$Script = Join-Path $RepoRoot 'scripts\c01_ofi_tradability.py'
+$PyScript = Join-Path $RepoRoot 'scripts\c01_ofi_tradability.py'
 $tradePath = Join-Path $HarvestDir 'raw\bybit\publicTrade'
 $HarvestOk = $true
 if ((-not $DryRun) -and (-not (Test-Path $tradePath))) {
@@ -125,10 +125,10 @@ if (-not $HarvestOk) {
         Record-Step -Name $n -Status 'SKIP' -Rc 0 -Dur 0 -Detail ("Harvester fehlt (" + $tradePath + ")")
     }
 } else {
-    [void](Invoke-Step -Name 'H05C_PRIMARY' -TimeoutSec $TmoStep -CmdArgs ($CommonArgs + @('--latency-ms', "$LatPrimary", '--out-dir', (Join-Path $RunDir 'h05c'))))
-    [void](Invoke-Step -Name 'H05C_LAT100'  -TimeoutSec $TmoStep -CmdArgs ($CommonArgs + @('--latency-ms', "$LatLow",  '--out-dir', (Join-Path $RunDir 'h05c_lat100'))))
-    [void](Invoke-Step -Name 'H05C_LAT500'  -TimeoutSec $TmoStep -CmdArgs ($CommonArgs + @('--latency-ms', "$LatHigh", '--out-dir', (Join-Path $RunDir 'h05c_lat500'))))
-    [void](Invoke-Step -Name 'H05C_MAKER'   -TimeoutSec $TmoStep -CmdArgs ($CommonArgs + @('--latency-ms', "$LatPrimary", '--maker-secondary', '--out-dir', (Join-Path $RunDir 'h05c_maker'))))
+    [void](Invoke-Step -Name 'H05C_PRIMARY' -TimeoutSec $TmoStep -CmdArgs (@($PyScript) + $CommonArgs + @('--latency-ms', "$LatPrimary", '--out-dir', (Join-Path $RunDir 'h05c'))))
+    [void](Invoke-Step -Name 'H05C_LAT100'  -TimeoutSec $TmoStep -CmdArgs (@($PyScript) + $CommonArgs + @('--latency-ms', "$LatLow",  '--out-dir', (Join-Path $RunDir 'h05c_lat100'))))
+    [void](Invoke-Step -Name 'H05C_LAT500'  -TimeoutSec $TmoStep -CmdArgs (@($PyScript) + $CommonArgs + @('--latency-ms', "$LatHigh", '--out-dir', (Join-Path $RunDir 'h05c_lat500'))))
+    [void](Invoke-Step -Name 'H05C_MAKER'   -TimeoutSec $TmoStep -CmdArgs (@($PyScript) + $CommonArgs + @('--latency-ms', "$LatPrimary", '--maker-secondary', '--out-dir', (Join-Path $RunDir 'h05c_maker'))))
 }
 
 $ok = ($Script:Results | Where-Object { $_.Status -eq 'OK' }).Count
