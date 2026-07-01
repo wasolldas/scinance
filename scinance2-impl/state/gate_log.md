@@ -544,3 +544,42 @@ Hartes Ein-Fenster-PARK-Kriterium (Registry H-05c / DEC-16) durch F0 ausgelöst 
 
 ### Programm-Bilanz (nach GL-011)
 Welle 1: H-01/H-02/H-03 alle DROP. Welle 2: H-04 WEITER (kapitalfrei) · H-04b PARK · H-05 DROP · H-06 DROP. Welle 3: H-05b WEITER (kapitalfrei, GL-010) · **H-05c PARK (GL-011)**. **Zwei kapitalfreie Mess-WEITER (H-04, H-05b), beide in der gleich-vorregistrierten Tradability-Prüfung (H-04b, H-05c) ehrlich PARK — 0 handelbare Kanten.** Die Mess-Gate-vs-Tradability-Gate-Trennung hat den S2-2023-Trap (Signal mit Handelbarkeit verwechseln) in BEIDEN Fällen abgefangen.
+
+---
+
+## GL-012 · 2026-07-01 · H-07 · C-06 Cross-Sectional Ergodic Mean-Reversion (Welle-3-Pilot, KAPITALFREI) — **DROP (struktureller A-priori-Power-DROP)**
+
+**Quelle:** Registrierter H-07-Eintrag + DEC-17 + `c06_xmr`-Build-Befund (Modul grün, 17 Tests) + mathematische Verifikation (unten). **Kein Datenlauf nötig** — das Urteil ruht auf einer beweisbaren Eigenschaft von (Gate, Panel), nicht auf gemessenen Datenwerten.
+
+### Registriertes Gate (H-07, relevant)
+- **Achse A (Kern-Trigger):** Über-Dehnung `|z_{i,t}| ≥ 2.5`, wobei `z` die **Cross-Sectional-Standardisierung über die N=5 Panel-Symbole zum Zeitpunkt t** ist (`σ_cross,t` = Cross-Sectional-Std der 5 Symbol-Zeitmittel; M13-Formel, registriert).
+- **N-Floor (harte DROP-Bedingung):** < 30 konditionierte (i,t)-Ereignisse pro Fenster nach Konditionierung → DROP; **kein Symbol-Nachladen, keine Z_THRESH-Absenkung** (registriert).
+
+### Struktureller Befund (mathematische Gewissheit)
+Die Cross-Sectional-z-Statistik über N Punkte ist hart beschränkt: für ein Extremsymbol gegen N−1 gleiche gilt `z_extrem = (N−1)/√(N−1) = √(N−1)`. Für **N=5**: **max|z| = √4 = 2.0** (Population-Std) bzw. **1.79** (Sample-Std, ddof=1). Beides **< 2.5**. Verifiziert (numerisch):
+
+| N | Std | max\|z\| | Z_THRESH=2.5 erreichbar? |
+|---|---|---:|---|
+| 5 | Population (ddof=0) | 2.0000 | **nein** |
+| 5 | Sample (ddof=1) | 1.7889 | **nein** |
+
+Die M13-Literatur-Schwelle |z|>2.5 wurde für ein **Top-20-Panel** gesetzt (dort √(N−1)=√19≈4.36 → 2.5 gut erreichbar). Auf dem verfügbaren **5-Symbol-Harvester-Panel** ist sie **mathematisch unerreichbar**.
+
+### Je-Kriterium-Anwendung
+| Kriterium (Registry) | Schwelle | Struktureller Wert | Bestanden |
+|---|---|---|---|
+| Achse A: |z|≥2.5 feuert | ≥1 Event möglich | max|z|=2.0 < 2.5 → **0 Events möglich** | **nein (nie)** |
+| N-Floor ≥ 30 Events/Fenster | ≥ 30 | N = 0 (garantiert) | **nein → DROP** |
+| Nicht-Trivialitäts-Anker, FDR, ≥2-Fenster | — | nicht erreichbar (N=0) | n/a |
+
+### Abgrenzung zur Torpfosten-Verschiebung (verbindlich)
+Z_THRESH bleibt **2.5** (registriert, CLI-Default unverändert). Es wird **NICHT** abgesenkt, um N>0 zu erzwingen — das wäre der explizit verbotene „Retten durch Z_THRESH-Absenkung" (Registry H-07 / §2). Der DROP wird **angenommen, nicht umgangen**. Der `c06_xmr`-Build ist korrekt und behält 2.5 als Default; die Mechanismus-Tests nutzen dokumentiert z_thresh=1.8 (NUR um die Verstärkungs-Logik zu prüfen, NICHT urteilstragend).
+
+### Mechanistische Schlussfolgerung
+H-07 ist an der **Datenlage** gescheitert (5-statt-20-Symbol-Panel), nicht an einer Widerlegung der Mean-Reversion-Verstärkung selbst — die konnte auf diesem Panel mit der registrierten Literatur-Schwelle **nie gemessen** werden. Das ist der ehrlichste mögliche Ausgang der vorregistrierten H-07: die Verfassung (Literatur-Schwelle) trifft auf eine Daten-Realität (nur 5 Symbole verfügbar), und wir verschieben die Schwelle NICHT, sondern nehmen den DROP. **research_notes §7.5 hat genau das antizipiert** („5 Symbole zu eng gekoppelt").
+
+### URTEIL: **DROP (struktureller A-priori-Power-DROP).**
+Achse A (|z|≥2.5) ist auf dem registrierten 5-Symbol-Panel mathematisch nie erfüllbar (max|z|=2.0) → N=0 → registrierter N-Floor reißt mit Sicherheit → DROP. Kein GRAUBEREICH. Kein Datenlauf nötig (beweisbare Eigenschaft); ein empirischer Lauf würde N=0 deterministisch bestätigen (optional für den Audit-Trail, nicht urteilsverändernd). KAPITALFREIHEIT gewahrt (kein bps-Bezug). **Kein H-07-Retten.** Die panel-robuste Rang-/Perzentil-Über-Dehnung ist eine NEUE, separat vorzuregistrierende Hypothese **H-08** (nicht durch dieses DROP nahegelegt außer als ehrliche wissenschaftliche Folge-Frage; A-priori dort weiterhin DROP wegen Survivorship).
+
+### Programm-Bilanz (nach GL-012)
+Welle 1: H-01/H-02/H-03 DROP. Welle 2: H-04 WEITER (kapitalfrei) · H-04b PARK · H-05 DROP · H-06 DROP. Welle 3: H-05b WEITER (kapitalfrei) · H-05c PARK · **H-07 DROP (struktureller Power-DROP)**. 2 kapitalfreie Mess-WEITER, beide Tradability-PARK; 0 handelbare Kanten. H-07 ist der erste **struktureller** DROP (Daten-Panel-Grenze), sauber ohne Torpfosten-Verschiebung angenommen.
