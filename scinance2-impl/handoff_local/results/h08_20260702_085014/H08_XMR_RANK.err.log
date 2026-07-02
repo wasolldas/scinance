@@ -1,0 +1,16 @@
+[c06_xmr] base-dir=E:\Claude\Projects\Data Harvest\data-harvest\data symbols=['BTCUSDT', 'ETHUSDT', 'SOLUSDT', 'BNBUSDT', 'XRPUSDT'] windows=['2026-04-15', '2026-05-15'] bar_min=5 calendar_days=2 overextension=rank
+[h05b] BTCUSDT@2026-04-15: 5000000 ticks (cap 5000000), buy=2593284 sell=2406716, span 1776211200079..1776432915066 ms
+[h05b] ETHUSDT@2026-04-15: 5000000 ticks (cap 5000000), buy=2514607 sell=2485393, span 1776211200029..1776424753704 ms
+[h05b] SOLUSDT@2026-04-15: 2029328 ticks (cap 5000000), buy=1030218 sell=999110, span 1776211200641..1776470396415 ms
+[h05b] BNBUSDT@2026-04-15: 221749 ticks (cap 5000000), buy=118907 sell=102842, span 1776211202819..1776470395463 ms
+[h05b] XRPUSDT@2026-04-15: 1880357 ticks (cap 5000000), buy=950274 sell=930083, span 1776211200276..1776470399401 ms
+[c06_xmr] window A@2026-04-15: 576 synchronised bars x 5 symbols
+[h05b] BTCUSDT@2026-05-15: 3818908 ticks (cap 5000000), buy=1927079 sell=1891829, span 1778803200024..1779062399796 ms
+[h05b] ETHUSDT@2026-05-15: 4515920 ticks (cap 5000000), buy=2230952 sell=2284968, span 1778803200035..1779062397923 ms
+[h05b] SOLUSDT@2026-05-15: 1311191 ticks (cap 5000000), buy=632444 sell=678747, span 1778803200005..1779062399398 ms
+[h05b] BNBUSDT@2026-05-15: 274265 ticks (cap 5000000), buy=136638 sell=137627, span 1778803200080..1779062398422 ms
+[h05b] XRPUSDT@2026-05-15: 1279677 ticks (cap 5000000), buy=638381 sell=641296, span 1778803200260..1779062398783 ms
+[c06_xmr] window B@2026-05-15: 576 synchronised bars x 5 symbols
+[c06_xmr] wrote E:\Claude\Projects\scinance\scinance2-impl\handoff_local\results\h08_20260702_085014\h08\c06_xmr_results.json
+[c06_xmr] wrote E:\Claude\Projects\scinance\scinance2-impl\handoff_local\results\h08_20260702_085014\h08\c06_xmr_results.md
+[c06_xmr] DONE: hypothesis=H-08 mode=rank windows=2 fdr_p_crit=0.0 n_fdr_sig=0 any_amplified_consistent=False
