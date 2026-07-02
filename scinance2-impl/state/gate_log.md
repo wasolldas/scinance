@@ -583,3 +583,32 @@ Achse A (|z|≥2.5) ist auf dem registrierten 5-Symbol-Panel mathematisch nie er
 
 ### Programm-Bilanz (nach GL-012)
 Welle 1: H-01/H-02/H-03 DROP. Welle 2: H-04 WEITER (kapitalfrei) · H-04b PARK · H-05 DROP · H-06 DROP. Welle 3: H-05b WEITER (kapitalfrei) · H-05c PARK · **H-07 DROP (struktureller Power-DROP)**. 2 kapitalfreie Mess-WEITER, beide Tradability-PARK; 0 handelbare Kanten. H-07 ist der erste **struktureller** DROP (Daten-Panel-Grenze), sauber ohne Torpfosten-Verschiebung angenommen.
+
+---
+
+## GL-013 · 2026-07-02 · H-08 · C-06 Cross-Sectional MR mit RANG-Über-Dehnung (Welle-3-Pilot, KAPITALFREI) — **DROP**
+
+**Quelle:** `handoff_local/results/h08_20260702_085014/h08/c06_xmr_results.{json,md}` + `SUMMARY_2026-07-02.md`. Lauf: 5-Symbol-Panel (BTC/ETH/SOL/BNB/XRP) auf read-only Harvester-Backfill, DEC-15-Kalenderfenster A@2026-04-15 + B@2026-05-15 (je 2 Tage, synchronisierte 5-min-Bars), Rang-Über-Dehnung (argmax|z| je Bar, schwellen-frei), Achse B Crash-Dezil-Veto, h ∈ {1,3,6} Bars, n_surrogates=200, BH-FDR α=0.10 über **F-XMR-RANK**. Runner 1/1 OK (rc=0, 68s). `overextension_mode=rank`, `hypothesis=H-08`, `capital_free=true` im Payload bestätigt.
+
+### Registriertes Gate (H-08, wörtlich) — vier Kriterien + N-Floor
+WEITER erfordert ALLE gemeinsam: (1) konditionierte μ_rev > 0, (2) Surrogate-p ≤ 0.05 nach BH-FDR über F-XMR-RANK, (3) ≥2-Fenster-Konsistenz, (4) Nicht-Trivialitäts-Anker: Δμ > 0 UND nicht-überlappende 95%-Bootstrap-CIs (kond vs. baseline) in ≥2 Fenstern für ≥1 h, plus N ≥ 30 je Fenster. Hartes Ein-Fenster-Kriterium, kein GRAUBEREICH.
+
+### Je-Kriterium-Tabelle (Messwerte, urteilstragend)
+
+| Kriterium | Schwelle | Messwert | Bestanden |
+|---|---|---|---|
+| N-Floor ≥ 30 Events/Fenster | ≥ 30 | 501–508 Events je Fenster (Rang-Modus feasible — bestätigt die GL-012/DEC-18-Konstruktion) | **ja** |
+| Konditionierte μ_rev > 0 in allen tragenden Zellen | > 0 | A: +0.9/+2.2/+2.3 bp (h1/h3/h6) · B: +0.4/+0.7/**−0.8** bp — **B-h6 NEGATIV** | **nein** (B h6) |
+| Surrogate-p ≤ 0.05 nach BH-FDR (F-XMR-RANK) | ≤ 0.05 | p ∈ [0.0796, 0.9453] über alle 6 Zellen; **0 FDR-Survivor**, p_crit = 0.0000 | **nein — in ALLEN Zellen** |
+| ≥2-Fenster-Konsistenz | ≥ 2 | 0 Fenster mit FDR-sig Zelle | **nein** |
+| Nicht-Trivialitäts-Anker (CIs nicht-überlappend, Δμ>0, ≥2 Fenster) | erfüllt | `ci_nonoverlap_vs_baseline=False` in **allen 6 Zellen**; Δμ in Fenster B sogar ≤ 0 (h3: −0.3 bp, h6: −2.2 bp) | **nein — in ALLEN Zellen** |
+| `any_amplified_consistent` | true für WEITER | **False** | **nein** |
+
+### Mechanistische Schlussfolgerung — der Survivorship-Guard hat gegriffen
+Das Regime-Muster ist exakt das vorregistrierte Survivorship-Szenario (research_notes §7.5, XRP-April): In **Fenster A (April)** zeigt die konditionierte Reversion durchweg positive Δμ (+0.8 bis +1.6 bp über Baseline) — schwach, nicht signifikant, aber richtungskonform mit dem April-MR-Regime. In **Fenster B (Mai)** kollabiert der Effekt vollständig: Δμ ≤ 0 bei h3/h6, konditionierte μ_rev bei h6 sogar negativ (Momentum statt Reversion). Der ≥2-Fenster-über-Regimes-Zwang (April UND Mai) war als Survivorship-Guard konstruiert — er hat den April-only-Effekt wie vorhergesagt aussortiert. Zusätzlich ist die Verdünnung der Rang-Definition sichtbar: das je Bar extremste von 5 eng gekoppelten Symbolen trägt keine CI-trennbare Verstärkung gegen den unkonditionierten Baseline. Die E-04-verbotene Trivial-Lesart wurde korrekt NIE als Erfolgspfad angeboten (Anker-Konstruktion), und auch die nicht-triviale Amplifikations-These ist damit empirisch gefallen.
+
+### URTEIL: **DROP.**
+Hartes Ein-Fenster-Kriterium mehrfach ausgelöst (0 FDR-Survivor in beiden Fenstern; Anker in allen 6 Zellen verfehlt; B-h6 mit negativem μ_rev). Kein GRAUBEREICH. KAPITALFREIHEIT gewahrt (kein bps-Edge-Bezug im Gate; die bp-Angaben oben sind reine Mess-Deskriptoren der Renditegröße, keine Tradability-Aussage). **C-06 ist damit vollständig und empirisch abgeschlossen:** Trivial-MR (E-04, verboten), absolute Über-Dehnung (H-07, struktureller Power-DROP GL-012), rang-basierte Über-Dehnung (H-08, empirischer DROP GL-013). Kein H-08b/H-09-Nachschieben nahegelegt — der C-06-Hypothesenraum auf dem verfügbaren 5-Symbol-Panel ist erschöpft.
+
+### Programm-Bilanz (nach GL-013)
+Welle 1: H-01/H-02/H-03 DROP. Welle 2: H-04 WEITER (kapitalfrei) · H-04b PARK · H-05 DROP · H-06 DROP. Welle 3: H-05b WEITER (kapitalfrei) · H-05c PARK · H-07 DROP (strukturell) · **H-08 DROP (empirisch)**. 2 kapitalfreie Mess-WEITER, beide Tradability-PARK; **0 handelbare Kanten**. 13 Gate-Verdikte, 0 Torpfosten-Verschiebungen.

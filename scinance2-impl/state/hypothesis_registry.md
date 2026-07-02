@@ -209,7 +209,7 @@
 - **A-priori (ehrlich benannt): DROP.** (a) Survivorship-Historie unverändert (research_notes XRP-April, sub-10bp; E-04/PRD-§6). (b) NEU und gewichtig: die **Verdünnung** der Rang-Definition — das extremste von 5 eng gekoppelten Symbolen ist meist nur schwach über-dehnt; die Amplifikation gegen Baseline dürfte klein und nicht CI-trennbar sein. Das Gate testet ehrlich, ob trotz Verdünnung eine messbare Verstärkung existiert; der erwartete Ausgang ist, dass die CIs überlappen → DROP über den Nicht-Trivialitäts-Anker.
 - **FDR-Familie:** **F-XMR-RANK** (NEU, getrennt von F-XMR — andere Über-Dehnungs-Definition = andere Hypothese = eigene Familie). BH-FDR α=0.10. F-WAVE2 NICHT erweitert; allein laufend nur Familien-intern (Standard-Regel).
 - **Friction-Wand-Referenz:** ENTFÄLLT (kapitalfrei).
-- **Status:** **registriert, Lauf NICHT gestartet.** Build = kleiner Erweiterungs-WP am gate-neutralen `c06_xmr`-Modul (Über-Dehnungs-Modus als Parameter, H-07-Default „z" UNVERÄNDERT — DEC-18). Urteil durch gate-auditor gegen DIESEN Eintrag.
+- **Status:** **GEURTEILT -> DROP, GL-013 (2026-07-02).** Lauf `h08_20260702_085014` (5er-Panel, DEC-15-Kalenderfenster, Rang-Modus). N-Floor überall erfüllt (501-508 Events/Fenster — Konstruktion feasible), aber: 0 FDR-Survivor (Surrogate-p 0.08-0.95), Nicht-Trivialitäts-Anker in allen 6 Zellen verfehlt (CIs überlappen), Fenster B (Mai) mit Δμ<=0 und μ_rev(h6)<0 — der April-only-Effekt wurde vom vorregistrierten ≥2-Fenster-Survivorship-Guard wie vorhergesagt aussortiert. **C-06 vollständig abgeschlossen** (E-04 trivial verboten / H-07 strukturell / H-08 empirisch). Details: gate_log.md GL-013.
 
 ---
 
