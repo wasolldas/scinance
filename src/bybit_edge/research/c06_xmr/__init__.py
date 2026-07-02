@@ -1,4 +1,10 @@
-"""C-06 Cross-Sectional Ergodic Mean-Reversion mess-gate (Welle-3 WP, H-07).
+"""C-06 Cross-Sectional Ergodic Mean-Reversion mess-gate (Welle-3 WP, H-07/H-08).
+
+H-08 extension (DEC-18): the driver takes an ``overextension`` mode — ``"z"``
+(default, the UNCHANGED H-07 path, |z| >= 2.5, family F-XMR) or ``"rank"``
+(H-08: axis A = per-bar rank-1 symbol argmax|z|, threshold-free, tie ->
+alphabetically first symbol, family F-XMR-RANK). Everything else (axis B,
+baseline, surrogates, CIs, FDR, N-floor) is shared unchanged between modes.
 
 KAPITALFREI cross-sectional measurement + amplification module (DEC-17). On the
 read-only harvester backfill it builds a contemporaneously-synchronised 5-symbol
@@ -26,8 +32,11 @@ from __future__ import annotations
 from .driver import (
     DEFAULT_N_FLOOR,
     FDR_FAMILY,
+    FDR_FAMILY_RANK,
     HYPOTHESIS_ID,
+    HYPOTHESIS_ID_RANK,
     MIN_WINDOWS,
+    OVEREXTENSION_MODES,
     REGISTRY_PATH,
     SCHEMA_VERSION,
     render_markdown,
@@ -62,10 +71,12 @@ from .xsec import (
     PANEL_RV_BARS,
     EventTable,
     build_event_table,
+    build_event_table_rank,
     cross_sectional_z,
     forward_return_h,
     non_crash_mask,
     panel_realized_vol,
+    rank_over_stretch_mask,
     time_mean_returns,
 )
 
@@ -81,9 +92,12 @@ __all__ = [
     "DEFAULT_Z_THRESH",
     "FDR_ALPHA",
     "FDR_FAMILY",
+    "FDR_FAMILY_RANK",
     "HYPOTHESIS_ID",
+    "HYPOTHESIS_ID_RANK",
     "MAX_FFILL_BARS",
     "MIN_WINDOWS",
+    "OVEREXTENSION_MODES",
     "PANEL_RV_BARS",
     "REGISTRY_PATH",
     "SCHEMA_VERSION",
@@ -95,12 +109,14 @@ __all__ = [
     "block_bootstrap_ci",
     "build_calendar_grid",
     "build_event_table",
+    "build_event_table_rank",
     "ci_non_overlap",
     "cross_sectional_z",
     "forward_return_h",
     "load_panel_window",
     "non_crash_mask",
     "panel_realized_vol",
+    "rank_over_stretch_mask",
     "render_markdown",
     "resample_last_price",
     "run",

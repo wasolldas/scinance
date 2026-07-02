@@ -4,11 +4,16 @@
 Reads the read-only harvester Hive tree (default base ``data/harvest``) for the
 two pre-registered DEC-15 calendar windows (2026-04-15 + 2026-05-15, 2 calendar
 days each), builds the contemporaneously-synchronised 5-symbol 5-min last-price
-bar panel, runs the H-07 amplification gate over horizons {1,3,6} bars, applies
-BH-FDR over F-XMR, and writes ``c06_xmr_results.{json,md}``. Gate-neutral — the
-gate-auditor adjudicates against H-07. KAPITALFREI.
+bar panel, runs the amplification gate over horizons {1,3,6} bars, applies
+BH-FDR, and writes ``c06_xmr_results.{json,md}``. Gate-neutral — the
+gate-auditor adjudicates. KAPITALFREI.
+
+``--overextension`` selects axis A (DEC-18): ``z`` (default, H-07 path,
+|z| >= Z_THRESH, family F-XMR — behaviour unchanged) or ``rank`` (H-08 path,
+per-bar rank-1 symbol argmax|z|, threshold-free, family F-XMR-RANK).
 
     python scripts/c06_xmr.py [--base-dir data/harvest] [--out-dir DIR]
+                              [--overextension {z,rank}]
 
 No write access to the harvester tree. Mirrors the H-05b CLI conventions.
 """
@@ -55,7 +60,7 @@ def _dumps(payload) -> str:
 
 
 def main(argv: list[str] | None = None) -> int:
-    p = argparse.ArgumentParser(description="H-07 C-06 cross-sectional MR mess-gate.")
+    p = argparse.ArgumentParser(description="C-06 cross-sectional MR mess-gate (H-07 z / H-08 rank).")
     p.add_argument("--base-dir", default="data/harvest",
                    help="Harvester data root (read-only junction). Default data/harvest.")
     p.add_argument("--symbols", default=",".join(DEFAULT_SYMBOLS),
@@ -65,7 +70,11 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--calendar-days", type=int, default=2, help="Calendar days per window.")
     p.add_argument("--bar-min", type=int, default=5, help="Bar length in minutes.")
     p.add_argument("--lookback-bars", type=int, default=12, help="Time-mean lookback L (bars).")
-    p.add_argument("--z-thresh", type=float, default=2.5, help="Over-stretch |z| threshold.")
+    p.add_argument("--z-thresh", type=float, default=2.5,
+                   help="Over-stretch |z| threshold (z mode only; ignored in rank mode).")
+    p.add_argument("--overextension", choices=("z", "rank"), default="z",
+                   help="Axis-A mode (DEC-18): z = H-07 default path (unchanged), "
+                        "rank = H-08 rank-1 over-stretch (F-XMR-RANK).")
     p.add_argument("--crash-decile", type=float, default=0.9, help="Axis B top-decile cutoff.")
     p.add_argument("--horizons", default="1,3,6", help="Comma-separated forward horizons (bars).")
     p.add_argument("--n-surrogates", type=int, default=200)
@@ -85,7 +94,8 @@ def main(argv: list[str] | None = None) -> int:
     base = Path(args.base_dir)
     print(f"[c06_xmr] base-dir={base.resolve()} symbols={list(symbols)} "
           f"windows={list(win_starts)} bar_min={args.bar_min} "
-          f"calendar_days={args.calendar_days}", file=sys.stderr, flush=True)
+          f"calendar_days={args.calendar_days} overextension={args.overextension}",
+          file=sys.stderr, flush=True)
 
     panels = []
     for start, label in zip(win_starts, win_labels):
@@ -114,6 +124,7 @@ def main(argv: list[str] | None = None) -> int:
         crash_decile=args.crash_decile, horizons=horizons,
         n_surrogates=args.n_surrogates, n_bootstrap=args.n_bootstrap,
         n_floor=args.n_floor, seed=args.seed, source=source,
+        overextension=args.overextension,
     )
 
     out_dir = Path(args.out_dir)
@@ -126,7 +137,9 @@ def main(argv: list[str] | None = None) -> int:
     print(f"[c06_xmr] wrote {json_path}", file=sys.stderr, flush=True)
     print(f"[c06_xmr] wrote {md_path}", file=sys.stderr, flush=True)
     print(
-        f"[c06_xmr] DONE: windows={len(panels)} fdr_p_crit={payload['fdr_p_crit']} "
+        f"[c06_xmr] DONE: hypothesis={payload['hypothesis']} "
+        f"mode={payload['overextension_mode']} "
+        f"windows={len(panels)} fdr_p_crit={payload['fdr_p_crit']} "
         f"n_fdr_sig={payload['n_fdr_significant']} "
         f"any_amplified_consistent={payload['any_amplified_consistent']}",
         file=sys.stderr, flush=True,

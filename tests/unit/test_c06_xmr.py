@@ -411,3 +411,256 @@ def test_end_to_end_cli_produces_valid_json(tmp_path: Path) -> None:
     blob = json.dumps(payload).lower()
     for tok in ("bps", "pnl", "sharpe", "friction"):
         assert tok not in blob
+
+
+# ===========================================================================
+# H-08 RANK over-stretch mode (DEC-18) — ADDITIONS ONLY, existing tests above
+# are unchanged (they ARE the H-07 default-path regression proof).
+# ===========================================================================
+
+from bybit_edge.research.c06_xmr.driver import render_markdown  # noqa: E402
+from bybit_edge.research.c06_xmr.xsec import (  # noqa: E402
+    build_event_table_rank,
+    rank_over_stretch_mask,
+)
+
+
+# ---------------------------------------------------------------------------
+# Rank-event correctness (axis A, H-08)
+# ---------------------------------------------------------------------------
+
+def test_rank_mask_picks_extreme_symbol_per_bar_and_alphabetical_tiebreak() -> None:
+    # Known mini panel of time-means; SYMBOLS order is BTC,ETH,SOL,BNB,XRP.
+    tm = np.array([
+        [0.0, 0.0, 0.0, 0.0, 1.0],    # XRP (idx 4) clearly most extreme
+        [0.0, 0.0, 1.0, -1.0, 0.0],   # |z| TIE between SOL (idx 2) and BNB (idx 3)
+        [np.nan, 0.0, 0.0, 0.0, 0.5],  # NaN row -> no event at all
+    ])
+    z = cross_sectional_z(tm)
+    mask = rank_over_stretch_mask(z, SYMBOLS)
+    # exactly ONE symbol per finite bar, none on the NaN bar
+    assert mask[0].sum() == 1 and mask[1].sum() == 1 and mask[2].sum() == 0
+    assert mask[0, 4]  # XRPUSDT is the extreme symbol of bar 0
+    # tie -> alphabetically FIRST symbol: "BNBUSDT" (idx 3) < "SOLUSDT" (idx 2)
+    assert mask[1, 3] and not mask[1, 2]
+
+
+def test_rank_mask_no_magnitude_threshold_fires_every_finite_bar() -> None:
+    # even a nearly flat panel (tiny |z| everywhere) yields one event per bar.
+    rng = np.random.default_rng(5)
+    tm = rng.normal(0.0, 1e-9, size=(50, 5))
+    z = cross_sectional_z(tm)
+    mask = rank_over_stretch_mask(z, SYMBOLS)
+    finite_rows = np.all(np.isfinite(z), axis=1)
+    assert (mask.sum(axis=1)[finite_rows] == 1).all()
+
+
+def test_rank_mask_symbol_count_mismatch_raises() -> None:
+    z = np.zeros((3, 5))
+    with pytest.raises(ValueError):
+        rank_over_stretch_mask(z, ("A", "B"))
+
+
+# ---------------------------------------------------------------------------
+# z mode N=0 vs rank mode N>0 on the 5-symbol panel (GL-012 structural finding)
+# ---------------------------------------------------------------------------
+
+def test_z_default_25_yields_zero_events_rank_yields_positive_n() -> None:
+    # On N=5 symbols max|z| = sqrt(N-1) = 2.0 < 2.5 -> the REGISTERED default
+    # Z_THRESH can never fire (GL-012). The rank mode fires every bar (after
+    # the axis-B filter), so the N-floor becomes satisfiable (registry H-08).
+    panels = [_amplified_panel(1, amplify=True, label="A"),
+              _amplified_panel(2, amplify=True, label="B")]
+    # z mode, registered default threshold 2.5 -> N=0 in every cell
+    pz = run(panels, window_labels=("A", "B"), z_thresh=2.5,
+             n_surrogates=20, n_bootstrap=50, seed=3)
+    assert pz["hypothesis"] == "H-07"
+    assert all(c["n_events_conditioned"] == 0 for c in pz["cells"])
+    assert all(not c["n_floor_met"] for c in pz["cells"])
+    assert pz["any_amplified_consistent"] is False
+    # rank mode -> N>0 everywhere and N-floor (30) reachable
+    pr = run(panels, window_labels=("A", "B"), overextension="rank",
+             n_surrogates=20, n_bootstrap=50, seed=3)
+    assert pr["hypothesis"] == "H-08"
+    assert all(c["n_events_conditioned"] > 0 for c in pr["cells"])
+    assert all(c["n_floor_met"] for c in pr["cells"])  # ~1 event/bar >> 30
+
+
+def test_rank_event_table_one_event_per_conditioned_bar() -> None:
+    panel = _amplified_panel(1, amplify=True, label="A")
+    evt = build_event_table_rank(panel, crash_decile=0.9, horizon=1)
+    # rank axis A fires every finite bar -> conditioned count is large (>= floor)
+    assert evt.n_conditioned >= 30
+    # and is bounded by the bar count (at most one event per bar)
+    assert evt.n_conditioned <= panel.n_bars
+
+
+# ---------------------------------------------------------------------------
+# Default-path regression: overextension="z" is the unchanged H-07 path
+# ---------------------------------------------------------------------------
+
+def test_run_without_overextension_reports_h07_and_matches_explicit_z() -> None:
+    panels = [_amplified_panel(1, amplify=True, label="A"),
+              _amplified_panel(2, amplify=True, label="B")]
+    kw = dict(window_labels=("A", "B"), z_thresh=1.8, crash_decile=0.9,
+              horizons=(1, 3, 6), n_surrogates=50, n_bootstrap=200,
+              n_floor=30, seed=7)
+    p_default = run(panels, **kw)
+    # explicit test: run() WITHOUT the overextension argument reports H-07
+    assert p_default["hypothesis"] == "H-07"
+    assert p_default["fdr_family"] == "F-XMR"
+    assert p_default["overextension_mode"] == "z"
+    # and is numerically identical to the explicit overextension="z" call
+    p_z = run(panels, overextension="z", **kw)
+    for key in ("hypothesis", "fdr_family", "overextension_mode",
+                "any_amplified_consistent", "n_fdr_significant", "fdr_p_crit"):
+        assert p_default[key] == p_z[key]
+    # cell-level bit-identity (json.dumps keeps NaN literals comparable)
+    assert json.dumps(p_default["cells"]) == json.dumps(p_z["cells"])
+    assert json.dumps(p_default["horizon_rollup"]) == json.dumps(p_z["horizon_rollup"])
+
+
+def test_run_rejects_unknown_overextension_mode() -> None:
+    panels = [_amplified_panel(1, amplify=True, label="A"),
+              _amplified_panel(2, amplify=True, label="B")]
+    with pytest.raises(ValueError):
+        run(panels, window_labels=("A", "B"), overextension="perzentil")
+
+
+# ---------------------------------------------------------------------------
+# Synthetic panels for the rank-mode positive / trivial tests
+# ---------------------------------------------------------------------------
+
+def _rank_amplified_panel(seed: int, *, amplify: bool, label: str) -> SyncedPanel:
+    """Panel where the per-bar RANK-1 (most extreme) symbol reverts strongly.
+
+    At each bar t the cross-sectional-z of the previous bar (window of the last
+    L=12 completed bars — exactly the event-table window for an event at t-1)
+    is computed; in amplify mode the argmax-|z| symbol receives a strong
+    reversion kick in bar t, so rank events revert MORE than the baseline. In
+    trivial mode (amplify=False) all returns are i.i.d. noise — the rank-1
+    conditioning carries no information (conditioned ~ baseline).
+    """
+    rng = np.random.default_rng(seed)
+    T, N, L = 500, 5, 12
+    ts = np.arange(T, dtype=np.float64) * 300_000.0
+    kick = 0.004
+    ret = np.zeros((T, N))
+    for t in range(T):
+        r = rng.normal(0.0, 0.002, N)
+        if amplify and t >= L + 1:
+            window = ret[t - L: t, :]  # rows t-12..t-1 = z window of bar t-1
+            tmean = window.mean(axis=0)
+            sd = tmean.std()
+            if sd > 0.0:
+                zrow = (tmean - tmean.mean()) / sd
+                j = int(np.argmax(np.abs(zrow)))
+                r[j] += -np.sign(zrow[j]) * kick  # revert the rank-1 symbol
+        ret[t, :] = r
+    px = np.zeros((T, N))
+    px[0, :] = 100.0
+    for t in range(1, T):
+        px[t, :] = px[t - 1, :] * (1.0 + ret[t, :])
+    ret2 = np.full((T, N), np.nan)
+    ret2[1:, :] = px[1:, :] / px[:-1, :] - 1.0
+    return SyncedPanel(ts, SYMBOLS, px, ret2, label)
+
+
+def test_rank_positive_detection_amplified_consistent() -> None:
+    # amplified reversion of the per-bar extremest symbol -> H-08 mechanism
+    # detected: amplified_consistent=True (conditioned CI above baseline CI).
+    panels = [_rank_amplified_panel(21, amplify=True, label="A"),
+              _rank_amplified_panel(22, amplify=True, label="B")]
+    payload = run(panels, window_labels=("A", "B"), overextension="rank",
+                  crash_decile=0.9, horizons=(1, 3, 6),
+                  n_surrogates=100, n_bootstrap=400, n_floor=30, seed=7)
+    assert payload["hypothesis"] == "H-08"
+    assert payload["fdr_family"] == "F-XMR-RANK"
+    assert payload["any_amplified_consistent"] is True
+    amp = [r for r in payload["horizon_rollup"] if r["amplified_consistent"]]
+    assert amp and max(r["n_passing_windows"] for r in amp) >= 2
+    passing_h = amp[0]["horizon"]
+    cells = [c for c in payload["cells"]
+             if c["horizon"] == passing_h and c["ci_nonoverlap_vs_baseline"]]
+    assert cells
+    assert cells[0]["ci_low_conditioned"] > cells[0]["ci_high_baseline"]
+
+
+def test_rank_trivial_control_not_amplified() -> None:
+    # conditioned ~ baseline (pure noise) -> CIs overlap -> no amplification.
+    panels = [_rank_amplified_panel(31, amplify=False, label="A"),
+              _rank_amplified_panel(32, amplify=False, label="B")]
+    payload = run(panels, window_labels=("A", "B"), overextension="rank",
+                  crash_decile=0.9, horizons=(1, 3, 6),
+                  n_surrogates=100, n_bootstrap=400, n_floor=30, seed=7)
+    assert payload["any_amplified_consistent"] is False
+    for c in payload["cells"]:
+        assert c["ci_nonoverlap_vs_baseline"] is False
+
+
+def test_rank_capital_free_and_no_forbidden_tokens() -> None:
+    panels = [_rank_amplified_panel(21, amplify=True, label="A"),
+              _rank_amplified_panel(22, amplify=True, label="B")]
+    payload = run(panels, window_labels=("A", "B"), overextension="rank",
+                  n_surrogates=30, n_bootstrap=100, seed=1)
+    assert payload["capital_free"] is True
+    blob = json.dumps(payload).lower()
+    for tok in ("bps", "pnl", "sharpe", "friction", "slippage", "edge"):
+        assert tok not in blob, f"forbidden capital token in payload: {tok!r}"
+
+
+def test_rank_render_markdown_reports_mode_and_hypothesis() -> None:
+    panels = [_rank_amplified_panel(21, amplify=True, label="A"),
+              _rank_amplified_panel(22, amplify=True, label="B")]
+    payload = run(panels, window_labels=("A", "B"), overextension="rank",
+                  n_surrogates=20, n_bootstrap=50, seed=1)
+    md = render_markdown(payload)
+    assert "H-08" in md
+    assert "F-XMR-RANK" in md
+    assert "rank" in md
+    # and the z-mode markdown still reports H-07 / F-XMR
+    payload_z = run(panels, window_labels=("A", "B"),
+                    n_surrogates=20, n_bootstrap=50, seed=1)
+    md_z = render_markdown(payload_z)
+    assert "H-07" in md_z and "H-08" not in md_z
+    assert "F-XMR-RANK" not in md_z
+
+
+# ---------------------------------------------------------------------------
+# End-to-end: CLI with --overextension rank (H-08)
+# ---------------------------------------------------------------------------
+
+def test_end_to_end_cli_rank_mode_produces_valid_h08_json(tmp_path: Path) -> None:
+    base = tmp_path / "harvest"
+    for i, sym in enumerate(SYMBOLS):
+        _write_symbol_window(base, sym, "2026-04-15", seed=100 + i)
+        _write_symbol_window(base, sym, "2026-05-15", seed=200 + i)
+
+    out_dir = tmp_path / "out"
+    script = REPO_ROOT / "scripts" / "c06_xmr.py"
+    import os
+    env = {**os.environ, "PYTHONPATH": str(REPO_ROOT / "src")}
+    proc = subprocess.run(
+        [sys.executable, str(script),
+         "--base-dir", str(base), "--out-dir", str(out_dir),
+         "--overextension", "rank",
+         "--n-surrogates", "30", "--n-bootstrap", "100", "--seed", "1"],
+        capture_output=True, text=True, env=env, timeout=300,
+    )
+    assert proc.returncode == 0, f"CLI failed:\nSTDOUT{proc.stdout}\nSTDERR{proc.stderr}"
+    json_path = out_dir / "c06_xmr_results.json"
+    md_path = out_dir / "c06_xmr_results.md"
+    assert json_path.exists() and md_path.exists()
+    payload = json.loads(json_path.read_text())
+    assert payload["capital_free"] is True
+    assert payload["hypothesis"] == "H-08"
+    assert payload["fdr_family"] == "F-XMR-RANK"
+    assert payload["overextension_mode"] == "rank"
+    assert payload["n_windows"] == 2
+    assert len(payload["cells"]) == 2 * 3
+    # rank axis A fires every bar -> conditioned N > 0 in every cell
+    assert all(c["n_events_conditioned"] > 0 for c in payload["cells"])
+    blob = json.dumps(payload).lower()
+    for tok in ("bps", "pnl", "sharpe", "friction"):
+        assert tok not in blob
+    assert "H-08" in md_path.read_text(encoding="utf-8")

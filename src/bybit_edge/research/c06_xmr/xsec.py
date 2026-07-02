@@ -8,7 +8,11 @@ Implements the M13 formulas on the synchronised 5-min bar panel (``panel.py``):
   * ``sigma_cross,t`` = cross-sectional std of the 5 ``E_t[X_j]`` at t.
   * ``z_{i,t}``  = (E_t[X_i] - <X>_t) / sigma_cross,t.
 
-Over-stretch events (axis A): ``|z_{i,t}| >= Z_THRESH`` (2.5).
+Over-stretch events (axis A): ``|z_{i,t}| >= Z_THRESH`` (2.5) in the default
+z mode (H-07). In RANK mode (H-08 / DEC-18, ``rank_over_stretch_mask`` /
+``build_event_table_rank``) axis A is instead the per-bar rank-1 symbol
+``argmax_i |z_{i,t}|`` (tie -> alphabetically first symbol, deterministic,
+threshold-free). The z-mode functions are unchanged by the rank additions.
 
 Axis B (non-crash regime): the panel realized-vol at t = sum of squared
 contemporaneous 5-symbol bar returns over a forward 15-min window (= 3 bars),
@@ -228,6 +232,84 @@ def build_event_table(
     )
 
 
+def rank_over_stretch_mask(z: np.ndarray, symbols: tuple[str, ...] | list[str]) -> np.ndarray:
+    """Axis A in RANK mode (H-08 / DEC-18): the ONE most extreme symbol per bar.
+
+    For each bar t whose z-row is fully finite, exactly ONE symbol is flagged:
+    ``i* = argmax_i |z_{i,t}|``. Ties are resolved deterministically by the
+    alphabetically FIRST symbol name (registry H-08). There is NO magnitude
+    threshold — the rank-1 definition is threshold-free by construction
+    (any |z| cutoff below 2.5 would be a disguised Z_THRESH lowering, DEC-18).
+    Bars with any non-finite z are all-False (no event).
+    """
+    zz = np.asarray(z, dtype=np.float64)
+    T, N = zz.shape
+    if len(symbols) != N:
+        raise ValueError(f"symbols ({len(symbols)}) must match z columns ({N})")
+    out = np.zeros((T, N), dtype=bool)
+    for t in range(T):
+        row = zz[t, :]
+        if not np.all(np.isfinite(row)):
+            continue
+        a = np.abs(row)
+        m = float(a.max())
+        tied = [i for i in range(N) if a[i] == m]
+        i_star = min(tied, key=lambda i: symbols[i])  # alphabetical tie-break
+        out[t, i_star] = True
+    return out
+
+
+def build_event_table_rank(
+    panel: SyncedPanel,
+    *,
+    lookback_bars: int = DEFAULT_LOOKBACK_BARS,
+    crash_decile: float = DEFAULT_CRASH_DECILE,
+    panel_rv_bars: int = PANEL_RV_BARS,
+    horizon: int = 1,
+) -> EventTable:
+    """Build the per-(i,t) event table with RANK-based axis A (H-08 / DEC-18).
+
+    Identical to ``build_event_table`` in every respect EXCEPT axis A: instead
+    of ``|z| >= z_thresh`` the over-stretch event is the per-bar rank-1 symbol
+    (``argmax_i |z_{i,t}|``, tie -> alphabetically first, threshold-free). Axis
+    B (non-crash decile), the reversion signing, the baseline and all downstream
+    statistics are unchanged. The z-mode function above stays untouched.
+    """
+    returns = panel.returns
+    tmeans = time_mean_returns(returns, lookback_bars)
+    z = cross_sectional_z(tmeans)
+    rank_mask = rank_over_stretch_mask(z, panel.symbols)
+    rv = panel_realized_vol(returns, panel_rv_bars)
+    non_crash = non_crash_mask(rv, crash_decile)  # (T,)
+    fwd = forward_return_h(panel.last_price, horizon)  # (T, N)
+
+    T, N = z.shape
+    non_crash_mat = np.broadcast_to(non_crash[:, None], (T, N))
+
+    z_flat = z.reshape(-1)
+    fwd_flat = fwd.reshape(-1)
+    non_crash_flat = non_crash_mat.reshape(-1)
+    rank_flat = rank_mask.reshape(-1)
+
+    valid = np.isfinite(z_flat) & np.isfinite(fwd_flat)
+    z_v = z_flat[valid]
+    fwd_v = fwd_flat[valid]
+    nc_v = non_crash_flat[valid]
+    rk_v = rank_flat[valid]
+
+    rev_ret = -np.sign(z_v) * fwd_v
+    conditioned = rk_v & nc_v
+
+    return EventTable(
+        horizon=horizon,
+        z=z_v,
+        rev_ret=rev_ret,
+        is_over_stretch=rk_v.astype(bool),
+        is_non_crash=nc_v.astype(bool),
+        is_conditioned=conditioned,
+    )
+
+
 __all__ = [
     "DEFAULT_LOOKBACK_BARS",
     "DEFAULT_Z_THRESH",
@@ -236,9 +318,11 @@ __all__ = [
     "PANEL_RV_BARS",
     "EventTable",
     "build_event_table",
+    "build_event_table_rank",
     "cross_sectional_z",
     "forward_return_h",
     "non_crash_mask",
     "panel_realized_vol",
+    "rank_over_stretch_mask",
     "time_mean_returns",
 ]

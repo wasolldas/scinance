@@ -1,4 +1,10 @@
-"""Orchestration + gate-neutral payload for the C-06 XMR mess-gate (H-07).
+"""Orchestration + gate-neutral payload for the C-06 XMR mess-gate (H-07/H-08).
+
+The ``overextension`` mode parameter (DEC-18) selects axis A: ``"z"`` (default)
+is the unchanged H-07 path (|z| >= z_thresh, family F-XMR); ``"rank"`` is the
+H-08 path (per-bar rank-1 symbol = argmax |z|, threshold-free, family
+F-XMR-RANK). Everything downstream (axis B, baseline, surrogates, CIs, FDR,
+N-floor, payload shape) is identical between the modes.
 
 Per (window, horizon h) this computes, on the reversion-signed forward returns:
   * mu_rev_conditioned  — events passing axis A (|z|>=2.5) AND axis B (non-crash),
@@ -45,12 +51,20 @@ from .xsec import (
     DEFAULT_Z_THRESH,
     PANEL_RV_BARS,
     build_event_table,
+    build_event_table_rank,
 )
 
 SCHEMA_VERSION = 1
 HYPOTHESIS_ID = "H-07"
 REGISTRY_PATH = "scinance2-impl/state/hypothesis_registry.md"
 FDR_FAMILY = "F-XMR"
+
+#: RANK over-stretch mode (H-08 / DEC-18): own hypothesis + own FDR family.
+HYPOTHESIS_ID_RANK = "H-08"
+FDR_FAMILY_RANK = "F-XMR-RANK"
+
+#: Valid axis-A over-stretch modes ("z" = H-07 default path, "rank" = H-08).
+OVEREXTENSION_MODES: tuple[str, ...] = ("z", "rank")
 
 #: Minimum conditioned over-stretch events per window (registry H-07: >= 30).
 DEFAULT_N_FLOOR = 30
@@ -73,28 +87,50 @@ def run(
     n_floor: int = DEFAULT_N_FLOOR,
     seed: int = 42,
     source: str = "",
+    overextension: str = "z",
 ) -> dict[str, Any]:
     """Run the C-06 XMR mess-gate over >= 2 pre-registered synchronised panels.
 
     ``panels[w]`` is the synchronised panel for window w (>= 2). Returns the
     gate-neutral payload (per-cell stats + per-h amplification roll-up).
+
+    ``overextension`` selects axis A (DEC-18): ``"z"`` (default) is the H-07
+    path — |z| >= z_thresh, bit-identical to the pre-DEC-18 behaviour;
+    ``"rank"`` is the H-08 path — per-bar rank-1 symbol (argmax |z|,
+    threshold-free), reported under hypothesis H-08 / family F-XMR-RANK.
+    Axis B, baseline, surrogates, CIs, FDR and N-floor are identical in both.
     """
+    if overextension not in OVEREXTENSION_MODES:
+        raise ValueError(
+            f"overextension must be one of {OVEREXTENSION_MODES}, got {overextension!r}"
+        )
+    hypothesis_id = HYPOTHESIS_ID_RANK if overextension == "rank" else HYPOTHESIS_ID
+    fdr_family = FDR_FAMILY_RANK if overextension == "rank" else FDR_FAMILY
     n_windows = len(panels)
     if n_windows < MIN_WINDOWS:
-        raise ValueError(f"H-07 needs >= {MIN_WINDOWS} windows, got {n_windows}")
+        raise ValueError(f"{hypothesis_id} needs >= {MIN_WINDOWS} windows, got {n_windows}")
 
     # 1) per (window, horizon) cell stats.
     cells: list[dict[str, Any]] = []
     for w, panel in enumerate(panels):
         for h in horizons:
-            evt = build_event_table(
-                panel,
-                lookback_bars=lookback_bars,
-                z_thresh=z_thresh,
-                crash_decile=crash_decile,
-                panel_rv_bars=panel_rv_bars,
-                horizon=h,
-            )
+            if overextension == "rank":
+                evt = build_event_table_rank(
+                    panel,
+                    lookback_bars=lookback_bars,
+                    crash_decile=crash_decile,
+                    panel_rv_bars=panel_rv_bars,
+                    horizon=h,
+                )
+            else:
+                evt = build_event_table(
+                    panel,
+                    lookback_bars=lookback_bars,
+                    z_thresh=z_thresh,
+                    crash_decile=crash_decile,
+                    panel_rv_bars=panel_rv_bars,
+                    horizon=h,
+                )
             cond = evt.conditioned()
             base = evt.baseline()
             n_cond = int(cond.size)
@@ -161,8 +197,9 @@ def run(
 
     return {
         "schema_version": SCHEMA_VERSION,
-        "hypothesis": HYPOTHESIS_ID,
+        "hypothesis": hypothesis_id,
         "hypothesis_registry": REGISTRY_PATH,
+        "overextension_mode": overextension,
         "capital_free": True,
         "generated_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
         "source": source,
@@ -181,7 +218,7 @@ def run(
         "seed": int(seed),
         "ci_level": CI_LEVEL,
         "fdr_alpha": FDR_ALPHA,
-        "fdr_family": FDR_FAMILY,
+        "fdr_family": fdr_family,
         "fdr_p_crit": _f(p_crit),
         "n_fdr_significant": int(n_fdr_sig),
         "gate_thresholds": {
@@ -222,25 +259,35 @@ def _fmt(v: Any, nd: int = 6) -> str:
 
 
 def render_markdown(payload: dict[str, Any]) -> str:
+    hyp = payload.get("hypothesis", HYPOTHESIS_ID)
+    mode = payload.get("overextension_mode", "z")
+    family = payload.get("fdr_family", FDR_FAMILY)
+    if mode == "rank":
+        axis_a = "rank — Achse A = Rang-1-Symbol je Bar (argmax |z|, schwellen-frei, DEC-18)"
+        thresh_txt = "Z_THRESH=entfällt (Rang-Modus)"
+    else:
+        axis_a = f"z — Achse A = |z| ≥ Z_THRESH ({payload['z_thresh']})"
+        thresh_txt = f"Z_THRESH={payload['z_thresh']}"
     L: list[str] = []
-    L.append("# C-06 Cross-Sectional Ergodic Mean-Reversion — H-07 Mess-Gate (KAPITALFREI)")
+    L.append(f"# C-06 Cross-Sectional Ergodic Mean-Reversion — {hyp} Mess-Gate (KAPITALFREI)")
     L.append("")
-    L.append(f"- **Hypothese:** {payload['hypothesis']} — `{payload['hypothesis_registry']}`")
+    L.append(f"- **Hypothese:** {hyp} — `{payload['hypothesis_registry']}`")
+    L.append(f"- **Über-Dehnungs-Modus:** {axis_a}")
     L.append(f"- **Erzeugt:** {payload['generated_at']} (UTC)")
     L.append(f"- **Quelle:** `{payload['source']}` (Panel: {', '.join(payload['symbols'])})")
     L.append(f"- **Fenster (vorregistriert):** {', '.join(payload['window_labels'])} "
              f"· Bars/Fenster: {payload['n_bars_per_window']}")
-    L.append(f"- **L={payload['lookback_bars']} Bars · Z_THRESH={payload['z_thresh']} · "
+    L.append(f"- **L={payload['lookback_bars']} Bars · {thresh_txt} · "
              f"Crash-Dezil={payload['crash_decile']} · Panel-RV={payload['panel_rv_bars']} Bars · "
              f"Horizonte={payload['horizons']} Bars**")
     L.append(f"- **Surrogates={payload['n_surrogates']} · Bootstrap={payload['n_bootstrap']} · "
              f"N-Floor={payload['n_floor']} · Seed={payload['seed']}**")
-    L.append(f"- **FDR-Familie:** {payload['fdr_family']} · **BH-FDR α:** {payload['fdr_alpha']} "
+    L.append(f"- **FDR-Familie:** {family} · **BH-FDR α:** {payload['fdr_alpha']} "
              f"· **p_crit:** {_fmt(payload['fdr_p_crit'], 4)}")
     L.append("- **KAPITALFREI:** ja — reiner Mess-/Verstärkungs-Test, keine bps/Edge/PnL/Sharpe.")
     L.append("")
-    L.append("> Gate-Urteil fällt der gate-auditor gegen H-07. WEITER verlangt (ALLE gemeinsam): "
-             "konditioniert μ_rev>0 UND p≤0.05 (BH-FDR F-XMR) UND ≥2-Fenster-Konsistenz UND "
+    L.append(f"> Gate-Urteil fällt der gate-auditor gegen {hyp}. WEITER verlangt (ALLE gemeinsam): "
+             f"konditioniert μ_rev>0 UND p≤0.05 (BH-FDR {family}) UND ≥2-Fenster-Konsistenz UND "
              "nicht-überlappende 95%-Bootstrap-CIs (konditioniert > Baseline) für ≥1 Horizont in "
              "≥2 Fenstern UND N≥30/Fenster. Nicht-Trivialitäts-Anker: konditioniert MUSS echt "
              "stärker revertieren als der unkonditionierte Baseline (E-04-/§6-verbotene Trivial-MR "
@@ -277,16 +324,20 @@ def render_markdown(payload: dict[str, Any]) -> str:
             f"{_fmt(c['ci_high_baseline'])} | {c['n_events_baseline']} | — | — | — | — | — |"
         )
     L.append("")
-    L.append("*Erzeugt von `c06_xmr/driver.py` (read-only Harvester-Backfill, DEC-15/DEC-17). "
-             "capital_free=true. Endgültiges Gate-Urteil: gate-auditor gegen H-07.*")
+    L.append(f"*Erzeugt von `c06_xmr/driver.py` (read-only Harvester-Backfill, DEC-15/DEC-17"
+             f"{'/DEC-18' if mode == 'rank' else ''}). "
+             f"capital_free=true. Endgültiges Gate-Urteil: gate-auditor gegen {hyp}.*")
     return "\n".join(L)
 
 
 __all__ = [
     "SCHEMA_VERSION",
     "HYPOTHESIS_ID",
+    "HYPOTHESIS_ID_RANK",
     "REGISTRY_PATH",
     "FDR_FAMILY",
+    "FDR_FAMILY_RANK",
+    "OVEREXTENSION_MODES",
     "DEFAULT_N_FLOOR",
     "MIN_WINDOWS",
     "DEFAULT_SYMBOLS",
