@@ -146,9 +146,13 @@ def scan_and_select(
         n_strikes = smile.n_strikes if smile is not None else 0
         rv = float("nan")
         try:
+            # min_days = rv_window_days: RV_5d requires the FULL registered
+            # 5-day window (audit_h13 Bug 6 — a 3-day tolerance would make
+            # "RV_5d" effectively RV_3d and co-decide regime condition (i));
+            # a day with gaps gets RV = NaN and is excluded (conservative).
             r, _meta = load_returns_window(
                 base_dir, perp_symbol, d,
-                n_days=rv_window_days, min_days=max(2, rv_window_days - 2),
+                n_days=rv_window_days, min_days=rv_window_days,
             )
             rv = float(np.sqrt(np.mean(r * r))) if r.size else float("nan")
         except DataError as exc:

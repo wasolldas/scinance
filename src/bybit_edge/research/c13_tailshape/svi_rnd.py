@@ -27,6 +27,11 @@ from dataclasses import dataclass
 from typing import Any
 
 import numpy as np
+# scipy.integrate.trapezoid (stable name for the whole pinned scipy>=1.12
+# range) instead of a numpy spelling: np.trapezoid only exists from numpy 2.0
+# and np.trapz was REMOVED in numpy 2.0, so neither numpy name is portable
+# across the repo's numpy>=1.26 pin (audit_h13 Bug 8).
+from scipy.integrate import trapezoid
 from scipy.optimize import least_squares
 from scipy.stats import norm
 
@@ -125,13 +130,18 @@ def rnd_from_svi(
     *,
     k_range: tuple[float, float] = K_GRID_RANGE,
     n_grid: int = K_GRID_N,
-) -> tuple[np.ndarray, np.ndarray]:
+) -> tuple[np.ndarray, np.ndarray, float]:
     """Breeden-Litzenberger density q(K) = d^2C/dK^2 from the SVI surface.
 
     Numerical second derivative (``np.gradient`` twice, non-uniform-safe) of
     the SVI-implied Black-76 call prices on a dense log-moneyness grid.
-    Negative numerical noise is clipped at 0 and the density renormalised to
-    unit mass over the grid. Returns ``(K_grid, q)``.
+    Negative density (numerical noise OR a genuine butterfly-arbitrage
+    violation of the SVI fit) is clipped at 0 and the density renormalised to
+    unit mass over the grid; the fraction of probability mass removed by that
+    clipping is reported as a diagnostic (audit_h13 Bug 2 — partial fix: a
+    full Gatheral g(k) >= 0 arbitrage reject-and-refit is NOT implemented,
+    the diagnostic makes a degraded fit visible downstream instead of silent).
+    Returns ``(K_grid, q, clipped_mass_fraction)``.
     """
     if not (forward > 0 and t_years > 0):
         raise RndError(f"invalid forward/t: {forward}, {t_years}")
@@ -142,12 +152,14 @@ def rnd_from_svi(
         raise RndError("SVI total variance non-positive on the RND grid")
     iv = np.sqrt(w / t_years)
     C = black76_call(forward, K, iv, t_years)
-    q = np.gradient(np.gradient(C, K), K)
-    q = np.clip(q, 0.0, None)
-    mass = float(np.trapezoid(q, K))
+    q_raw = np.gradient(np.gradient(C, K), K)
+    q = np.clip(q_raw, 0.0, None)
+    neg_mass = float(trapezoid(np.clip(-q_raw, 0.0, None), K))
+    mass = float(trapezoid(q, K))
     if not (math.isfinite(mass) and mass > 1e-8):
         raise RndError("BL density has no mass")
-    return K, q / mass
+    clipped_mass_fraction = neg_mass / (neg_mass + mass) if math.isfinite(neg_mass) else float("nan")
+    return K, q / mass, clipped_mass_fraction
 
 
 def rnd_quantile(K: np.ndarray, q: np.ndarray, alpha: float) -> float:
@@ -243,6 +255,9 @@ class XiQResult:
     svi_rms: float
     xi_boot: np.ndarray
     n_boot_failed: int
+    #: Fraction of BL probability mass clipped at 0 (point estimate; Bug 2
+    #: diagnostic — >~1e-3 signals a butterfly-arbitrage-violating SVI fit).
+    clipped_mass_fraction: float = float("nan")
 
     @property
     def xi_se(self) -> float:
@@ -261,6 +276,7 @@ class XiQResult:
                 zip(("a", "b", "rho", "m", "sigma"), self.svi_params)
             },
             "svi_rms": float(self.svi_rms),
+            "clipped_mass_fraction": float(self.clipped_mass_fraction),
             "xi_se_bootstrap": self.xi_se,
             "n_bootstrap_valid": int(b.size),
             "n_bootstrap_failed": int(self.n_boot_failed),
@@ -269,14 +285,15 @@ class XiQResult:
 
 def _xi_q_once(strikes: np.ndarray, ivs: np.ndarray, forward: float,
                t_years: float, tail_alpha: float) -> tuple[float, float, float,
-                                                           np.ndarray, float]:
+                                                           np.ndarray, float,
+                                                           float]:
     k = np.log(np.asarray(strikes, dtype=np.float64) / forward)
     w = np.asarray(ivs, dtype=np.float64) ** 2 * t_years
     params, rms = fit_svi(k, w)
-    K, q = rnd_from_svi(params, forward, t_years)
+    K, q, clipped_frac = rnd_from_svi(params, forward, t_years)
     sample, q_alpha = left_tail_excess_sample(K, q, alpha=tail_alpha)
     xi, beta = gpd_fit_pwm(sample)
-    return xi, beta, q_alpha, params, rms
+    return xi, beta, q_alpha, params, rms, clipped_frac
 
 
 def estimate_xi_q(
@@ -298,7 +315,7 @@ def estimate_xi_q(
     """
     strikes = np.asarray(strikes, dtype=np.float64)
     ivs = np.asarray(ivs, dtype=np.float64)
-    xi, beta, q_alpha, params, rms = _xi_q_once(
+    xi, beta, q_alpha, params, rms, clipped_frac = _xi_q_once(
         strikes, ivs, forward, t_years, tail_alpha,
     )
     rng = np.random.default_rng(seed)
@@ -319,4 +336,5 @@ def estimate_xi_q(
     return XiQResult(
         xi=xi, beta=beta, q_alpha=q_alpha, svi_params=params, svi_rms=rms,
         xi_boot=boot, n_boot_failed=n_failed,
+        clipped_mass_fraction=clipped_frac,
     )

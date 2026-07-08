@@ -18,7 +18,8 @@ Documented assumptions (see README_H13.md):
     divided by 100 (Deribit quotes IV in percent, e.g. 55.0).
   * **Snapshot definition:** all ticks within +/- ``window_min`` minutes of
     08:00 UTC, last mark per instrument wins; if the window is empty, the
-    single tick closest to 08:00 UTC of that day is used.
+    single tick closest to 08:00 UTC of that day is used — that fallback is
+    reported in the payload via ``snapshot_fallback_used``/``snapshot_ts_ms``.
   * **Forward price:** preferred from an explicit ``forward_price`` /
     ``underlying_price`` / ``index_price`` field if present in any entry;
     otherwise estimated from put-call parity in inverse (coin-denominated)
@@ -173,12 +174,16 @@ def load_snapshot_entries(
     window_min: int = SNAPSHOT_WINDOW_MIN,
     exchange: str = "deribit",
     stream: str = "markprice.options",
-) -> dict[str, dict[str, Any]]:
+) -> tuple[dict[str, dict[str, Any]], dict[str, Any]]:
     """Last mark per instrument around the 08:00 UTC snapshot of one day.
 
-    Returns ``{instrument_name: entry_dict}``. Ticks within +/- ``window_min``
-    of the snapshot time are used; if none exist, the single closest tick of
-    the day is used (documented fallback). Read-only.
+    Returns ``({instrument_name: entry_dict}, snapshot_meta)``. Ticks within
+    +/- ``window_min`` of the snapshot time are used; if none exist, the
+    single closest tick of the day is used (documented fallback).
+    ``snapshot_meta`` carries ``snapshot_fallback_used`` (True iff that
+    closest-tick fallback fired — audit_h13 Bug 4: the fallback must be
+    visible in the payload, not silent) and ``snapshot_ts_ms`` (exchange ts
+    of the latest tick actually used as the snapshot). Read-only.
     """
     import duckdb
 
@@ -205,9 +210,11 @@ def load_snapshot_entries(
         raise OptionsDataError(f"{symbol}@{date_str}: 0 markprice rows")
     lo, hi = target_ms - window_min * 60_000, target_ms + window_min * 60_000
     in_win = [(ts, pj) for ts, pj in rows if lo <= ts <= hi]
+    fallback_used = False
     if not in_win:
         closest_ts = min(rows, key=lambda r: abs(r[0] - target_ms))[0]
         in_win = [(ts, pj) for ts, pj in rows if ts == closest_ts]
+        fallback_used = True
     by_instrument: dict[str, dict[str, Any]] = {}
     for ts, pj in in_win:  # ascending ts -> last mark per instrument wins
         for e in _extract_entries(pj):
@@ -216,7 +223,11 @@ def load_snapshot_entries(
                 by_instrument[name] = e
     if not by_instrument:
         raise OptionsDataError(f"{symbol}@{date_str}: no instrument entries in snapshot")
-    return by_instrument
+    snapshot_meta = {
+        "snapshot_fallback_used": fallback_used,
+        "snapshot_ts_ms": int(in_win[-1][0]),
+    }
+    return by_instrument, snapshot_meta
 
 
 # ----------------------------------------------------------------------------
@@ -292,6 +303,11 @@ class SmileSlice:
     strikes: np.ndarray
     ivs: np.ndarray
     deltas: np.ndarray
+    #: Exchange ts (ms) of the latest tick used as the snapshot; None until
+    #: set by :func:`load_smile` (audit_h13 Bug 4 diagnostic).
+    snapshot_ts_ms: int | None = None
+    #: True iff the closest-tick fallback fired (empty +/-30-min window).
+    snapshot_fallback_used: bool = False
 
     @property
     def n_strikes(self) -> int:
@@ -308,6 +324,8 @@ class SmileSlice:
             "n_strikes": self.n_strikes,
             "strike_min": float(self.strikes.min()) if self.n_strikes else None,
             "strike_max": float(self.strikes.max()) if self.n_strikes else None,
+            "snapshot_ts_ms": int(self.snapshot_ts_ms) if self.snapshot_ts_ms is not None else None,
+            "snapshot_fallback_used": bool(self.snapshot_fallback_used),
         }
 
 
@@ -389,12 +407,20 @@ def load_smile(
 ) -> SmileSlice | None:
     """Convenience: load snapshot entries and build the filtered smile."""
     try:
-        entries = load_snapshot_entries(
+        entries, snapshot_meta = load_snapshot_entries(
             base_dir, symbol, date_str, snapshot_hour=snapshot_hour,
         )
     except OptionsDataError as exc:
         print(f"[h13] options {symbol}@{date_str}: {exc}", file=sys.stderr, flush=True)
         return None
-    return build_smile(
+    smile = build_smile(
         entries, symbol, date_str, tenor_dte=tenor_dte, delta_band=delta_band,
     )
+    if smile is not None:
+        smile.snapshot_ts_ms = snapshot_meta["snapshot_ts_ms"]
+        smile.snapshot_fallback_used = snapshot_meta["snapshot_fallback_used"]
+        if smile.snapshot_fallback_used:
+            print(f"[h13] options {symbol}@{date_str}: empty +/-30-min window, "
+                  f"closest-tick fallback used (ts={smile.snapshot_ts_ms})",
+                  file=sys.stderr, flush=True)
+    return smile

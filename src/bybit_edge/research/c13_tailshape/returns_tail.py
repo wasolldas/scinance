@@ -39,6 +39,12 @@ N_BOOTSTRAP = 500
 #: Trailing window length in trading days (crypto: calendar days).
 TRAILING_DAYS = 60
 #: Robustness floor: minimum days with data inside the trailing window.
+#: NOTE (audit_h13 Bug 5): this tolerance is NOT part of the registered H-13
+#: entry (which fixes a trailing 60-day window) — it is an intentional
+#: data-availability guard against harvester gaps only, documented in
+#: README_H13.md; the actually-used coverage is always visible in the payload
+#: (``returns_side.n_days_present`` vs. ``n_days_requested``), so the
+#: gate-auditor can invalidate a thin cell.
 MIN_TRAILING_DAYS = 30
 #: Minimum number of POT exceedances for a GPD fit.
 MIN_EXCEEDANCES = 20

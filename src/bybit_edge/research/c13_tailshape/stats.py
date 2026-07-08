@@ -5,10 +5,13 @@ symbol x snapshot day; Delta_xi = xi_P - xi_Q. The p-value comes from the
 COMBINED bootstrap distribution (block bootstrap of xi_P crossed with the
 strike bootstrap of xi_Q), shifted to the null.
 
-BH-FDR alpha = 0.10 over the F-TAILSHAPE family (2 symbols x 2 snapshot
-days = up to 4 cells). Own copy of the Benjamini-Hochberg helper (repo
-convention: research families keep an independent copy so the GL-bearing
-modules stay untouched).
+BH-FDR alpha = 0.10 over the F-TAILSHAPE family. The registry fixes the
+family at 2 symbols x 2 snapshot days = 4 cells; the driver pads unmeasured
+(symbol, day) slots with p = 1.0 sentinel cells (``measured=False``) so the
+BH family NEVER shrinks below the registered size (audit_h13 Bug 1 —
+a smaller family would be anti-conservative). Own copy of the
+Benjamini-Hochberg helper (repo convention: research families keep an
+independent copy so the GL-bearing modules stay untouched).
 """
 from __future__ import annotations
 
@@ -110,13 +113,18 @@ def evaluate_gate(
     """Apply BH-FDR over the F-TAILSHAPE family and evaluate the H-13 gate.
 
     Each cell needs: ``symbol``, ``day_label`` ("D1"/"D2"), ``delta_xi``,
-    ``p_value``, ``hill_contradiction`` (bool). Mutates each cell with
-    ``fdr_significant`` and the per-criterion flags. Gate (registry, verbatim
-    criteria): WEITER iff for >= 1 symbol at BOTH snapshot days:
-    sign(Delta_xi) identical AND |Delta_xi| >= 0.15 AND bootstrap-p <= 0.05
-    after BH-FDR alpha = 0.10 over F-TAILSHAPE AND the Hill cross-check does
-    not contradict the GPD sign. The payload stays gate-neutral — the
-    gate-auditor adjudicates; this only precomputes the registered flags.
+    ``p_value``, ``hill_contradiction`` (bool); an optional ``measured``
+    flag (default True) marks p = 1.0 sentinel cells padded in by the driver
+    to keep the family at the registered fixed size (2 symbols x 2 days = 4).
+    BH runs over ALL cells (sentinels included — that is the point of the
+    padding); per-symbol day/sign bookkeeping only counts MEASURED cells.
+    Mutates each cell with ``fdr_significant`` and the per-criterion flags.
+    Gate (registry, verbatim criteria): WEITER iff for >= 1 symbol at BOTH
+    snapshot days: sign(Delta_xi) identical AND |Delta_xi| >= 0.15 AND
+    bootstrap-p <= 0.05 after BH-FDR alpha = 0.10 over F-TAILSHAPE AND the
+    Hill cross-check does not contradict the GPD sign. The payload stays
+    gate-neutral — the gate-auditor adjudicates; this only precomputes the
+    registered flags.
     """
     p_values = [float(c["p_value"]) for c in cells]
     rejected, p_crit = benjamini_hochberg(p_values, alpha)
@@ -135,22 +143,29 @@ def evaluate_gate(
     per_symbol: dict[str, dict[str, Any]] = {}
     for sym in sorted({c["symbol"] for c in cells}):
         sym_cells = [c for c in cells if c["symbol"] == sym]
-        days = {c["day_label"] for c in sym_cells}
+        meas = [c for c in sym_cells if c.get("measured", True)]
+        days = {c["day_label"] for c in meas}
         both_days = {"D1", "D2"} <= days
-        signs = {c["sign"] for c in sym_cells}
+        signs = {c["sign"] for c in meas}
         sign_consistent = both_days and len(signs) == 1 and 0 not in signs
-        all_met = both_days and all(c["cell_criteria_met"] for c in sym_cells)
+        all_met = both_days and all(c["cell_criteria_met"] for c in meas)
         per_symbol[sym] = {
             "n_cells": len(sym_cells),
+            "n_cells_measured": len(meas),
             "both_days_measured": bool(both_days),
             "sign_consistent": bool(sign_consistent),
             "all_cell_criteria_met": bool(all_met),
             "symbol_gate_met": bool(sign_consistent and all_met),
         }
 
+    n_measured = sum(1 for c in cells if c.get("measured", True))
     return {
         "fdr_alpha": alpha,
         "fdr_p_crit": float(p_crit),
+        # Fixed registered family size (sentinels included) vs. measured cells:
+        "family_size": len(cells),
+        "n_cells_measured": int(n_measured),
+        "n_cells_sentinel": int(len(cells) - n_measured),
         "n_fdr_significant": int(sum(1 for c in cells if c["fdr_significant"])),
         "delta_xi_floor": delta_floor,
         "bootstrap_p_max": p_max,

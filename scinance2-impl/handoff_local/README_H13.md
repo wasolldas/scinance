@@ -26,10 +26,20 @@ CLI und Runner einen sauberen SKIP (exit 2):
 Interpretation der Entsperrung (dokumentierte Festlegung): Die D1/D2-Suche
 läuft **je Symbol** (BTC-RV für BTC, ETH-RV für ETH); entsperrt ist, sobald
 **mindestens ein** Symbol ein gültiges Paar hat — das registrierte Gate
-verlangt ohnehin nur `>= 1 Symbol in {BTC, ETH}`. Symbole ohne gültiges Paar
-werden nicht gemessen (ihre Zellen fehlen in F-TAILSHAPE).
+verlangt ohnehin nur `>= 1 Symbol in {BTC, ETH}`. **Die FDR-Familie bleibt
+dabei FIX bei den registrierten 2 Symbole × 2 Snapshot-Tage = 4 Zellen:**
+Symbole ohne gültiges Paar (und einzelne fehlgeschlagene Zellen) werden nicht
+gemessen, ihre (Symbol, Tag)-Slots gehen aber als **Sentinel-Zellen mit
+p = 1,0** (`measured=false`, `delta_floor_met=false`) in die BH-Familie ein —
+die Familie schrumpft NIE unter m = 4 (eine kleinere Familie hätte lenientere
+BH-Rangschwellen 0,05/0,10 statt 0,025/0,05 und wäre eine anti-konservative
+Abweichung von der Registrierung; Audit-Befund `state/audit_h13.md` Bug 1).
+Solange GAR KEIN Symbol entsperrt ist, bleibt der Lauf ein ehrlicher SKIP
+(keine Messung, kein Padding, kein Gate).
 `RV_5d` = Root-Mean-Square der 1-min-Log-Returns über die 5 Kalendertage
-strikt VOR dem Snapshot-Tag (Skalierung kürzt sich im Ratio).
+strikt VOR dem Snapshot-Tag (Skalierung kürzt sich im Ratio); alle 5 Tage
+müssen vorhanden sein, sonst gilt RV als nicht messbar und der Tag scheidet
+als D1/D2-Kandidat aus (konservativ — keine stillschweigende RV_3d-Toleranz).
 
 ## Start
 

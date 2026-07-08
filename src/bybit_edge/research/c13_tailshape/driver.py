@@ -73,9 +73,12 @@ def check_unlock(
     """Programmatic D1/D2 search per symbol (the H-13 unlock condition).
 
     ``unlocked`` is True iff AT LEAST ONE symbol has a valid (D1, D2) pair —
-    the registered gate itself only requires >= 1 symbol in {BTC, ETH};
-    symbols without a valid pair are simply not measured (their cells are
-    absent from the F-TAILSHAPE family).
+    the registered gate itself only requires >= 1 symbol in {BTC, ETH}.
+    Symbols without a valid pair are not measured, but their cells are NOT
+    dropped from the F-TAILSHAPE family: the registry fixes the family at
+    2 symbols x 2 snapshot days = 4 cells, so unmeasured (symbol, day) combos
+    enter BH-FDR as sentinel cells with p = 1.0 (see :func:`run` — audit_h13
+    Bug 1; a shrunken family would be anti-conservative).
     """
     selections: dict[str, SelectionResult] = {}
     for sym in symbols:
@@ -127,6 +130,7 @@ def _measure_cell(
     p_value, n_comb = combined_bootstrap_p(xi_p.xi_boot, xi_q.xi_boot, delta_xi)
     return {
         "symbol": symbol,
+        "measured": True,
         "day_label": day_label,
         "snapshot_date": date_str,
         "xi_p": float(xi_p.xi),
@@ -137,6 +141,33 @@ def _measure_cell(
         "hill_contradiction": hill_contradicts(delta_xi, xi_p.xi_hill, xi_q.xi),
         "returns_side": {**xi_p.as_dict(), **r_meta},
         "options_side": {**xi_q.as_dict(), **smile.as_dict()},
+    }
+
+
+def _sentinel_cell(symbol: str, day_label: str, reason: str) -> dict[str, Any]:
+    """Unmeasured F-TAILSHAPE cell, padded into the fixed 4-cell BH family.
+
+    Registry H-13 fixes F-TAILSHAPE at 2 symbols x 2 snapshot days = 4 cells.
+    A (symbol, day) combination that could not be measured (symbol not
+    unlocked, or its cell measurement failed) must still occupy its slot in
+    the BH-FDR family — otherwise the family silently shrinks to m = 2 and
+    the BH rank thresholds become MORE lenient than registered (audit_h13
+    Bug 1, anti-conservative). p = 1.0 is maximally conservative: a sentinel
+    can never be BH-rejected itself and only tightens the thresholds for the
+    measured cells.
+    """
+    return {
+        "symbol": symbol,
+        "measured": False,
+        "day_label": day_label,
+        "snapshot_date": None,
+        "sentinel_reason": reason,
+        "xi_p": float("nan"),
+        "xi_q": float("nan"),
+        "delta_xi": float("nan"),
+        "p_value": 1.0,
+        "n_combined_bootstrap": 0,
+        "hill_contradiction": False,
     }
 
 
@@ -154,7 +185,11 @@ def run(
 
     Gate-neutral payload. If the unlock condition fails for ALL symbols the
     payload carries ``skip=True`` (the hypothesis stays LOCKED, nothing is
-    measured — the T2 runner reports a clean SKIP).
+    measured, no sentinel padding — the T2 runner reports a clean SKIP).
+    Once at least one symbol is unlocked, the BH-FDR family is ALWAYS the
+    registered fixed size (len(symbols) x 2 days; 4 cells for the registered
+    BTC/ETH set): unmeasured slots are padded with p = 1.0 sentinel cells
+    (audit_h13 Bug 1).
     """
     unlock = check_unlock(base_dir, symbols, snapshot_hour=snapshot_hour)
     selections: dict[str, SelectionResult] = unlock.pop("_selections")
@@ -222,6 +257,23 @@ def run(
                     "snapshot_date": str(date_str), "error": str(exc),
                 })
 
+    # Fixed F-TAILSHAPE family (registry H-13: 2 symbols x 2 snapshot days =
+    # 4 cells, audit_h13 Bug 1): pad every unmeasured (symbol, day) slot with
+    # a p = 1.0 sentinel so BH-FDR always runs over the registered family
+    # size — never over a silently shrunken (more lenient) family.
+    done = {(c["symbol"], c["day_label"]) for c in cells}
+    for sym in symbols:
+        sel = selections[sym]
+        for day_label in ("D1", "D2"):
+            if (sym, day_label) in done:
+                continue
+            if not sel.found:
+                reason = (f"symbol not unlocked (no valid D1/D2 pair): "
+                          f"{sel.reason or 'selection empty'}")
+            else:
+                reason = "cell measurement failed (see cell_errors)"
+            cells.append(_sentinel_cell(sym, day_label, reason))
+
     gate = evaluate_gate(cells) if cells else None
     return {
         **base_payload,
@@ -266,12 +318,18 @@ def render_markdown(payload: dict[str, Any]) -> str:
         L.append("*H-13 bleibt GESPERRT; kein Fit, kein Gate-Urteil. "
                  "Schwelle waechst mit Kalenderzeit, wird NICHT gesenkt.*")
         return "\n".join(L)
-    L.append("## F-TAILSHAPE-Zellen (Symbol x Snapshot-Tag)")
+    L.append("## F-TAILSHAPE-Zellen (Symbol x Snapshot-Tag, fixe 4er-Familie)")
     L.append("")
     L.append("| Symbol | Tag | Datum | xi_P | xi_Q | Delta_xi | p (komb. Bootstrap) | "
              "FDR-sig | \\|Delta\\|>=0.15 | Hill-Widerspruch | Zelle ok |")
     L.append("|---|---|---|---:|---:|---:|---:|:---:|:---:|:---:|:---:|")
     for c in payload["cells"]:
+        if not c.get("measured", True):
+            L.append(
+                f"| {c['symbol']} | {c['day_label']} | — (Sentinel) | — | — | — | "
+                f"{c['p_value']:.4f} | nein | nein | nein | nein |"
+            )
+            continue
         L.append(
             f"| {c['symbol']} | {c['day_label']} | {c['snapshot_date']} | "
             f"{c['xi_p']:+.4f} | {c['xi_q']:+.4f} | {c['delta_xi']:+.4f} | "
@@ -280,6 +338,15 @@ def render_markdown(payload: dict[str, Any]) -> str:
             f"{'JA' if c.get('hill_contradiction') else 'nein'} | "
             f"{'JA' if c.get('cell_criteria_met') else 'nein'} |"
         )
+    sentinels = [c for c in payload["cells"] if not c.get("measured", True)]
+    if sentinels:
+        L.append("")
+        L.append("*Sentinel-Zellen (nicht gemessen, p=1.0): die Registry fixiert "
+                 "F-TAILSHAPE auf 2 Symbole x 2 Tage = 4 Zellen — ungemessene "
+                 "(Symbol, Tag)-Slots werden konservativ mit p=1.0 in die "
+                 "BH-Familie eingesetzt statt die Familie zu verkleinern.*")
+        for c in sentinels:
+            L.append(f"- {c['symbol']}/{c['day_label']}: {c.get('sentinel_reason', '')}")
     g = payload.get("gate") or {}
     L.append("")
     L.append("## Gate-Kern je Symbol (gate-neutral — gate-auditor urteilt)")
@@ -292,7 +359,10 @@ def render_markdown(payload: dict[str, Any]) -> str:
                  f"{'ja' if v['all_cell_criteria_met'] else 'nein'} | "
                  f"{'JA' if v['symbol_gate_met'] else 'nein'} |")
     L.append("")
-    L.append(f"**p_crit (BH-FDR):** {g.get('fdr_p_crit', 0.0):.4f} · "
+    L.append(f"**BH-Familie (fix):** {g.get('family_size', 0)} Zellen "
+             f"({g.get('n_cells_measured', 0)} gemessen, "
+             f"{g.get('n_cells_sentinel', 0)} Sentinel p=1.0) · "
+             f"**p_crit (BH-FDR):** {g.get('fdr_p_crit', 0.0):.4f} · "
              f"**FDR-signifikante Zellen:** {g.get('n_fdr_significant', 0)} · "
              f"**mind. ein Symbol-Gate erfuellt:** "
              f"{'ja' if g.get('any_symbol_gate_met') else 'nein'}")

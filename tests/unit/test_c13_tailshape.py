@@ -30,10 +30,12 @@ from pathlib import Path
 
 import numpy as np
 import pytest
+from scipy.integrate import trapezoid as scipy_trapezoid
 from scipy.stats import genpareto
 
 from bybit_edge.research.c13_tailshape.driver import (
     check_unlock,
+    render_markdown,
     run as driver_run,
 )
 from bybit_edge.research.c13_tailshape.options_loader import (
@@ -163,15 +165,33 @@ def test_svi_fit_and_rnd_sanity():
     assert np.all(svi_total_variance(fit_params, k) > 0)
 
     forward, t_years = 50_000.0, 30 / 365.0
-    K, q = rnd_from_svi(fit_params, forward, t_years)
+    K, q, clipped_frac = rnd_from_svi(fit_params, forward, t_years)
     assert np.all(np.isfinite(q))
     assert np.all(q >= 0.0), "clipped BL density must never be negative"
-    mass = float(np.trapezoid(q, K))
+    assert math.isfinite(clipped_frac) and 0.0 <= clipped_frac <= 1.0
+    assert clipped_frac < 1e-3, "exact synthetic smile must not need real clipping"
+    mass = float(scipy_trapezoid(q, K))
     assert mass == pytest.approx(1.0, abs=1e-3), "RND must be re-normalised to unit mass"
     # sanity: the density should peak somewhere near the forward, not at a grid edge
     peak_idx = int(np.argmax(q))
     assert 0.2 * forward < K[peak_idx] < 4.0 * forward
     assert 0 < peak_idx < len(K) - 1
+
+
+def test_rnd_integration_matches_scipy_trapezoid_reference():
+    # audit_h13 Bug 8: svi_rnd.py now integrates via scipy.integrate.trapezoid
+    # (portable across the repo's numpy>=1.26 pin) instead of np.trapezoid
+    # (numpy>=2.0 only). Confirm the module's internally-normalised RND mass
+    # is numerically consistent with an independently-computed trapezoid
+    # integral of the same grid (using whichever numpy trapezoid spelling is
+    # available in THIS numpy, so the test itself stays portable).
+    true_params = np.array([0.02, 0.15, -0.3, 0.0, 0.3])
+    forward, t_years = 50_000.0, 30 / 365.0
+    K, q, _ = rnd_from_svi(true_params, forward, t_years)
+    ref_trapz = getattr(np, "trapezoid", None) or np.trapz
+    mass_ref = float(ref_trapz(q, K))
+    assert mass_ref == pytest.approx(1.0, abs=1e-3)
+
 
 
 # ----------------------------------------------------------------------------
@@ -269,6 +289,49 @@ def test_gate_hill_contradiction_blocks_positive_cell():
     gate = evaluate_gate(cells)
     assert gate["any_symbol_gate_met"] is False
     assert cells[0]["cell_criteria_met"] is False
+
+
+def test_evaluate_gate_sentinel_padding_keeps_family_at_registered_size():
+    # audit_h13 Bug 1: F-TAILSHAPE is registry-fixed at 2 symbols x 2 days =
+    # 4 cells. If only ONE symbol (BTC) was actually measured, the driver
+    # must pad the other symbol's two day-slots with p=1.0 sentinel cells
+    # (measured=False) BEFORE calling evaluate_gate, so BH-FDR always runs
+    # over m=4 — never the leniently-shrunken m=2 that a per-symbol-only
+    # family would produce (rank thresholds 0.025/0.05 instead of 0.05/0.10).
+    measured = [
+        {"symbol": "BTC", "day_label": "D1", "delta_xi": 0.22, "p_value": 0.01,
+         "hill_contradiction": False, "measured": True},
+        {"symbol": "BTC", "day_label": "D2", "delta_xi": 0.20, "p_value": 0.015,
+         "hill_contradiction": False, "measured": True},
+    ]
+    sentinels = [
+        {"symbol": "ETH", "day_label": "D1", "delta_xi": float("nan"), "p_value": 1.0,
+         "hill_contradiction": False, "measured": False},
+        {"symbol": "ETH", "day_label": "D2", "delta_xi": float("nan"), "p_value": 1.0,
+         "hill_contradiction": False, "measured": False},
+    ]
+    padded_cells = measured + sentinels
+    gate_padded = evaluate_gate(padded_cells)
+    assert gate_padded["family_size"] == 4
+    assert gate_padded["n_cells_measured"] == 2
+    assert gate_padded["n_cells_sentinel"] == 2
+    # sentinels never register as FDR-significant and never satisfy the floor
+    eth_sentinels = [c for c in padded_cells if c["symbol"] == "ETH"]
+    assert all(c["fdr_significant"] is False for c in eth_sentinels)
+    assert all(c["delta_floor_met"] is False for c in eth_sentinels)
+    assert gate_padded["per_symbol"]["ETH"]["symbol_gate_met"] is False
+    assert gate_padded["per_symbol"]["ETH"]["both_days_measured"] is False
+
+    # The unpadded (m=2) family is STRICTLY more lenient: same two BTC cells,
+    # same p-values, but a smaller family raises the BH rank thresholds --
+    # demonstrate the padded p_crit is <= the unpadded p_crit (never looser).
+    gate_unpadded = evaluate_gate(list(measured))
+    assert gate_padded["fdr_p_crit"] <= gate_unpadded["fdr_p_crit"]
+    # BTC's own verdict must be identical whether or not ETH is padded in --
+    # padding must never change a MEASURED symbol's outcome, only the family
+    # size the p-values are judged against.
+    assert (gate_padded["per_symbol"]["BTC"]["symbol_gate_met"]
+            == gate_unpadded["per_symbol"]["BTC"]["symbol_gate_met"])
 
 
 # ----------------------------------------------------------------------------
@@ -477,6 +540,61 @@ def test_e2e_found_case_unlock_and_full_run(tmp_path):
     assert "any_symbol_gate_met" in payload["gate"]
     md = (tmp_path / "out2" / "c13_tailshape_results.md").read_text()
     assert "F-TAILSHAPE" in md and "KAPITALFREI" in md
+
+
+def test_e2e_family_padded_to_four_when_only_one_symbol_unlocked(tmp_path):
+    # audit_h13 Bug 1, end-to-end: only BTC has a valid D1/D2 pair (no ETH
+    # data anywhere), yet the run must still evaluate the FIXED F-TAILSHAPE
+    # family of 2 symbols x 2 days = 4 cells (2 measured BTC + 2 ETH
+    # sentinels at p=1.0) -- never silently shrink BH-FDR to m=2.
+    base = tmp_path / "harvest"
+    svi_params = np.array([0.02, 0.15, -0.3, 0.0, 0.3])
+    forward = 50_000.0
+    d1 = date(2026, 1, 15)
+    d2 = d1 + timedelta(days=14)
+
+    n1 = _build_deribit_day(base, "BTC", d1, svi_params=svi_params, forward=forward)
+    n2 = _build_deribit_day(base, "BTC", d2, svi_params=svi_params, forward=forward)
+    assert n1 >= MIN_STRIKES and n2 >= MIN_STRIKES
+
+    trailing_days = 60
+    start = d1 - timedelta(days=trailing_days + 3)
+    _build_bybit_tree(
+        base, "BTCUSDT", start, d2,
+        low_vol_window=(d1 - timedelta(days=5), d1 - timedelta(days=1)),
+        high_vol_window=(d2 - timedelta(days=5), d2 - timedelta(days=1)),
+    )
+    # deliberately NO Deribit/Bybit data for ETH anywhere in the tree.
+
+    unlock = check_unlock(base, ("BTC", "ETH"))
+    assert unlock["unlocked"] is True  # >= 1 symbol suffices to unlock
+    assert unlock["selection"]["BTC"]["found"] is True
+    assert unlock["selection"]["ETH"]["found"] is False
+
+    payload = driver_run(
+        base, ("BTC", "ETH"),
+        n_bootstrap=30, trailing_days=trailing_days, seed=7,
+    )
+    assert payload["skip"] is False
+    assert len(payload["cells"]) == 4, "fixed F-TAILSHAPE family must be 4 cells"
+    btc_cells = [c for c in payload["cells"] if c["symbol"] == "BTC"]
+    eth_cells = [c for c in payload["cells"] if c["symbol"] == "ETH"]
+    assert len(btc_cells) == 2 and all(c["measured"] for c in btc_cells)
+    assert len(eth_cells) == 2 and all(not c["measured"] for c in eth_cells)
+    assert all(c["p_value"] == 1.0 for c in eth_cells)
+    assert all(c["delta_floor_met"] is False for c in eth_cells)
+    assert all(c["fdr_significant"] is False for c in eth_cells)
+    assert {c["day_label"] for c in eth_cells} == {"D1", "D2"}
+
+    gate = payload["gate"]
+    assert gate["family_size"] == 4
+    assert gate["n_cells_measured"] == 2
+    assert gate["n_cells_sentinel"] == 2
+    assert gate["per_symbol"]["ETH"]["symbol_gate_met"] is False
+    assert gate["per_symbol"]["ETH"]["both_days_measured"] is False
+
+    md = render_markdown(payload)
+    assert "Sentinel" in md
 
 
 def test_e2e_locked_case_reports_clean_skip(tmp_path):
