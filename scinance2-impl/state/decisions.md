@@ -259,3 +259,12 @@
 - **Auswirkung auf Phase C (Adversarial-Audit):** urspruenglich als 5 parallele Fable-5-Agenten geplant (frische Instanz pro Modul, nicht der Builder selbst — Betriebsblindheit vermeiden). Diese Eigenschaft (frischer, unabhaengiger Pruef-Agent) ist wichtiger als das konkrete Modell — Sonnet-Audit-Agenten erfuellen dieselbe Funktion (zeilenweiser Spec-Abgleich durch eine Instanz, die nicht gebaut hat). Wird mit Sonnet fortgesetzt.
 - **Begruendung:** Reversibelste Option (keine Code-Aenderung an bereits gebauter Substanz, nur Fortsetzung mit anderem Werkzeug); haelt die Torpfosten-/Verifikations-Disziplin vollstaendig aufrecht (jedes Modul durchlaeuft weiterhin Build+Test+Audit, nur das ausfuehrende Modell aendert sich).
 - **Rueckbauweg:** entfaellt (reine Werkzeug-Entscheidung, kein inhaltlicher Eingriff; bei erneuter Fable-5-Verfuegbarkeit koennte eine spaetere Session die Sonnet-geschriebenen Tests/Audits durch Fable-5-Versionen ersetzen, ist aber nicht noetig — Qualitaetsstandard bleibt identisch).
+
+
+---
+
+### DEC-20-Korrektur (append-only, 2026-07-08) · Fable-5-Verfuegbarkeit laenger als angenommen
+- **Korrektur:** Der Nutzer stellt klar, dass Fable 5 laenger verfuegbar ist als in DEC-20 angenommen (das Wochenlimit war eine temporaere Quota-Grenze, kein permanentes Zugriffsende). DEC-20 wird NICHT rueckwirkend geaendert (Registry-Disziplin — Entscheidungen sind append-only), sondern hier korrigiert fortgeschrieben.
+- **Angepasste Entscheidung:** Ab sofort **Fable 5** fuer (a) **Phase C — Adversarial-Audit** aller 5 Welle-4-Module (Rueckkehr zum urspruenglichen Netzwerk-Entwurf) und (b) **jeden weiteren neuen Code** in diesem Lauf (Phase D Fix-Loop falls noetig).
+- **Was NICHT rueckgaengig gemacht wird:** Die zwei zum Korrektur-Zeitpunkt bereits LAUFENDEN Sonnet-Agenten (H-12-Tests, H-13-Tests) werden NICHT abgebrochen — sie sind mit vollem Kontext mitten in der Fertigstellung reiner Test-Dateien (die zugrundeliegende Statistik-Substanz aller Module stammt bereits vollstaendig von Fable 5, DEC-20). Ein Abbruch waere verschwendete Arbeit ohne Qualitaetsgewinn. Sobald sie fertig sind, werden ihre Tests normal verifiziert und committet — kein Fable-5-Nachbau noetig.
+- **Rueckbauweg:** entfaellt (reine Werkzeug-Fortfuehrung).
