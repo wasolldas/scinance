@@ -122,9 +122,16 @@ def load_minute_last_price(
     and aggregates INSIDE DuckDB to the last trade price per ``[t, t+60s)``
     minute (``max_by(price, ts_exchange_ms)``), so full tick windows never
     enter Python memory. Price is extracted exchange-agnostically via
-    ``COALESCE($.price, $.p)`` — covers the Bybit backfill (``price``), the
-    Bybit live per-trade (``p``), Binance aggTrades (``p``) and Deribit
-    (``price``) payload forms.
+    ``COALESCE($.price, $.p)`` — covers the Bybit backfill (``price``) and
+    Binance aggTrades (``p``, top-level) and Deribit (``price``) payload
+    forms. It does NOT cover the Bybit LIVE ``publicTrade`` multi-trade
+    envelope (``{"topic":..., "data":[{...,"p":...}, ...]}``, DATASET.md §6)
+    since ``p`` is nested inside ``data[]`` there, not top-level; such rows
+    fail the ``IS NOT NULL`` filter and the affected minute/day becomes
+    invalid (loud, visible via the day counters) rather than silently wrong.
+    The registered H-12 windows are backfill-bound (flat ``price`` form), so
+    this is immaterial for the pre-registered run; a ``$.data[]`` explosion
+    would be needed only to cover live-form edge days.
 
     Returns a ``(len(dates) * 1440,)`` float array of last prices, NaN where
     the minute has no trade. Read-only: never writes into the harvester tree.

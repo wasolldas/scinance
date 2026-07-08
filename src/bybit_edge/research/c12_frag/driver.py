@@ -38,7 +38,7 @@ from typing import Any
 import numpy as np
 
 from .nulls import DEFAULT_N_MC, empirical_p_ge, one_factor_null_day, wishart_null_mc
-from .panel import WindowDays
+from .panel import MINUTES_PER_DAY, WindowDays
 from .spectrum import analyze_day
 from .stats import FDR_ALPHA, benjamini_hochberg
 
@@ -203,11 +203,14 @@ def run(
         )
 
         # stage-a MC-Wishart reference, ONCE per window (orientation only):
+        # registered at T=MINUTES_PER_DAY (Q=240, "6x1440"); t_med reported alongside
+        # as an additional, non-registered orientation figure (audit finding B-1).
         if analyzed:
             t_med = int(np.median([d["t_eff"] for d in analyzed]))
             wishart_ref = wishart_null_mc(
-                len(win.series_labels), t_med, n_draws=n_mc, seed=seed + 1000 + wi
+                len(win.series_labels), MINUTES_PER_DAY, n_draws=n_mc, seed=seed + 1000 + wi
             )
+            wishart_ref["t_eff_median_observed"] = t_med
         else:
             wishart_ref = None
 

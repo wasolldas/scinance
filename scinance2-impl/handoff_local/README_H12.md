@@ -8,10 +8,12 @@ Gate-Urteil fällt der gate-auditor gegen den H-12-Registry-Eintrag
 (`scinance2-impl/state/hypothesis_registry.md` → „### H-12 ·
 Cross-Exchange-Fragmentierungsmatrix"); dieses Skript fällt KEIN Gesamturteil.
 
-> **Status:** Code komplett gebaut und gegen synthetische Harvester-Bäume
-> getestet (`tests/unit/test_c12_frag.py`); **KEIN Lauf gegen echte Daten
-> erfolgt, KEIN Commit** (siehe DEC-20 in `state/decisions.md` — Fable-5-
-> Wochenlimit erreicht, CLI/Runner/Tests von Sonnet nachgezogen; die
+> **Status:** Code komplett gebaut, committet (`4700fd2`) und gegen
+> synthetische Harvester-Bäume getestet (`tests/unit/test_c12_frag.py`,
+> 8/8 grün) sowie unabhängig adversarial auditet
+> (`scinance2-impl/state/audit_h12.md`, Verdikt PASS-WITH-NOTES); **KEIN
+> Lauf gegen echte Daten erfolgt** (siehe DEC-20 in `state/decisions.md` —
+> Fable-5-Wochenlimit erreicht, CLI/Runner/Tests von Sonnet nachgezogen; die
 > Statistik-Substanz der 5 Moduldateien selbst stammt unverändert von Fable 5).
 
 ## Aufruf (ein Befehl, keine Pflicht-Parameter, ca. 20-40 min)
@@ -82,7 +84,9 @@ deribit:BTC-PERPETUAL, deribit:ETH-PERPETUAL`.
 | Null Stufe a | MC-Gaussian-Wishart-Referenz (Q=T/N=240), 1000 Ziehungen, NICHT urteilstragend |
 | Null Stufe b | Ein-Faktor-Gauss-Null je Tag aus (λ1,v1), 1000 Replikationen, urteilstragend; Tages-p = P(λ2_sim≥λ2_obs) |
 | FDR | **F-FRAG** — alle Tages-λ2-Tests beider Fenster (~70-100 Tests), BH-FDR α=0,10 |
-| Seed | 42 |
+
+*Seed 42 ist Code-/Runner-Default (Determinismus), NICHT von der Registry
+vorregistriert — separat ausgewiesen, nicht Teil der obigen "NICHT ändern"-Tabelle.*
 
 ## Gate (gate-auditor gegen H-12 — hier nur zur Orientierung)
 
