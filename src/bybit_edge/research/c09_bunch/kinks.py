@@ -59,6 +59,38 @@ KINK_PLACEHOLDER_NOTE = (
     "Nachtrag erforderlich. Nur BTCUSDT=2.000.000 USDT ist registry-beziffert."
 )
 
+# --- Registered run identity (panel / windows / family size) -----------------
+#
+# The F-BUNCH family is FIXED at 5 symbols x 2 windows = 10 order-level tests
+# (registry H-09). The CLI accepts --symbols / --window-* overrides for tests;
+# any deviation from this registered identity voids ``gate_valid_assumptions``
+# (Bug-4 fix, audit_h09.md) — a WEITER reading on a deviating panel or window
+# set is NOT a valid H-09 reading.
+REGISTERED_PANEL_SYMBOLS: tuple[str, ...] = (
+    "BTCUSDT", "ETHUSDT", "SOLUSDT", "BNBUSDT", "XRPUSDT",
+)
+REGISTERED_WINDOW_A: tuple[str, str] = ("2026-03-27", "2026-05-15")
+REGISTERED_WINDOW_B: tuple[str, str] = ("2026-05-16", "2026-07-04")
+REGISTERED_FAMILY_SIZE: int = 10  # 5 symbols x 2 windows, order level
+
+
+def registered_window_labels() -> tuple[str, str]:
+    """Canonical window labels (same ``W<i>@start..end`` form the CLI builds)."""
+    return tuple(
+        f"W{i + 1}@{w[0]}..{w[1]}"
+        for i, w in enumerate((REGISTERED_WINDOW_A, REGISTERED_WINDOW_B))
+    )
+
+
+def panel_matches_registered(symbols: tuple[str, ...] | list[str]) -> bool:
+    """True iff ``symbols`` is exactly the registered 5-symbol panel."""
+    return sorted(symbols) == sorted(REGISTERED_PANEL_SYMBOLS)
+
+
+def windows_match_registered(window_labels: tuple[str, ...] | list[str]) -> bool:
+    """True iff the window labels are exactly the two registered windows."""
+    return tuple(window_labels) == registered_window_labels()
+
 # --- Band / bin geometry (relative to K_s) ---------------------------------
 BAND_LO_REL: float = 0.40   # estimation band lower bound (inclusive)
 BAND_HI_REL: float = 1.30   # estimation band upper bound (exclusive)
@@ -99,6 +131,8 @@ def gate_assumptions_valid(
     poly_degree: int,
     n_floor_orders: int,
     cf_expectation_floor: float,
+    symbols: tuple[str, ...] | list[str] | None = None,
+    window_labels: tuple[str, ...] | list[str] | None = None,
 ) -> bool:
     """Anti-gaming check (registry H-09: no band/bin/placebo/floor adaptation).
 
@@ -108,12 +142,16 @@ def gate_assumptions_valid(
     * ``n_bootstrap >= 500`` (registered residual-bootstrap reps not reduced),
     * ``poly_degree == 7`` (counterfactual degree not changed),
     * ``n_floor_orders >= 2000`` (order N-floor not lowered),
-    * ``cf_expectation_floor >= 50`` (counterfactual B- floor not lowered).
+    * ``cf_expectation_floor >= 50`` (counterfactual B- floor not lowered),
+    * ``symbols`` (if given) is exactly the registered 5-symbol panel — a
+      ``--symbols`` CLI override is a panel deviation (Bug-4 fix),
+    * ``window_labels`` (if given) are exactly the two registered calendar
+      windows — a ``--window-*`` CLI override is a window deviation (Bug-4 fix).
 
-    Band/bin/window/placebo geometry is NOT parameterised at run level (fixed
-    module constants), so it cannot be gamed via the CLI. When this returns
-    False the driver MUST set ``gate_valid_assumptions: false`` in the payload
-    and any ``weiter_indication`` is void (a deviating setup would be a NEW
+    Band/bin/placebo geometry is NOT parameterised at run level (fixed module
+    constants), so it cannot be gamed via the CLI. When this returns False the
+    driver MUST set ``gate_valid_assumptions: false`` in the payload and any
+    ``weiter_indication`` is void (a deviating setup would be a NEW
     hypothesis, not a goalpost shift on H-09).
     """
     return (
@@ -121,4 +159,6 @@ def gate_assumptions_valid(
         and (poly_degree == POLY_DEGREE)
         and (n_floor_orders >= N_FLOOR_ORDERS)
         and (cf_expectation_floor >= CF_EXPECTATION_FLOOR)
+        and (symbols is None or panel_matches_registered(tuple(symbols)))
+        and (window_labels is None or windows_match_registered(tuple(window_labels)))
     )

@@ -56,10 +56,17 @@ Zahlenwert wird recherchiert. Der JSON-Payload traegt je Zelle
   `HARVEST_DIR=/pfad/zu/harvest bash run_h09.sh`.
 - Trockenlauf ohne Daten: `HANDOFF_DRY_RUN=1 bash run_h09.sh` (rc via
   `HANDOFF_DRY_RC`).
-- Speicherhinweis: je Fenster werden bis zu 50 Mio. publicTrade-Records je
-  Symbol geladen (`--max-ticks`, operatives Limit, KEINE registrierte
-  Schwelle); bei Speichernot `--max-ticks` im Runner senken und die
-  Abweichung im Upload vermerken.
+- Speicherhinweis: die Order-Aggregation (`GROUP BY ts_exchange_ms, side` +
+  `SUM(price*size)`) laeuft VOLLSTAENDIG in DuckDB; es gibt **kein**
+  Tick-Limit mehr und **keinen** `--max-ticks`-Schalter (audit_h09.md Bugs
+  1+2 behoben) — nur die kleine Notional-Liste je Fenster erreicht Python,
+  RAM bleibt window-fuer-window begrenzt statt alle 10 Fenster gleichzeitig
+  zu halten.
+- Faellt ein Symbol beim Laden aus (fehlende/luekenhafte Daten), wird es NICHT
+  stillschweigend aus der F-BUNCH-Familie entfernt: es wird als p=1.0-
+  Sentinel-Zelle in beide Fenster eingefuegt (Familiengroesse bleibt bei 10),
+  `family_size_deviation: true` gesetzt und `gate_valid_assumptions` auf
+  `false` erzwungen (audit_h09.md Bug 3).
 
 ## Vorregistrierte Parameter (Registry H-09 / DEC-19, NICHT aendern)
 
