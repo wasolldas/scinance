@@ -12,13 +12,19 @@ H-10-Registry-Eintrag; dieses Skript fällt KEIN Gesamturteil.
   63-Tage-Median-Residuen, zentriertes 11-Tage-Fenster). Null: 1.000
   zirkuläre Surrogate je Serie (Marginal/Autokorrelation erhalten,
   Cross-Ausrichtung zerstört).
-- **Stufe 2 (Pre-Event-Drift, Hold-out):** dvol-Index D_t = z-standardisiertes
-  Mittel der Deribit-dvol-Level **BTC + ETH** (Symbole `BTC`/`ETH`, NICHT
-  `BTCUSDT`; dvol und book_summary sind vollständig aus der Detektion
-  ausgeschlossen). Δpre(t) = Mittel(D,[t−5,t−1]) − Mittel(D,[t−15,t−6]);
-  S = Mittel(Δpre) über die Pointer-Tage des Fensters. Null: 1.000
-  Permutations-Ziehungen gleich großer Zufalls-Tagesmengen mit ≥ 6 Tagen
-  Abstand zu JEDEM Pointer-Tag; p zweiseitig.
+- **Stufe 2 (Pre-Event-Drift, Hold-out):** dvol-Index D_t = Mittel der JE
+  SERIE z-standardisierten Deribit-dvol-Tagesschlüsse **BTC + ETH** (Symbole
+  `BTC`/`ETH`, NICHT `BTCUSDT`; dvol und book_summary sind vollständig aus
+  der Detektion ausgeschlossen; z-Parameter über den nutzbaren Zeitraum,
+  siehe DEC-21 in `state/decisions.md`). Δpre(t) = Mittel(D,[t−5,t−1]) −
+  Mittel(D,[t−15,t−6]); S = Mittel(Δpre) über die Pointer-Tage des Fensters.
+  Null: 1.000 Permutations-Ziehungen gleich großer Zufalls-Tagesmengen mit
+  ≥ 6 Tagen Abstand zu JEDEM Pointer-Tag; p zweiseitig.
+- **Neuwirth-Fenster-Crosscheck (mitberichtet, NICHT-urteilstragend):**
+  dieselbe Detrend-/Pointer-Regel mit einem 13-Tage-Fenster statt des
+  urteilstragenden 11-Tage-Cropper-Fensters — reines Anti-Method-Shopping-
+  Diagnostikum im JSON-Payload (`neuwirth_crosscheck`), geht in KEINE Zelle,
+  KEIN p, KEINE FDR ein (Registry H-10 "Methoden-Fixierung").
 
 ## Aufruf (ein Befehl, keine Pflicht-Parameter, ca. 5-20 min)
 
@@ -39,24 +45,40 @@ Exit-Codes: 0 = OK · 1 = FAIL · 2 = SKIP (Harvester-/Hold-out-Pfad fehlt).
   `data/harvest`). **Kein Schreibzugriff** auf den Harvester-Baum (Schutzgut).
 - Fehlt die Junction, Env `HARVEST_DIR` auf das Harvester-Root setzen:
   `HARVEST_DIR=/pfad/zu/harvest bash run_h10.sh`.
-- Der Runner prüft VOR dem Lauf `raw/bybit/publicTrade` UND
-  `raw/deribit/dvol` (Stufe 2 braucht den Hold-out zwingend) → sonst SKIP.
+- Der Runner prüft VOR dem Lauf `raw/bybit/publicTrade`, `raw/binance/rest.fundingRate`,
+  `raw/binance/rest.openInterest` UND `raw/deribit/dvol` (Stufe 2 braucht den
+  Hold-out zwingend, die Detektion braucht beide Exchanges) → sonst SKIP
+  (audit_h10 BUG-5: der alte Pre-Check prüfte nur 2 der 4 benötigten Pfade).
 - Trockenlauf ohne Daten: `HANDOFF_DRY_RUN=1 bash run_h10.sh` (rc via
   `HANDOFF_DRY_RC`).
+- Die CLI (`scripts/c10_pointer.py`) bricht mit rc=1 ab, wenn die
+  Detektions-Serien strukturell unter dem `n_avail`-Floor (18) bleiben ODER
+  der Hold-out-dvol unter `DVOL_MIN_USABLE_DAYS=30` nutzbare Tage hat — sonst
+  würde ein Feldnamen-Fehlgriff (BUG-3/4) als vollständig aussehendes, aber
+  bedeutungsloses DROP-Payload mit rc=0 durchrutschen (audit_h10 BUG-5).
 
 ## Die 4 Stream-Loader (NEU, `c10_pointer/loaders.py`) — Annahmen
 
 | Stream | Aggregat | payload_json-Feld(er) | Sicherheit |
 |---|---|---|---|
-| `publicTrade` → RV | Tages-Last-Price via `arg_max(price, ts)`; RV_t = (Δlog P_Tag)² | `price` (Backfill), Fallback `p` (Live) | GESICHERT (identisch `load_harvest_window`) |
-| `rest.fundingRate` → Funding | Tagesmittel | `fundingRate`, Fallback `lastFundingRate` (Binance-REST-Form) | Bybit GESICHERT (Registry); Binance-Fallback = **ANNAHME** |
-| `rest.openInterest` → ΔlogOI | Tagesschluss (last by ts), dann Δlog | `openInterest`, Fallback `sumOpenInterest` (Binance-Form) | Bybit GESICHERT (Registry); Binance-Fallback = **ANNAHME** |
-| `dvol` (deribit, Hold-out) | Tagesmittel | Kandidaten in Reihenfolge: `dvol`, `value`, `index_value`, `close`, `price`; sonst **erstes numerisches Top-Level-Feld mit WARN-Log** | Payload-Struktur **UNBEKANNT-GENERISCH** — Feldwahl ist eine dokumentierte Annahme; WARN im stderr-Log (`H10_POINTER.err.log`) prüfen! |
+| `publicTrade` → RV | 1-Min-Last-Price-Bars (`max_by(price, ts)` je 60s-Bucket, wie `c12_frag`); RV_t = log Σ(Δlog P_1min)² je Tag; NaN bei < `RV_MIN_BARS_PER_DAY`=30 Bars | `price` (Backfill), Fallback `p` (Live) | GESICHERT (identisches Feld-Coalesce wie `load_harvest_window`); RV-Definition = wörtlich hardened_hypotheses.md |
+| `rest.fundingRate` → Funding | Tagesmittel | `fundingRate`, Fallback `lastFundingRate` (Binance-REST) bzw. `info.fundingRate` (ccxt-normalisiert, DATASET.md §6) | Bybit GESICHERT (Registry); Binance-Fallbacks = **ANNAHME** |
+| `rest.openInterest` → ΔlogOI | Tagesschluss (last by ts), dann Δlog | `openInterest`, Fallback `openInterestAmount` (ccxt Top-Level), `sumOpenInterest`, `info.sumOpenInterest` (ccxt-normalisiert, DATASET.md §6) | Bybit GESICHERT (Registry); Binance-Fallbacks = **ANNAHME** |
+| `dvol` (deribit, Hold-out) | Tagesschluss (last by ts) | Kandidaten in Reihenfolge: `dvol`, `value`, `index_value`, `close`, `price`, `volatility`, `mark_iv`; sonst **erstes numerisches, NICHT-zeitstempel-artiges Top-Level-Feld (Wert ≤ 1e6) mit WARN-Log** | Payload-Struktur **UNBEKANNT-GENERISCH** — Feldwahl ist eine dokumentierte Annahme; Parse-Modus steht im JSON-Payload (`dvol_parse_mode`), WARN zusätzlich im stderr-Log (`H10_POINTER.err.log`) |
 
-RV-Lesart (Registry wörtlich "Last-Price je Tages-Bar, log-Return-Quadrate
-summiert"): mit TAGES-Bars reduziert sich die Summe auf das EINE quadrierte
-Tages-Log-Return pro Tag — exakt so implementiert (Kommentar in
-`loaders.py::rv_from_daily_last_price`).
+**RV-Lesart (korrigiert, audit_h10 BUG-1):** die registrierte Definition ist
+wörtlich `hardened_hypotheses.md` H-10 "Methodik": "RV = log Σ r²(1-min-
+Last-Price) je Tag" — 1-Minuten-Bars, NICHT ein einzelner quadrierter
+Tages-Return, UND mit äußerem Logarithmus. (Eine frühere Code-/README-Fassung
+rationalisierte eine TAGES-Bar-Kurzform mit einem angeblichen Registry-Zitat
+"Last-Price je Tages-Bar, log-Return-Quadrate summiert" — dieses Zitat
+existiert in KEINEM der beiden Ground-Truth-Dokumente und wurde entfernt;
+siehe `state/audit_h10.md` BUG-1.)
+
+**Coverage-Audit (audit_h10 BUG-3):** jede Serie, deren Partitionen existieren
+aber auf 0 finite Tage parsen (falscher Feldname), löst eine WARN im
+stderr-Log aus; `detection_series_finite_days` im JSON-Payload zeigt die
+finite-Tage-Zahl je der 30 Serien für eine nachträgliche Prüfung.
 
 ## Vorregistrierte Parameter (Registry H-10, NICHT ändern)
 

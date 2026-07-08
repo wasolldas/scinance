@@ -31,6 +31,7 @@ from .cropper import (
     DETREND_MIN_PERIODS,
     DETREND_WINDOW,
     N_AVAIL_FLOOR,
+    NEUWIRTH_HALF_WINDOW,
     SHARE_FLOOR,
     detect_pointer_days,
     score_matrix,
@@ -75,6 +76,7 @@ def run(
     n_permutations: int = 1000,
     seed: int = 42,
     source: str = "",
+    dvol_parse_modes: dict[str, str] | None = None,
 ) -> dict[str, Any]:
     """Run the H-10 two-stage pointer gate; return the gate-neutral payload.
 
@@ -83,7 +85,10 @@ def run(
     ``dvol_btc``/``dvol_eth`` are the HELD-OUT target levels on the same grid
     (NEVER part of ``detection_panel`` — enforced only by construction here;
     the caller must not mix them in). ``windows`` are (label, start, end)
-    inclusive; both must lie inside the usable range.
+    inclusive; both must lie inside the usable range. ``dvol_parse_modes``
+    (optional, from ``load_daily_dvol``'s ``info`` out-dict) is surfaced
+    verbatim in the payload as ``dvol_parse_mode`` so a fallback field guess
+    is auditable post hoc (audit_h10 BUG-4).
     """
     X = np.asarray(detection_panel, dtype=np.float64)
     t_full, n_series = X.shape
@@ -130,7 +135,10 @@ def run(
     )
 
     # 4) stage 2: held-out dvol index + Delta_pre + permutation null per window.
-    D = dvol_index(dvol_btc, dvol_eth)
+    # z-parameters over the USABLE (non-burn-in) period, applied to the full
+    # grid (hardened spec "über den nutzbaren Zeitraum"; DEC-21).
+    usable_mask_full = np.arange(t_full) >= u0
+    D = dvol_index(dvol_btc, dvol_eth, usable_mask_full)
     dpre = delta_pre(D)
     stage2 = [
         stage2_permutation_p(
@@ -139,6 +147,28 @@ def run(
         )
         for w in range(len(windows))
     ]
+
+    # 4b) Neuwirth window crosscheck — registered as "wird mitberichtet, ist
+    # aber nicht-urteilstragend" (hardened_hypotheses.md H-10): same detrend +
+    # pointer rule, but a 13-day centred window (Neuwirth et al. 2007) instead
+    # of the judgment-bearing 11-day Cropper window. Reported ONLY as a
+    # secondary anti-method-shopping diagnostic; enters NO cell, NO p-value,
+    # NO FDR (audit_h10 BUG-6).
+    C_nw_u = score_matrix(X, half_window=NEUWIRTH_HALF_WINDOW)[u0:, :]
+    obs_nw = detect_pointer_days(C_nw_u)
+    cropper_ptr_set = set(int(i) for i in obs.pointer_indices)
+    neuwirth_windows: list[dict[str, Any]] = []
+    for w, (label, w_start, w_end) in enumerate(windows):
+        mask = win_masks_usable[w]
+        nw_rel = obs_nw.pointer_indices[mask[obs_nw.pointer_indices]]
+        nw_dates = [days[u0 + int(i)] for i in nw_rel]
+        n_overlap = sum(1 for i in nw_rel if int(i) in cropper_ptr_set)
+        neuwirth_windows.append({
+            "window_label": label,
+            "n_pointer_neuwirth": int(nw_rel.size),
+            "pointer_dates_neuwirth": nw_dates,
+            "n_overlap_with_cropper": int(n_overlap),
+        })
 
     # 5) 4-cell family + BH-FDR (F-POINTER).
     cells: list[dict[str, Any]] = []
@@ -213,7 +243,27 @@ def run(
         ],
         "n_detection_series": int(n_series),
         "detection_series": list(detection_names),
+        # Per-series coverage so a data-plumbing failure (all-NULL field
+        # extraction, missing stream) is auditable post hoc (audit_h10 BUG-3).
+        "detection_series_finite_days": {
+            name: int(np.isfinite(X[:, j]).sum())
+            for j, name in enumerate(detection_names)
+        },
+        "n_detection_series_nonempty": int(sum(
+            1 for j in range(n_series) if np.isfinite(X[:, j]).any()
+        )),
         "holdout_target": "deribit dvol BTC+ETH (never in detection)",
+        "holdout_finite_days": {
+            "dvol_btc": int(np.isfinite(np.asarray(dvol_btc, dtype=np.float64)).sum()),
+            "dvol_eth": int(np.isfinite(np.asarray(dvol_eth, dtype=np.float64)).sum()),
+            "dvol_btc_usable": int(np.isfinite(
+                np.asarray(dvol_btc, dtype=np.float64)[u0:]).sum()),
+            "dvol_eth_usable": int(np.isfinite(
+                np.asarray(dvol_eth, dtype=np.float64)[u0:]).sum()),
+        },
+        # Parse mode used by the unknown-generic dvol payload parser
+        # (candidate:<field> / fallback:<field> / none) — audit_h10 BUG-4.
+        "dvol_parse_mode": dict(dvol_parse_modes) if dvol_parse_modes else None,
         "method": {
             "detrend_window_days": DETREND_WINDOW,
             "detrend_min_periods": DETREND_MIN_PERIODS,
@@ -237,6 +287,17 @@ def run(
             "fdr_alpha": FDR_ALPHA,
             "hard_one_window_drop": True,
             "n_pointer_floor_lowerable": False,
+        },
+        # Registered NON-judgment-bearing co-report (hardened_hypotheses.md
+        # H-10 "Methoden-Fixierung": "der Neuwirth-Fenster-Crosscheck wird
+        # mitberichtet, ist aber nicht-urteilstragend"). Enters no cell/FDR.
+        "neuwirth_crosscheck": {
+            "judgment_bearing": False,
+            "window_days": 2 * NEUWIRTH_HALF_WINDOW + 1,
+            "note": ("nicht-urteilstragend — schliesst Method-Shopping aus; "
+                     "einzige urteilstragende Standardisierung ist der "
+                     "11-Tage-Cropper"),
+            "windows": neuwirth_windows,
         },
         # Gate-neutral family-level observation (gate-auditor adjudicates):
         "all_four_cells_pass": all_pass,
@@ -330,6 +391,32 @@ def render_markdown(payload: dict[str, Any]) -> str:
             pts = "keine"
         L.append(f"- **{c['window_label']}** ({c['window_start']}..{c['window_end']}): {pts}")
     L.append("")
+    nw = payload.get("neuwirth_crosscheck")
+    if nw:
+        L.append("## Neuwirth-Fenster-Crosscheck (mitberichtet, NICHT-urteilstragend)")
+        L.append("")
+        L.append(f"> {nw['window_days']}-Tage-Fenster (Neuwirth et al. 2007), gleiche Detrend-/"
+                 "Pointer-Regel. Reines Anti-Method-Shopping-Diagnostikum — geht in KEINE "
+                 "Zelle, KEIN p, KEINE FDR ein (Registry H-10).")
+        L.append("")
+        for w in nw["windows"]:
+            dts = ", ".join(w["pointer_dates_neuwirth"]) or "keine"
+            L.append(f"- **{w['window_label']}**: N_pointer(Neuwirth)={w['n_pointer_neuwirth']} "
+                     f"(Ueberlapp mit Cropper: {w['n_overlap_with_cropper']}): {dts}")
+        L.append("")
+    hf = payload.get("holdout_finite_days")
+    if hf:
+        L.append("## Abdeckung (Coverage-Audit)")
+        L.append("")
+        L.append(f"- **Hold-out dvol:** BTC {hf['dvol_btc']} Tage "
+                 f"(nutzbar {hf['dvol_btc_usable']}) · ETH {hf['dvol_eth']} Tage "
+                 f"(nutzbar {hf['dvol_eth_usable']}) · Parse-Modus: "
+                 f"`{payload.get('dvol_parse_mode')}`")
+        L.append(f"- **Detektions-Serien nicht-leer:** "
+                 f"{payload.get('n_detection_series_nonempty')} von "
+                 f"{payload['n_detection_series']} (finite Tage je Serie im JSON: "
+                 f"`detection_series_finite_days`)")
+        L.append("")
     L.append("*Erzeugt von `c10_pointer/driver.py` (read-only Harvester-Baum). "
              "capital_free=true. Endgueltiges Gate-Urteil: gate-auditor gegen H-10.*")
     return "\n".join(L)

@@ -75,9 +75,16 @@ echo "Raster: $DATA_START..$DATA_END (Burn-in $BURN_IN) | W1 $W1_START..$W1_END 
 SCRIPT="$REPO_ROOT/scripts/c10_pointer.py"
 TRADE_PATH="$HARVEST_DIR/raw/bybit/publicTrade"
 DVOL_PATH="$HARVEST_DIR/raw/deribit/dvol"
+# audit_h10 BUG-5: der alte Pre-Check deckte nur 2 der 4 benoetigten Pfade ab
+# (Bybit-Detektion + Hold-out). Ohne Binance-Funding/OI waere ein fehlender
+# Binance-Zweig erst nach dem vollen Lauf im Payload sichtbar statt als
+# sauberes SKIP vorab.
+FUND_PATH="$HARVEST_DIR/raw/binance/rest.fundingRate"
+OI_PATH="$HARVEST_DIR/raw/binance/rest.openInterest"
 
-if [ "$DRY" != "1" ] && { [ ! -d "$TRADE_PATH" ] || [ ! -d "$DVOL_PATH" ]; }; then
-    echo "WARNUNG: Harvester-/Hold-out-Pfad fehlt ($TRADE_PATH bzw. $DVOL_PATH) - Junction data/harvest pruefen oder HARVEST_DIR setzen"
+if [ "$DRY" != "1" ] && { [ ! -d "$TRADE_PATH" ] || [ ! -d "$DVOL_PATH" ] \
+        || [ ! -d "$FUND_PATH" ] || [ ! -d "$OI_PATH" ]; }; then
+    echo "WARNUNG: Harvester-/Hold-out-Pfad fehlt (bybit publicTrade=$TRADE_PATH, deribit dvol=$DVOL_PATH, binance fundingRate=$FUND_PATH, binance openInterest=$OI_PATH) - Junction data/harvest pruefen oder HARVEST_DIR setzen"
     rec "H10_POINTER" "SKIP" "0" "0" "Harvester/Hold-out fehlt"; SK=$((SK+1))
 else
     step H10_POINTER "$SCRIPT" \

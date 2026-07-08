@@ -15,6 +15,7 @@ from .cropper import (
     DETREND_MIN_PERIODS,
     DETREND_WINDOW,
     N_AVAIL_FLOOR,
+    NEUWIRTH_HALF_WINDOW,
     SHARE_FLOOR,
     PointerDays,
     cropper_score,
@@ -23,13 +24,14 @@ from .cropper import (
 )
 from .driver import HYPOTHESIS_ID, render_markdown, run
 from .loaders import (
+    RV_MIN_BARS_PER_DAY,
     DataError,
     build_detection_panel,
     daily_grid,
     load_daily_dvol,
     load_daily_funding_mean,
-    load_daily_last_price,
     load_daily_oi_close,
+    load_daily_rv,
 )
 from .stats import (
     FDR_ALPHA,
@@ -55,8 +57,10 @@ __all__ = [
     "HYPOTHESIS_ID",
     "MIN_NULL_GAP_DAYS",
     "N_AVAIL_FLOOR",
+    "NEUWIRTH_HALF_WINDOW",
     "N_POINTER_FLOOR",
     "PointerDays",
+    "RV_MIN_BARS_PER_DAY",
     "SHARE_FLOOR",
     "SURROGATE_P_MAX",
     "benjamini_hochberg",
@@ -68,8 +72,8 @@ __all__ = [
     "dvol_index",
     "load_daily_dvol",
     "load_daily_funding_mean",
-    "load_daily_last_price",
     "load_daily_oi_close",
+    "load_daily_rv",
     "render_markdown",
     "run",
     "stage1_surrogate_p",

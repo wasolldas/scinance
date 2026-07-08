@@ -37,6 +37,13 @@ CROPPER_MIN_FINITE = 6
 #: Cropper anomaly threshold (registry H-10: |C| >= 1.5, NOT negotiable).
 C_THRESH = 1.5
 
+#: Neuwirth-window crosscheck half-width (13-day centred window, Neuwirth et
+#: al. 2007 pointer-year convention). Registered as "wird mitberichtet, ist
+#: aber nicht-urteilstragend" (hardened_hypotheses.md H-10 "Methoden-
+#: Fixierung") — a NON-judgment-bearing secondary diagnostic ONLY; the
+#: 11-day Cropper window above is the sole judgment-bearing standardisation.
+NEUWIRTH_HALF_WINDOW = 6
+
 #: Same-direction share floor for a pointer day (registry H-10: >= 0.60).
 SHARE_FLOOR = 0.60
 
@@ -164,14 +171,21 @@ def detect_pointer_days(
     )
 
 
-def score_matrix(panel: np.ndarray) -> np.ndarray:
-    """Detrend + Cropper-score every column of a (T x N) daily panel."""
+def score_matrix(panel: np.ndarray, *,
+                 half_window: int = CROPPER_HALF_WINDOW) -> np.ndarray:
+    """Detrend + Cropper-score every column of a (T x N) daily panel.
+
+    ``half_window`` defaults to the judgment-bearing 11-day Cropper window;
+    pass ``NEUWIRTH_HALF_WINDOW`` (13-day window) ONLY for the registered
+    non-judgment-bearing Neuwirth crosscheck.
+    """
     X = np.asarray(panel, dtype=np.float64)
     if X.ndim != 2:
         raise ValueError(f"panel must be 2-D (T x N), got shape {X.shape}")
     out = np.full_like(X, np.nan)
     for j in range(X.shape[1]):
-        out[:, j] = cropper_score(trailing_median_detrend(X[:, j]))
+        out[:, j] = cropper_score(trailing_median_detrend(X[:, j]),
+                                  half_window=half_window)
     return out
 
 
@@ -182,6 +196,7 @@ __all__ = [
     "DETREND_MIN_PERIODS",
     "DETREND_WINDOW",
     "N_AVAIL_FLOOR",
+    "NEUWIRTH_HALF_WINDOW",
     "SHARE_FLOOR",
     "PointerDays",
     "cropper_score",

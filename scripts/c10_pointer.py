@@ -33,6 +33,7 @@ from bybit_edge.research.c10_pointer.driver import (  # noqa: E402
     render_markdown,
     run,
 )
+from bybit_edge.research.c10_pointer.cropper import N_AVAIL_FLOOR  # noqa: E402
 from bybit_edge.research.c10_pointer.loaders import (  # noqa: E402
     DEFAULT_SYMBOLS,
     DataError,
@@ -40,6 +41,16 @@ from bybit_edge.research.c10_pointer.loaders import (  # noqa: E402
     daily_grid,
     load_daily_dvol,
 )
+
+#: Hard CLI floor on the summed usable finite hold-out days
+#: (finite(dvol_btc) + finite(dvol_eth) over the non-burn-in range). The
+#: usable range has 79 days => 158 possible symbol-days; below 30 (~19%) the
+#: Delta_pre far window ([t-15,t-6], needs >= 6 of 10 finite index days) is
+#: mostly undefined and stage-2 p degenerates to a pseudo-result manufactured
+#: from unparseable data (audit_h10 BUG-5). Unregistered SAFETY floor (data-
+#: plumbing guard, not a gate threshold): the run FAILS (rc=1) instead of
+#: emitting a complete-looking DROP payload.
+DVOL_MIN_USABLE_DAYS = 30
 
 
 def _dumps(payload) -> str:
@@ -106,17 +117,42 @@ def main(argv: list[str] | None = None) -> int:
     print(f"[c10_pointer] detection panel: {panel.shape[0]} days x "
           f"{panel.shape[1]} series ({n_nonempty} non-empty)",
           file=sys.stderr, flush=True)
+    if n_nonempty < N_AVAIL_FLOOR:
+        # Fewer non-empty series than the registered n_avail >= 18 floor
+        # means NO day can ever be a pointer day — a run would produce a
+        # complete-looking but structurally meaningless payload (BUG-5).
+        print(f"[c10_pointer] FATAL: only {n_nonempty} non-empty detection series "
+              f"(< n_avail floor {N_AVAIL_FLOOR}) — structurally zero pointer days; "
+              f"check stream coverage / payload field names",
+              file=sys.stderr, flush=True)
+        return 1
 
+    dvol_info_btc: dict = {}
+    dvol_info_eth: dict = {}
     try:
-        dvol_btc = load_daily_dvol(base, "BTC", days)
-        dvol_eth = load_daily_dvol(base, "ETH", days)
+        dvol_btc = load_daily_dvol(base, "BTC", days, info=dvol_info_btc)
+        dvol_eth = load_daily_dvol(base, "ETH", days, info=dvol_info_eth)
     except DataError as exc:
         print(f"[c10_pointer] FATAL: held-out dvol target not loadable: {exc}",
               file=sys.stderr, flush=True)
         return 1
-    print(f"[c10_pointer] dvol hold-out: BTC {int((dvol_btc == dvol_btc).sum())} / "
-          f"ETH {int((dvol_eth == dvol_eth).sum())} days with data",
+    u0 = args.burn_in_days
+    usable_btc = int((dvol_btc[u0:] == dvol_btc[u0:]).sum())
+    usable_eth = int((dvol_eth[u0:] == dvol_eth[u0:]).sum())
+    print(f"[c10_pointer] dvol hold-out: BTC {int((dvol_btc == dvol_btc).sum())} "
+          f"(usable {usable_btc}, parse {dvol_info_btc.get('parse_mode')}) / "
+          f"ETH {int((dvol_eth == dvol_eth).sum())} "
+          f"(usable {usable_eth}, parse {dvol_info_eth.get('parse_mode')}) days with data",
           file=sys.stderr, flush=True)
+    if usable_btc + usable_eth < DVOL_MIN_USABLE_DAYS:
+        # Partitions existed but (nearly) nothing parsed — stage 2 would be
+        # manufactured from unparseable data. FAIL instead of rc=0 (BUG-5).
+        print(f"[c10_pointer] FATAL: held-out dvol has only "
+              f"{usable_btc}+{usable_eth} usable finite days "
+              f"(< floor {DVOL_MIN_USABLE_DAYS}) — stage 2 undefined; "
+              f"check dvol payload field names (README_H10.md)",
+              file=sys.stderr, flush=True)
+        return 1
 
     source = (f"{base}/raw (bybit+binance publicTrade/rest.fundingRate/"
               f"rest.openInterest; deribit dvol hold-out)")
@@ -126,6 +162,10 @@ def main(argv: list[str] | None = None) -> int:
             windows=windows, burn_in_days=args.burn_in_days,
             n_surrogates=args.n_surrogates, n_permutations=args.n_permutations,
             seed=args.seed, source=source,
+            dvol_parse_modes={
+                "BTC": str(dvol_info_btc.get("parse_mode")),
+                "ETH": str(dvol_info_eth.get("parse_mode")),
+            },
         )
     except ValueError as exc:
         print(f"[c10_pointer] FATAL: {exc}", file=sys.stderr, flush=True)

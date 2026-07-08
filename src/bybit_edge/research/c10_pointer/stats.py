@@ -7,7 +7,9 @@
     days per window. One-sided empirical p:
         p = (#{N_surr >= N_obs} + 1) / (n_surrogates + 1).
   * Stage 2 (``dvol_index`` / ``delta_pre`` / ``stage2_permutation_p``): the
-    HELD-OUT dvol index D_t = z-standardised mean of the BTC+ETH dvol levels;
+    HELD-OUT dvol index D_t = mean of the PER-SERIES z-scored BTC+ETH dvol
+    daily closes, z-parameters over the usable (non-burn-in) period
+    (hardened_hypotheses.md H-10; DEC-21);
     pre-event drift Delta_pre(t) = mean(D, [t-5, t-1]) - mean(D, [t-15, t-6]);
     statistic S = mean of Delta_pre over the window's pointer days. Null:
     1,000 permutation draws of equally-sized random day sets from the window,
@@ -140,30 +142,51 @@ def stage1_surrogate_p(
 # Stage 2 — held-out dvol pre-event drift vs. permutation null
 # ----------------------------------------------------------------------------
 
-def dvol_index(dvol_btc: np.ndarray, dvol_eth: np.ndarray) -> np.ndarray:
-    """Held-out dvol index D_t: z-standardised mean of the BTC+ETH dvol levels.
+def dvol_index(dvol_btc: np.ndarray, dvol_eth: np.ndarray,
+               usable_mask: np.ndarray | None = None) -> np.ndarray:
+    """Held-out dvol index D_t = mean of the per-series z-scored daily closes.
 
-    Literal registry reading: first the plain mean of the two dvol levels per
-    day (nan-tolerant: if one symbol is missing on a day the other carries the
-    mean — availability robustness, documented), then a single global
-    z-standardisation (ddof=1) over all finite days.
+    Hardened spec (hardened_hypotheses.md, H-10 "Zielgröße Stufe 2", followed
+    per DEC-21 in state/decisions.md): "D_t = Mittel der (über den nutzbaren
+    Zeitraum z-standardisierten) BTC- und ETH-dvol-Tagesschlüsse" — z-score
+    EACH series FIRST (mu/sd with ddof=1, estimated over the USABLE
+    non-burn-in days given by ``usable_mask``; None = all days), THEN average
+    the two z-series per day. NOT equivalent to z(mean(levels)) when the
+    BTC/ETH dvol scales differ (audit_h10 BUG-2b). The affine z-transform is
+    applied to the FULL grid (so Delta_pre look-back windows that reach into
+    the burn-in stay defined), while its parameters come from the usable
+    period only (BUG-2c). Per-day nan-tolerant mean: if one symbol is missing
+    on a day the other carries the index (availability robustness,
+    documented). A series with fewer than 2 usable finite days or zero
+    usable-period variance contributes NaN.
     """
     b = np.asarray(dvol_btc, dtype=np.float64)
     e = np.asarray(dvol_eth, dtype=np.float64)
     if b.shape != e.shape:
         raise ValueError("dvol series must share the daily grid")
-    stacked = np.vstack([b, e])
+    if usable_mask is None:
+        usable = np.ones(b.size, dtype=bool)
+    else:
+        usable = np.asarray(usable_mask, dtype=bool)
+        if usable.shape != b.shape:
+            raise ValueError("usable_mask must share the daily grid")
+
+    def _z(x: np.ndarray) -> np.ndarray:
+        z = np.full(x.size, np.nan, dtype=np.float64)
+        fit = usable & np.isfinite(x)
+        if int(fit.sum()) < 2:
+            return z
+        mu = float(np.mean(x[fit]))
+        sd = float(np.std(x[fit], ddof=1))
+        if sd <= 0.0 or not np.isfinite(sd):
+            return z
+        finite = np.isfinite(x)
+        z[finite] = (x[finite] - mu) / sd
+        return z
+
+    stacked = np.vstack([_z(b), _z(e)])
     with np.errstate(invalid="ignore"):
-        m = np.nanmean(stacked, axis=0)
-    finite = np.isfinite(m)
-    out = np.full(m.size, np.nan, dtype=np.float64)
-    if int(finite.sum()) < 2:
-        return out
-    mu = float(np.mean(m[finite]))
-    sd = float(np.std(m[finite], ddof=1))
-    if sd <= 0.0 or not np.isfinite(sd):
-        return out
-    out[finite] = (m[finite] - mu) / sd
+        out = np.nanmean(stacked, axis=0)
     return out
 
 

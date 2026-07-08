@@ -123,9 +123,15 @@ Write-Host ("Raster: " + $DataStart + ".." + $DataEnd + " (Burn-in " + $BurnIn +
 if ($DryRun) { Write-Host "ACHTUNG: HANDOFF_DRY_RUN aktiv - keine echten Laeufe." }
 
 # Junction-Pruefung: Detektions- UND Hold-out-Pfad muessen existieren.
+# audit_h10 BUG-5: der alte Pre-Check deckte nur 2 der 4 benoetigten Pfade ab
+# (Bybit-Detektion + Hold-out). Ohne Binance-Funding/OI waere ein fehlender
+# Binance-Zweig erst nach dem vollen Lauf im Payload sichtbar statt als
+# sauberes SKIP vorab.
 $HarvestOk = $true
 $tradePath = Join-Path $HarvestDir 'raw\bybit\publicTrade'
 $dvolPath  = Join-Path $HarvestDir 'raw\deribit\dvol'
+$fundPath  = Join-Path $HarvestDir 'raw\binance\rest.fundingRate'
+$oiPath    = Join-Path $HarvestDir 'raw\binance\rest.openInterest'
 if (-not $DryRun) {
     if (-not (Test-Path $tradePath)) {
         $HarvestOk = $false
@@ -135,10 +141,18 @@ if (-not $DryRun) {
         $HarvestOk = $false
         Write-Host ("WARNUNG: Hold-out-Pfad fehlt (" + $dvolPath + ") - deribit dvol wird fuer Stufe 2 zwingend gebraucht")
     }
+    if (-not (Test-Path $fundPath)) {
+        $HarvestOk = $false
+        Write-Host ("WARNUNG: Binance-Funding-Pfad fehlt (" + $fundPath + ") - Detektion braucht beide Exchanges")
+    }
+    if (-not (Test-Path $oiPath)) {
+        $HarvestOk = $false
+        Write-Host ("WARNUNG: Binance-OI-Pfad fehlt (" + $oiPath + ") - Detektion braucht beide Exchanges")
+    }
 }
 
 if (-not $HarvestOk) {
-    Record-Step -Name 'H10_POINTER' -Status 'SKIP' -Rc 0 -Dur 0 -Detail ("Harvester/Hold-out fehlt (" + $tradePath + " / " + $dvolPath + ")")
+    Record-Step -Name 'H10_POINTER' -Status 'SKIP' -Rc 0 -Dur 0 -Detail ("Harvester/Hold-out fehlt (" + $tradePath + " / " + $dvolPath + " / " + $fundPath + " / " + $oiPath + ")")
 } else {
     # WICHTIG: Skript-Pfad ist das ERSTE CmdArg, VOR allen --flags (run_h05c-Bug meiden).
     [void](Invoke-Step -Name 'H10_POINTER' -TimeoutSec $TmoStep -CmdArgs @(
