@@ -9,11 +9,12 @@
 #   bash scinance2-impl/handoff_local/run_h11.sh
 #
 # WICHTIG - H-11 ist DATA-GATED (Registry: GESPERRT). Der Runner prueft
-# ZUERST die Entsperr-Bedingung (lueckenlose date=-Partitionen fuer bybit
+# ZUERST die Entsperr-Bedingung (lueckenlose done_days fuer bybit
 # publicTrade UND rest.fundingRate, BTC+ETH, 2024-03-27..2026-03-26,
-# >=730 Tage). Nicht erfuellt -> sauberer SKIP ("H-11 gesperrt -
-# Manifest-Coverage <730 Tage, Entsperr-Bedingung nicht erfuellt"),
-# Exit 2, KEIN Fehler, KEIN Datenlauf.
+# >=730 Tage) - primaer per harvest_manifest.sqlite-Query, Partitions-
+# Ordner-Scan nur als Fallback ohne Manifest. Nicht erfuellt -> sauberer
+# SKIP ("H-11 gesperrt - Manifest-Coverage <730 Tage, Entsperr-Bedingung
+# nicht erfuellt"), Exit 2, KEIN Fehler, KEIN Datenlauf.
 #
 # Nach Entsperrung: L=2024-03-27..2025-09-30 (LOO-CRPS-Gewichte, Grid
 # {0;0.5;1;1.5;2}^5, eingefroren), W1=2025-10-01..2026-03-26,
@@ -128,7 +129,7 @@ SUMMARY="$RUN/SUMMARY_$SUMD.md"
     echo ""
     echo "- **Erzeugt:** $(date -u +'%Y-%m-%d %H:%M:%S') UTC"
     echo "- **Run-Dir:** \`$RUN\` | Harvest \`$HARVEST_DIR\` (read-only) | Symbole $SYMBOLS"
-    echo "- **Entsperr-Bedingung:** lueckenlose date=-Partitionen publicTrade + rest.fundingRate, BTC+ETH, $UNLOCK_START..$UNLOCK_END (>=$MIN_UNLOCK Tage)"
+    echo "- **Entsperr-Bedingung:** lueckenlose done_days (Manifest-Query, Ordner-Scan-Fallback) publicTrade + rest.fundingRate, BTC+ETH, $UNLOCK_START..$UNLOCK_END (>=$MIN_UNLOCK Tage)"
     echo "- **Fenster:** L=$TUNE_START..$TUNE_END (Tuning) | W1=$W1_START..$W1_END | W2=$W2_START..$W2_END"
     echo "- **Methode:** k=$K_ANALOGS, Embargo ${EMBARGO}d, Grid {$WEIGHT_GRID}^5 eingefroren, Block-Bootstrap ${BLOCK_LEN}d x $BOOT | F-ANEN BH-FDR a=0.10"
     echo "- **KAPITALFREI** - reines Mess-Gate, KEINE bps/Edge/PnL/Sharpe/Friction-Rechnung."

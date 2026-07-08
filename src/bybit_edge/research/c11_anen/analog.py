@@ -2,9 +2,13 @@
 
 Delle Monache et al. (2013)-style analog forecasting on the pre-registered
 5-feature daily state vector: the k=20 nearest historical day-states under a
-weighted-euclidean distance on z-standardised features form the ensemble; the
-point forecast scored by the degenerate-distribution CRPS is the ensemble
-mean of the historical targets.
+weighted-euclidean distance on z-standardised features form the ensemble.
+The AnEn forecast is the EMPIRICAL DISTRIBUTION of the k analog targets
+(registry H-11: "AnEn-Vorhersageverteilung = empirische Verteilung der
+log-RV(t'+1..t'+3) der 20 Analoga"), scored with the proper ensemble CRPS
+(``stats.crps_ensemble``); the degenerate point-CRPS applies ONLY to the
+HAR baseline. The ensemble mean may be reported as a display statistic but
+never enters the scoring.
 
 Pre-registered construction (registry H-11):
 
@@ -24,6 +28,8 @@ import itertools
 import sys
 
 import numpy as np
+
+from .stats import crps_ensemble
 
 #: Pre-registered ensemble size (registry H-11).
 K_ANALOGS = 20
@@ -76,27 +82,30 @@ def analog_forecast(
     *,
     k: int = K_ANALOGS,
     embargo: int = EMBARGO_DAYS,
-) -> tuple[float, np.ndarray]:
-    """AnEn point forecast for day t plus the selected candidate indices.
+) -> tuple[np.ndarray, np.ndarray]:
+    """AnEn ensemble forecast for day t plus the selected candidate indices.
 
     Distance: sqrt( sum_j w_j * (z_t[j] - z_t'[j])^2 ) on features
     z-standardised with the expanding candidate-library stats. The k nearest
     candidates (ties broken by ascending day index — deterministic) form the
-    ensemble; the point forecast is the mean of their targets (the degenerate-
-    distribution representative scored by CRPS = |forecast - observation|).
+    ensemble. Returns ``(members, sel)`` where ``members`` are the k analog
+    targets — the EMPIRICAL FORECAST DISTRIBUTION registered for H-11, to be
+    scored with ``stats.crps_ensemble`` (NOT collapsed to its mean; the mean
+    is at most a display statistic).
 
-    Returns ``(nan, empty)`` when the current state is incomplete or fewer
+    Returns ``(empty, empty)`` when the current state is incomplete or fewer
     than k eligible candidates exist (no partial ensembles — deterministic,
     pre-registered k).
     """
     w = np.asarray(weights, dtype=np.float64)
     if w.shape != (features.shape[1],):
         raise ValueError(f"weights must have shape ({features.shape[1]},)")
+    empty = (np.empty(0, dtype=np.float64), np.empty(0, dtype=np.int64))
     if not np.all(np.isfinite(features[t])):
-        return float("nan"), np.empty(0, dtype=np.int64)
+        return empty
     cand = eligible_candidates(t, features, targets, embargo)
     if cand.size < k:
-        return float("nan"), np.empty(0, dtype=np.int64)
+        return empty
     mu, sd = zscore_stats(features, cand)
     z_now = (features[t] - mu) / sd
     z_lib = (features[cand] - mu) / sd
@@ -104,7 +113,7 @@ def analog_forecast(
     dist2 = (diff * diff) @ w
     order = np.argsort(dist2, kind="stable")[:k]
     sel = cand[order]
-    return float(np.mean(targets[sel])), sel
+    return targets[sel].astype(np.float64, copy=True), sel
 
 
 def loo_crps_for_weights(
@@ -116,22 +125,25 @@ def loo_crps_for_weights(
     k: int = K_ANALOGS,
     embargo: int = EMBARGO_DAYS,
 ) -> float:
-    """Mean leave-one-out CRPS of one weight vector over the tuning days.
+    """Mean leave-one-out ensemble CRPS of one weight vector over tuning days.
 
-    "Leave-one-out" is enforced structurally by the embargo: forecasting day t
-    only ever uses candidates <= t - embargo, so the day under evaluation (and
-    its 30-day neighbourhood) is excluded from its own analog library. Days
-    without a full ensemble or without an observed target are skipped. Returns
-    inf when no tuning day is scoreable (so it can never win the argmin).
+    Scores each forecast day with the proper ensemble CRPS of the k-member
+    empirical distribution (registry H-11 metric) — the same objective the
+    OOS windows are scored with. "Leave-one-out" is enforced structurally by
+    the embargo: forecasting day t only ever uses candidates <= t - embargo,
+    so the day under evaluation (and its 30-day neighbourhood) is excluded
+    from its own analog library. Days without a full ensemble or without an
+    observed target are skipped. Returns inf when no tuning day is scoreable
+    (so it can never win the argmin).
     """
     scores: list[float] = []
     for t in tune_idx:
         t = int(t)
         if not np.isfinite(targets[t]):
             continue
-        fc, _sel = analog_forecast(features, targets, t, weights, k=k, embargo=embargo)
-        if np.isfinite(fc):
-            scores.append(abs(fc - float(targets[t])))
+        members, _sel = analog_forecast(features, targets, t, weights, k=k, embargo=embargo)
+        if members.size:
+            scores.append(float(crps_ensemble(members, targets[t])[0]))
     if not scores:
         return float("inf")
     return float(np.mean(scores))
@@ -149,8 +161,10 @@ def tune_weights_loo_crps(
 ) -> tuple[np.ndarray, float]:
     """LOO-CRPS weight tuning on region L over the frozen grid (registry H-11).
 
-    Evaluates every weight vector in ``grid``^5 (default {0,0.5,1,1.5,2}^5 =
-    3125 combinations) by mean leave-one-out CRPS over ``tune_idx`` and returns
+    The objective is the mean leave-one-out ENSEMBLE CRPS of the k-member
+    empirical distribution — identical to the OOS scoring rule (never the
+    collapsed-mean point error). Evaluates every weight vector in ``grid``^5
+    (default {0,0.5,1,1.5,2}^5 = 3125 combinations) over ``tune_idx`` and returns
     ``(best_weights, best_mean_crps)``. Deterministic: ties resolve to the
     FIRST combination in ``itertools.product`` order. The all-zero vector is
     excluded (degenerate distance — every candidate equidistant). After this
@@ -190,7 +204,10 @@ def tune_weights_loo_crps(
             dist2 = d2 @ w
             # same deterministic selection rule as analog_forecast (stable sort)
             order = np.argsort(dist2, kind="stable")[:k]
-            total += abs(float(np.mean(cand_tgt[order])) - obs)
+            members = cand_tgt[order]
+            # inline ensemble CRPS (== stats.crps_ensemble on one day)
+            total += float(np.mean(np.abs(members - obs))
+                           - 0.5 * np.mean(np.abs(members[:, None] - members[None, :])))
         score = total / len(pre)
         if score < best_score - 1e-15:
             best_score = score

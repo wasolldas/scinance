@@ -9,11 +9,13 @@
 # bps/Edge/PnL/Sharpe/Friction-Rechnung (Monetarisierung waere NEUE H-11b).
 #
 # WICHTIG - H-11 ist DATA-GATED (Registry: GESPERRT). Dieser Runner prueft
-# ZUERST die Entsperr-Bedingung (lueckenlose date=-Partitionen fuer bybit
+# ZUERST die Entsperr-Bedingung (lueckenlose done_days fuer bybit
 # publicTrade UND rest.fundingRate, BTC+ETH, 2024-03-27..2026-03-26,
-# >=730 Tage). Ist sie NICHT erfuellt: sauberer SKIP mit Meldung
-# "H-11 gesperrt - Manifest-Coverage <730 Tage, Entsperr-Bedingung nicht
-# erfuellt" und Exit-Code 2 - KEIN Fehler, KEIN Datenlauf.
+# >=730 Tage) - primaer per harvest_manifest.sqlite-Query, Partitions-
+# Ordner-Scan nur als Fallback ohne Manifest. Ist sie NICHT erfuellt:
+# sauberer SKIP mit Meldung "H-11 gesperrt - Manifest-Coverage <730 Tage,
+# Entsperr-Bedingung nicht erfuellt" und Exit-Code 2 - KEIN Fehler, KEIN
+# Datenlauf.
 #
 # Nach Entsperrung laeuft der volle Gate-Lauf: Tuning-Bereich
 # L=2024-03-27..2025-09-30 (LOO-CRPS-Gewichte, Grid {0;0.5;1;1.5;2}^5,
@@ -195,7 +197,7 @@ $sb = New-Object System.Text.StringBuilder
 [void]$sb.AppendLine("- **Erzeugt:** " + (Get-Date).ToUniversalTime().ToString('yyyy-MM-dd HH:mm:ss') + " UTC")
 [void]$sb.AppendLine("- **Run-Dir:** ``" + $RunDir + "``")
 [void]$sb.AppendLine("- **Harvest:** ``" + $HarvestDir + "`` (read-only Junction) | Symbole: " + $Symbols)
-[void]$sb.AppendLine("- **Entsperr-Bedingung:** lueckenlose date=-Partitionen publicTrade + rest.fundingRate, BTC+ETH, " + $UnlockStart + ".." + $UnlockEnd + " (>=" + $MinUnlock + " Tage)")
+[void]$sb.AppendLine("- **Entsperr-Bedingung:** lueckenlose done_days (Manifest-Query, Ordner-Scan-Fallback) publicTrade + rest.fundingRate, BTC+ETH, " + $UnlockStart + ".." + $UnlockEnd + " (>=" + $MinUnlock + " Tage)")
 [void]$sb.AppendLine("- **Fenster:** L=" + $TuneStart + ".." + $TuneEnd + " (Tuning) | W1=" + $W1Start + ".." + $W1End + " | W2=" + $W2Start + ".." + $W2End)
 [void]$sb.AppendLine("- **Methode:** k=" + $KAnalogs + ", Embargo " + $Embargo + "d, Grid {" + $WeightGrid + "}^5 eingefroren, Block-Bootstrap " + $BlockLen + "d x " + $Bootstrap + " | F-ANEN BH-FDR a=0.10")
 [void]$sb.AppendLine("- **KAPITALFREI** - reines Mess-Gate, KEINE bps/Edge/PnL/Sharpe/Friction-Rechnung.")

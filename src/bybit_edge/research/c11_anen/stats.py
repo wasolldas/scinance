@@ -1,9 +1,14 @@
 """Statistics for the H-11 AnEn vs. HAR-RV mess-gate (KAPITALFREI).
 
-  * ``crps_point`` — the pre-registered degenerate-distribution CRPS of a
-    point forecast: CRPS = |forecast - observation| (registry H-11 fixes
-    EXACTLY this simplified variant; the full distributional CRPS integral is
-    deliberately NOT implemented here).
+  * ``crps_ensemble`` — proper CRPS of the empirical k-member ensemble
+    distribution (registry H-11: the AnEn forecast IS the empirical
+    distribution of the log-RV(t'+1..t'+3) targets of the 20 analogs):
+    CRPS(F, y) = (1/k) sum_i |x_i - y| - (1/(2 k^2)) sum_i sum_j |x_i - x_j|.
+  * ``crps_point`` — degenerate-distribution CRPS of a point forecast:
+    CRPS = |forecast - observation|. Per registry H-11 this applies ONLY to
+    the HAR-RV baseline ("CRPS der Punktprognose"), never to the AnEn.
+  * ``pit_ranks`` — PIT rank of the observation within the k-member ensemble
+    (non-judgment-bearing calibration diagnostic, registry: "mitberichtet").
   * ``crpss`` — skill score CRPSS = 1 - sum(CRPS_AnEn) / sum(CRPS_HAR).
   * ``block_bootstrap_p`` — Diebold-Mariano-style circular block bootstrap
     (block length 5 days, 1000 reps) for H0: mean CRPS difference
@@ -31,14 +36,64 @@ N_BOOTSTRAP = 1000
 
 
 def crps_point(forecast: np.ndarray, observation: np.ndarray) -> np.ndarray:
-    """Degenerate-distribution CRPS of the point forecast: |forecast - obs|.
+    """Degenerate-distribution CRPS of a point forecast: |forecast - obs|.
 
-    This is the registry-H-11 pre-registered scoring rule (a point forecast is
-    a degenerate predictive distribution, for which the CRPS reduces exactly
-    to the absolute error). Vectorised; NaN propagates.
+    A point forecast is a degenerate predictive distribution, for which the
+    CRPS reduces exactly to the absolute error. Registry H-11 assigns this
+    rule to the HAR-RV BASELINE only ("Baseline: ... CRPS der Punktprognose =
+    |Prognose - Beobachtung|"); the AnEn is scored by ``crps_ensemble`` on its
+    full 20-member distribution. Vectorised; NaN propagates.
     """
     return np.abs(np.asarray(forecast, dtype=np.float64)
                   - np.asarray(observation, dtype=np.float64))
+
+
+def crps_ensemble(members: np.ndarray, observation: np.ndarray) -> np.ndarray:
+    """Proper CRPS of the empirical k-member ensemble distribution.
+
+    Standard closed form for an empirical-CDF forecast with members x_1..x_k
+    (Gneiting & Raftery 2007):
+
+        CRPS(F, y) = (1/k) sum_i |x_i - y| - (1/(2 k^2)) sum_i sum_j |x_i - x_j|
+
+    This is the registered H-11 scoring rule for the AnEn ("AnEn-
+    Vorhersageverteilung = empirische Verteilung der log-RV(t'+1..t'+3) der
+    20 Analoga"). ``members`` has shape (n_days, k) (a single (k,) vector is
+    accepted and treated as one forecast day); ``observation`` has shape
+    (n_days,). Returns per-day CRPS values; NaN propagates. A degenerate
+    ensemble (all members identical) reduces exactly to ``crps_point``.
+    """
+    x = np.asarray(members, dtype=np.float64)
+    y = np.asarray(observation, dtype=np.float64)
+    if x.ndim == 1:
+        x = x[None, :]
+    y = np.atleast_1d(y)
+    if x.shape[0] != y.shape[0]:
+        raise ValueError(f"members rows ({x.shape[0]}) != observations ({y.shape[0]})")
+    if x.shape[1] < 1:
+        raise ValueError("ensemble must have at least one member")
+    term_obs = np.mean(np.abs(x - y[:, None]), axis=1)
+    term_spread = 0.5 * np.mean(np.abs(x[:, :, None] - x[:, None, :]), axis=(1, 2))
+    return term_obs - term_spread
+
+
+def pit_ranks(members: np.ndarray, observation: np.ndarray) -> np.ndarray:
+    """PIT rank of each observation within its k-member ensemble (0..k).
+
+    rank(t) = #{ members of day t strictly below the observation } — a
+    deterministic tie rule (ties count as members >= obs). For a calibrated
+    ensemble the ranks are ~uniform over the k+1 bins (rank histogram).
+    NON-JUDGMENT-BEARING secondary diagnostic (registry H-11: "Rank-
+    Histogramm/PIT ... mitberichtet"); no gate condition reads it.
+    """
+    x = np.asarray(members, dtype=np.float64)
+    y = np.asarray(observation, dtype=np.float64)
+    if x.ndim == 1:
+        x = x[None, :]
+    y = np.atleast_1d(y)
+    if x.shape[0] != y.shape[0]:
+        raise ValueError(f"members rows ({x.shape[0]}) != observations ({y.shape[0]})")
+    return np.sum(x < y[:, None], axis=1).astype(np.int64)
 
 
 def crpss(crps_anen: np.ndarray, crps_har: np.ndarray) -> float:
@@ -107,6 +162,10 @@ def benjamini_hochberg(
     significant at FDR ``alpha`` and ``p_crit`` the largest passing p-value
     (0.0 if none). Input order preserved. OWN copy (registry §8.2 convention —
     each research package keeps its own; no cross-import between packages).
+
+    NOTE: BH rejection at alpha=0.10 does NOT imply p <= 0.05 — the registered
+    H-11 gate additionally requires the raw bootstrap p <= BOOTSTRAP_P_MAX,
+    enforced separately in the driver (``boot_p_le_max``).
     """
     m = len(p_values)
     if m == 0:
@@ -134,6 +193,8 @@ __all__ = [
     "N_BOOTSTRAP",
     "benjamini_hochberg",
     "block_bootstrap_p",
+    "crps_ensemble",
     "crps_point",
     "crpss",
+    "pit_ranks",
 ]

@@ -18,10 +18,11 @@ day t uses days t+1..t+3 only (strictly future — it is the OBSERVATION the
 forecasts are scored against, never a model input at time t).
 
 Data source: the read-only harvester Hive tree (DATASET.md §2/§3) — bybit
-``publicTrade`` ticks for the realised vol and ``rest.fundingRate`` records
-for the funding features. Loading mirrors ``c01_ofi_sign/oos.py::
-load_harvest_window`` (DuckDB over ``payload_json``, backfill keys with live
-fallback). Never writes into the harvester tree (Schutzgut).
+``publicTrade`` for the realised vol (aggregated INSIDE DuckDB to 1-minute
+last-price bars, then daily RV from 1-min log returns — the registered
+"1-min-RV"; mirrors the ``c12_frag/panel.py`` minute-bar pattern, no
+tick-level fetch into Python) and ``rest.fundingRate`` records for the
+funding features. Never writes into the harvester tree (Schutzgut).
 
 KAPITALFREI: pure measurement features. No cost model of any kind.
 """
@@ -89,6 +90,11 @@ def _glob_for(base: Path, exchange: str, stream: str, symbol: str) -> str:
     return str(base / "raw" / exchange / stream / f"symbol={symbol}" / "date=*" / "*.parquet")
 
 
+#: Milliseconds per 1-minute bar / per UTC day (registered 1-min-RV raster).
+MS_PER_MINUTE = 60_000
+MS_PER_DAY = 86_400_000
+
+
 def load_daily_rv(
     base_dir: Path | str,
     symbol: str,
@@ -98,9 +104,17 @@ def load_daily_rv(
     exchange: str = "bybit",
     stream: str = "publicTrade",
 ) -> dict[str, float]:
-    """Daily realised vol from publicTrade ticks: sqrt(sum of squared log
-    returns of consecutive trade prices within the UTC day). Days with < 2
-    valid ticks are omitted (NaN downstream). Read-only.
+    """Daily realised vol from 1-MINUTE returns (registry H-11: "1-min-RV").
+
+    Aggregation happens entirely INSIDE DuckDB (c12_frag minute-bar pattern):
+    1-minute last-price bars (bucket ``ts_exchange_ms // 60000``, last trade
+    per bucket via ``max_by``), 1-min log returns WITHIN each UTC day
+    (partitioned lag — no cross-midnight return), then per day
+    RV = sqrt(sum r_1min^2). Only ~1 row per day ever reaches Python — no
+    tick-level fetchall (real BTCUSDT volume is 10^6+ trades/day). Tick-to-
+    tick returns are deliberately NOT used: bid-ask bounce inflates tick RV,
+    and the registered quantity is the 1-min-return RV. Days with < 2 minute
+    bars are omitted (NaN downstream). Read-only.
     """
     import duckdb
 
@@ -111,41 +125,46 @@ def load_daily_rv(
     if not list((base / "raw" / exchange / stream / f"symbol={symbol}").glob("date=*")):
         raise DataError(f"no partitions for {exchange}/{stream}/{symbol} under {base}")
     sql = f"""
-        SELECT date AS d, ts_exchange_ms AS ts,
-               CAST(COALESCE(json_extract_string(payload_json,'$.price'),
-                             json_extract_string(payload_json,'$.p')) AS DOUBLE) AS price
-        FROM read_parquet('{glob}', hive_partitioning=1, union_by_name=1)
-        WHERE ts_exchange_ms IS NOT NULL
-          AND date >= '{start_date}' AND date <= '{end_date}'
-        ORDER BY date, ts_exchange_ms
+        WITH bars AS (
+            SELECT CAST(ts_exchange_ms // {MS_PER_MINUTE} AS BIGINT) AS minute_idx,
+                   max_by(
+                     CAST(COALESCE(json_extract_string(payload_json,'$.price'),
+                                   json_extract_string(payload_json,'$.p')) AS DOUBLE),
+                     ts_exchange_ms) AS px
+            FROM read_parquet('{glob}', hive_partitioning=1, union_by_name=1)
+            WHERE ts_exchange_ms IS NOT NULL
+              AND date >= '{start_date}' AND date <= '{end_date}'
+              AND COALESCE(json_extract_string(payload_json,'$.price'),
+                           json_extract_string(payload_json,'$.p')) IS NOT NULL
+            GROUP BY 1
+        ),
+        rets AS (
+            SELECT minute_idx * {MS_PER_MINUTE} // {MS_PER_DAY} AS day_idx,
+                   ln(px) - ln(lag(px) OVER (
+                       PARTITION BY minute_idx * {MS_PER_MINUTE} // {MS_PER_DAY}
+                       ORDER BY minute_idx)) AS r
+            FROM bars
+            WHERE px IS NOT NULL AND px > 0.0 AND isfinite(px)
+        )
+        SELECT day_idx, sqrt(sum(r * r)) AS rv
+        FROM rets
+        WHERE r IS NOT NULL AND isfinite(r)
+        GROUP BY day_idx
+        ORDER BY day_idx
     """
     con = duckdb.connect()
     try:
         rows = con.execute(sql).fetchall()
     finally:
         con.close()
+    epoch = date(1970, 1, 1)
     out: dict[str, float] = {}
-    cur_day: str | None = None
-    prices: list[float] = []
-
-    def _flush() -> None:
-        if cur_day is None or len(prices) < 2:
-            return
-        p = np.asarray(prices, dtype=np.float64)
-        p = p[np.isfinite(p) & (p > 0.0)]
-        if p.size < 2:
-            return
-        r = np.diff(np.log(p))
-        out[cur_day] = float(np.sqrt(np.sum(r * r)))
-
-    for d, _ts, price in rows:
-        d = str(d)
-        if d != cur_day:
-            _flush()
-            cur_day = d
-            prices = []
-        prices.append(price)
-    _flush()
+    for day_idx, rv in rows:
+        if rv is None or not np.isfinite(rv):
+            continue
+        d = (epoch + timedelta(days=int(day_idx))).isoformat()
+        if start_date <= d <= end_date:
+            out[d] = float(rv)
     return out
 
 

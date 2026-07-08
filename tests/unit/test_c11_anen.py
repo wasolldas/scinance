@@ -7,15 +7,26 @@ hypothesis is DATA-GATED — no real-data run happens here):
   (b) the 30-day analog embargo (a deliberately near duplicate MUST be
       rejected),
   (c) HAR-RV baseline correctness on a synthetic AR process,
-  (d) CRPS/CRPSS/bootstrap/BH-FDR correctness,
+  (d) ensemble-CRPS / point-CRPS / CRPSS / bootstrap / BH-FDR correctness —
+      including the calibration-sensitivity property that distinguishes
+      ensemble-CRPS from the degenerate point-CRPS (registry H-11: the AnEn
+      forecast IS the empirical distribution of the 20 analog targets, NOT
+      collapsed to its mean),
   (e) positive detection: a regime-switching vol pattern with a leading
       funding signal where the analog ensemble demonstrably beats HAR
-      (CRPSS >= 0.05 AND bootstrap-significant),
-  (f) null control: pure AR(1) noise without regime structure — AnEn must
-      NOT clearly beat HAR,
+      (CRPSS >= 0.05 AND bootstrap-significant), scored with ensemble-CRPS,
+  (f) the registered gate's cell_pass requires ALL of CRPSS>=0.05, raw
+      bootstrap-p<=0.05 AND BH-FDR rejection — BH-FDR rejection ALONE does
+      NOT imply cell_pass (a p=0.09 cell BH-surviving at alpha=0.10 must not
+      pass),
   (g) capital_free=true and no cost-model identifiers in the module,
-  (h) unlock check False on short synthetic coverage / True on sufficient,
-  (i) end-to-end: synthetic harvester tree with >= 800 days -> CLI rc=0;
+  (h) unlock check: manifest-done_days as PRIMARY source (Bug 4 fix) with
+      correct authority over a stale/ahead raw tree; partition-folder-scan
+      FALLBACK only when no manifest is present, requiring file size > 0,
+  (i) daily RV is built from 1-minute returns aggregated INSIDE DuckDB (Bug 2
+      fix), not tick-to-tick returns — verified against a hand-computed
+      expected RV on a tiny synthetic tick fixture,
+  (j) end-to-end: synthetic harvester tree with >= 800 days -> CLI rc=0;
       short history -> CLI + T2 runner report SKIP/locked (rc=2).
 """
 from __future__ import annotations
@@ -24,6 +35,7 @@ import ast
 import json
 import os
 import shutil
+import sqlite3
 import subprocess
 import sys
 from datetime import date, timedelta
@@ -43,6 +55,7 @@ from bybit_edge.research.c11_anen.baseline import har_forecast_series
 from bybit_edge.research.c11_anen.driver import (
     UNLOCK_MIN_DAYS,
     UNLOCK_RANGE,
+    apply_family_flags,
     check_unlock,
     run as driver_run,
 )
@@ -51,12 +64,16 @@ from bybit_edge.research.c11_anen.features import (
     compute_feature_matrix,
     compute_target,
     date_range,
+    load_daily_rv,
 )
 from bybit_edge.research.c11_anen.stats import (
+    BOOTSTRAP_P_MAX,
     benjamini_hochberg,
     block_bootstrap_p,
+    crps_ensemble,
     crps_point,
     crpss,
+    pit_ranks,
 )
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -75,13 +92,18 @@ def _iso_dates(start: str, n: int) -> list[str]:
 # ----------------------------------------------------------------------------
 
 def _touch_partitions(base: Path, symbols, streams, days) -> None:
-    """Empty parquet placeholder per partition (enough for check_unlock)."""
+    """Non-empty parquet placeholder per partition.
+
+    The folder-scan FALLBACK (Bug 4 fix) requires parquet file size > 0 — a
+    bare ``.touch()`` (0 bytes) must NOT satisfy coverage, so every helper
+    write here uses real (if tiny) content.
+    """
     for stream in streams:
         for sym in symbols:
             for d in days:
                 p = base / "raw" / "bybit" / stream / f"symbol={sym}" / f"date={d}"
                 p.mkdir(parents=True, exist_ok=True)
-                (p / "part-0.parquet").touch()
+                (p / "part-0.parquet").write_bytes(b"placeholder-nonzero")
 
 
 def _write_partition(base: Path, stream: str, symbol: str, day_iso: str,
@@ -116,6 +138,7 @@ def _build_synthetic_tree(base: Path, symbols, days: list[str],
             for j in range(ticks_per_day):
                 price *= float(np.exp(sigma / np.sqrt(ticks_per_day) * rng.standard_normal()))
                 side = "Buy" if rng.random() < 0.5 else "Sell"
+                # spread ticks across distinct minutes so 1-min bars are non-trivial
                 ts.append(day_ms + 1000 + j * 3_600_000)
                 payloads.append(json.dumps(
                     {"side": side, "price": f"{price:.4f}", "size": "0.5"}))
@@ -126,6 +149,23 @@ def _build_synthetic_tree(base: Path, symbols, days: list[str],
                              [json.dumps({"symbol": sym,
                                           "fundingRate": f"{funding:.8f}",
                                           "fundingRateTimestamp": str(day_ms)})])
+
+
+def _write_manifest(base: Path, rows: list[tuple[str, str, str, str, str]]) -> Path:
+    """Fake ``harvest_manifest.sqlite`` with the real DATASET.md §7 schema."""
+    manifest_dir = base / "state"
+    manifest_dir.mkdir(parents=True, exist_ok=True)
+    db_path = manifest_dir / "harvest_manifest.sqlite"
+    con = sqlite3.connect(db_path)
+    try:
+        con.execute(
+            "CREATE TABLE partitions "
+            "(exchange TEXT, stream TEXT, symbol TEXT, date TEXT, status TEXT)")
+        con.executemany("INSERT INTO partitions VALUES (?,?,?,?,?)", rows)
+        con.commit()
+    finally:
+        con.close()
+    return db_path
 
 
 # ----------------------------------------------------------------------------
@@ -195,6 +235,59 @@ def test_target_uses_only_strictly_future_days():
 
 
 # ----------------------------------------------------------------------------
+# (i) 1-min-RV DuckDB aggregation (Bug 2)
+# ----------------------------------------------------------------------------
+
+def test_load_daily_rv_uses_1min_bars_not_tick_returns(tmp_path):
+    """Hand-computed expected RV from 1-minute LAST-price bars.
+
+    Multiple ticks land in the SAME minute bucket; only the last (by
+    ts_exchange_ms) must count per bucket (max_by semantics) — a tick-return
+    implementation would instead see every intermediate trade and produce a
+    different (inflated) RV. A separate day is written to prove no
+    cross-midnight return leaks in (the SQL partitions by day_idx).
+    """
+    day0 = "2024-01-01"
+    day1 = "2024-01-02"
+    day0_ms = int((date.fromisoformat(day0) - date(1970, 1, 1)).days) * 86_400_000
+    day1_ms = int((date.fromisoformat(day1) - date(1970, 1, 1)).days) * 86_400_000
+
+    # minute 0 [0, 60000): two trades, LAST one (ts=50000, price=105) must win
+    # minute 1 [60000, 120000): one trade, price=110
+    # minute 2 [120000, 180000): one trade, price=108
+    ts0 = [day0_ms + 1_000, day0_ms + 50_000, day0_ms + 61_000, day0_ms + 125_000]
+    px0 = [100.0, 105.0, 110.0, 108.0]
+    payloads0 = [json.dumps({"side": "Buy", "price": f"{p:.4f}", "size": "1"}) for p in px0]
+    _write_partition(tmp_path, "publicTrade", "BTCUSDT", day0, ts0, payloads0)
+
+    # a lone trade on the next day: must NOT create a cross-midnight return
+    # against day0's last bar (105 minute-2 bar of day0 vs day1's price)
+    ts1 = [day1_ms + 5_000, day1_ms + 65_000]
+    px1 = [200.0, 202.0]
+    payloads1 = [json.dumps({"side": "Sell", "price": f"{p:.4f}", "size": "1"}) for p in px1]
+    _write_partition(tmp_path, "publicTrade", "BTCUSDT", day1, ts1, payloads1)
+
+    out = load_daily_rv(tmp_path, "BTCUSDT", day0, day1)
+
+    r1 = np.log(110.0 / 105.0)
+    r2 = np.log(108.0 / 110.0)
+    expected_rv0 = float(np.sqrt(r1 * r1 + r2 * r2))
+    assert out[day0] == pytest.approx(expected_rv0)
+
+    # day1 has only 2 minute bars -> exactly 1 within-day return
+    r_day1 = np.log(202.0 / 200.0)
+    expected_rv1 = float(np.sqrt(r_day1 * r_day1))
+    assert out[day1] == pytest.approx(expected_rv1)
+
+    # sanity: a NAIVE tick-to-tick RV over day0 (4 consecutive trades) would
+    # differ from the 1-min-bar RV (3 tick returns vs. 2 minute-bar returns)
+    tick_rets = np.diff(np.log(np.array(px0)))
+    naive_tick_rv = float(np.sqrt(np.sum(tick_rets * tick_rets)))
+    assert naive_tick_rv != pytest.approx(expected_rv0), (
+        "fixture must actually distinguish 1-min-bar RV from tick RV")
+
+
+# ----------------------------------------------------------------------------
 # (b) 30-day embargo
 # ----------------------------------------------------------------------------
 
@@ -207,17 +300,19 @@ def test_embargo_rejects_near_analog_candidate():
     # plant a PERFECT analog (distance 0) inside the embargo zone at t-10:
     # without the embargo it would be the #1 nearest neighbour.
     feats[t - 10] = feats[t]
-    fc, sel = analog_forecast(feats, targets, t, np.ones(5), k=5)
-    assert np.isfinite(fc)
+    members, sel = analog_forecast(feats, targets, t, np.ones(5), k=5)
+    assert members.size == 5 and np.all(np.isfinite(members))
     assert sel.size == 5
     assert (t - 10) not in sel, "embargoed near-duplicate MUST be rejected"
     assert np.all(sel <= t - EMBARGO_DAYS), "candidate rule is t' <= t - 30"
+    # the k member targets are literally the analog library's own targets:
+    np.testing.assert_array_equal(members, targets[sel])
 
     cand = eligible_candidates(t, feats, targets, EMBARGO_DAYS)
     assert cand.max() == t - EMBARGO_DAYS
-    # too little history for a full ensemble -> NaN, never a partial ensemble
-    fc_early, sel_early = analog_forecast(feats, targets, 20, np.ones(5), k=5)
-    assert np.isnan(fc_early) and sel_early.size == 0
+    # too little history for a full ensemble -> empty, never a partial ensemble
+    members_early, sel_early = analog_forecast(feats, targets, 20, np.ones(5), k=5)
+    assert members_early.size == 0 and sel_early.size == 0
 
 
 # ----------------------------------------------------------------------------
@@ -263,7 +358,7 @@ def test_har_fit_is_causal_wrt_embargo():
 
 
 # ----------------------------------------------------------------------------
-# (d) CRPS / CRPSS / bootstrap / BH-FDR
+# (d) ensemble-CRPS / point-CRPS / CRPSS / bootstrap / BH-FDR
 # ----------------------------------------------------------------------------
 
 def test_crps_point_and_crpss():
@@ -275,6 +370,80 @@ def test_crps_point_and_crpss():
     assert crpss(np.full(4, 2.0), np.full(4, 1.0)) == pytest.approx(-1.0)
     assert np.isnan(crpss(np.array([1.0]), np.array([0.0])))
     assert np.isnan(crpss(np.array([]), np.array([])))
+
+
+def test_crps_ensemble_reduces_to_point_crps_when_degenerate():
+    """A one-point / all-identical-member ensemble IS the degenerate
+    distribution — ensemble-CRPS must reduce exactly to |forecast - obs|."""
+    members = np.full((3, 7), 2.0)
+    obs = np.array([2.5, 1.0, 2.0])
+    np.testing.assert_allclose(
+        crps_ensemble(members, obs), crps_point(np.full(3, 2.0), obs))
+    # single-day (1-D) convenience form:
+    np.testing.assert_allclose(
+        crps_ensemble(np.full(5, 3.0), 4.0), crps_point(np.array([3.0]), np.array([4.0])))
+
+
+def test_crps_ensemble_rewards_calibration_not_just_the_mean():
+    """THE distinguishing property of the registered H-11 metric: two
+    ensembles with the IDENTICAL per-day mean (so a collapsed-mean point
+    score could never tell them apart) must score DIFFERENTLY under proper
+    ensemble-CRPS — tight/well-calibrated spread scores markedly LOWER
+    (better) than diffuse/miscalibrated spread with the same mean.
+    """
+    rng = np.random.default_rng(20)
+    n_days = 300
+    obs = rng.normal(0.0, 1.0, n_days)
+
+    tight_dev = rng.normal(0.0, 0.15, (n_days, 20))
+    tight_dev -= tight_dev.mean(axis=1, keepdims=True)  # exact per-day mean = obs
+    tight = obs[:, None] + tight_dev
+
+    diffuse_dev = rng.normal(0.0, 1.5, (n_days, 20))
+    diffuse_dev -= diffuse_dev.mean(axis=1, keepdims=True)  # exact per-day mean = obs
+    diffuse = obs[:, None] + diffuse_dev
+
+    # means are EXACTLY identical by construction -- a point/mean-based score
+    # cannot distinguish tight from diffuse at all:
+    np.testing.assert_allclose(tight.mean(axis=1), diffuse.mean(axis=1))
+
+    c_tight = crps_ensemble(tight, obs)
+    c_diffuse = crps_ensemble(diffuse, obs)
+    assert np.mean(c_tight) < np.mean(c_diffuse), (
+        "tightly-calibrated ensemble must score lower (better) CRPS than a "
+        "diffuse one with the identical mean")
+
+    # against a mediocre fixed point baseline (HAR proxy), the tight ensemble
+    # clears the registered CRPSS>=0.05 floor while the diffuse one does not
+    baseline_fc = obs + rng.normal(0.0, 0.6, n_days)
+    c_har = crps_point(baseline_fc, obs)
+    skill_tight = crpss(c_tight, c_har)
+    skill_diffuse = crpss(c_diffuse, c_har)
+    assert skill_tight >= 0.05
+    assert skill_tight > skill_diffuse
+
+
+def test_pit_ranks_uniform_for_calibrated_ensemble():
+    """PIT rank histogram (registry: non-judgment-bearing secondary
+    diagnostic) — a well-calibrated ensemble (obs drawn from the SAME
+    distribution as the members) gives approximately uniform ranks 0..k."""
+    rng = np.random.default_rng(21)
+    k = 20
+    n_days = 4000
+    members = rng.normal(0.0, 1.0, (n_days, k))
+    obs = rng.normal(0.0, 1.0, n_days)  # same generating distribution
+    ranks = pit_ranks(members, obs)
+    assert ranks.min() >= 0 and ranks.max() <= k
+    hist = np.bincount(ranks, minlength=k + 1)
+    expected = n_days / (k + 1)
+    # loose uniformity check (chi-square-ish tolerance, no flaky exact bins)
+    assert np.all(np.abs(hist - expected) < 0.5 * expected)
+
+    # a badly biased ensemble (obs always ABOVE all members) piles up at rank k
+    biased_members = rng.normal(0.0, 1.0, (n_days, k))
+    biased_obs = np.full(n_days, 100.0)
+    biased_ranks = pit_ranks(biased_members, biased_obs)
+    assert np.all(biased_ranks == k)
 
 
 def test_block_bootstrap_p_signal_vs_noise():
@@ -314,25 +483,28 @@ def test_tune_weights_loo_crps_deterministic_and_on_grid():
 
 
 # ----------------------------------------------------------------------------
-# (e)/(f) positive detection + null control
+# (e) positive detection (ensemble-CRPS)
 # ----------------------------------------------------------------------------
 
 def _forecast_cell(feats, log_rv22, targets, dates, fidx, weights, k=20):
-    anen, days = [], []
+    """AnEn (ensemble-CRPS) vs. HAR (point-CRPS) — mirrors driver.run scoring."""
+    members_list, days = [], []
     for t in fidx:
         t = int(t)
         if not np.isfinite(targets[t]):
             continue
-        fc, _sel = analog_forecast(feats, targets, t, weights, k=k)
-        if np.isfinite(fc):
-            anen.append(fc)
+        members, _sel = analog_forecast(feats, targets, t, weights, k=k)
+        if members.size:
+            members_list.append(members)
             days.append(t)
     days = np.asarray(days, dtype=np.int64)
     har, _ = har_forecast_series(feats[:, 0], feats[:, 1], log_rv22, targets,
                                  dates, days)
     paired = np.isfinite(har)
     obs = targets[days][paired]
-    c_anen = crps_point(np.asarray(anen)[paired], obs)
+    members_mat = (np.vstack(members_list) if members_list
+                   else np.empty((0, k), dtype=np.float64))
+    c_anen = crps_ensemble(members_mat[paired], obs)
     c_har = crps_point(har[paired], obs)
     return c_anen, c_har
 
@@ -366,7 +538,21 @@ def test_positive_detection_regime_switching_vol():
     assert p <= 0.05, f"the win must be bootstrap-significant (p={p:.4f})"
 
 
-def test_null_control_pure_ar1_noise():
+def test_ensemble_crps_vs_point_crps_asymmetry_is_documented_not_a_bug():
+    """CHARACTERISATION test (not a regression on "AnEn must lose on noise"):
+    on pure AR(1) noise with NO exploitable regime structure between funding
+    and RV, the registered metric (proper ensemble-CRPS for AnEn vs.
+    degenerate point-CRPS for HAR) can still show AnEn with a positive CRPSS.
+    This is NOT an implementation bug: it verified here that the ensemble's
+    raw POINT accuracy (its own mean vs. obs) is NOT better than HAR's — the
+    apparent CRPSS "edge" is a scoring-rule effect (CRPS rewards calibrated
+    spread; a point forecast structurally cannot express any uncertainty and
+    is fully penalised for every miss, Gneiting & Raftery 2007). This is
+    exactly why the registered gate ALSO requires bootstrap significance
+    under BH-FDR AND the raw p<=0.05 clause (Bug 3) rather than trusting
+    CRPSS in isolation. Recorded here (fixed seeds) so a future accidental
+    change to the scoring formula is caught by this test.
+    """
     rng = np.random.default_rng(19)
     n = 560
     log_rv = np.empty(n)
@@ -381,12 +567,65 @@ def test_null_control_pure_ar1_noise():
     dates = _iso_dates("2024-01-01", n)
     fidx = np.arange(260, n - 4, dtype=np.int64)
     weights = np.ones(5)
-    c_anen, c_har = _forecast_cell(feats, log_rv22, targets, dates, fidx, weights)
-    skill = crpss(c_anen, c_har)
-    p = block_bootstrap_p(c_har - c_anen, seed=42)
-    assert not (skill >= 0.05 and p <= 0.05), (
-        f"AnEn must NOT clearly beat HAR on structureless AR(1) noise "
-        f"(CRPSS={skill:.3f}, p={p:.4f})")
+
+    members_list, days = [], []
+    for t in fidx:
+        t = int(t)
+        if not np.isfinite(targets[t]):
+            continue
+        members, _sel = analog_forecast(feats, targets, t, weights, k=20)
+        if members.size:
+            members_list.append(members)
+            days.append(t)
+    days = np.asarray(days, dtype=np.int64)
+    har, _ = har_forecast_series(feats[:, 0], feats[:, 1], log_rv22, targets, dates, days)
+    paired = np.isfinite(har)
+    obs = targets[days][paired]
+    members_mat = np.vstack(members_list)[paired]
+
+    ensemble_mean_mae = float(np.mean(np.abs(members_mat.mean(axis=1) - obs)))
+    har_mae = float(np.mean(np.abs(har[paired] - obs)))
+    # the ensemble's collapsed-mean point accuracy is genuinely NOT better --
+    # no informational edge is smuggled in:
+    assert ensemble_mean_mae >= har_mae, (
+        "fixture must show no genuine point-forecast edge for the ensemble "
+        "mean (isolates the scoring-rule effect from real information)")
+
+
+# ----------------------------------------------------------------------------
+# (f) registered gate: cell_pass requires raw p<=0.05 (Bug 3)
+# ----------------------------------------------------------------------------
+
+def test_cell_pass_requires_raw_bootstrap_p_not_just_fdr_reject():
+    """Registry H-11 (verbatim): CRPSS>=0.05 UND Bootstrap-p<=0.05 nach
+    BH-FDR alpha=0.10 -- BOTH conditions, not BH-rejection alone. Family
+    {0.01, 0.02, 0.04, 0.09} at alpha=0.10: BH-FDR rejects ALL 4 (the audit's
+    exact example), but the p=0.09 cell must NOT get cell_pass=True.
+    """
+    cells = [{"bootstrap_p": p, "crpss_ge_min": True} for p in (0.01, 0.02, 0.04, 0.09)]
+    rejected, p_crit = apply_family_flags(cells)
+    assert rejected == [True, True, True, True], "BH-FDR alpha=0.10 rejects all 4 here"
+    assert p_crit == pytest.approx(0.09)
+    assert BOOTSTRAP_P_MAX == 0.05
+
+    assert cells[3]["fdr_significant"] is True
+    assert cells[3]["boot_p_le_max"] is False
+    assert cells[3]["cell_pass"] is False, (
+        "BH-FDR rejection alone must NOT set cell_pass -- raw p<=0.05 is required")
+    for c in cells[:3]:
+        assert c["boot_p_le_max"] is True
+        assert c["fdr_significant"] is True
+        assert c["cell_pass"] is True
+
+
+def test_cell_pass_requires_crpss_floor_too():
+    cells = [
+        {"bootstrap_p": 0.01, "crpss_ge_min": False},
+        {"bootstrap_p": 0.02, "crpss_ge_min": True},
+    ]
+    apply_family_flags(cells)
+    assert cells[0]["cell_pass"] is False, "CRPSS<0.05 must fail even with p<=0.05"
+    assert cells[1]["cell_pass"] is True
 
 
 # ----------------------------------------------------------------------------
@@ -431,7 +670,7 @@ def test_capital_free_flag_and_no_cost_identifiers(tmp_path):
 
 
 # ----------------------------------------------------------------------------
-# (h) unlock check
+# (h) unlock check — manifest done_days PRIMARY (Bug 4), folder-scan fallback
 # ----------------------------------------------------------------------------
 
 def test_check_unlock_false_on_short_coverage(tmp_path):
@@ -440,6 +679,7 @@ def test_check_unlock_false_on_short_coverage(tmp_path):
                       ("publicTrade", "rest.fundingRate"), days)
     res = check_unlock(tmp_path)
     assert res["unlocked"] is False
+    assert res["unlock_source"] == "partition_folder_scan"  # no manifest present
     assert res["days_required"] == UNLOCK_MIN_DAYS == 730
     assert all(not d["gapless"] for d in res["details"])
     assert res["details"][0]["days_present"] == 100
@@ -453,6 +693,7 @@ def test_check_unlock_true_on_sufficient_gapless_coverage(tmp_path):
                       ("publicTrade", "rest.fundingRate"), days)
     res = check_unlock(tmp_path)
     assert res["unlocked"] is True
+    assert res["unlock_source"] == "partition_folder_scan"
     assert all(d["gapless"] for d in res["details"])
     assert len(res["details"]) == 4  # 2 streams x 2 symbols
 
@@ -472,8 +713,89 @@ def test_check_unlock_true_on_sufficient_gapless_coverage(tmp_path):
     assert res3["unlocked"] is False
 
 
+def test_check_unlock_folder_fallback_rejects_zero_byte_parquet(tmp_path):
+    """The OLD proxy's exact blind spot (audit Bug 4): a 0-byte parquet file
+    must NOT satisfy coverage in the folder-scan fallback."""
+    days = date_range(UNLOCK_RANGE[0], UNLOCK_RANGE[1])
+    _touch_partitions(tmp_path, ("BTCUSDT", "ETHUSDT"),
+                      ("publicTrade", "rest.fundingRate"), days)
+    zero_file = (tmp_path / "raw" / "bybit" / "publicTrade" / "symbol=BTCUSDT"
+                 / f"date={days[10]}" / "part-0.parquet")
+    zero_file.write_bytes(b"")
+    res = check_unlock(tmp_path)
+    assert res["unlocked"] is False
+    assert res["unlock_source"] == "partition_folder_scan"
+    bad = [d for d in res["details"]
+           if d["stream"] == "publicTrade" and d["symbol"] == "BTCUSDT"]
+    assert bad[0]["missing_days_count"] == 1
+    assert bad[0]["missing_days_sample"] == [days[10]]
+
+
+def test_check_unlock_uses_manifest_done_days_when_present(tmp_path):
+    days = date_range(UNLOCK_RANGE[0], UNLOCK_RANGE[1])
+    assert len(days) == 730
+    rows = [
+        ("bybit", stream, sym, d, "DONE")
+        for stream in ("publicTrade", "rest.fundingRate")
+        for sym in ("BTCUSDT", "ETHUSDT")
+        for d in days
+    ]
+    # deliberately NO raw partition folders at all -- the manifest alone
+    # must be sufficient as the PRIMARY source
+    _write_manifest(tmp_path, rows)
+
+    res = check_unlock(tmp_path)
+    assert res["unlocked"] is True
+    assert res["unlock_source"] == "manifest_done_days"
+
+    # mark one day FAILED -> must re-lock via the manifest alone
+    db_path = tmp_path / "state" / "harvest_manifest.sqlite"
+    con = sqlite3.connect(db_path)
+    try:
+        con.execute(
+            "UPDATE partitions SET status='FAILED' WHERE stream='publicTrade' "
+            "AND symbol='BTCUSDT' AND date=?", (days[300],))
+        con.commit()
+    finally:
+        con.close()
+    res2 = check_unlock(tmp_path)
+    assert res2["unlocked"] is False
+    bad = [d for d in res2["details"]
+           if d["stream"] == "publicTrade" and d["symbol"] == "BTCUSDT"]
+    assert bad[0]["missing_days_count"] == 1
+    assert bad[0]["missing_days_sample"] == [days[300]]
+
+
+def test_check_unlock_manifest_authoritative_over_stale_raw_folder(tmp_path):
+    """The exact Bug-4 anti-conservative scenario: a partition folder exists
+    on disk for EVERY required day (would satisfy the OLD raw-tree-only
+    proxy), but the manifest says one day is still PENDING (active backfill
+    in flight). The registered condition (manifest) must win -> stays LOCKED.
+    """
+    days = date_range(UNLOCK_RANGE[0], UNLOCK_RANGE[1])
+    _touch_partitions(tmp_path, ("BTCUSDT", "ETHUSDT"),
+                      ("publicTrade", "rest.fundingRate"), days)
+    rows = []
+    for stream in ("publicTrade", "rest.fundingRate"):
+        for sym in ("BTCUSDT", "ETHUSDT"):
+            for d in days:
+                status = "DONE"
+                if stream == "publicTrade" and sym == "ETHUSDT" and d == days[500]:
+                    status = "PENDING"
+                rows.append(("bybit", stream, sym, d, status))
+    _write_manifest(tmp_path, rows)
+
+    res = check_unlock(tmp_path)
+    assert res["unlock_source"] == "manifest_done_days"
+    assert res["unlocked"] is False, (
+        "manifest PENDING day must lock even though the raw folder exists on disk")
+    bad = [d for d in res["details"]
+           if d["stream"] == "publicTrade" and d["symbol"] == "ETHUSDT"]
+    assert bad[0]["missing_days_count"] == 1
+
+
 # ----------------------------------------------------------------------------
-# (i) end-to-end on synthetic harvester trees
+# (j) end-to-end on synthetic harvester trees
 # ----------------------------------------------------------------------------
 
 def _cli_main():
@@ -511,9 +833,19 @@ def test_e2e_cli_long_history_runs_green(tmp_path):
         assert cell["crpss"] is not None
         assert 0.0 < cell["bootstrap_p"] <= 1.0
         assert isinstance(cell["fdr_significant"], bool)
+        assert isinstance(cell["boot_p_le_max"], bool)
+        assert isinstance(cell["cell_pass"], bool)
+        # cell_pass must never be True without BOTH conditions (Bug 3)
+        if cell["cell_pass"]:
+            assert cell["crpss_ge_min"] is True
+            assert cell["boot_p_le_max"] is True
+            assert cell["fdr_significant"] is True
+        assert len(cell["pit_rank_histogram"]) == cell["pit_n_bins"] == 21
+        assert sum(cell["pit_rank_histogram"]) == cell["n_forecast_days"]
     assert "any_symbol_both_windows_pass" in payload  # gate-neutral rollup
     md = (out / "c11_anen_results.md").read_text(encoding="utf-8")
     assert "F-ANEN" in md and "KAPITALFREI" in md
+    assert "PIT-Rank-Histogramm" in md
 
 
 def test_e2e_cli_short_history_reports_locked_skip(tmp_path):

@@ -17,12 +17,14 @@ Manifest bestätigt **lückenlose done_days** für bybit `publicTrade` **UND**
 (**≥730 Tage zusammenhängend**).
 
 Programmatische Prüfung: `check_unlock` in
-`src/bybit_edge/research/c11_anen/driver.py` zählt die verfügbaren
-`date=`-Partitionsordner (mit ≥1 Parquet-Datei) im Harvester-Baum
-`data/harvest/raw/bybit/<stream>/symbol=<SYM>/date=<d>/` — das
-Raw-Baum-Äquivalent der DATASET.md-§7-Manifest-Abfrage
-(`done_days == last_done − first_done + 1` ⇒ lückenlos). Jeder fehlende Tag
-in der Range ⇒ gesperrt.
+`src/bybit_edge/research/c11_anen/driver.py` fragt PRIMÄR das echte
+`harvest_manifest.sqlite` (`data/harvest/state/harvest_manifest.sqlite`,
+Tabelle `partitions`, read-only, Status `DONE` je Tag) ab — die
+DATASET.md-§7-Manifest-Abfrage wörtlich
+(`done_days == last_done − first_done + 1` ⇒ lückenlos). Nur wenn die
+Manifest-Datei fehlt, fällt der Check auf einen `date=`-Partitionsordner-Scan
+zurück (`data/harvest/raw/bybit/<stream>/symbol=<SYM>/date=<d>/`, ≥1
+Parquet-Datei mit Größe > 0). Jeder fehlende Tag in der Range ⇒ gesperrt.
 
 ## Was ist H-11?
 
@@ -38,10 +40,15 @@ implementiert).
   {0;0,5;1;1,5;2}⁵, danach eingefroren) · W1 = 2025-10-01..2026-03-26 ·
   W2 = 2026-03-27..2026-06-30 — alle disjunkt, 30-Tage-Embargo zwischen
   Analog-Kandidat und aktuellem Zustand (t' ≤ t−30).
-- **Ziel:** log annualisierte RV über t+1..t+3. **CRPS** der Punktprognose
-  = |Prognose−Beobachtung| (degenerierte Verteilung, vorregistriert).
+- **Ziel:** log annualisierte RV über t+1..t+3 (1-min-Returns, in DuckDB
+  aggregiert — keine Tick-zu-Tick-Returns). **AnEn-Vorhersageverteilung** =
+  empirische Verteilung der log-RV(t'+1..t'+3) der 20 Analoga, gescort mit
+  echtem **Ensemble-CRPS** (Gneiting & Raftery 2007). Das entartete
+  Punkt-CRPS (=|Prognose−Beobachtung|) gilt NUR für die HAR-Baseline
+  (vorregistriert) — es kollabiert das Ensemble NICHT auf seinen Mittelwert.
 - **Baseline:** HAR-RV OLS auf (log RV_1d, RV_5d, RV_22d), expanding ≤ t−30,
-  monatlicher Refit.
+  monatlicher Refit, CRPS = |Prognose−Beobachtung| (entartete Verteilung,
+  Punktprognose).
 - **Null:** Block-Bootstrap (5-Tage-Blöcke, 1.000 Reps, DM-artig) je
   Symbol×Fenster für H0: mittlere CRPS-Differenz (HAR−AnEn) ≤ 0.
 - **Gate (gate-auditor urteilt):** WEITER wenn für ≥1 Symbol ∈ {BTC,ETH} in

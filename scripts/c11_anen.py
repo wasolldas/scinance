@@ -2,9 +2,11 @@
 """H-11 AnEn-vol-regime mess-gate driver — DATA-GATED, KAPITALFREI.
 
 Runs the pre-registered H-11 gate (AnEn k=20 vs. HAR-RV, 3-day horizon,
-CRPS = |forecast - obs|, F-ANEN BH-FDR alpha=0.10) against the read-only
-harvester Hive tree (default base ``data/harvest``). Gate-neutral output —
-the gate-auditor adjudicates. Mirrors the c06_xmr/H-05b CLI conventions.
+AnEn scored by proper ensemble CRPS of its 20-member empirical distribution,
+HAR baseline scored by the degenerate point CRPS = |forecast - obs|,
+F-ANEN BH-FDR alpha=0.10) against the read-only harvester Hive tree
+(default base ``data/harvest``). Gate-neutral output — the gate-auditor
+adjudicates. Mirrors the c06_xmr/H-05b CLI conventions.
 
 H-11 is GESPERRT (data-gated): the unlock condition (gapless bybit
 publicTrade + rest.fundingRate coverage, BTC+ETH, 2024-03-27..2026-03-26,
