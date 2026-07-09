@@ -102,6 +102,60 @@ def test_load_harvest_window_missing_raises(tmp_path: Path) -> None:
         load_harvest_window(tmp_path, "NOPE", "2026-04-15", spill_days=0)
 
 
+def _write_raw_live(tmp: Path, symbol: str, date_str: str,
+                    rows_ts: list[int | None], side_value: str = "Buy") -> None:
+    """Write a synthetic raw-form parquet in the LIVE per-trade form ($.S/$.p/$.v).
+
+    ``rows_ts`` may contain ``None`` to produce NULL ``ts_exchange_ms`` rows.
+    """
+    import duckdb
+
+    d = tmp / "raw" / "bybit" / "publicTrade" / f"symbol={symbol}" / f"date={date_str}"
+    d.mkdir(parents=True, exist_ok=True)
+    con = duckdb.connect()
+    try:
+        rows = []
+        for ts in rows_ts:
+            payload = json.dumps({"S": side_value, "p": "2500.5", "v": "0.10",
+                                  "s": symbol})
+            rows.append((ts, payload))
+        con.execute("CREATE TABLE t (ts_exchange_ms BIGINT, payload_json VARCHAR)")
+        con.executemany("INSERT INTO t VALUES (?, ?)", rows)
+        out = d / "live.parquet"
+        con.execute(f"COPY t TO '{out.as_posix()}' (FORMAT parquet)")
+    finally:
+        con.close()
+
+
+def test_load_harvest_window_live_form_respects_ts_filters(tmp_path: Path) -> None:
+    """Regression: SQL AND/OR precedence (CRITICAL_REVIEW_2026-07-09, oos.py:138).
+
+    Before the fix, ``... AND side IS NOT NULL OR S IS NOT NULL`` was parsed as
+    ``(... AND side IS NOT NULL) OR (S IS NOT NULL)``, so every LIVE-form row
+    ($.S key) bypassed BOTH the NULL-timestamp filter and the pre-registered
+    window-start filter ``ts_exchange_ms >= start_ms``. A live-form row with
+    ts < start_ms and one with ts = NULL were both wrongly returned.
+    """
+    start_ms = _midnight_ms("2026-04-15")
+    # valid in-window backfill rows
+    _write_raw_backfill(tmp_path, "ETHUSDT", "2026-04-15", 100, start_ms, side_value="Buy")
+    # LIVE-form rows in the same date partition:
+    #   one BEFORE the window start, one with NULL ts  -> both must be EXCLUDED
+    #   one at/after the window start                  -> must be INCLUDED (fallback)
+    _write_raw_live(tmp_path, "ETHUSDT", "2026-04-15",
+                    [start_ms - 1000, None, start_ms + 50], side_value="sell")
+    arr = load_harvest_window(tmp_path, "ETHUSDT", "2026-04-15", max_ticks=1000, spill_days=0)
+    assert arr.size == 101, (
+        "exactly the 100 backfill rows + 1 in-window live-form row must survive; "
+        "pre-window / NULL-ts live-form rows must be excluded"
+    )
+    assert np.isfinite(arr.ts).all(), "NULL ts must never leak into the ts array (NaN)"
+    assert (arr.ts >= start_ms).all(), "no tick before the pre-registered window start"
+    # the surviving live-form row is normalised to exactly "Sell"
+    assert int(np.sum(arr.side == "Sell")) == 1
+    assert int(np.sum(arr.side == "Buy")) == 100
+
+
 # ---------------------------------------------------------------------------
 # run_oos
 # ---------------------------------------------------------------------------

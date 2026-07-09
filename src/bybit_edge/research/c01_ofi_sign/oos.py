@@ -136,8 +136,8 @@ def load_harvest_window(
                              json_extract_string(payload_json,'$.v')) AS DOUBLE) AS volume
         FROM read_parquet({file_list}, hive_partitioning=1, union_by_name=1)
         WHERE ts_exchange_ms IS NOT NULL AND ts_exchange_ms >= {start_ms}
-          AND json_extract_string(payload_json,'$.side') IS NOT NULL
-              OR json_extract_string(payload_json,'$.S') IS NOT NULL
+          AND (json_extract_string(payload_json,'$.side') IS NOT NULL
+               OR json_extract_string(payload_json,'$.S') IS NOT NULL)
         ORDER BY ts_exchange_ms
         LIMIT {int(max_ticks)}
     """
