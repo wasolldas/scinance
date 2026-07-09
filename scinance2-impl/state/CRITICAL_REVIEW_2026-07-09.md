@@ -17,6 +17,19 @@ Dieser Bericht ist eine reine, verlustarme Verdichtung der bereits verifizierten
 Ergebnisse — es wurden keine eigenen Bewertungen, Meinungen oder zusätzlichen
 Befunde ergänzt.
 
+> **Update 2026-07-09 — Bugfix-Runde abgeschlossen:** Alle 5 Critical-Befunde
+> sind gefixt, regressionsgetestet und committed (3 parallele Fable-5-Fix-
+> Agenten, je eigenständig von mir verifiziert und committed):
+> - `recorder/recording_engine.py:620` + `recorder/storage.py:208` → Commit `d8b3f5b`
+> - `strategies/strategy1_cascade.py:297` + `layers/l4_pattern/m15_gr_omori.py:218` → Commit `3ebdc24`
+> - `research/c01_ofi_sign/oos.py:138` → Commit `c61229f` (inkl. Transparenz-Nachtrag
+>   zu GL-010/GL-011 in `gate_log.md` und DEC-23 — Verdikte selbst unverändert,
+>   siehe dort für die materielle Bewertung)
+>
+> Die 21 High- und 14 Medium-Befunde unten sind **noch offen** (keine Fix-Runde
+> angestoßen) — dokumentierter Backlog, nicht blockierend für den weiteren
+> Programmablauf.
+
 ## Zusammenfassung
 
 | Schweregrad | Anzahl |
