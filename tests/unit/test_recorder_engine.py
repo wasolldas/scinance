@@ -779,6 +779,113 @@ class TestPerSpecSubscribeAndPhantom:
 
 
 # ══════════════════════════════════════════════════════════════════════
+# 7) Housekeeping resilience (CRITICAL_REVIEW_2026-07-09,
+#    silent-failure-resource-exhaustion regression tests): a failing
+#    _maybe_flush()/cap.enforce() must NOT kill the housekeeping loop.
+# ══════════════════════════════════════════════════════════════════════
+class TestHousekeepingResilience:
+    async def test_housekeeping_survives_flush_and_enforce_errors(
+        self, tmp_path, monkeypatch: pytest.MonkeyPatch,
+        caplog: pytest.LogCaptureFixture,
+    ) -> None:
+        """Transient errors in _maybe_flush() and cap.enforce() are logged
+        with traceback and the loop keeps running: cap.enforce() MUST be
+        called again on later intervals (previously a single exception
+        killed the coroutine permanently and stop() swallowed it)."""
+        monkeypatch.setattr(engine_mod, "CAP_ENFORCE_INTERVAL_SECONDS", 0.01)
+        factory = FakeConnectFactory({"linear": [json.dumps(_rpi_frame())]})
+        engine = _make_engine(
+            tmp_path, enabled_streams=["rpi_orderbook"], ws_connect=factory
+        )
+
+        flush_calls = {"n": 0}
+        real_maybe_flush = engine._maybe_flush
+
+        def flaky_flush(stream=None):
+            if stream is None:  # only fail the housekeeping-wide flush
+                flush_calls["n"] += 1
+                if flush_calls["n"] == 1:
+                    raise OSError("simulated fs error in flush")
+            return real_maybe_flush(stream)
+
+        enforce_calls = {"n": 0}
+        real_enforce = engine.cap.enforce
+
+        def flaky_enforce():
+            enforce_calls["n"] += 1
+            if enforce_calls["n"] == 1:
+                raise OSError("simulated fs error in enforce")
+            return real_enforce()
+
+        monkeypatch.setattr(engine, "_maybe_flush", flaky_flush)
+        monkeypatch.setattr(engine.cap, "enforce", flaky_enforce)
+
+        with caplog.at_level(
+            logging.INFO, logger="bybit_edge.recorder.recording_engine"
+        ):
+            task = asyncio.create_task(engine.run())
+            # Iter 1 dies in flush, iter 2 dies in enforce; the loop must
+            # STILL reach enforce successfully on later iterations.
+            assert await _wait_for(lambda: enforce_calls["n"] >= 3)
+            await engine.stop()
+            await asyncio.wait_for(task, timeout=2.0)
+
+        assert task.exception() is None
+        assert flush_calls["n"] >= 2, "housekeeping stopped calling _maybe_flush"
+        failures = [
+            r for r in caplog.records
+            if r.levelno == logging.ERROR
+            and "Housekeeping iteration failed" in r.message
+        ]
+        assert len(failures) >= 2, "per-iteration errors were not logged"
+        # Full traceback attached (logger.exception), not just a message.
+        assert any(r.exc_info for r in failures)
+        # After recovery, telemetry logging resumed (loop fully alive).
+        assert any("Storage telemetry" in r.message for r in caplog.records)
+
+    async def test_housekeeping_alarm_after_consecutive_failures(
+        self, tmp_path, monkeypatch: pytest.MonkeyPatch,
+        caplog: pytest.LogCaptureFixture,
+    ) -> None:
+        """Persistent failures raise an escalated ALARM log once the
+        consecutive-failure threshold is reached — and the loop still keeps
+        running (it must never stop while the engine runs)."""
+        monkeypatch.setattr(engine_mod, "CAP_ENFORCE_INTERVAL_SECONDS", 0.01)
+        monkeypatch.setattr(engine_mod, "HOUSEKEEPING_ALARM_THRESHOLD", 3)
+        factory = FakeConnectFactory({"linear": [json.dumps(_rpi_frame())]})
+        engine = _make_engine(
+            tmp_path, enabled_streams=["rpi_orderbook"], ws_connect=factory
+        )
+
+        fail = {"on": True, "n": 0}
+        real_enforce = engine.cap.enforce
+
+        def failing_enforce():
+            if fail["on"]:
+                fail["n"] += 1
+                raise OSError("simulated persistent fs error")
+            return real_enforce()
+
+        monkeypatch.setattr(engine.cap, "enforce", failing_enforce)
+        with caplog.at_level(
+            logging.ERROR, logger="bybit_edge.recorder.recording_engine"
+        ):
+            task = asyncio.create_task(engine.run())
+            # Loop survives well past the alarm threshold.
+            assert await _wait_for(lambda: fail["n"] >= 5)
+            fail["on"] = False  # let shutdown's enforce succeed
+            await engine.stop()
+            await asyncio.wait_for(task, timeout=2.0)
+
+        assert task.exception() is None
+        alarms = [
+            r for r in caplog.records
+            if r.levelno == logging.ERROR and "ALARM" in r.message
+        ]
+        assert alarms, "escalated ALARM missing after consecutive failures"
+
+
+# ══════════════════════════════════════════════════════════════════════
 # Spec wiring sanity: StreamSpec names must match the storage schemas
 # ══════════════════════════════════════════════════════════════════════
 def test_default_stream_specs_cover_all_schemas() -> None:

@@ -59,6 +59,12 @@ DEFAULT_CAP_GB: float = 50.0
 DEFAULT_FLUSH_ROWS: int = 2_000
 DEFAULT_FLUSH_SECONDS: float = 10.0
 
+# If flushes keep failing, the in-memory buffer is retained for retry (rows
+# are NEVER silently discarded) but it grows unboundedly. Once it exceeds
+# this multiple of ``flush_rows`` an escalated alarm is logged every flush
+# attempt so the operator sees the memory-growth risk long before OOM.
+BUFFER_ALARM_FACTOR: int = 10
+
 
 # ══════════════════════════════════════════════════════════════════════
 # Explicit per-stream pyarrow schemas
@@ -178,6 +184,7 @@ class ParquetStreamWriter:
         self._seg_counter: int = 0
         self.rows_written: int = 0
         self.segments_written: int = 0
+        self.flush_failures: int = 0
 
     # ------------------------------------------------------------------
     def append(self, row: dict[str, Any]) -> None:
@@ -194,45 +201,79 @@ class ParquetStreamWriter:
         return (now - self._last_flush) >= self.flush_seconds
 
     def flush(self) -> Optional[Path]:
-        """Write the buffer to a new Parquet segment and clear it.
+        """Write the buffer to a new Parquet segment, then clear it.
 
-        Returns the written segment path, or ``None`` if the buffer was empty.
-        Rows are projected onto the explicit schema (missing columns -> null,
-        unknown columns dropped) so a malformed payload can never corrupt the
-        column layout.
+        Returns the written segment path, or ``None`` if the buffer was empty
+        or the write failed. Rows are projected onto the explicit schema
+        (missing columns -> null, unknown columns dropped) so a malformed
+        payload can never corrupt the column layout.
+
+        Failure semantics (CRITICAL_REVIEW_2026-07-09, data-loss-write-
+        ordering): the buffer is cleared only AFTER ``pq.write_table``
+        succeeded. If any step of the write path fails, the rows stay
+        buffered for a retry on the next flush call, an ERROR naming the
+        number of at-risk rows is logged, and the exception is contained
+        here — it must not escape into the WS transport loop (where it would
+        masquerade as a connection loss) or abort the writer-close loop in
+        ``RecordingEngine.stop()``.
         """
         if not self._buffer:
             return None
 
+        # Snapshot — the buffer is only cleared after a successful write.
         rows = self._buffer
-        self._buffer = []
 
-        # Build columnar arrays strictly from the declared schema.
-        columns: dict[str, list[Any]] = {f.name: [] for f in self.schema}
-        for row in rows:
-            for name in columns:
-                columns[name].append(row.get(name))
-        table = pa.table(columns, schema=self.schema)
+        try:
+            # Build columnar arrays strictly from the declared schema.
+            columns: dict[str, list[Any]] = {f.name: [] for f in self.schema}
+            for row in rows:
+                for name in columns:
+                    columns[name].append(row.get(name))
+            table = pa.table(columns, schema=self.schema)
 
-        recv_ts = time.time()
-        # Partition by the UTC date of the *first* row's recv_ts if present,
-        # else by the flush wall-clock — keeps a segment inside one date dir.
-        anchor = rows[0].get("recv_ts") or recv_ts
-        date_dir = self.root / self.stream / _utc_date(anchor)
-        date_dir.mkdir(parents=True, exist_ok=True)
+            recv_ts = time.time()
+            # Partition by the UTC date of the *first* row's recv_ts if
+            # present, else by the flush wall-clock — keeps a segment inside
+            # one date dir.
+            anchor = rows[0].get("recv_ts") or recv_ts
+            date_dir = self.root / self.stream / _utc_date(anchor)
+            date_dir.mkdir(parents=True, exist_ok=True)
 
-        self._seg_counter += 1
-        seg_path = date_dir / f"seg-{int(recv_ts * 1000)}-{self._seg_counter}.parquet"
+            self._seg_counter += 1
+            seg_path = (
+                date_dir / f"seg-{int(recv_ts * 1000)}-{self._seg_counter}.parquet"
+            )
 
-        metadata = {
-            b"stream": self.stream.encode(),
-            b"schema_version": str(SCHEMA_VERSION).encode(),
-            b"written_recv_ts": str(recv_ts).encode(),
-            b"row_count": str(table.num_rows).encode(),
-        }
-        table = table.replace_schema_metadata(metadata)
-        pq.write_table(table, seg_path, compression=self.compression)
+            metadata = {
+                b"stream": self.stream.encode(),
+                b"schema_version": str(SCHEMA_VERSION).encode(),
+                b"written_recv_ts": str(recv_ts).encode(),
+                b"row_count": str(table.num_rows).encode(),
+            }
+            table = table.replace_schema_metadata(metadata)
+            pq.write_table(table, seg_path, compression=self.compression)
+        except Exception:
+            self.flush_failures += 1
+            logger.exception(
+                "[%s] flush FAILED — %d buffered row(s) retained for retry "
+                "on the next flush (failure #%d)",
+                self.stream, len(rows), self.flush_failures,
+            )
+            if len(self._buffer) > BUFFER_ALARM_FACTOR * self.flush_rows:
+                logger.error(
+                    "ALARM: [%s] retry buffer holds %d rows (> %d x "
+                    "flush_rows=%d) after repeated flush failures — memory "
+                    "keeps growing until a flush succeeds; rows are never "
+                    "silently discarded.",
+                    self.stream, len(self._buffer),
+                    BUFFER_ALARM_FACTOR, self.flush_rows,
+                )
+            return None
 
+        # Success: drop exactly the rows that were written. (flush() is
+        # synchronous, so normally self._buffer is rows — the slice keeps
+        # this correct even if appends ever interleave with a flush.)
+        self._buffer = self._buffer[len(rows):]
         self.rows_written += table.num_rows
         self.segments_written += 1
         self._last_flush = recv_ts
@@ -243,7 +284,13 @@ class ParquetStreamWriter:
 
     def close(self) -> Optional[Path]:
         """Flush any remaining buffered rows (graceful shutdown)."""
-        return self.flush()
+        seg = self.flush()
+        if self._buffer:
+            logger.error(
+                "[%s] close(): %d buffered row(s) could NOT be persisted "
+                "(final flush failed)", self.stream, len(self._buffer),
+            )
+        return seg
 
 
 # ══════════════════════════════════════════════════════════════════════

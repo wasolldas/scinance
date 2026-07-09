@@ -22,7 +22,9 @@ import pytest
 
 from bybit_edge.config import DATA_DIR
 from bybit_edge.recorder.recording_engine import RecordingEngine
+import bybit_edge.recorder.storage as storage_mod
 from bybit_edge.recorder.storage import (
+    BUFFER_ALARM_FACTOR,
     RECORDING_ROOT,
     SCHEMA_VERSION,
     STREAM_SCHEMAS,
@@ -97,6 +99,125 @@ class TestParquetWriter:
         assert writer.flush() is None
         assert writer.close() is None
         assert list(tmp_path.rglob("*.parquet")) == []
+
+
+# ══════════════════════════════════════════════════════════════════════
+# 5b) Flush failure: buffer retained for retry, NEVER cleared before the
+#     Parquet segment is durably written (CRITICAL_REVIEW_2026-07-09,
+#     data-loss-write-ordering regression tests)
+# ══════════════════════════════════════════════════════════════════════
+class TestFlushFailureRetainsBuffer:
+    def test_failed_write_table_keeps_buffer_and_logs_row_count(
+        self, tmp_path, monkeypatch: pytest.MonkeyPatch,
+        caplog: pytest.LogCaptureFixture,
+    ) -> None:
+        """A failing pq.write_table must NOT clear the buffer: the rows stay
+        for retry, an ERROR names the affected row count, and the exception
+        does not escape (it would destabilise the calling WS loop)."""
+        writer = ParquetStreamWriter("insurance_pool", root=tmp_path)
+        writer.append(_insurance_row())
+        writer.append(_insurance_row(ts=1718000001000))
+
+        def boom(*args, **kwargs):
+            raise OSError("simulated transient disk error")
+
+        monkeypatch.setattr(storage_mod.pq, "write_table", boom)
+        with caplog.at_level(logging.ERROR, logger="bybit_edge.recorder.storage"):
+            seg = writer.flush()  # must not raise
+
+        assert seg is None
+        assert len(writer._buffer) == 2, "rows were discarded on failed write"
+        assert writer.rows_written == 0
+        assert writer.segments_written == 0
+        assert writer.flush_failures == 1
+        assert list(tmp_path.rglob("*.parquet")) == []
+        errs = [r for r in caplog.records if r.levelno == logging.ERROR]
+        assert any(
+            "2 buffered row" in r.getMessage() and "retained for retry" in r.getMessage()
+            for r in errs
+        ), "ERROR log must name the number of at-risk rows"
+
+    def test_rows_survive_failed_flush_and_land_in_next_successful_one(
+        self, tmp_path, monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """First flush fails (transient), second succeeds: BOTH original rows
+        plus a newly appended one must be in the written segment."""
+        writer = ParquetStreamWriter("insurance_pool", root=tmp_path)
+        writer.append(_insurance_row())
+        writer.append(_insurance_row(ts=1718000001000))
+
+        real_write = storage_mod.pq.write_table
+        calls = {"n": 0}
+
+        def flaky(table, path, **kwargs):
+            calls["n"] += 1
+            if calls["n"] == 1:
+                raise OSError("simulated transient disk error")
+            return real_write(table, path, **kwargs)
+
+        monkeypatch.setattr(storage_mod.pq, "write_table", flaky)
+        assert writer.flush() is None            # transient failure
+        writer.append(_insurance_row(ts=1718000002000))  # new data keeps coming
+        seg = writer.flush()                      # retry succeeds
+
+        assert seg is not None and seg.exists()
+        table = pq.read_table(seg)
+        assert table.num_rows == 3, "retained rows missing after retry"
+        assert sorted(table.column("ts").to_pylist()) == [
+            1718000000000, 1718000001000, 1718000002000,
+        ]
+        assert writer._buffer == []
+        assert writer.rows_written == 3
+        assert writer.flush_failures == 1
+
+    def test_repeated_failures_alarm_but_never_drop_rows(
+        self, tmp_path, monkeypatch: pytest.MonkeyPatch,
+        caplog: pytest.LogCaptureFixture,
+    ) -> None:
+        """Unbounded buffer growth under persistent failure is alarmed
+        (ERROR) once the buffer exceeds BUFFER_ALARM_FACTOR x flush_rows —
+        but rows are never silently discarded."""
+        writer = ParquetStreamWriter(
+            "insurance_pool", root=tmp_path, flush_rows=2, flush_seconds=0.0
+        )
+
+        def boom(*args, **kwargs):
+            raise OSError("simulated persistent disk error")
+
+        monkeypatch.setattr(storage_mod.pq, "write_table", boom)
+        n_rows = BUFFER_ALARM_FACTOR * writer.flush_rows + 1
+        with caplog.at_level(logging.ERROR, logger="bybit_edge.recorder.storage"):
+            for i in range(n_rows):
+                writer.append(_insurance_row(ts=1718000000000 + i))
+                if writer.should_flush():
+                    writer.flush()
+
+        assert len(writer._buffer) == n_rows, "rows must never be dropped"
+        alarms = [
+            r for r in caplog.records
+            if r.levelno == logging.ERROR and "ALARM" in r.getMessage()
+        ]
+        assert alarms, "buffer-growth ALARM was not logged"
+
+    def test_close_logs_error_when_final_flush_fails(
+        self, tmp_path, monkeypatch: pytest.MonkeyPatch,
+        caplog: pytest.LogCaptureFixture,
+    ) -> None:
+        """close() must not raise on a failing final flush and must log the
+        unpersisted row count (shutdown data-loss visibility)."""
+        writer = ParquetStreamWriter("insurance_pool", root=tmp_path)
+        writer.append(_insurance_row())
+
+        def boom(*args, **kwargs):
+            raise OSError("simulated disk error at shutdown")
+
+        monkeypatch.setattr(storage_mod.pq, "write_table", boom)
+        with caplog.at_level(logging.ERROR, logger="bybit_edge.recorder.storage"):
+            assert writer.close() is None  # must not raise
+        assert any(
+            "could NOT be persisted" in r.getMessage()
+            for r in caplog.records if r.levelno == logging.ERROR
+        )
 
 
 # ══════════════════════════════════════════════════════════════════════

@@ -63,6 +63,12 @@ REST_PREMIUM_INDEX_KLINE: str = "/v5/market/premium-index-price-kline"
 # How often the storage cap is enforced and telemetry is logged (seconds).
 CAP_ENFORCE_INTERVAL_SECONDS: float = 30.0
 
+# After this many CONSECUTIVE housekeeping failures an escalated alarm is
+# logged (the loop itself never stops while the engine is running — a dead
+# housekeeping task would silently disable the storage cap while the WS
+# transports keep writing, until the disk fills up).
+HOUSEKEEPING_ALARM_THRESHOLD: int = 5
+
 # Application-level heartbeat ({"op": "ping"}) interval per Bybit v5 docs
 # (recommended every 20 s). The OPTION public WS does NOT answer RFC-6455
 # protocol pings — the T3/T2 runs of 2026-06-11/12 show the client itself
@@ -612,14 +618,42 @@ class RecordingEngine:
     # Storage-cap / flush housekeeping loop
     # ------------------------------------------------------------------
     async def _run_housekeeping(self) -> None:
+        # The loop body is guarded PER ITERATION: a single transient error
+        # (e.g. filesystem hiccup during flush or cap enforcement) must never
+        # kill this coroutine permanently — that would silently stop the
+        # ring-buffer storage cap while the WS transports keep recording,
+        # until the disk fills up (CRITICAL_REVIEW_2026-07-09, lane
+        # collector-recorder). Errors are logged with full traceback and the
+        # loop keeps running as long as the engine runs.
+        consecutive_failures = 0
         while self._running:
             try:
                 await asyncio.sleep(CAP_ENFORCE_INTERVAL_SECONDS)
             except asyncio.CancelledError:
                 raise
-            self._maybe_flush()
-            self.cap.enforce()
-            logger.info("Storage telemetry: %s", self.cap.usage_report())
+            try:
+                self._maybe_flush()
+                self.cap.enforce()
+                logger.info("Storage telemetry: %s", self.cap.usage_report())
+            except asyncio.CancelledError:
+                raise
+            except Exception:
+                consecutive_failures += 1
+                logger.exception(
+                    "Housekeeping iteration failed (%d consecutive failure(s))"
+                    " — flush/cap-enforce will be retried next interval.",
+                    consecutive_failures,
+                )
+                if consecutive_failures >= HOUSEKEEPING_ALARM_THRESHOLD:
+                    logger.error(
+                        "ALARM: housekeeping has failed %d times in a row — "
+                        "storage cap and flush may be ineffective; check disk "
+                        "space/permissions under %s.",
+                        consecutive_failures,
+                        self.cap.root,
+                    )
+            else:
+                consecutive_failures = 0
 
     # ------------------------------------------------------------------
     # Lifecycle
@@ -697,8 +731,13 @@ class RecordingEngine:
         for task in self._tasks:
             try:
                 await task
-            except (asyncio.CancelledError, Exception):
+            except asyncio.CancelledError:
                 pass
+            except Exception:
+                # Never abort shutdown, but never swallow silently either:
+                # a stored task exception is the only evidence that a loop
+                # died before stop() was called.
+                logger.exception("Recorder task ended with an unexpected error")
         self._tasks = []
         for writer in self.writers.values():
             writer.close()
