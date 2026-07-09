@@ -210,6 +210,126 @@ class TestStrategy1CascadeDetector:
         assert result["reason"] == "rho_decay"
         assert strat.in_trade is False
 
+    # ------------------------------------------------------------------
+    # Regression: causality-wallclock-in-replay (CRITICAL_REVIEW 2026-07-09)
+    #
+    # The Omori-decay exit previously computed
+    # ``elapsed = time.time() - mainshock_ts``. In a historical replay
+    # ``mainshock_ts`` is event time weeks/months in the past, so elapsed
+    # was always ~1e5..1e7 s and EVERY replayed S1 position force-closed
+    # ("omori_decay") on the very first in-trade tick. The exit must use
+    # the simulation clock ``current_ts`` instead.
+    # ------------------------------------------------------------------
+
+    @staticmethod
+    def _replay_module_mocks(strat, mainshock_ts: float):
+        """Module-output mocks for an in-trade replay tick.
+
+        rho stays above the exit threshold and OI recovery is kept below
+        95%, so the ONLY exit that can fire is the Omori-decay exit.
+        """
+        m14 = {
+            "branching_ratio": 0.90,  # above S1_RHO_EXIT=0.5 -> no rho exit
+            "intensity": 5.0, "mu": 0.1, "alpha": 0.9, "beta": 1.0,
+            "critical": True, "signal": 1,
+            "method_id": "M14", "confidence": 0.9, "ts": time.time(),
+        }
+        m15 = {
+            "b_value": 0.4, "b_low": True, "mainshock": True,
+            "mainshock_ts": mainshock_ts,  # HISTORICAL event time
+            "omori_active": True, "aftershock_rate": 2.0,
+            # c=5.0 -> Omori decay threshold = S1_OMORI_DECAY_FACTOR*c = 25 s
+            "omori_params": {"K": 10.0, "c": 5.0, "p": 1.0},
+            "signal": 1, "method_id": "M15", "confidence": 0.8,
+            "ts": time.time(),
+        }
+        m26 = {
+            "signal": 1, "r0": 1.5, "beta": 0.01, "gamma": 0.1,
+            "s_current": 1000, "i_current": 10, "peak_i_forecast": 50,
+            "cascade_risk": True, "method_id": "M26", "confidence": 0.7,
+            "ts": time.time(),
+        }
+        m25 = {
+            "signal": 0, "kyle_lambda": 0.1, "lambda_q95": 0.5,
+            "toxic_flow": False, "method_id": "M25", "confidence": 0.0,
+            "ts": time.time(),
+        }
+        return (
+            patch.object(strat.m14, "compute", return_value=m14),
+            patch.object(strat.m15, "compute", return_value=m15),
+            patch.object(strat.m26, "compute", return_value=m26),
+            patch.object(strat.m25, "compute", return_value=m25),
+        )
+
+    def test_s1_replay_historical_mainshock_no_instant_omori_exit(self) -> None:
+        """Replay with a mainshock_ts far in the past must NOT exit while the
+        SIMULATED elapsed time is still inside the Omori decay threshold.
+
+        mainshock_ts is ~2023 event time; wall clock today is >1e8 s later.
+        With the wall-clock bug, elapsed = time.time() - mainshock_ts would
+        exceed 25 s (=5*c) by orders of magnitude and force an immediate
+        "omori_decay" exit. With the fix, elapsed = current_ts - mainshock_ts
+        = 10 s < 25 s -> the position is held.
+        """
+        historical_mainshock_ts = 1_700_000_000.0  # 2023-11-14, weeks+ in the past
+        current_ts = historical_mainshock_ts + 10.0  # simulated: 10 s after shock
+
+        strat = Strategy1CascadeDetector()
+        strat._in_trade = True
+        strat._entry_direction = 1
+        strat._entry_ts = historical_mainshock_ts + 5.0
+        strat._pre_cascade_oi = 20000.0  # OI 10000/20000 = 50% -> no oi_recovery
+
+        p14, p15, p26, p25 = self._replay_module_mocks(
+            strat, historical_mainshock_ts
+        )
+        with p14, p15, p26, p25:
+            result = strat.on_data(
+                liq_events=_make_liq_events(5),
+                event_times=_make_event_times(5),
+                open_interest=10000.0,
+                trades=_make_trades(5),
+                current_ts=current_ts,
+                liq_side="Long",
+            )
+
+        assert result["action"] != "exit", (
+            f"S1 must NOT exit at simulated t=10s < 25s decay threshold "
+            f"(got action={result['action']}, reason={result['reason']}); "
+            f"an exit here means wall-clock time leaked into the replay path"
+        )
+        assert strat.in_trade is True
+
+    def test_s1_replay_omori_exit_fires_on_simulated_elapsed(self) -> None:
+        """The Omori-decay exit must still fire once SIMULATED elapsed time
+        exceeds S1_OMORI_DECAY_FACTOR * c (here 25 s), proving the exit logic
+        runs on the simulation clock rather than being disabled."""
+        historical_mainshock_ts = 1_700_000_000.0
+        current_ts = historical_mainshock_ts + 30.0  # 30 s > 25 s threshold
+
+        strat = Strategy1CascadeDetector()
+        strat._in_trade = True
+        strat._entry_direction = 1
+        strat._entry_ts = historical_mainshock_ts + 5.0
+        strat._pre_cascade_oi = 20000.0
+
+        p14, p15, p26, p25 = self._replay_module_mocks(
+            strat, historical_mainshock_ts
+        )
+        with p14, p15, p26, p25:
+            result = strat.on_data(
+                liq_events=_make_liq_events(5),
+                event_times=_make_event_times(5),
+                open_interest=10000.0,
+                trades=_make_trades(5),
+                current_ts=current_ts,
+                liq_side="Long",
+            )
+
+        assert result["action"] == "exit"
+        assert result["reason"] == "omori_decay"
+        assert strat.in_trade is False
+
 
 # ═══════════════════════════════════════════════════════════════════
 # Strategy 2: Entropie-Momentum

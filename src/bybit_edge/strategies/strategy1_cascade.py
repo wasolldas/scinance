@@ -28,7 +28,6 @@ Edge: Mean-Reversion nach Liquidations-Klimax.
 from __future__ import annotations
 
 import json
-import time
 from collections import deque
 from pathlib import Path
 from typing import Any
@@ -119,8 +118,6 @@ class Strategy1CascadeDetector:
         -------
         dict with action, direction, price, strategy, modules, reason.
         """
-        now: float = time.time()
-
         # ----------------------------------------------------------
         # 1. Compute all module outputs
         # ----------------------------------------------------------
@@ -152,7 +149,7 @@ class Strategy1CascadeDetector:
         # ----------------------------------------------------------
         if self._in_trade:
             exit_reason: str | None = self._check_exit(
-                m14_out, m15_out, open_interest
+                m14_out, m15_out, open_interest, current_ts
             )
             if exit_reason is not None:
                 direction_was: int = self._entry_direction
@@ -184,7 +181,9 @@ class Strategy1CascadeDetector:
                 direction: int = 1 if liq_side == "Long" else -1
                 self._in_trade = True
                 self._entry_direction = direction
-                self._entry_ts = now
+                # Event time, not wall clock: in replay this is the simulated
+                # tick time; live it equals time.time() (behaviour-neutral).
+                self._entry_ts = current_ts
                 self._pre_cascade_oi = open_interest
                 return {
                     "action": "enter",
@@ -282,8 +281,13 @@ class Strategy1CascadeDetector:
         m14_out: dict[str, Any],
         m15_out: dict[str, Any],
         open_interest: float,
+        current_ts: float,
     ) -> str | None:
-        """Evaluate exit conditions."""
+        """Evaluate exit conditions.
+
+        ``current_ts`` is the CURRENT EVENT TIME (seconds) as passed to
+        ``on_data`` — the simulation clock in replay, wall clock live.
+        """
         rho: float = m14_out["branching_ratio"]
 
         # Exit 1: rho < 0.5
@@ -291,10 +295,19 @@ class Strategy1CascadeDetector:
             return "rho_decay"
 
         # Exit 2: Omori decay phase (t > 5*c)
+        #
+        # BUGFIX (2026-07-09, CRITICAL_REVIEW causality-wallclock-in-replay):
+        # elapsed was previously computed as ``time.time() - mainshock_ts``.
+        # In historical replays ``mainshock_ts`` is event time weeks/months in
+        # the past while ``time.time()`` is the real wall clock, so elapsed was
+        # always huge (~1e5..1e7 s) and every replayed S1 position was force-
+        # closed on the very first in-trade tick ("omori_decay"). Using the
+        # caller-supplied ``current_ts`` is correct in BOTH contexts: replay
+        # (simulation time) and live (current_ts ~= time.time()).
         omori_params = m15_out.get("omori_params")
         if omori_params is not None and m15_out.get("mainshock_ts") is not None:
             c_val: float = omori_params.get("c", 1.0)
-            elapsed: float = time.time() - m15_out["mainshock_ts"]
+            elapsed: float = current_ts - m15_out["mainshock_ts"]
             if elapsed > S1_OMORI_DECAY_FACTOR * c_val:
                 return "omori_decay"
 

@@ -361,6 +361,152 @@ class TestNoOptimizeWarningLeaks:
         assert {"K", "c", "p"} == set(result.keys())
 
 
+class TestOverlappingWindowDedup:
+    """Regression: data-corruption via re-sent rolling windows (2026-07-09).
+
+    Both real callers (replay_backtester, live_runner) pass the FULL rolling
+    1h window from ``liq_buffer.recent_by_ts(3600)`` on EVERY tick. Before
+    the dedup fix each event was re-appended to the 24h buffer per tick, so
+    b-value / Q99 / Omori statistics were computed on a massively duplicated
+    multiset and real 24h history was evicted from the bounded deque.
+    """
+
+    @staticmethod
+    def _window_events(
+        n: int, base_ts_ms: int, usd_range=(1_000.0, 50_000.0), seed: int = 7
+    ) -> list[dict]:
+        """n unique events spread over the hour before base_ts_ms."""
+        rng = np.random.default_rng(seed)
+        events = []
+        for i in range(n):
+            events.append(_make_liq_event(
+                base_ts_ms - 3_600_000 + i * (3_600_000 // n),
+                float(rng.uniform(*usd_range)),
+            ))
+        return events
+
+    def test_refeeding_same_window_does_not_grow_buffer(self) -> None:
+        """Feeding the identical 1h window over many ticks must keep the
+        internal buffer at the number of UNIQUE events (no duplication)."""
+        now = 1_700_000_000.0
+        window = self._window_events(200, int(now * 1000))
+
+        m = M15GROmori(min_events=50)
+        for k in range(25):
+            m.compute(window, now + k)  # full window re-sent every tick
+
+        assert len(m._event_buffer) == len(window), (
+            f"Buffer holds {len(m._event_buffer)} entries for "
+            f"{len(window)} unique events — duplication across ticks"
+        )
+
+    def test_stats_stable_across_overlapping_ticks(self) -> None:
+        """b_value under SLIDING overlapping windows must equal a delta-fed
+        reference on every tick.
+
+        Sliding windows (one new event per tick, 199 re-sent) are what the
+        real callers produce. Without dedup, older events are re-appended
+        once per tick, so the duplication weights differ across events and
+        the (weight-sensitive) Aki b-value diverges from the true value.
+        """
+        now = 1_700_000_000.0
+        n_window = 200
+        n_ticks = 30
+        # Enough uniquely-timestamped events for the initial window plus one
+        # genuinely new event per subsequent tick.
+        all_events = self._window_events(
+            n_window + n_ticks, int((now + n_ticks) * 1000)
+        )
+
+        # Reference: documented delta semantics (each event exactly once).
+        ref = M15GROmori(min_events=50)
+        # Overlapping-window module: full window re-sent, sliding by 1.
+        m = M15GROmori(min_events=50)
+
+        ref.compute(all_events[:n_window], now)
+        m.compute(all_events[:n_window], now)
+
+        for k in range(1, n_ticks + 1):
+            ts = now + k
+            ref_out = ref.compute([all_events[n_window + k - 1]], ts)
+            out = m.compute(all_events[k : n_window + k], ts)
+            assert ref_out["b_value"] is not None
+            assert out["b_value"] == pytest.approx(
+                ref_out["b_value"], rel=1e-12
+            ), (
+                f"tick {k}: b_value {out['b_value']} diverged from delta-fed "
+                f"reference {ref_out['b_value']} — duplicated events skewed "
+                f"the Aki estimator"
+            )
+
+    def test_refed_window_does_not_evict_24h_history(self) -> None:
+        """Re-sent 1h windows must not displace genuine older 24h history
+        from the bounded deque."""
+        now = 1_700_000_000.0
+        # 100 genuine events ~23h old.
+        old_events = self._window_events(
+            100, int((now - 23 * 3600) * 1000), seed=3
+        )
+        window = self._window_events(200, int(now * 1000))
+
+        m = M15GROmori(min_events=50)
+        m.compute(old_events, now - 23 * 3600)
+        for k in range(50):
+            m.compute(window, now + k)
+
+        assert len(m._event_buffer) == len(old_events) + len(window)
+        # The old events must still be present (nothing was evicted).
+        oldest_ts = min(ts for ts, _ in m._event_buffer)
+        assert oldest_ts == old_events[0]["timestamp_ms"]
+
+    def test_mainshock_and_omori_stable_under_refeeding(self) -> None:
+        """A cascade window (mainshock + aftershocks) re-sent per tick must
+        keep aftershock_rate consistent with a delta-fed reference — the
+        Omori fit must not be inflated by duplicated aftershock counts."""
+        rng = np.random.default_rng(11)
+        base_ms = 1_700_000_000_000
+        events: list[dict] = []
+        for i in range(80):
+            events.append(_make_liq_event(
+                base_ms + i * 1000,
+                1.0e5 + float(abs(rng.normal(0, 3e4))),
+            ))
+        mainshock_ms = base_ms + 80 * 1000
+        events.append(_make_liq_event(mainshock_ms, 5.0e7))
+        for j in range(60):
+            events.append(_make_liq_event(
+                mainshock_ms + (j + 1) * 1000,
+                2.0e5 + float(abs(rng.normal(0, 1e5))),
+            ))
+
+        eval_ts = (mainshock_ms + 61_000) / 1000.0
+
+        # Delta-fed reference: one shot, then empty ticks.
+        ref = M15GROmori(min_events=50)
+        ref.compute(events, eval_ts)
+        ref_out = ref.compute([], eval_ts + 5)
+
+        # Full-window re-feeding, same timestamps.
+        m = M15GROmori(min_events=50)
+        m.compute(events, eval_ts)
+        out = None
+        for k in range(1, 6):
+            out = m.compute(events, eval_ts + k)  # window re-sent per tick
+
+        assert out is not None
+        assert m._mainshock_ts == ref._mainshock_ts
+        assert len(m._event_buffer) == len(events), (
+            "Cascade events were duplicated across ticks"
+        )
+        # aftershock_rate at the same event time must match the delta-fed
+        # reference (duplicated aftershocks would inflate the Omori K).
+        final = m.compute([], eval_ts + 5)
+        assert final["aftershock_rate"] == pytest.approx(
+            ref_out["aftershock_rate"], rel=1e-6, abs=1e-9
+        )
+        assert final["omori_active"] == ref_out["omori_active"]
+
+
 class TestSignalLogic:
     """Signal should be 1 only when mainshock AND omori_active."""
 

@@ -88,6 +88,29 @@ class M15GROmori(BaseModule):
             maxlen=_EVENT_BUFFER_MAXLEN
         )
 
+        # Deduplication bookkeeping (BUGFIX 2026-07-09, CRITICAL_REVIEW
+        # data-corruption): the docstring of ``compute`` promises delta
+        # semantics ("new liquidation events"), but both real callers
+        # (replay_backtester and live_runner) pass the FULL rolling 1h window
+        # from ``liq_buffer.recent_by_ts(3600)`` on EVERY tick. Without dedup
+        # each event was re-appended per tick, so the "24h" buffer was a
+        # massively duplicated multiset of the most recent window and every
+        # M15 statistic (Aki b-value, Q99 mainshock threshold, Omori
+        # aftershock rate) was corrupted. We dedup INSIDE M15 (rather than
+        # fixing the callers to pass deltas) so the module stays correct
+        # regardless of caller discipline: overlapping windows, deltas, and
+        # mixed usage are all handled. Dedup key is
+        # (timestamp_ms, usd_value, side) — callers provide no event id; a
+        # collision would require two distinct liquidations in the same
+        # millisecond with identical USD value AND side, which is negligible
+        # compared to the per-tick full-window duplication this fixes.
+        # ``_event_keys`` mirrors ``_event_buffer`` index-for-index so evicted
+        # entries can be removed from the ``_seen_keys`` set.
+        self._event_keys: deque[tuple[int, float, Any]] = deque(
+            maxlen=_EVENT_BUFFER_MAXLEN
+        )
+        self._seen_keys: set[tuple[int, float, Any]] = set()
+
         # Mainshock state
         self._mainshock_ts: float | None = None
         self._mainshock_usd: float = 0.0
@@ -199,8 +222,11 @@ class M15GROmori(BaseModule):
         Parameters
         ----------
         liq_events : list[dict]
-            New liquidation events, each with keys:
+            Liquidation events, each with keys:
             ``timestamp_ms`` (int), ``usd_value`` (float), ``side`` (str).
+            May be a delta (only new events) OR an overlapping rolling
+            window re-sent every tick — events already ingested are
+            deduplicated internally and ignored (see __init__).
         current_ts : float
             Current timestamp in seconds (time.time()-compatible).
 
@@ -210,12 +236,27 @@ class M15GROmori(BaseModule):
         aftershock_rate, omori_params, signal, method_id, confidence, ts.
         """
         # ----------------------------------------------------------
-        # 1. Ingest new events
+        # 1. Ingest new events (with dedup — see __init__ for rationale).
+        #    Callers may pass overlapping rolling windows per tick; only
+        #    events not seen before are appended to the 24h buffer, and
+        #    only those genuinely-new events participate in mainshock
+        #    detection below (restoring the documented delta semantics).
         # ----------------------------------------------------------
+        new_events: list[dict[str, Any]] = []
         for ev in liq_events:
             ts_ms: int = int(ev["timestamp_ms"])
             usd: float = float(ev["usd_value"])
+            key = (ts_ms, usd, ev.get("side"))
+            if key in self._seen_keys:
+                continue
+            if len(self._event_buffer) == _EVENT_BUFFER_MAXLEN:
+                # Explicit eviction keeps _seen_keys in sync with the deque.
+                self._event_buffer.popleft()
+                self._seen_keys.discard(self._event_keys.popleft())
             self._event_buffer.append((ts_ms, usd))
+            self._event_keys.append(key)
+            self._seen_keys.add(key)
+            new_events.append(ev)
 
         # ----------------------------------------------------------
         # 2. Filter to last 24h
@@ -275,8 +316,10 @@ class M15GROmori(BaseModule):
             # over ALL recent usd values, including any non-positive ones).
             q99 = float(np.quantile(recent_usd, self._mainshock_quantile))
 
-            # Check new events only (from liq_events)
-            for ev in liq_events:
+            # Check genuinely-new events only (deduped in step 1). Previously
+            # this iterated the raw ``liq_events``, which with full-window
+            # callers re-tested every old event against Q99 on every tick.
+            for ev in new_events:
                 ev_usd = float(ev["usd_value"])
                 if ev_usd > q99:
                     mainshock = True
@@ -413,3 +456,5 @@ class M15GROmori(BaseModule):
         self._omori_params = None
         self._last_fit_ts = None
         self._event_buffer.clear()
+        self._event_keys.clear()
+        self._seen_keys.clear()
