@@ -19,17 +19,17 @@
 # echtes CUDA-Device ist NIEMALS verdikt-tragend.
 #
 # **EXTREME LAUFZEIT (~226 volle Trainings, ~2-3 GPU-Tage auf RTX 5060 Ti)
-# — DIESER RUNNER IST RESUME-FAEHIG.** Jedes abgeschlossene Training
+# - DIESER RUNNER IST RESUME-FAEHIG.** Jedes abgeschlossene Training
 # (1 Vollmodell + 12 Ablationen + ~100 Nullen, je Fenster) schreibt SOFORT
 # einen eigenen Checkpoint (atomic write) nach einem STABILEN, NICHT
 # zeitgestempelten Verzeichnis (results/h14_checkpoints/). Ein Stromausfall,
 # ein Timeout dieses Runners oder ein manueller Abbruch verliert HOECHSTENS
-# das gerade laufende einzelne Training (10-20 Min) — nicht den restlichen
+# das gerade laufende einzelne Training (10-20 Min) - nicht den restlichen
 # Fortschritt. EINFACH DIESES SKRIPT ERNEUT STARTEN: es laedt automatisch
 # alle bereits abgeschlossenen Trainings aus results/h14_checkpoints/ und
 # trainiert nur die fehlenden weiter. Der volle Lauf braucht typischerweise
 # MEHRERE Aufrufe dieses Skripts ueber mehrere Naechte (Default-Budget pro
-# Aufruf s.u.) — das ist der VORGESEHENE Betriebsmodus, kein Fehler.
+# Aufruf s.u.) - das ist der VORGESEHENE Betriebsmodus, kein Fehler.
 #
 # Ablauf: (1) H14_GPU_CHECK via --check-gpu-only (rc 2 = kein CUDA -> SKIP,
 # der volle Lauf startet dann NICHT), (2) nur bei rc 0: H14_PANELLAG voller

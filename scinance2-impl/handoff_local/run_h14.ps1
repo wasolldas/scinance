@@ -18,7 +18,7 @@
 # echtes CUDA-Device ist NIEMALS verdikt-tragend.
 #
 # **EXTREME LAUFZEIT (~226 volle Trainings, ~2-3 GPU-Tage auf RTX 5060 Ti)
-# — DIESER RUNNER IST RESUME-FAEHIG.** Jedes abgeschlossene Training
+# - DIESER RUNNER IST RESUME-FAEHIG.** Jedes abgeschlossene Training
 # schreibt SOFORT einen eigenen Checkpoint (atomic write) nach einem
 # STABILEN, NICHT zeitgestempelten Verzeichnis (results\h14_checkpoints\).
 # Ein Stromausfall, ein Timeout dieses Runners oder ein manueller Abbruch

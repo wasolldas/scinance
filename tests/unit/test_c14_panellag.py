@@ -369,6 +369,43 @@ def test_positive_control_failure_marks_run_invalid_not_drop() -> None:
     assert payload["positive_control_ok_all_windows"] is False
     assert payload["validity_status"] == "ungueltig"
     assert payload["validity_status"] != "drop"
+    # Audit Bug #2 regression: weiter_indication MUST be None (a genuine
+    # third state — "methodically invalid, no verdict"), NOT a real False
+    # that collapses onto looking like DROP. Before the fix this was
+    # `bool(pc_ok_all and all_windows_survivor)` == False under gate_valid,
+    # indistinguishable in the payload from a real DROP.
+    assert payload["weiter_indication"] is None
+
+
+def test_positive_control_failure_nulls_weiter_indication_even_with_survivor(
+) -> None:
+    """Audit Bug #2 regression, sharper reproduction: even when a REAL
+    non-BTC-source edge survives (all_windows_survivor=True) in both
+    windows, a failed positive control must still null weiter_indication —
+    it must never collapse to a real True either. Pre-fix code path only
+    guarded on `gate_valid`, so `weiter_indication` mirrored
+    `all_windows_survivor` whenever the positive control failed, silently
+    dropping the "methodically invalid" signal.
+    """
+    j_src, i_tgt = 6, 7  # bybit:SOL -> binance:SOL, a genuine non-BTC edge
+    edge_boost = {(j_src, i_tgt): 0.08}  # NO BTC->ETH boost: PC fails
+    window_stats = []
+    for wlabel in ("W1", "W2"):
+        results = _fake_results(n_null=40, edge_boost=edge_boost)
+        stats = compute_window_edges(results, NODE_LABELS, NODE_BASES, n_null=40)
+        stats.update({
+            "window_label": wlabel, "start_date": "2030-01-01",
+            "end_date": "2030-01-02", "node_labels": NODE_LABELS,
+            "node_bases": NODE_BASES, "coverage": [1.0] * N_NODES,
+        })
+        window_stats.append(stats)
+    payload = assemble_payload(
+        window_stats, n_null=40, seed=1, source="x",
+        compute_info=make_compute_info(ran_on_gpu=True),
+    )
+    assert payload["positive_control_ok_all_windows"] is False
+    assert payload["all_windows_have_surviving_non_btc_source"] is True
+    assert payload["weiter_indication"] is None
 
 
 # ---------------------------------------------------------------------------
@@ -441,6 +478,81 @@ def test_run_window_plan_executes_and_checkpoints(tmp_path: Path) -> None:
     calls["n"] = 0
     run_window_plan(win, tasks, ckpt, counting_train_fn, log=False)
     assert calls["n"] == 1
+
+
+def test_run_window_plan_rejects_resumed_cpu_dummy_checkpoint_when_cuda_required(
+    tmp_path: Path,
+) -> None:
+    """Audit Bug #1 regression: a checkpoint dir populated by a prior
+    --allow-cpu-fallback/dummy run (device="cpu-dummy") must NEVER be
+    silently resumed by a later run that claims require_cuda=True (i.e. is
+    about to report gate_valid=True). Before the fix, `_load_checkpoint`
+    only checked for the presence of a loss value, not the `device` field,
+    so this scenario resumed silently with 0 retrains and no error — the
+    exact gap the audit reproduced.
+    """
+    win = _tiny_window("W1")
+    tasks = build_task_plan(win.label, N_NODES, n_null=2, seed=5)
+    ckpt = tmp_path / "ckpt"
+
+    # Step 1: a prior --allow-cpu-fallback/dummy smoke test writes cpu-dummy
+    # checkpoints for ALL tasks into this (shared) checkpoint directory.
+    run_window_plan(win, tasks, ckpt, make_dummy_train_fn(N_NODES), log=False)
+    for t in tasks:
+        payload = json.loads(
+            (ckpt / win.label / f"{t.task_id.replace('/', '_')}.json").read_text()
+        )
+        assert payload["device"] == "cpu-dummy"
+
+    # Step 2: a later "real GPU" run (require_cuda=True) must NOT resume
+    # these checkpoints and must NEVER call train_fn on their behalf.
+    def exploding_train_fn(returns, meta):
+        raise AssertionError(
+            "train_fn must never be called: this task should have been "
+            "rejected at the checkpoint-provenance check, not silently "
+            "resumed nor retrained"
+        )
+
+    with pytest.raises(ValueError, match="(?i)provenance"):
+        run_window_plan(
+            win, tasks, ckpt, exploding_train_fn, require_cuda=True, log=False,
+        )
+
+
+def test_driver_run_never_reports_gate_valid_true_over_mixed_provenance(
+    tmp_path: Path,
+) -> None:
+    """Audit Bug #1 regression, full driver.run() path: a checkpoint dir
+    from a prior dummy/CPU run must not let a later run claiming
+    ran_on_gpu=True produce gate_valid=True (or any weiter_indication other
+    than a hard abort). Reproduces the audit's exact repro steps.
+    """
+    win_a = _tiny_window("W1", seed=11)
+    win_b = _tiny_window("W2", seed=12)
+    ckpt = tmp_path / "ckpt"
+
+    # Step 1: dummy run (as if from --allow-cpu-fallback) populates the
+    # shared checkpoint directory for BOTH windows.
+    dummy_compute_info = make_compute_info(
+        ran_on_gpu=False, synthetic_train_fn_used=True,
+    )
+    driver_run(
+        [win_a, win_b], ckpt, n_null=2, seed=1, source="unit-test",
+        train_fn=make_dummy_train_fn(N_NODES), compute_info=dummy_compute_info,
+    )
+
+    # Step 2: a run that claims ran_on_gpu=True (as the CLI would build after
+    # a real torch.cuda.is_available() check) tries to resume the SAME
+    # checkpoint dir with a train_fn that must never be invoked.
+    def exploding_train_fn(returns, meta):
+        raise AssertionError("train_fn must never be called on resume")
+
+    gpu_compute_info = make_compute_info(ran_on_gpu=True)
+    with pytest.raises(ValueError, match="(?i)provenance"):
+        driver_run(
+            [win_a, win_b], ckpt, n_null=2, seed=1, source="unit-test",
+            train_fn=exploding_train_fn, compute_info=gpu_compute_info,
+        )
 
 
 def test_driver_run_end_to_end_with_dummy_train_fn(tmp_path: Path) -> None:

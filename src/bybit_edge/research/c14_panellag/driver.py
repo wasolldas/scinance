@@ -250,12 +250,15 @@ def assemble_payload(
         w["any_family_survivor"] for w in window_records
     )
     # weiter_indication is NON-verdict-bearing (null) without real GPU
-    # training; with it, it mirrors the registered gate reading.
+    # training OR when the positive control fails (methodically invalid run
+    # — a THIRD state, distinct from a genuine DROP). Only with real CUDA
+    # training AND a valid positive control does it mirror the registered
+    # gate reading.
     weiter_indication: bool | None
-    if not gate_valid:
+    if not gate_valid or not pc_ok_all:
         weiter_indication = None
     else:
-        weiter_indication = bool(pc_ok_all and all_windows_survivor)
+        weiter_indication = bool(all_windows_survivor)
 
     return {
         "schema_version": SCHEMA_VERSION,
@@ -386,6 +389,14 @@ def run(
             synthetic_train_fn_used=synthetic,
         )
 
+    # Checkpoint-provenance gate (Bug #1 fix): whenever this run claims
+    # ran_on_gpu=True (about to report gate_valid=True), EVERY task result —
+    # freshly trained now OR resumed from an existing checkpoint — must be
+    # real-CUDA. Prevents a checkpoint directory previously populated by a
+    # --allow-cpu-fallback/dummy run from being silently resumed into a
+    # verdict-bearing gate_valid=True result. Raises ValueError on mismatch.
+    require_cuda = bool(compute_info.get("ran_on_gpu", False))
+
     window_stats: list[dict[str, Any]] = []
     for win in windows:
         tasks = build_task_plan(win.label, win.n_nodes, n_null=n_null, seed=seed)
@@ -394,7 +405,9 @@ def run(
             f"(1 full + {win.n_nodes} ablations + {n_null} nulls)",
             file=sys.stderr, flush=True,
         )
-        results = run_window_plan(win, tasks, ckpt_dir, train_fn)
+        results = run_window_plan(
+            win, tasks, ckpt_dir, train_fn, require_cuda=require_cuda
+        )
         stats = compute_window_edges(
             results, win.node_labels, win.node_bases, n_null=n_null
         )

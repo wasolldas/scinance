@@ -181,6 +181,7 @@ def run_window_plan(
     sample_stride: int = int(DEFAULT_TRAIN_PARAMS["sample_stride"]),
     train_frac: float = float(DEFAULT_TRAIN_PARAMS["train_frac"]),
     log: bool = True,
+    require_cuda: bool = False,
 ) -> dict[str, dict[str, Any]]:
     """Execute (or resume) one window's training plan.
 
@@ -191,6 +192,18 @@ def run_window_plan(
     horizon and task identity; the returned dict MUST contain
     ``per_node_log_loss`` (OOS, natural log) and is checkpointed verbatim
     (plus bookkeeping). Returns ``{task_id: result}``.
+
+    ``require_cuda``: set by the caller whenever the CURRENT run claims
+    ``ran_on_gpu=True`` (i.e. is about to report ``gate_valid=True``). When
+    set, EVERY task result — freshly trained now OR resumed from an
+    existing checkpoint — must carry a ``device`` field starting with
+    ``"cuda"``, checked IMMEDIATELY as each result becomes available. This
+    closes the checkpoint-provenance gap where a checkpoint directory
+    previously populated by a ``--allow-cpu-fallback``/dummy run (``device``
+    == ``"cpu"``/``"cpu-dummy"``) is silently resumed by a later run that
+    believes it ran on real GPU: a ``ValueError`` is raised instead of ever
+    letting mixed (non-CUDA + claimed-CUDA) provenance reach
+    ``gate_valid=True``.
     """
     ckpt = Path(ckpt_dir)
     t_total = window.n_seconds
@@ -199,10 +212,30 @@ def run_window_plan(
     )
     results: dict[str, dict[str, Any]] = {}
     n_done_before = 0
+
+    def _check_provenance(task_id: str, result: dict[str, Any], *, resumed: bool) -> None:
+        if not require_cuda:
+            return
+        device = str(result.get("device", ""))
+        if not device.startswith("cuda"):
+            origin = "resumed checkpoint" if resumed else "fresh training result"
+            raise ValueError(
+                f"H-14 checkpoint-provenance violation: "
+                f"{window.label}/{task_id} is a {origin} with device={device!r}, "
+                f"but this run claims ran_on_gpu=True (require_cuda=True). "
+                f"Mixed provenance MUST NOT produce gate_valid=True — likely "
+                f"cause: a previous --allow-cpu-fallback/dummy run wrote "
+                f"checkpoints into the same --ckpt-dir now being resumed by a "
+                f"real GPU run. Use a separate --ckpt-dir for CPU-fallback "
+                f"smoke tests, or delete/clear the checkpoint directory before "
+                f"the production GPU run."
+            )
+
     for task in tasks:
         path = _ckpt_path(ckpt, window.label, task.task_id)
         cached = _load_checkpoint(path)
         if cached is not None:
+            _check_provenance(task.task_id, cached, resumed=True)
             results[task.task_id] = cached
             n_done_before += 1
             continue
@@ -249,6 +282,7 @@ def run_window_plan(
             "n_oos_anchors": int(oos_anchors.size),
             "wall_seconds": round(time.time() - t0, 3),
         }
+        _check_provenance(task.task_id, result, resumed=False)
         _write_checkpoint(path, result)
         results[task.task_id] = result
         if log:

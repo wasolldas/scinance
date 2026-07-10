@@ -77,6 +77,9 @@ from bybit_edge.research.c14_panellag.panel import (  # noqa: E402
 RC_OK = 0
 RC_ERROR = 1
 RC_SKIP_NO_COMPUTE = 2
+#: Alias of RC_ERROR for the missing-harvester-data path (same exit code,
+#: kept as its own name for readability at the call site).
+RC_DATA_MISSING = RC_ERROR
 
 
 def _dumps(payload) -> str:

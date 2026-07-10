@@ -83,6 +83,18 @@ Ein voller Lauf ist **NUR mit torch + echtem CUDA-Device verdikt-tragend**:
   `weiter_indication=null` (JSON `null`, NICHT verdikt-tragend) — niemals
   ein numpy-/CPU-Ersatz für die registrierte ~226-Trainings-Retrain-Null.
 
+> **WARNUNG — niemals `--allow-cpu-fallback`-Testläufe auf denselben
+> `--ckpt-dir` wie den produktiven GPU-Lauf richten.** Checkpoints tragen ein
+> `device`-Feld ("cuda"/"cpu"/"cpu-dummy"); ein produktiver GPU-Lauf
+> (`ran_on_gpu=True`) verweigert seit dem Audit-Fix (2026-07-10) das Resume
+> von Checkpoints mit inkompatiblem `device` HART (`ValueError`, Abbruch mit
+> `rc=1`) — genau deshalb DARF ein Smoke-Test mit `--allow-cpu-fallback`
+> NIEMALS denselben `--ckpt-dir` treffen wie `results/h14_checkpoints/`
+> (der stabile Default in `run_h14.{sh,ps1}`). Für Smoke-Tests VOR dem
+> echten Lauf immer ein separates `--ckpt-dir` (z. B.
+> `results/h14_checkpoints_smoketest/`) verwenden oder den Ordner danach
+> löschen, bevor der produktive Lauf startet.
+
 ## Start
 
 ```powershell
