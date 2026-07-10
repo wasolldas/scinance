@@ -218,13 +218,15 @@ def run_fold(
 
     # --- registered permutation null (FULL retraining per replicate) ------
     null_accs: list[float] = []
+    null_fit_infos: list[dict[str, Any]] = []
     for r in range(n_perm):
         rng = np.random.default_rng((seed, fold_index, r))
         y_perm = permute_within_groups(y_tr, groups_tr, rng)
         venues_perm = np.array([venue_order[int(v)] for v in y_perm], dtype=object)
         enc_r = encoder_factory(seed * 1000 + fold_index * 100 + r + 1)
-        enc_r.fit(x_tr, m_tr, _node_ids(venues_perm, panel.symbols[tr]),
-                  **fit_kwargs)
+        fit_info_r = enc_r.fit(x_tr, m_tr, _node_ids(venues_perm, panel.symbols[tr]),
+                               **fit_kwargs)
+        null_fit_infos.append(fit_info_r)
         emb_tr_r = enc_r.embed(x_tr, m_tr)
         emb_te_r = enc_r.embed(x_te, m_te)
         probe_r = train_linear_probe(emb_tr_r, y_perm, seed=seed)
@@ -235,6 +237,16 @@ def run_fold(
               file=sys.stderr, flush=True)
 
     p_value = empirical_p_ge(np.array(null_accs), acc)
+    # Audit finding M-1: the compute gate must see the ACHIEVED batch size
+    # (eff_batch = min(requested, n) per training), not only the CLI-
+    # requested value — aggregate the minimum over the main fit AND every
+    # null retraining in this fold, so a thin fold can never silently hide
+    # under the registered BATCH_SIZE_MIN.
+    all_fit_infos = [fit_info, *null_fit_infos]
+    achieved_batches = [
+        int(fi["batch_size"]) for fi in all_fit_infos if "batch_size" in fi
+    ]
+    min_effective_batch_size = min(achieved_batches) if achieved_batches else None
     return {
         "held_out_symbol": fold.held_out_symbol,
         "test_start_date": fold.test_start_date,
@@ -253,6 +265,7 @@ def run_fold(
         ),
         "p_value": float(p_value),
         "fit_info": fit_info,
+        "min_effective_batch_size": min_effective_batch_size,
         # carried for pooled accuracy + daily distance series (stripped
         # from the JSON payload by run()):
         "_y_true": y_te,
@@ -354,6 +367,22 @@ def run(
     if batch_size < BATCH_SIZE_MIN:
         blocked_reasons.append(
             f"Batch {batch_size} < registriertes Minimum {BATCH_SIZE_MIN}")
+    # Audit finding M-1: also enforce the ACHIEVED batch size, not only the
+    # requested one -- a thin fold's train set can silently push
+    # eff_batch=min(batch_size, n) below BATCH_SIZE_MIN even when the CLI
+    # request was >= 2048.
+    achieved_batch_sizes = [
+        r["min_effective_batch_size"] for r in fold_records
+        if r.get("min_effective_batch_size") is not None
+    ]
+    min_achieved_batch_size = min(achieved_batch_sizes) if achieved_batch_sizes else None
+    if achieved_batch_sizes and min_achieved_batch_size < BATCH_SIZE_MIN:
+        verdict_bearing = False
+        blocked_reasons.append(
+            f"tatsaechlich erreichter Batch {min_achieved_batch_size} < "
+            f"registriertes Minimum {BATCH_SIZE_MIN} (mind. ein Fold/"
+            f"Retraining unterschritt das Minimum trotz angefordertem "
+            f"Batch {batch_size})")
     if len(symbols) != N_FOLDS:
         verdict_bearing = False
         blocked_reasons.append(

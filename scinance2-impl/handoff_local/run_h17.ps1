@@ -132,7 +132,7 @@ function Invoke-Step {
 
 # GPU_CHECK is a diagnostic PROBE, not a pass/fail step: rc=3 ("kein CUDA")
 # is an EXPECTED, informative outcome (e.g. every sandbox/non-GPU run) and
-# must NOT count as a runner FAIL — only a genuine crash (rc not in {0,3})
+# must NOT count as a runner FAIL - only a genuine crash (rc not in {0,3})
 # does. Records to steps.tsv as INFO/FAIL, returns the raw rc.
 function Invoke-GpuCheck {
     param([string]$ScriptPath, [int]$TimeoutSec)

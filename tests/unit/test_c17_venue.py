@@ -479,6 +479,47 @@ def test_driver_run_pretends_cuda_used_still_blocked_by_fallback_encoder() -> No
     assert payload["weiter_indication"] is False
 
 
+class _SmallBatchVerdictCapableEncoder(NumpyFallbackEncoder):
+    """Test-only stub: reports itself as verdict-capable (like a real torch
+    encoder would) but ``fit()`` returns an ACHIEVED batch size below
+    ``BATCH_SIZE_MIN`` — simulating a thin fold whose train set forces
+    ``eff_batch = min(requested, n) < BATCH_SIZE_MIN`` even though the
+    caller requested a compliant batch size (audit finding M-1)."""
+
+    verdict_bearing = True
+
+    def fit(self, x, mask, node_ids, **kwargs):  # noqa: ANN001, D102
+        self.n_fit_calls += 1
+        return {"trained": True, "batch_size": 17, "batch_size_registered_min": 2048,
+                "small_batch_override": True}
+
+
+def test_driver_run_blocks_verdict_when_achieved_batch_below_minimum() -> None:
+    """Audit finding M-1 regression test: cuda_used=True, a verdict-capable
+    encoder, and a requested batch_size >= BATCH_SIZE_MIN must still NOT be
+    verdict-bearing if the per-fold ACHIEVED batch size (fit_info["batch_size"])
+    falls below the registered minimum -- the compute gate must look at what
+    actually happened during training, not only the CLI request.
+    """
+    nodes = _small_synthetic_nodes(SYMBOLS5, VENUES2, n_days=28, seed=104)
+    payload = run(
+        nodes, n_perm=1, seed=1, cuda_used=True, torch_available=True,
+        batch_size=2048,
+        encoder_factory=lambda s: _SmallBatchVerdictCapableEncoder(seed=s),
+    )
+    assert payload["compute"]["encoder_verdict_capable"] is True
+    assert payload["compute"]["cuda_used"] is True
+    assert payload["compute"]["verdict_bearing"] is False, (
+        "achieved batch size 17 << BATCH_SIZE_MIN=2048 must block the "
+        "verdict even though the requested batch_size was compliant"
+    )
+    assert payload["weiter_indication"] is False
+    reasons_blob = " ".join(payload["compute"]["blocked_reasons"])
+    assert "17" in reasons_blob and "2048" in reasons_blob
+    for rec in payload["folds"]:
+        assert rec["min_effective_batch_size"] == 17
+
+
 # ---------------------------------------------------------------------------
 # (f) --check-gpu-only honestly reports the sandbox (no torch/CUDA)
 # ---------------------------------------------------------------------------
