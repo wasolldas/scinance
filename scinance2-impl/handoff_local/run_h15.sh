@@ -23,22 +23,38 @@
 #     MODE=mechanics env, dann NIEMALS verdikt-tragend (gate_valid=false).
 #
 # Erwartete Laufzeit auf RTX 5060 Ti: Stunden (5 Symbole x 4 Folds x 3
-# Seeds seriell). EIN Block: H15_GRAMMAR. Ergebnisse werden laufend im
-# JSON persistiert (kein Datenverlust bei Abbruch mitten im Lauf).
+# Seeds seriell). EIN Block: H15_GRAMMAR. Persistenz: der Treiber
+# checkpointet NACH JEDEM ABGESCHLOSSENEN SYMBOL atomar nach
+# $CKPT_DIR/<symbol>.json (analog H-14-Muster) - ein Timeout/Crash verliert
+# hoechstens das GERADE LAUFENDE Symbol, nicht die bereits fertigen. Die
+# finale c15_grammar_results.{json,md} wird weiterhin erst nach ALLEN 5
+# Symbolen geschrieben (KEIN Zwischenstand der Gesamt-JSON) - ein erneuter
+# Aufruf dieses Skripts setzt aber ueber $CKPT_DIR automatisch fort, statt
+# bereits fertige Symbole neu zu trainieren.
 #
 # Datenbasis (Registry H-15, vorregistriert): Basis-Bestand 2026-03-27..
 # Cutoff (~100 Tage), 5 Bybit-Perp-Symbole, publicTrade-Tokenstream je
 # Symbol. EIN Fenster (Purged Walk-Forward, kein W1/W2-Split).
 # >=200 Surrogate, F-GRAMMAR BH-FDR a=0.10.
 #
+# WICHTIG - Resume nach Timeout/Crash: das Ergebnis-Verzeichnis $RUN ist
+# PRO AUFRUF timestamped (siehe unten), der Checkpoint-Ordner CKPT_DIR ist
+# das ABSICHTLICH NICHT - er ist stabil ueber mehrere Aufrufe hinweg
+# (Default: handoff_local/results/h15_ckpt, Override per Env). Ein Re-Aufruf
+# DIESES Skripts nach einem Timeout/Crash setzt automatisch bei den bereits
+# checkpointeten Symbolen fort (analog H-14-Muster), OHNE dass $RUN manuell
+# reproduziert werden muss.
+#
 # Env-Overrides: HARVEST_DIR, MODE (full|mechanics, Default full),
-# HANDOFF_DRY_RUN (+HANDOFF_DRY_RC).
+# CKPT_DIR (stabiler Resume-Ordner, Default s.o.), HANDOFF_DRY_RUN
+# (+HANDOFF_DRY_RC).
 # Exit: 0=OK 1=FAIL 2=SKIP.
 # ========================================================================
 set -u
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 HARVEST_DIR="${HARVEST_DIR:-$REPO_ROOT/data/harvest}"
+CKPT_DIR="${CKPT_DIR:-$SCRIPT_DIR/results/h15_ckpt}"
 
 SYMBOLS="BTCUSDT,ETHUSDT,SOLUSDT,BNBUSDT,XRPUSDT"
 DATA_START="2026-03-27"; DATA_END="2026-07-04"
@@ -80,6 +96,7 @@ step() {
 echo "RUN_H15 (T3) - Repo: $REPO_ROOT - Ergebnisse: $RUN"
 echo "Harvest: $HARVEST_DIR | Panel: $SYMBOLS x publicTrade | Raster $DATA_START..$DATA_END"
 echo "Walk-Forward: $N_FOLDS Folds, ${EMBARGO_DAYS}-Tag-Embargo, Seeds $SEEDS | Surrogate $N_SURROGATES (Block $BLOCK_LEN)"
+echo "Checkpoint-Ordner (stabil, Resume nach Timeout/Crash): $CKPT_DIR"
 [ "$DRY" = "1" ] && echo "ACHTUNG: HANDOFF_DRY_RUN aktiv."
 
 SCRIPT="$REPO_ROOT/scripts/c15_grammar.py"
@@ -112,7 +129,7 @@ else
             --mode "$MODE" \
             --n-folds "$N_FOLDS" --embargo-days "$EMBARGO_DAYS" \
             --seeds "$SEEDS" --n-surrogates "$N_SURROGATES" --block-len "$BLOCK_LEN" \
-            --out-dir "$RUN/h15"
+            --out-dir "$RUN/h15" --ckpt-dir "$CKPT_DIR"
     fi
 fi
 
@@ -123,6 +140,7 @@ SUMMARY="$RUN/SUMMARY_$SUMD.md"
     echo ""
     echo "- **Erzeugt:** $(date -u +'%Y-%m-%d %H:%M:%S') UTC"
     echo "- **Run-Dir:** \`$RUN\` | Harvest \`$HARVEST_DIR\` (read-only)"
+    echo "- **Checkpoint-Ordner (stabil, Resume nach Timeout/Crash):** \`$CKPT_DIR\`"
     echo "- **Modus:** $MODE (full = verdikt-faehig, braucht CUDA; mechanics = NIE verdikt-tragend)"
     echo "- **Panel:** $SYMBOLS x publicTrade | Raster $DATA_START..$DATA_END"
     echo "- **Walk-Forward:** $N_FOLDS Folds, ${EMBARGO_DAYS}-Tag-Embargo, Seeds $SEEDS"

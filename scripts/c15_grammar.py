@@ -125,6 +125,17 @@ def main(argv: list[str] | None = None) -> int:
                    help="Debug/mechanics convenience: cap events/day per symbol "
                         "(0 = no cap, registered data binding). Voids gate_valid.")
     p.add_argument("--out-dir", default=".", help="Output directory for results.")
+    p.add_argument("--ckpt-dir", default=None,
+                   help="Per-symbol checkpoint directory (default: "
+                        "<out-dir>/c15_grammar_ckpt). Each completed symbol "
+                        "is atomically checkpointed there; re-running with "
+                        "the SAME --ckpt-dir (and identical registered "
+                        "parameters) RESUMES by skipping already-finished "
+                        "symbols instead of re-training them, so a timeout/"
+                        "crash loses at most the in-flight symbol. Pass "
+                        "--no-ckpt to disable.")
+    p.add_argument("--no-ckpt", action="store_true",
+                   help="Disable per-symbol checkpointing entirely.")
     args = p.parse_args(argv)
 
     if args.check_gpu_only:
@@ -180,6 +191,14 @@ def main(argv: list[str] | None = None) -> int:
         epochs=args.epochs, batch_size=args.batch_size, lr=args.lr,
     )
     source = f"{base}/raw/bybit/publicTrade (H-15, read-only harvester tree)"
+    out_dir = Path(args.out_dir)
+    if args.no_ckpt:
+        ckpt_dir = None
+    else:
+        ckpt_dir = Path(args.ckpt_dir) if args.ckpt_dir else out_dir / "c15_grammar_ckpt"
+        print(f"[c15_grammar] per-symbol checkpoint dir: {ckpt_dir} "
+              f"(re-run with the same --ckpt-dir to resume after a timeout/"
+              f"crash)", file=sys.stderr, flush=True)
     try:
         payload = run(
             symbol_events, days,
@@ -189,6 +208,7 @@ def main(argv: list[str] | None = None) -> int:
             block_len=args.block_len, use_tick_direction=args.use_tick_direction,
             events_capped=bool(args.max_events_per_day),
             source=source,
+            ckpt_dir=ckpt_dir,
         )
     except ComputeUnavailableError as exc:
         print(f"[c15_grammar] FATAL (compute gate): {exc}", file=sys.stderr, flush=True)
@@ -197,7 +217,6 @@ def main(argv: list[str] | None = None) -> int:
         print(f"[c15_grammar] FATAL: {exc}", file=sys.stderr, flush=True)
         return 1
 
-    out_dir = Path(args.out_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
     json_path = out_dir / "c15_grammar_results.json"
     md_path = out_dir / "c15_grammar_results.md"

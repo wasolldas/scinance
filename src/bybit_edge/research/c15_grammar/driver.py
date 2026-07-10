@@ -59,6 +59,9 @@ KAPITALFREI: ``capital_free: true`` — no capital metric of any kind anywhere.
 """
 from __future__ import annotations
 
+import json
+import math
+import os
 import re
 import sys
 from dataclasses import dataclass
@@ -325,6 +328,108 @@ def prepare_fold(
 
 
 # ----------------------------------------------------------------------------
+# Per-symbol checkpointing (atomic write, resume by skip)
+#
+# A full T3 run trains 5 symbols x 4 folds x 3 seeds sequentially and can
+# take HOURS on the 12h runner timeout budget (see run_h15.sh/.ps1). Without
+# checkpointing, a timeout/crash after N of 5 symbols loses ALL of them —
+# including the already-finished ones (see audit_h15.md Bug #3). Each
+# completed symbol's AGGREGATED result (the same dict that lands in
+# ``per_symbol`` below) is atomically written to
+# ``<ckpt_dir>/<symbol>.json``; a re-run with the SAME ``ckpt_dir`` loads it
+# back and skips re-training that symbol entirely. A ``fingerprint`` of the
+# registered run parameters is stored alongside the result and re-checked on
+# load — a checkpoint from a run with different folds/seeds/surrogates/
+# architecture/data-grid is treated as stale (recomputed, never silently
+# reused) so resume can never mix results from two different configurations.
+# ----------------------------------------------------------------------------
+
+def _run_fingerprint(
+    *,
+    cfg: GrammarTransformerConfig,
+    n_folds: int,
+    embargo_days: int,
+    seeds: tuple[int, ...],
+    n_surrogates: int,
+    block_len: int,
+    use_tick_direction: bool,
+    days: list[str],
+) -> dict[str, Any]:
+    return {
+        "n_folds": int(n_folds),
+        "embargo_days": int(embargo_days),
+        "seeds": list(seeds),
+        "n_surrogates": int(n_surrogates),
+        "block_len": int(block_len),
+        "use_tick_direction": bool(use_tick_direction),
+        "data_start": days[0],
+        "data_end": days[-1],
+        "n_days": len(days),
+        "model_config": {
+            "vocab_size": cfg.vocab_size,
+            "context_len": cfg.context_len,
+            "d_model": cfg.d_model,
+            "n_heads": cfg.n_heads,
+            "n_layers": cfg.n_layers,
+            "dropout": cfg.dropout,
+            "lr": cfg.lr,
+            "batch_size": cfg.batch_size,
+            "epochs": cfg.epochs,
+            "grad_clip": cfg.grad_clip,
+        },
+    }
+
+
+def _ckpt_clean(v: Any) -> Any:
+    """Recursively swap non-finite floats for JSON-null (round-trips via _f)."""
+    if isinstance(v, float) and not math.isfinite(v):
+        return None
+    if isinstance(v, dict):
+        return {k: _ckpt_clean(x) for k, x in v.items()}
+    if isinstance(v, (list, tuple)):
+        return [_ckpt_clean(x) for x in v]
+    return v
+
+
+def _symbol_ckpt_path(ckpt_dir: Path | str, symbol: str) -> Path:
+    return Path(ckpt_dir) / f"{symbol}.json"
+
+
+def _write_symbol_checkpoint(
+    path: Path, symbol_result: dict[str, Any], fingerprint: dict[str, Any],
+) -> None:
+    """Atomic tmp+rename write (H-14 checkpoint pattern, see ablation.py)."""
+    path.parent.mkdir(parents=True, exist_ok=True)
+    tmp = path.with_suffix(".json.tmp")
+    payload = {"fingerprint": fingerprint, "result": symbol_result}
+    tmp.write_text(json.dumps(_ckpt_clean(payload), indent=2), encoding="utf-8")
+    os.replace(tmp, path)
+
+
+def _load_symbol_checkpoint(
+    path: Path, fingerprint: dict[str, Any],
+) -> dict[str, Any] | None:
+    """Return the cached aggregated symbol result iff the fingerprint matches.
+
+    A missing file, unreadable/corrupt JSON, or a fingerprint mismatch (run
+    parameters changed since the checkpoint was written) all return ``None``
+    — the caller then recomputes the symbol from scratch rather than risking
+    a resumed run that silently mixes two different configurations.
+    """
+    if not path.exists():
+        return None
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return None
+    if not isinstance(payload, dict) or "result" not in payload:
+        return None
+    if payload.get("fingerprint") != fingerprint:
+        return None
+    return payload["result"]
+
+
+# ----------------------------------------------------------------------------
 # Main run
 # ----------------------------------------------------------------------------
 
@@ -343,6 +448,7 @@ def run(
     surrogate_seed: int = 20260709,
     events_capped: bool = False,
     source: str = "",
+    ckpt_dir: Path | str | None = None,
 ) -> dict[str, Any]:
     """Run the H-15 grammar gate; return the gate-neutral payload.
 
@@ -351,6 +457,13 @@ def run(
     ``mode="mechanics"``: pipeline-mechanics only — never verdict-bearing
     (``gate_valid: false``, ``ran_on_gpu: false`` ALWAYS); transformer arm
     runs on CPU if torch is present, else is skipped (CEs NaN).
+
+    ``ckpt_dir``: if given, EVERY completed symbol is atomically checkpointed
+    to ``<ckpt_dir>/<symbol>.json`` (fingerprinted against the run's
+    registered parameters); re-calling ``run()`` with the SAME ``ckpt_dir``
+    resumes by skipping already-checkpointed symbols instead of re-training
+    them — a timeout/crash loses at most the symbol that was in flight, not
+    the whole multi-hour run (see audit_h15.md Bug #3).
     """
     if mode not in ("full", "mechanics"):
         raise ValueError(f"unknown mode {mode!r}")
@@ -398,12 +511,38 @@ def run(
     if use_tick_direction:
         gate_valid_reasons.append(
             "tick-direction vocab extension (256) enabled — registered base is 128")
+    _default_cfg = GrammarTransformerConfig()
+    for field in ("context_len", "d_model", "n_heads", "n_layers", "epochs",
+                  "batch_size", "lr", "dropout", "grad_clip"):
+        if getattr(cfg, field) != getattr(_default_cfg, field):
+            gate_valid_reasons.append(
+                f"{field}={getattr(cfg, field)} != registered default "
+                f"{getattr(_default_cfg, field)}")
 
     folds = walk_forward_folds(days, n_folds=n_folds, embargo_days=embargo_days)
     symbols = list(symbol_events.keys())
+    if tuple(sorted(symbols)) != tuple(sorted(DEFAULT_SYMBOLS)):
+        gate_valid_reasons.append(
+            f"symbols {symbols} != registered 5-symbol panel {DEFAULT_SYMBOLS}")
+
+    ckpt_fingerprint = _run_fingerprint(
+        cfg=cfg, n_folds=n_folds, embargo_days=embargo_days, seeds=seeds,
+        n_surrogates=n_surrogates, block_len=block_len,
+        use_tick_direction=use_tick_direction, days=days,
+    )
 
     per_symbol: list[dict[str, Any]] = []
     for symbol in symbols:
+        if ckpt_dir is not None:
+            cached = _load_symbol_checkpoint(
+                _symbol_ckpt_path(ckpt_dir, symbol), ckpt_fingerprint)
+            if cached is not None:
+                print(f"[c15_grammar] {symbol}: RESUMED from checkpoint "
+                      f"({_symbol_ckpt_path(ckpt_dir, symbol)}) — skipping "
+                      f"training", file=sys.stderr, flush=True)
+                per_symbol.append(cached)
+                continue
+
         events = symbol_events[symbol]
         print(f"[c15_grammar] === {symbol}: {events.n_events} events, "
               f"{len(folds)} folds ===", file=sys.stderr, flush=True)
@@ -420,8 +559,16 @@ def run(
             fold_rows.append(row["public"])
             fold_gap_matrix.append(row["surrogate_gaps"])
 
-        per_symbol.append(_aggregate_symbol(symbol, fold_rows, fold_gap_matrix,
-                                            n_surrogates))
+        symbol_result = _aggregate_symbol(symbol, fold_rows, fold_gap_matrix,
+                                           n_surrogates)
+        per_symbol.append(symbol_result)
+        if ckpt_dir is not None:
+            _write_symbol_checkpoint(
+                _symbol_ckpt_path(ckpt_dir, symbol), symbol_result,
+                ckpt_fingerprint)
+            print(f"[c15_grammar] {symbol}: checkpointed to "
+                  f"{_symbol_ckpt_path(ckpt_dir, symbol)}",
+                  file=sys.stderr, flush=True)
 
     # BH-FDR over the F-GRAMMAR family (one p per symbol).
     p_for_bh = [

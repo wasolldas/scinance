@@ -11,10 +11,15 @@ registry Selbstkill: hyper-parameters fixed BEFORE the run):
 Training (pre-fixed defaults): AdamW lr=3e-4, cosine schedule, grad-clip 1.0,
 batch 32 non-overlapping (context+1)-chunks, epochs=3, per-seed shuffling.
 
-Torch-optional pattern (identical to ``m18_patchtst.py``): the module is
-importable WITHOUT torch (``_TORCH_AVAILABLE = False``); every train/eval
-entry point then raises ``ComputeUnavailableError`` with an honest message
-instead of fabricating numbers. ``torch_cuda_status()`` reports availability
+Torch-optional IMPORT GUARD (structurally identical to ``m18_patchtst.py``:
+``try: import torch ... except: _TORCH_AVAILABLE = False``, module stays
+importable without torch). The FALLBACK BEHAVIOUR beyond the import guard
+differs deliberately: ``m18_patchtst.fit()`` without torch returns a
+degraded-but-defined result (a documented no-op); every train/eval entry
+point here instead raises ``ComputeUnavailableError`` with an honest
+message. For a verdict-bearing gate this is the stricter of the two choices
+(fail-loud, never fabricates numbers) — appropriate here, not a weaker
+imitation of the m18 pattern. ``torch_cuda_status()`` reports availability
 without side effects (used by the CLI ``--check-gpu-only`` compute gate).
 
 COMPUTE GATE (binding): a verdict-bearing H-15 run REQUIRES a real CUDA

@@ -539,6 +539,230 @@ class TestCapitalFree:
 
 
 # ----------------------------------------------------------------------------
+# (g) gate_valid deviation checks: architecture drift (Bug #1) + symbol-panel
+# identity (Bug #2) — audit_h15.md findings, regression-locked here.
+# ----------------------------------------------------------------------------
+
+class TestGateDeviationChecks:
+    def _small_payload(self, **run_kwargs) -> dict:
+        days = _day_grid("2026-01-01", 20)
+        events = {
+            "BTCUSDT": _make_stream("BTCUSDT", days, 30, seed=1),
+            "ETHUSDT": _make_stream("ETHUSDT", days, 30, seed=2),
+        }
+        kwargs = dict(mode="mechanics", n_folds=2, embargo_days=1,
+                      seeds=(42,), n_surrogates=3)
+        kwargs.update(run_kwargs)
+        return c15_driver.run(events, days, **kwargs)
+
+    def test_architecture_drift_voids_gate_valid(self) -> None:
+        """Bug #1: cfg.n_layers deviating from the registered default MUST
+        surface as a gate_valid_reasons entry (previously silently ignored:
+        only n_folds/embargo/seeds/surrogates/block_len/tick-dir were
+        checked, never context_len/d_model/n_heads/n_layers/epochs/
+        batch_size/lr/dropout/grad_clip)."""
+        drifted_cfg = c15_transformer.GrammarTransformerConfig(n_layers=8)
+        payload = self._small_payload(config=drifted_cfg)
+        assert payload["gate_valid"] is False
+        reasons = payload["gate_valid_reasons"]
+        assert any("n_layers=8" in r and "!= registered default" in r
+                    for r in reasons), reasons
+
+    def test_default_architecture_has_no_drift_reason(self) -> None:
+        """Sanity counterpart: the registered-default config must NOT trip
+        the new architecture-drift check (only mechanics-mode reasons)."""
+        payload = self._small_payload()
+        reasons = payload["gate_valid_reasons"]
+        assert not any("!= registered default" in r for r in reasons), reasons
+
+    def test_each_architecture_field_individually_flagged(self) -> None:
+        """Every field in the drift check trips its own reason string."""
+        deviations = {
+            "context_len": 512, "d_model": 128, "n_heads": 2, "n_layers": 8,
+            "epochs": 1, "batch_size": 16, "lr": 1e-3, "dropout": 0.5,
+            "grad_clip": 2.0,
+        }
+        for field, value in deviations.items():
+            cfg = c15_transformer.GrammarTransformerConfig(**{field: value})
+            payload = self._small_payload(config=cfg)
+            reasons = payload["gate_valid_reasons"]
+            assert any(r.startswith(f"{field}={value}") for r in reasons), \
+                f"{field}: no drift reason found in {reasons}"
+
+    def test_wrong_symbol_panel_same_length_voids_gate_valid(self) -> None:
+        """Bug #2: a same-LENGTH but wrong-IDENTITY 5-symbol panel must be
+        flagged (previously only len(per_symbol) >= FAMILY_SIZE was
+        checked — a same-length wrong panel slipped through silently)."""
+        days = _day_grid("2026-01-01", 20)
+        wrong_panel = ("BTCUSDT", "ETHUSDT", "SOLUSDT", "BNBUSDT", "DOGEUSDT")
+        events = {
+            sym: _make_stream(sym, days, 30, seed=i)
+            for i, sym in enumerate(wrong_panel)
+        }
+        payload = c15_driver.run(
+            events, days, mode="mechanics", n_folds=2, embargo_days=1,
+            seeds=(42,), n_surrogates=3,
+        )
+        assert payload["gate_valid"] is False
+        reasons = payload["gate_valid_reasons"]
+        assert any("!= registered 5-symbol panel" in r for r in reasons), reasons
+
+    def test_correct_symbol_panel_no_identity_reason(self) -> None:
+        days = _day_grid("2026-01-01", 20)
+        events = {
+            sym: _make_stream(sym, days, 30, seed=i)
+            for i, sym in enumerate(c15_driver.DEFAULT_SYMBOLS)
+        }
+        payload = c15_driver.run(
+            events, days, mode="mechanics", n_folds=2, embargo_days=1,
+            seeds=(42,), n_surrogates=3,
+        )
+        reasons = payload["gate_valid_reasons"]
+        assert not any("registered 5-symbol panel" in r for r in reasons), reasons
+
+
+# ----------------------------------------------------------------------------
+# (h) per-symbol checkpoint/resume (Bug #3, option b) — a timeout/crash must
+# lose at most the in-flight symbol, not already-finished ones.
+# ----------------------------------------------------------------------------
+
+class TestSymbolCheckpointResume:
+    def _events(self) -> tuple[list[str], dict]:
+        days = _day_grid("2026-01-01", 20)
+        events = {
+            "BTCUSDT": _make_stream("BTCUSDT", days, 30, seed=1),
+            "ETHUSDT": _make_stream("ETHUSDT", days, 30, seed=2),
+        }
+        return days, events
+
+    def test_checkpoint_written_per_symbol(self, tmp_path: Path) -> None:
+        days, events = self._events()
+        ckpt_dir = tmp_path / "ckpt"
+        c15_driver.run(
+            events, days, mode="mechanics", n_folds=2, embargo_days=1,
+            seeds=(42,), n_surrogates=3, ckpt_dir=ckpt_dir,
+        )
+        assert (ckpt_dir / "BTCUSDT.json").exists()
+        assert (ckpt_dir / "ETHUSDT.json").exists()
+
+    def test_resume_skips_completed_symbols(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        days, events = self._events()
+        ckpt_dir = tmp_path / "ckpt"
+        run_kwargs = dict(
+            mode="mechanics", n_folds=2, embargo_days=1,
+            seeds=(42,), n_surrogates=3, ckpt_dir=ckpt_dir,
+        )
+        first = c15_driver.run(events, days, **run_kwargs)
+
+        calls: list[str] = []
+        real_run_fold = c15_driver._run_fold
+
+        def counting_run_fold(ev, fold, cfg, **kw):
+            calls.append(ev.symbol)
+            return real_run_fold(ev, fold, cfg, **kw)
+
+        monkeypatch.setattr(c15_driver, "_run_fold", counting_run_fold)
+        second = c15_driver.run(events, days, **run_kwargs)
+
+        assert calls == [], f"resume must not retrain any symbol, got {calls}"
+        first_syms = {s["symbol"]: s["best_markov_ce"] for s in first["per_symbol"]}
+        second_syms = {s["symbol"]: s["best_markov_ce"] for s in second["per_symbol"]}
+        assert first_syms == second_syms
+
+    def test_stale_fingerprint_forces_recompute(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """A checkpoint written under different registered parameters must
+        NOT be silently reused (would risk mixing two configurations within
+        one family)."""
+        days, events = self._events()
+        ckpt_dir = tmp_path / "ckpt"
+        c15_driver.run(
+            events, days, mode="mechanics", n_folds=2, embargo_days=1,
+            seeds=(42,), n_surrogates=3, ckpt_dir=ckpt_dir,
+        )
+
+        calls: list[str] = []
+        real_run_fold = c15_driver._run_fold
+
+        def counting_run_fold(ev, fold, cfg, **kw):
+            calls.append(ev.symbol)
+            return real_run_fold(ev, fold, cfg, **kw)
+
+        monkeypatch.setattr(c15_driver, "_run_fold", counting_run_fold)
+        # Different seeds -> different fingerprint -> stale checkpoint.
+        c15_driver.run(
+            events, days, mode="mechanics", n_folds=2, embargo_days=1,
+            seeds=(42, 43), n_surrogates=3, ckpt_dir=ckpt_dir,
+        )
+        assert set(calls) == {"BTCUSDT", "ETHUSDT"}, calls
+
+
+# ----------------------------------------------------------------------------
+# (i) benjamini_hochberg — dedicated unit test (Bug #4), own BH-FDR copy.
+# ----------------------------------------------------------------------------
+
+class TestBenjaminiHochberg:
+    def test_all_p_one_never_rejects(self) -> None:
+        rejected, p_crit = c15_stats.benjamini_hochberg([1.0] * 5, alpha=0.10)
+        assert rejected == [False] * 5
+        assert p_crit == 0.0
+
+    def test_all_p_zero_rejects_all(self) -> None:
+        rejected, p_crit = c15_stats.benjamini_hochberg([0.0] * 5, alpha=0.10)
+        assert rejected == [True] * 5
+        assert p_crit == 0.0
+
+    def test_empty_input(self) -> None:
+        rejected, p_crit = c15_stats.benjamini_hochberg([], alpha=0.10)
+        assert rejected == []
+        assert p_crit == 0.0
+
+    def test_known_f_grammar_m5_case(self) -> None:
+        # m=5, alpha=0.10 -> BH thresholds (rank/m)*alpha = 0.02, 0.04,
+        # 0.06, 0.08, 0.10. Sorted p = [0.01, 0.03, 0.20, 0.40, 0.50].
+        # Largest k with p_(k) <= (k/5)*0.10: k=2 (p=0.03 <= 0.04); k=3
+        # (0.20 <= 0.06) fails, and no larger k passes either -> reject
+        # ranks 1,2 only.
+        p = [0.50, 0.01, 0.40, 0.03, 0.20]
+        rejected, p_crit = c15_stats.benjamini_hochberg(p, alpha=0.10)
+        # indices of the two smallest p-values (0.01 at idx1, 0.03 at idx3)
+        assert rejected[1] is True
+        assert rejected[3] is True
+        assert rejected[0] is False
+        assert rejected[2] is False
+        assert rejected[4] is False
+        assert p_crit == pytest.approx(0.03)
+
+    def test_ties_at_boundary(self) -> None:
+        # m=4, alpha=0.10, thresholds 0.025/0.05/0.075/0.10. Two tied
+        # p-values at the k=2 threshold.
+        p = [0.05, 0.05, 0.5, 0.9]
+        rejected, p_crit = c15_stats.benjamini_hochberg(p, alpha=0.10)
+        assert rejected[0] is True
+        assert rejected[1] is True
+        assert rejected[2] is False
+        assert rejected[3] is False
+        assert p_crit == pytest.approx(0.05)
+
+    def test_no_rejection_when_all_p_above_thresholds(self) -> None:
+        p = [0.5, 0.6, 0.7, 0.8, 0.9]
+        rejected, p_crit = c15_stats.benjamini_hochberg(p, alpha=0.10)
+        assert rejected == [False] * 5
+        assert p_crit == 0.0
+
+    def test_input_order_preserved(self) -> None:
+        p = [0.9, 0.001, 0.5]
+        rejected, _ = c15_stats.benjamini_hochberg(p, alpha=0.10)
+        assert len(rejected) == 3
+        # only the smallest p-value (idx 1) can plausibly reject here
+        assert rejected[1] is True
+        assert rejected[0] is False
+
+
+# ----------------------------------------------------------------------------
 # Module-level sanity (registered constants match the registry, verbatim)
 # ----------------------------------------------------------------------------
 

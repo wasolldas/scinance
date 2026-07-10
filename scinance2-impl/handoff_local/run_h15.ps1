@@ -28,8 +28,17 @@
 # Ergebnisse: scinance2-impl\handoff_local\results\h15_<timestamp>\
 #             + SUMMARY_<datum>.md (gate-auditor urteilt gegen H-15).
 #
+# Persistenz/Resume: der Treiber checkpointet NACH JEDEM ABGESCHLOSSENEN
+# SYMBOL atomar nach $CkptDir\<symbol>.json (analog H-14-Muster, stabil
+# UEBER mehrere Aufrufe hinweg, NICHT timestamped wie das Run-Verzeichnis)
+# - ein Timeout/Crash verliert hoechstens das GERADE LAUFENDE Symbol. Ein
+# erneuter Aufruf dieses Skripts setzt darueber automatisch fort. Die
+# finale c15_grammar_results.{json,md} wird weiterhin erst nach ALLEN 5
+# Symbolen geschrieben (kein Zwischenstand der Gesamt-JSON).
+#
 # Optionale Env-Overrides: HARVEST_DIR, MODE (full|mechanics, Default full),
-# HANDOFF_DRY_RUN=1 (+HANDOFF_DRY_RC).
+# CKPT_DIR (stabiler Resume-Ordner, Default s.u.), HANDOFF_DRY_RUN=1
+# (+HANDOFF_DRY_RC).
 # PS 5.1-kompatibel (handle-cache + BelowNormal + ASCII-Body).
 # ========================================================================
 $ErrorActionPreference = 'Continue'
@@ -37,6 +46,7 @@ $ErrorActionPreference = 'Continue'
 $ScriptDir = $PSScriptRoot
 $RepoRoot  = (Resolve-Path (Join-Path $ScriptDir '..\..')).Path
 $HarvestDir = if ($env:HARVEST_DIR) { $env:HARVEST_DIR } else { Join-Path $RepoRoot 'data\harvest' }
+$CkptDir = if ($env:CKPT_DIR) { $env:CKPT_DIR } else { Join-Path $ScriptDir 'results\h15_ckpt' }
 
 $Symbols     = 'BTCUSDT,ETHUSDT,SOLUSDT,BNBUSDT,XRPUSDT'
 $DataStart   = '2026-03-27'
@@ -121,6 +131,7 @@ function Invoke-Step {
 Write-Host ("RUN_H15 (T3) - Repo: " + $RepoRoot + " - Ergebnisse: " + $RunDir)
 Write-Host ("Harvest: " + $HarvestDir + " | Panel: " + $Symbols + " x publicTrade | Raster " + $DataStart + ".." + $DataEnd)
 Write-Host ("Walk-Forward: " + $NFolds + " Folds, " + $EmbargoDays + "-Tag-Embargo, Seeds " + $Seeds + " | Surrogate " + $NSurrogates + " (Block " + $BlockLen + ") | Modus " + $Mode)
+Write-Host ("Checkpoint-Ordner (stabil, Resume nach Timeout/Crash): " + $CkptDir)
 if ($DryRun) { Write-Host "ACHTUNG: HANDOFF_DRY_RUN aktiv - keine echten Laeufe." }
 
 $Script = Join-Path $RepoRoot 'scripts\c15_grammar.py'
@@ -163,7 +174,7 @@ if (-not $HarvestOk) {
             '--mode', $Mode,
             '--n-folds', "$NFolds", '--embargo-days', "$EmbargoDays",
             '--seeds', $Seeds, '--n-surrogates', "$NSurrogates", '--block-len', "$BlockLen",
-            '--out-dir', (Join-Path $RunDir 'h15')
+            '--out-dir', (Join-Path $RunDir 'h15'), '--ckpt-dir', $CkptDir
         ))
     }
 }
@@ -181,6 +192,7 @@ $sb = New-Object System.Text.StringBuilder
 [void]$sb.AppendLine("")
 [void]$sb.AppendLine("- **Erzeugt:** " + (Get-Date).ToUniversalTime().ToString('yyyy-MM-dd HH:mm:ss') + " UTC")
 [void]$sb.AppendLine("- **Run-Dir:** ``" + $RunDir + "``")
+[void]$sb.AppendLine("- **Checkpoint-Ordner (stabil, Resume nach Timeout/Crash):** ``" + $CkptDir + "``")
 [void]$sb.AppendLine("- **Modus:** " + $Mode + " (full = verdikt-faehig, braucht CUDA; mechanics = NIE verdikt-tragend)")
 [void]$sb.AppendLine("- **Harvest:** ``" + $HarvestDir + "`` (read-only Junction) | Panel: " + $Symbols + " x publicTrade")
 [void]$sb.AppendLine("- **Raster:** " + $DataStart + ".." + $DataEnd)
