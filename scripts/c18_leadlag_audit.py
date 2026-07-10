@@ -207,15 +207,27 @@ def main(argv: Optional[list[str]] = None) -> int:
         print(f"C18-LEADLAG-AUDIT BACKEND-FEHLER: {exc}", file=sys.stderr)
         return 2
 
+    data_binding_ok = payload.get("data_binding_vs_gl006", {}).get(
+        "all_windows_match_gl006"
+    )
     print(
         f"C18-LEADLAG-AUDIT H-18 | pair={payload['symbol_a']}/{payload['symbol_b']} "
         f"windows={payload['n_windows']} n_surrogates={payload['n_surrogates']} "
         f"backend={payload['backend']['resolved']} mode={payload['mode']} "
         f"verdict_carrying={payload['verdict_carrying']} "
+        f"data_binding_matches_gl006={data_binding_ok} "
         f"t1_holds={payload['t1_partial_claim'].get('t1_holds')} "
         f"t2_holds={payload['t2_partial_claim'].get('t2_holds')} "
         f"-> {json_path}, {md_path}"
     )
+    if data_binding_ok is False:
+        print(
+            "C18-LEADLAG-AUDIT WARNUNG: Fenster weichen von den archivierten "
+            "GL-006-Fenstern ab (all_windows_match_gl006=False) -- T1/T2 sind "
+            "NICHT als Aufloesung von GL-006 lesbar, siehe Report-Abschnitt "
+            "'Datenbindung vs. GL-006'.",
+            file=sys.stderr,
+        )
     return 0
 
 

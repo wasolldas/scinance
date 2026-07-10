@@ -94,7 +94,8 @@ SCRIPT="$REPO_ROOT/scripts/c18_leadlag_audit.py"
 
 # -- Schritt 1: Methodik-Aequivalenz-Test (immer, unabhaengig von GPU) ---
 step H18_SELFTEST "$TMO_SELFTEST" "$SCRIPT" --self-test --seed "$SEED" --out "$RUN/h18"
-if [ "$LAST_RC" != "0" ] && [ "$DRY" != "1" ]; then
+SELFTEST_RC="$LAST_RC"
+if [ "$SELFTEST_RC" != "0" ] && [ "$DRY" != "1" ]; then
     echo "FAIL: H18_SELFTEST — Methodik-Aequivalenz zur ORIGINALEN c17_c41_lead_lag-Pipeline gebrochen. Kein Audit-Lauf."
 fi
 
@@ -102,12 +103,20 @@ fi
 step H18_GPU_CHECK "$TMO_GPU_CHECK" "$SCRIPT" --check-gpu-only --out "$RUN/h18"
 GPU_RC="$LAST_RC"
 
-# -- Schritt 3: voller 100k-Surrogat-Audit-Lauf, nur bei echtem CUDA ------
+# -- Schritt 3: voller 100k-Surrogat-Audit-Lauf, nur bei echtem CUDA UND
+# bestandenem Selftest (Audit-Befund H-1: beide Bedingungen sind Pflicht,
+# nicht nur GPU_RC — ein gebrochener Selftest darf den teuren Lauf nie
+# durchlassen, das ist genau das Szenario, vor dem das Compute-Gating
+# schuetzen soll). --------------------------------------------------------
 if [ "$DRY" = "1" ]; then
     step H18_AUDIT "$TMO_AUDIT" "$SCRIPT" \
         --db "$DUCKDB_PATH" --pair "$PAIR" --windows "$N_WINDOWS" \
         --surrogates "$N_SURROGATES" --seed "$SEED" --db-copy --backend cuda \
         --out "$RUN/h18"
+elif [ "$SELFTEST_RC" != "0" ]; then
+    rec H18_AUDIT SKIP 0 0 "H18_SELFTEST fehlgeschlagen (rc=$SELFTEST_RC) — Methodik-Aequivalenz nicht bestaetigt, kein Audit-Lauf"
+    SK=$((SK+1))
+    echo "SKIP: H18_AUDIT — H18_SELFTEST fehlgeschlagen, Aequivalenz-Grundlage nicht gesichert (Compute-Gating-Pflicht)."
 elif [ "$GPU_RC" = "0" ]; then
     if [ ! -f "$DUCKDB_PATH" ]; then
         rec H18_AUDIT SKIP 0 0 "DuckDB fehlt ($DUCKDB_PATH)"; SK=$((SK+1))
@@ -125,6 +134,24 @@ else
 fi
 
 EXIT=0; [ "$FN" -gt 0 ] && EXIT=1; [ "$FN" -eq 0 ] && [ "$SK" -gt 0 ] && EXIT=2
+
+# Datenbindungs-Status gegen GL-006 fuer die SUMMARY sichtbar machen (Audit-
+# Befund M-1: darf nicht nur im JSON-Report-Koerper stehen).
+DATA_BINDING_JSON="$RUN/h18/c18_leadlag_audit_results.json"
+DATA_BINDING_STATUS="n/a (kein Report)"
+if [ -f "$DATA_BINDING_JSON" ]; then
+    DATA_BINDING_STATUS=$("$PY" -c "
+import json, sys
+try:
+    with open(sys.argv[1]) as f:
+        d = json.load(f)
+    v = d.get('data_binding_vs_gl006', {}).get('all_windows_match_gl006')
+    print(v)
+except Exception as e:
+    print(f'n/a ({e})')
+" "$DATA_BINDING_JSON" 2>/dev/null || echo "n/a (Parse-Fehler)")
+fi
+
 SUMMARY="$RUN/SUMMARY_$SUMD.md"
 {
     echo "# H-18 GL-006/H-04 Lead-Lag High-N-Surrogat-Aufloesungs-Audit — T3 (Welle 5)"
@@ -147,6 +174,10 @@ SUMMARY="$RUN/SUMMARY_$SUMD.md"
     if [ -f "$STEPS" ]; then while IFS=$'\t' read -r n s r d de; do echo "| $n | $s | $r | ${d}s | $de |"; done < "$STEPS"; fi
     echo ""
     echo "**Gesamt:** ok=$OKN fail=$FN skip=$SK -> exit $EXIT"
+    echo ""
+    echo "**Datenbindung vs. GL-006 (all_windows_match_gl006): $DATA_BINDING_STATUS**"
+    echo "— bei \`False\` misst dieser Lauf NICHT die archivierten GL-006-Fenster,"
+    echo "T1/T2 sind dann NICHT als Aufloesung von GL-006 lesbar (s. Report)."
     echo ""
     echo "*Ergebnis: \`h18/c18_leadlag_audit_results.json\` (+ .md) enthaelt die"
     echo "vorregistrierten Teil-Claims T1 (12 GL-006-Stage-1-FDR-Survivor bei p<=1e-3"

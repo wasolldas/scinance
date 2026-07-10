@@ -4,10 +4,13 @@ VERDICT-CARRYING NULL (byte-identical to GL-006): the circular block shift of
 the source series, exactly as in ``c17_c41_lead_lag.surrogate._circular_shift``.
 The random shift OFFSETS are always drawn on the CPU with the SAME sequential
 ``np.random.default_rng(seed).integers(lo, hi)`` consumption as the original
-serial loop, so at equal ``n_surrogates`` the surrogate ensemble is
-bit-identical to the original pipeline regardless of the compute backend
-(numpy / torch-cpu / torch-cuda). Only the *statistic evaluation* over the
-ensemble is batched.
+serial loop, so at equal ``n_surrogates`` the shift offsets / shifted series
+are bit-identical to the original pipeline regardless of the compute backend
+(numpy / torch-cpu / torch-cuda). The TE/WCOH *statistic computed over* that
+bit-identical ensemble is batched and can differ from the original by
+floating-point summation order (~1e-16 per cell, see ``te_batched.py`` -- this
+never changed a p-value in any tested case, but "bit-identical" applies to the
+offsets/ensemble members, not to every derived floating-point statistic).
 
 REGISTRY-NAMED GPU PRIMITIVES (H-18 Methodik): phase-shuffle surrogates via
 ``rfft``/``irfft`` with randomised phases (amplitude spectrum preserved) and

@@ -134,13 +134,20 @@ $rcGpu = Invoke-Step -Name 'H18_GPU_CHECK' -TimeoutSec $TmoGpuCheck -CmdArgs @(
     $Script, '--check-gpu-only', '--out', (Join-Path $RunDir 'h18')
 )
 
-# -- Schritt 3: voller 100k-Surrogat-Audit-Lauf, nur bei echtem CUDA ------
+# -- Schritt 3: voller 100k-Surrogat-Audit-Lauf, nur bei echtem CUDA UND
+# bestandenem Selftest (Audit-Befund H-1: beide Bedingungen sind Pflicht,
+# nicht nur $rcGpu - ein gebrochener Selftest darf den teuren Lauf nie
+# durchlassen, das ist genau das Szenario, vor dem das Compute-Gating
+# schuetzen soll). --------------------------------------------------------
 if ($DryRun) {
     [void](Invoke-Step -Name 'H18_AUDIT' -TimeoutSec $TmoAudit -CmdArgs @(
         $Script, '--db', $DuckDbPath, '--pair', $Pair, '--windows', "$NWindows",
         '--surrogates', "$NSurrogates", '--seed', "$Seed", '--db-copy', '--backend', 'cuda',
         '--out', (Join-Path $RunDir 'h18')
     ))
+} elseif ($rcSelftest -ne 0) {
+    Record-Step -Name 'H18_AUDIT' -Status 'SKIP' -Rc 0 -Dur 0 -Detail ("H18_SELFTEST fehlgeschlagen (rc=" + $rcSelftest + ") - Methodik-Aequivalenz nicht bestaetigt, kein Audit-Lauf")
+    Write-Host "SKIP: H18_AUDIT - H18_SELFTEST fehlgeschlagen, Aequivalenz-Grundlage nicht gesichert (Compute-Gating-Pflicht)."
 } elseif ($rcGpu -eq 0) {
     if (-not (Test-Path $DuckDbPath)) {
         Record-Step -Name 'H18_AUDIT' -Status 'SKIP' -Rc 0 -Dur 0 -Detail ("DuckDB fehlt (" + $DuckDbPath + ")")
@@ -163,6 +170,19 @@ $fail = ($Script:Results | Where-Object { $_.Status -eq 'FAIL' }).Count
 $skip = ($Script:Results | Where-Object { $_.Status -eq 'SKIP' }).Count
 $exit = 0
 if ($fail -gt 0) { $exit = 1 } elseif ($skip -gt 0) { $exit = 2 }
+
+# Datenbindungs-Status gegen GL-006 fuer die SUMMARY sichtbar machen (Audit-
+# Befund M-1: darf nicht nur im JSON-Report-Koerper stehen).
+$DataBindingJson = Join-Path $RunDir 'h18\c18_leadlag_audit_results.json'
+$DataBindingStatus = 'n/a (kein Report)'
+if (Test-Path $DataBindingJson) {
+    try {
+        $resultObj = Get-Content -Raw -Path $DataBindingJson | ConvertFrom-Json
+        $DataBindingStatus = [string]$resultObj.data_binding_vs_gl006.all_windows_match_gl006
+    } catch {
+        $DataBindingStatus = 'n/a (Parse-Fehler)'
+    }
+}
 
 $SummaryPath = Join-Path $RunDir ("SUMMARY_" + $SummaryDate + ".md")
 $sb = New-Object System.Text.StringBuilder
@@ -189,6 +209,10 @@ foreach ($r in $Script:Results) {
 }
 [void]$sb.AppendLine("")
 [void]$sb.AppendLine("**Gesamt:** ok=" + $ok + " fail=" + $fail + " skip=" + $skip + " -> exit " + $exit)
+[void]$sb.AppendLine("")
+[void]$sb.AppendLine("**Datenbindung vs. GL-006 (all_windows_match_gl006): " + $DataBindingStatus + "**")
+[void]$sb.AppendLine("- bei ``False`` misst dieser Lauf NICHT die archivierten GL-006-Fenster,")
+[void]$sb.AppendLine("T1/T2 sind dann NICHT als Aufloesung von GL-006 lesbar (s. Report).")
 [void]$sb.AppendLine("")
 [void]$sb.AppendLine("*Ergebnis: ``h18\c18_leadlag_audit_results.json`` (+ .md) enthaelt die")
 [void]$sb.AppendLine("vorregistrierten Teil-Claims T1 (12 GL-006-Stage-1-FDR-Survivor bei p<=1e-3")
