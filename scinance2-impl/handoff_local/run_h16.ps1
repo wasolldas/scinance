@@ -203,3 +203,4 @@ if ($exit -eq 2) {
 Write-Host ""
 Write-Host ("SUMMARY: " + $SummaryPath)
 Write-Host ("Gesamt: ok=" + $ok + " fail=" + $fail + " skip=" + $skip + " -> exit " + $exit)
+exit $exit
