@@ -28,6 +28,23 @@ from bybit_edge.layers.base import BaseModule
 _Vec2 = npt.NDArray[np.float64]   # shape (2,)
 _Mat2 = npt.NDArray[np.float64]   # shape (2, 2)
 
+# F/Q are parameterized for this nominal inter-update interval. compute()
+# is invoked on irregular ticker updates (not a fixed timer), so _predict()
+# rescales F/Q by the actual elapsed wall-clock time relative to this
+# reference instead of applying a fixed per-call factor (see
+# CRITICAL_REVIEW_2 M24-Finding).
+_REFERENCE_DT_SECONDS: float = 1.0
+
+# Floor: guards against a near-zero/degenerate measured dt (e.g. two
+# back-to-back calls within the same millisecond) collapsing the process
+# noise Q toward zero and effectively freezing the filter. Also a
+# reasonable lower bound on realistic exchange ticker cadence.
+_MIN_DT_SECONDS: float = 0.01
+
+# Cap: a long reconnect/quiet gap shouldn't blow up decay/process-noise
+# scaling beyond "state fully forgotten".
+_MAX_DT_SECONDS: float = 3600.0
+
 
 class M24KalmanPremium(BaseModule):
     """Kalman-Funding-Premium-Decomposition Module.
@@ -73,15 +90,33 @@ class M24KalmanPremium(BaseModule):
         self._P: _Mat2 = np.eye(2, dtype=np.float64) * 1e-4  # State-Kovarianz
 
         self._initialized: bool = False
+        # Timestamp of the last compute() call (from ticker_data["ts"], NOT
+        # wall-clock — see compute()) — used to derive the actual elapsed dt
+        # for time-scaled predict().
+        self._last_update_ts: float | None = None
 
     # ------------------------------------------------------------------
     # Kalman-Filter Kern
     # ------------------------------------------------------------------
 
-    def _predict(self) -> None:
-        """Kalman predict step: propagiert State und Kovarianz."""
-        self._x = self._F @ self._x
-        self._P = self._F @ self._P @ self._F.T + self._Q
+    def _predict(self, dt: float) -> None:
+        """Kalman predict step: propagiert State und Kovarianz über `dt` Sekunden.
+
+        F/Q sind auf `_REFERENCE_DT_SECONDS` parametrisiert. Bei
+        unregelmäßigen Aufrufintervallen skalieren wir den Zerfall
+        (diagonale F-Einträge) mit `F_ii ** (dt / dt_reference)` und das
+        Prozessrauschen Q linear mit `dt / dt_reference`, damit die
+        effektive Zerfallsrate von echter verstrichener Zeit abhängt statt
+        von der Tick-Dichte. Annahme: F ist diagonal (wie im gesamten
+        Modul-Design — Random-Walk-Trend, Mean-Reverting-Sentiment).
+        """
+        ratio = dt / _REFERENCE_DT_SECONDS
+        f_diag = np.maximum(np.diag(self._F), 0.0)
+        f_dt_diag = f_diag ** ratio
+        F_dt = np.diag(f_dt_diag)
+
+        self._x = F_dt @ self._x
+        self._P = F_dt @ self._P @ F_dt.T + self._Q * ratio
 
     def _update(self, z: _Vec2) -> None:
         """Kalman update step: korrigiert State mit Beobachtung z."""
@@ -103,6 +138,9 @@ class M24KalmanPremium(BaseModule):
         ----------
         ticker_data : dict
             Muss enthalten: ``funding_rate``, ``mark_price``, ``index_price``.
+            Optional: ``ts`` (epoch seconds) — used as the "now" for
+            dt-scaling (see ``_predict``); falls back to wall-clock
+            ``time.time()`` only if absent.
 
         Returns
         -------
@@ -121,11 +159,28 @@ class M24KalmanPremium(BaseModule):
 
         z: _Vec2 = np.array([funding_rate, basis], dtype=np.float64)
 
-        # Kalman predict + update
-        if self._initialized:
-            self._predict()
+        # "now" MUST come from ticker_data["ts"], not wall-clock time.time():
+        # this module also runs inside ReplayBacktester, which feeds ticks at
+        # CPU speed while ticker_data["ts"] carries the SIMULATED/event time
+        # (see replay_backtester._build_ticker_data). Using real wall-clock
+        # time here would make the dt-scaling below measure backtest-loop
+        # processing speed instead of actual elapsed market time, silently
+        # defeating the fix (same convention as M14 Hawkes's ``current_ts``
+        # parameter). live_runner._build_ticker_data sets ts=time.time(), so
+        # live behaviour is unchanged.
+        now: float = float(ticker_data.get("ts") or time.time())
+
+        # Kalman predict + update. dt is the actual elapsed time (event time
+        # in replay, wall-clock in live) since the last call, clamped to a
+        # sane range (see _MIN_DT_SECONDS/_MAX_DT_SECONDS) so predict()
+        # decays/injects process noise proportional to real elapsed time
+        # rather than to the number of compute() calls.
+        if self._initialized and self._last_update_ts is not None:
+            dt = float(np.clip(now - self._last_update_ts, _MIN_DT_SECONDS, _MAX_DT_SECONDS))
+            self._predict(dt)
         self._update(z)
         self._initialized = True
+        self._last_update_ts = now
 
         trend: float = float(self._x[0])
         sentiment: float = float(self._x[1])
@@ -158,7 +213,7 @@ class M24KalmanPremium(BaseModule):
             "sentiment_zscore": sentiment_zscore,
             "method_id": "M24",
             "confidence": confidence,
-            "ts": time.time(),
+            "ts": now,
         }
 
     def validate(self) -> bool:
@@ -175,3 +230,4 @@ class M24KalmanPremium(BaseModule):
         self._x = np.zeros(2, dtype=np.float64)
         self._P = np.eye(2, dtype=np.float64) * 1e-4
         self._initialized = False
+        self._last_update_ts = None

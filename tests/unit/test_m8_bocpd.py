@@ -200,6 +200,56 @@ class TestSignalIsBinary:
         assert 1 in signals, "Should have at least one changepoint signal"
 
 
+class TestNaNObservationSelfHeals:
+    """Regression: a single non-finite observation must not poison the
+    run-length posterior forever (CRITICAL_REVIEW_2 M8 finding).
+
+    Previously, `evidence > 0` is False for NaN, so the NaN-contaminated
+    unnormalised array was adopted as the new state directly, and every
+    subsequent compute() call — even with perfectly normal data — kept
+    returning NaN silently.
+    """
+
+    def test_single_nan_does_not_poison_state_forever(self) -> None:
+        rng = np.random.default_rng(5)
+        detector = M8BOCPD(hazard_lambda=200, prior_mean=0.0, prior_var=1.0)
+
+        for _ in range(30):
+            detector.compute(rng.normal(0.0, 0.5))
+
+        # Poison with a single NaN tick (e.g. from an upstream 0/0).
+        poisoned = detector.compute(float("nan"))
+        assert not np.isnan(poisoned["changepoint_prob"])
+
+        # Every call *after* the NaN tick must recover — not stay NaN.
+        for _ in range(10):
+            r = detector.compute(rng.normal(0.0, 0.5))
+            assert not np.isnan(r["changepoint_prob"]), (
+                "State should self-heal after a single NaN tick instead of "
+                "staying poisoned forever"
+            )
+            assert not np.isnan(detector._R).any(), (
+                "Internal run-length distribution should not carry NaN "
+                "after recovering from a poisoned tick"
+            )
+
+    def test_inf_observation_also_skipped(self) -> None:
+        detector = M8BOCPD(hazard_lambda=200, prior_mean=0.0, prior_var=1.0)
+        for _ in range(10):
+            detector.compute(0.0)
+        t_before = detector._t
+
+        r = detector.compute(float("inf"))
+        assert not np.isnan(r["changepoint_prob"])
+        assert r["changepoint"] is False
+        # A skipped tick must not advance the internal time counter.
+        assert detector._t == t_before
+
+        # Follow-up calls remain healthy.
+        r2 = detector.compute(0.0)
+        assert not np.isnan(r2["changepoint_prob"])
+
+
 class TestReturnDictStructure:
     """Ensure all expected keys are present in the return dict."""
 

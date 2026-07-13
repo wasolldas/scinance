@@ -134,3 +134,45 @@ class TestReset:
         rng = np.random.default_rng(42)
         mod.compute(rng.normal(0, 1, 200))
         mod.reset()  # Should not raise
+
+
+class TestConstantSeriesNoSpuriousBreakout:
+    """Regression: a frozen/constant series must NOT yield a high-confidence
+    breakout signal (CRITICAL_REVIEW_2 M12 finding).
+
+    A stuck feed (WS reconnect, illiquid symbol, repeated last price)
+    previously drove auto-epsilon to its numerical floor, making the
+    recurrence matrix fully recurrent and producing confidence≈1.0
+    "breakout imminent" for a market that wasn't moving at all.
+    """
+
+    def test_exactly_constant_series_no_breakout(self) -> None:
+        mod = M12RQA()
+        series = np.ones(500)
+        result = mod.compute(series)
+
+        assert result["breakout_signal"] is False
+        assert result["signal"] == 0
+        assert result["confidence"] == 0.0
+        assert result["degenerate"] is True
+
+    def test_near_constant_series_no_breakout(self) -> None:
+        """A series with only floating-point-noise-level variation should
+        also be treated as degenerate, not just an exactly constant one."""
+        mod = M12RQA()
+        rng = np.random.default_rng(7)
+        series = 1.0 + rng.normal(0, 1e-13, 500)
+        result = mod.compute(series)
+
+        assert result["breakout_signal"] is False
+        assert result["confidence"] == 0.0
+        assert result["degenerate"] is True
+
+    def test_normal_series_not_flagged_degenerate(self) -> None:
+        """A genuinely varying series should not be marked degenerate."""
+        mod = M12RQA()
+        rng = np.random.default_rng(7)
+        series = rng.normal(0, 1.0, 500)
+        result = mod.compute(series)
+
+        assert result["degenerate"] is False

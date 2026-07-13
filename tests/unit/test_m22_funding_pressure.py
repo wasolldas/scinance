@@ -39,6 +39,22 @@ def _make_ticker(premium_index: float) -> dict:
     }
 
 
+def _make_jittered_ticker(rng: np.random.Generator) -> dict:
+    """Ticker whose pressure varies slightly around a small non-zero value.
+
+    Used to build "quiet phase" history with a *genuine* non-degenerate
+    sigma. A perfectly constant premium_index yields a perfectly constant
+    pressure, whose std is either exactly 0.0 (if pressure lands exactly on
+    0) or a meaningless ~1e-20 floating-point-summation artifact (if it
+    doesn't) — neither is a real reference distribution. Offsetting the
+    premium just past the clamp boundary by a small jittered amount
+    produces a small but reliably non-zero, non-constant pressure series.
+    """
+    jitter = float(rng.uniform(0.0, 0.0002))
+    premium_index = FUNDING_INTEREST_RATE - (FUNDING_CLAMP_UPPER + 0.0003 + jitter)
+    return _make_ticker(premium_index)
+
+
 class TestPressureCalculation:
     """Test analytisch berechnete Pressure-Werte."""
 
@@ -93,11 +109,13 @@ class TestSignalInWindow:
     def test_signal_in_window(self) -> None:
         """30 min vor Settlement mit extremem Pressure → Signal != 0."""
         mod = M22FundingPressure()
+        rng = np.random.default_rng(1)
 
-        # Erst History füllen mit kleinen Pressure-Werten für niedrige Sigma
+        # Erst History füllen mit kleinen, leicht schwankenden Pressure-Werten
+        # (echte, kleine Sigma statt exakt-konstant/0).
         for _ in range(_MIN_SAMPLES_FOR_SIGMA + 50):
             mod.compute(
-                _make_ticker(FUNDING_INTEREST_RATE),  # pressure ≈ 0
+                _make_jittered_ticker(rng),
                 seconds_to_settlement=3600.0,
             )
 
@@ -113,11 +131,12 @@ class TestSignalInWindow:
     def test_signal_outside_window(self) -> None:
         """60 min vor Settlement → Signal == 0 (außerhalb Window)."""
         mod = M22FundingPressure()
+        rng = np.random.default_rng(2)
 
         # History füllen
         for _ in range(_MIN_SAMPLES_FOR_SIGMA + 50):
             mod.compute(
-                _make_ticker(FUNDING_INTEREST_RATE),
+                _make_jittered_ticker(rng),
                 seconds_to_settlement=7200.0,
             )
 
@@ -165,11 +184,12 @@ class TestSignalDirection:
     """Test korrekte Signal-Richtung."""
 
     def _build_module_with_history(self) -> M22FundingPressure:
-        """Baut ein Modul mit genug History (pressure ≈ 0, sigma klein)."""
+        """Baut ein Modul mit genug History (pressure klein, sigma klein > 0)."""
         mod = M22FundingPressure()
+        rng = np.random.default_rng(3)
         for _ in range(_MIN_SAMPLES_FOR_SIGMA + 50):
             mod.compute(
-                _make_ticker(FUNDING_INTEREST_RATE),  # pressure ≈ 0
+                _make_jittered_ticker(rng),
                 seconds_to_settlement=3600.0,
             )
         return mod
@@ -223,11 +243,13 @@ class TestReset:
     def test_reset_clears_history(self) -> None:
         """Nach reset() ist die History leer und sigma == 0."""
         mod = M22FundingPressure()
+        rng = np.random.default_rng(4)
 
-        # Fülle History
+        # Fülle History mit leicht schwankenden (nicht exakt konstanten)
+        # Pressure-Werten, damit sigma auf einer echten Streuung beruht.
         for _ in range(_MIN_SAMPLES_FOR_SIGMA + 50):
             mod.compute(
-                _make_ticker(0.001),
+                _make_jittered_ticker(rng),
                 seconds_to_settlement=900.0,
             )
 
@@ -254,6 +276,102 @@ class TestValidate:
         """Standard-Konfiguration ist valide."""
         mod = M22FundingPressure()
         assert mod.validate() is True
+
+
+class TestSigmaExcludesCurrentTickAndUsesTimeWindow:
+    """Regression: `_24h_sigma` must not include the current tick in its own
+    reference distribution, and its window must be time-based rather than a
+    fixed sample count (CRITICAL_REVIEW_2 M22 finding).
+    """
+
+    def test_zscore_uses_prior_history_not_current_tick(self) -> None:
+        """The z-score of the CURRENT tick must be computed from sigma over
+        only the PRIOR history, not a sigma that already includes this
+        tick's own (possibly extreme) pressure value."""
+        mod = M22FundingPressure()
+
+        # Deterministic, known pressures: push diff just past the upper
+        # clamp by a small increasing amount so pressure = k * 1e-5
+        # exactly (clamped term is constant once diff exceeds the bound).
+        known_pressures = []
+        for k in range(1, _MIN_SAMPLES_FOR_SIGMA + 1):
+            diff = FUNDING_CLAMP_UPPER + k * 1e-5
+            premium_index = FUNDING_INTEREST_RATE - diff
+            mod.compute(_make_ticker(premium_index), seconds_to_settlement=3600.0)
+            known_pressures.append(k * 1e-5)
+
+        expected_sigma_prior = float(np.std(known_pressures))
+        assert expected_sigma_prior > 0
+
+        # One more, distinctly different pressure value as the "current" tick.
+        current_diff = FUNDING_CLAMP_UPPER + 500 * 1e-5
+        current_premium = FUNDING_INTEREST_RATE - current_diff
+        result = mod.compute(_make_ticker(current_premium), seconds_to_settlement=3600.0)
+        current_pressure = 500 * 1e-5
+
+        expected_zscore = current_pressure / expected_sigma_prior
+        assert result["pressure_zscore"] == pytest.approx(expected_zscore, rel=1e-9), (
+            "pressure_zscore should be computed from sigma over the prior "
+            "history only, excluding the current tick's own pressure"
+        )
+
+    def test_history_stores_timestamped_samples(self) -> None:
+        """The pressure history must carry timestamps (for time-based
+        pruning), not bare floats."""
+        mod = M22FundingPressure()
+        mod.compute(_make_ticker(0.001), seconds_to_settlement=900.0)
+        assert len(mod._pressure_history) == 1
+        entry = mod._pressure_history[0]
+        assert isinstance(entry, tuple)
+        assert len(entry) == 2
+
+    def test_stale_samples_pruned_by_wall_clock_time(self) -> None:
+        """Samples older than the 24h window must be pruned based on real
+        elapsed time, not retained purely because a sample-count cap
+        wasn't hit yet."""
+        mod = M22FundingPressure()
+        mod.compute(_make_ticker(0.001), seconds_to_settlement=900.0)
+        assert len(mod._pressure_history) == 1
+
+        # Simulate the one stored sample being > 24h old.
+        stale_ts, stale_pressure = mod._pressure_history[0]
+        mod._pressure_history[0] = (stale_ts - 25 * 60 * 60, stale_pressure)
+
+        mod.compute(_make_ticker(0.001), seconds_to_settlement=900.0)
+
+        # The stale entry should have been pruned; only the fresh one (from
+        # this call) remains.
+        assert len(mod._pressure_history) == 1
+        remaining_ts, _ = mod._pressure_history[0]
+        assert remaining_ts > stale_ts
+
+    def test_compute_uses_ticker_data_ts_not_wall_clock(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """compute() must derive "now" from ticker_data["ts"] when present,
+        not from real wall-clock time.time() — this module also runs inside
+        ReplayBacktester, which feeds ticks at CPU speed while
+        ticker_data["ts"] carries the SIMULATED/event time. If compute()
+        used time.time() here, the 24h pruning window would be driven by
+        backtest-loop processing speed instead of simulated elapsed market
+        time, silently defeating the whole time-based-window fix.
+        time.time() is monkeypatched to a constant so any use of it (instead
+        of ticker_data["ts"]) would make this assertion fail."""
+        monkeypatch.setattr(
+            "bybit_edge.layers.l5_risk.m22_funding_pressure.time.time",
+            lambda: 999_999.0,
+        )
+        mod = M22FundingPressure()
+
+        ticker = _make_ticker(0.001)
+        mod.compute(ticker | {"ts": 10_000.0}, seconds_to_settlement=900.0)
+        assert mod._pressure_history[0][0] == pytest.approx(10_000.0)
+
+        mod.compute(ticker | {"ts": 10_000.0 + 25 * 60 * 60}, seconds_to_settlement=900.0)
+        # The first sample (25h earlier in SIMULATED time) must be pruned
+        # even though wall-clock time.time() never moved.
+        assert len(mod._pressure_history) == 1
+        assert mod._pressure_history[0][0] == pytest.approx(10_000.0 + 25 * 60 * 60)
 
 
 class TestReturnFormat:

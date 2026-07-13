@@ -31,6 +31,18 @@ from bybit_edge.layers.base import BaseModule
 _FORWARD_HORIZON_S: float = 30.0 * 60.0
 _FORWARD_STEPS: int = 180  # 10-s-Auflösung
 
+# Kalibrierungsfenster-Limit (siehe CRITICAL_REVIEW_2 M26-Finding):
+# compute() erhält nur das AKTUELLE Open-Interest, keine historische
+# OI-Zeitreihe. `oi_history = [open_interest] * n` approximiert S(t) daher
+# für JEDES historische Event mit dem heutigen OI — für frühe Events einer
+# laufenden Kaskade (OI progressiv gefallen) ist das massiv falsch. Eine
+# echte historische OI-Serie ist ohne größere Änderungen am Aufrufer
+# (compute()-Signatur, Upstream-Datenfluss) hier nicht rekonstruierbar.
+# Als Milderung beschränken wir das Kalibrierungsfenster auf die jüngsten
+# Events, für die die Annahme "OI ≈ aktuelles OI" am wenigsten falsch ist,
+# statt das gesamte (potenziell sehr lange) liq_events-Fenster zu nutzen.
+_CALIBRATION_WINDOW_MAX_EVENTS: int = 20
+
 
 class M26SIR(BaseModule):
     """SIR-Kompartiment-Liquidations-Contagion Modul.
@@ -92,6 +104,13 @@ class M26SIR(BaseModule):
         S ≈ OI - kumuliertes Liq-Volumen
         I = laufende Liq-Rate (Events/Zeiteinheit)
         OLS: dI/dt ≈ β·S·I - γ·I  → regressiere dI/dt auf [S·I, -I]
+
+        LIMITATION: `open_interest_history` muss den zum jeweiligen
+        historischen Event-Zeitpunkt tatsächlich geltenden OI enthalten,
+        damit S(t) korrekt ist. Der einzige aktuelle Aufrufer
+        (`compute()`) kennt nur das AKTUELLE OI und approximiert die
+        gesamte Historie damit — siehe dortiger Kommentar zur
+        Fenster-Beschränkung.
 
         Returns
         -------
@@ -216,8 +235,15 @@ class M26SIR(BaseModule):
 
         # Re-Kalibrierung wenn genug Daten
         if len(liq_events) >= 10:
-            oi_history = [open_interest] * len(liq_events)  # Approximation
-            self._beta, self._gamma = self._calibrate(liq_events, oi_history)
+            # LIMITATION: nur das AKTUELLE Open-Interest ist hier bekannt.
+            # Wir kalibrieren daher nur auf die jüngsten
+            # _CALIBRATION_WINDOW_MAX_EVENTS Events (näher am aktuellen
+            # OI-Zeitpunkt) statt auf das volle liq_events-Fenster, um die
+            # Verzerrung durch die konstante-OI-Approximation zu begrenzen
+            # (siehe Modul-Kopf-Kommentar / CRITICAL_REVIEW_2 M26-Finding).
+            calib_events = liq_events[-_CALIBRATION_WINDOW_MAX_EVENTS:]
+            oi_history = [open_interest] * len(calib_events)  # Approximation
+            self._beta, self._gamma = self._calibrate(calib_events, oi_history)
             self._calibrated = True
 
         # R₀ berechnen — Division-by-Zero-Schutz

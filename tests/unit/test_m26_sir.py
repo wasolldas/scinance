@@ -192,6 +192,56 @@ class TestResetClearsCalibration:
         assert len(mod._recal_buffer) == 0
 
 
+class TestCalibrationWindowLimitedForConstantOIApproximation:
+    """Regression: re-calibration inside compute() must not use the FULL
+    liq_events history with a constant (current) OI approximation
+    (CRITICAL_REVIEW_2 M26 finding).
+
+    `compute()` only ever knows the CURRENT open_interest — there is no
+    historical OI series available to it. Feeding the current OI in for
+    every historical event in an arbitrarily long liq_events window badly
+    misestimates S(t) for the early/oldest events (OI may have fallen a
+    lot since then during an active cascade). We verify the module caps
+    how many trailing events it hands to `_calibrate()` instead of the
+    full history.
+    """
+
+    def test_calibration_window_is_capped(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        mod = M26SIR()
+        captured: dict[str, list] = {}
+
+        original_calibrate = mod._calibrate
+
+        def spy_calibrate(liq_events, open_interest_history):
+            captured["liq_events"] = liq_events
+            captured["oi_history"] = open_interest_history
+            return original_calibrate(liq_events, open_interest_history)
+
+        monkeypatch.setattr(mod, "_calibrate", spy_calibrate)
+
+        # Far more events than the calibration window cap.
+        events = _make_liq_events(200, volume=10.0)
+        mod.compute(events, open_interest=100_000.0, current_ts=1.0)
+
+        assert "liq_events" in captured, "compute() should trigger re-calibration"
+        assert len(captured["liq_events"]) < len(events), (
+            "Calibration should use a bounded recent window, not the full "
+            "liq_events history, when only the current OI is known"
+        )
+        # oi_history must be consistently sized with the (trimmed) events
+        # passed to _calibrate — no silent constant-OI blow-up across the
+        # full original history.
+        assert len(captured["oi_history"]) == len(captured["liq_events"])
+
+    def test_short_history_still_calibrates(self) -> None:
+        """Below the window cap, calibration should behave as before."""
+        mod = M26SIR()
+        events = _make_liq_events(12, volume=10.0)
+        result = mod.compute(events, open_interest=1_000.0, current_ts=1.0)
+        assert "r0" in result
+        assert not np.isnan(result["r0"])
+
+
 class TestReturnKeys:
     """Alle required Keys sind vorhanden und korrekt typisiert."""
 

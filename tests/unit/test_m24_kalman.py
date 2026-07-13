@@ -14,7 +14,12 @@ import numpy as np
 import pytest
 
 from bybit_edge.config import KALMAN_SENTIMENT_ZSCORE
-from bybit_edge.layers.l5_risk.m24_kalman_premium import M24KalmanPremium
+from bybit_edge.layers.l5_risk.m24_kalman_premium import (
+    M24KalmanPremium,
+    _MAX_DT_SECONDS,
+    _MIN_DT_SECONDS,
+    _REFERENCE_DT_SECONDS,
+)
 
 
 def _make_ticker(
@@ -175,6 +180,160 @@ class TestResetReinitializes:
         result = mod.compute(_make_ticker())
         assert result["method_id"] == "M24"
         assert result["signal"] in {-1, 0, 1}
+
+
+class TestPredictTimeScaling:
+    """Regression: the Kalman predict step must scale F/Q by the actual
+    elapsed wall-clock time since the last compute() call, not apply a
+    fixed factor once per call (CRITICAL_REVIEW_2 M24 finding).
+
+    Previously, 50 updates in 5 seconds decayed sentiment ~13x while a
+    single tick after a 5-minute quiet gap decayed it only by 0.95x — an
+    order-of-magnitude difference in effective decay rate driven purely by
+    tick density, not real market dynamics.
+    """
+
+    def test_predict_at_reference_dt_matches_raw_F(self) -> None:
+        mod = M24KalmanPremium()
+        mod._x = np.array([0.1, 1.0])
+        mod._predict(dt=_REFERENCE_DT_SECONDS)
+        # sentiment component decays by exactly F[1,1] = 0.95 at dt == reference
+        assert mod._x[1] == pytest.approx(0.95, rel=1e-9)
+        # trend has F[0,0] = 1.0 -> unaffected regardless of dt
+        assert mod._x[0] == pytest.approx(0.1, rel=1e-9)
+
+    def test_longer_dt_decays_more(self) -> None:
+        mod_short = M24KalmanPremium()
+        mod_short._x = np.array([0.0, 1.0])
+        mod_short._predict(dt=1.0)
+
+        mod_long = M24KalmanPremium()
+        mod_long._x = np.array([0.0, 1.0])
+        mod_long._predict(dt=10.0)
+
+        assert mod_long._x[1] < mod_short._x[1], (
+            "A longer elapsed real time should decay sentiment more"
+        )
+        assert mod_long._x[1] == pytest.approx(0.95 ** 10, rel=1e-6)
+
+    def test_many_fast_predicts_vs_one_slow_predict_same_total_time(self) -> None:
+        """50 predict() steps covering a total of 5s of real time should
+        decay sentiment the same as a single predict() spanning those same
+        5s — i.e. decay depends on elapsed time, not call count."""
+        mod_fast = M24KalmanPremium()
+        mod_fast._x = np.array([0.0, 1.0])
+        dt_step = 5.0 / 50
+        for _ in range(50):
+            mod_fast._predict(dt=dt_step)
+
+        mod_slow = M24KalmanPremium()
+        mod_slow._x = np.array([0.0, 1.0])
+        mod_slow._predict(dt=5.0)
+
+        assert mod_fast._x[1] == pytest.approx(mod_slow._x[1], rel=1e-6)
+
+    def test_compute_measures_actual_elapsed_wall_clock_time(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """compute() must track a real timestamp between calls rather than
+        assuming a fixed nominal interval per call."""
+        mod = M24KalmanPremium()
+
+        times = iter([1_000.0, 1_005.0])
+        monkeypatch.setattr(
+            "bybit_edge.layers.l5_risk.m24_kalman_premium.time.time",
+            lambda: next(times),
+        )
+
+        mod.compute(_make_ticker())
+        assert mod._last_update_ts == pytest.approx(1_000.0)
+
+        mod.compute(_make_ticker())
+        assert mod._last_update_ts == pytest.approx(1_005.0)
+
+    def test_compute_clamps_near_zero_dt_to_floor(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """A near-zero measured dt between calls must not collapse process
+        noise to (numerically) zero and freeze the filter."""
+        mod = M24KalmanPremium()
+        recorded_dts: list[float] = []
+        original_predict = mod._predict
+
+        def spy_predict(dt: float) -> None:
+            recorded_dts.append(dt)
+            original_predict(dt)
+
+        monkeypatch.setattr(mod, "_predict", spy_predict)
+        times = iter([2_000.0, 2_000.0 + 1e-9])
+        monkeypatch.setattr(
+            "bybit_edge.layers.l5_risk.m24_kalman_premium.time.time",
+            lambda: next(times),
+        )
+
+        mod.compute(_make_ticker())
+        mod.compute(_make_ticker())
+
+        assert recorded_dts == [pytest.approx(_MIN_DT_SECONDS)]
+        assert not np.isnan(mod._P).any()
+
+    def test_compute_clamps_huge_gap_to_max(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """A very long reconnect gap must not blow up decay/noise scaling
+        beyond a sane 'fully forgotten' cap."""
+        mod = M24KalmanPremium()
+        recorded_dts: list[float] = []
+        original_predict = mod._predict
+
+        def spy_predict(dt: float) -> None:
+            recorded_dts.append(dt)
+            original_predict(dt)
+
+        monkeypatch.setattr(mod, "_predict", spy_predict)
+        times = iter([3_000.0, 3_000.0 + 10 * _MAX_DT_SECONDS])
+        monkeypatch.setattr(
+            "bybit_edge.layers.l5_risk.m24_kalman_premium.time.time",
+            lambda: next(times),
+        )
+
+        mod.compute(_make_ticker())
+        mod.compute(_make_ticker())
+
+        assert recorded_dts == [pytest.approx(_MAX_DT_SECONDS)]
+        assert not np.isnan(mod._P).any()
+
+    def test_compute_uses_ticker_data_ts_not_wall_clock(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """compute() must derive dt from ticker_data["ts"] when present, not
+        from real wall-clock time.time() — this module also runs inside
+        ReplayBacktester, which feeds ticks at CPU speed while
+        ticker_data["ts"] carries the SIMULATED/event time. If compute()
+        used time.time() here, backtest dt-scaling would measure loop
+        processing speed instead of simulated elapsed market time, silently
+        defeating the whole dt-scaling fix. time.time() is monkeypatched to
+        a constant so any use of it (instead of ticker_data["ts"]) would
+        yield dt == floor for both calls, which this test rules out."""
+        mod = M24KalmanPremium()
+        recorded_dts: list[float] = []
+        original_predict = mod._predict
+
+        def spy_predict(dt: float) -> None:
+            recorded_dts.append(dt)
+            original_predict(dt)
+
+        monkeypatch.setattr(mod, "_predict", spy_predict)
+        monkeypatch.setattr(
+            "bybit_edge.layers.l5_risk.m24_kalman_premium.time.time",
+            lambda: 999_999.0,
+        )
+
+        mod.compute(_make_ticker() | {"ts": 5_000.0})
+        mod.compute(_make_ticker() | {"ts": 5_042.0})
+
+        assert recorded_dts == [pytest.approx(42.0)]
+        assert mod._last_update_ts == pytest.approx(5_042.0)
 
 
 class TestReturnFormat:

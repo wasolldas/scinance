@@ -169,6 +169,54 @@ class TestFitWithSyntheticData:
         )
 
 
+class TestMalformedFeaturesDegradeGracefully:
+    """Regression: compute() must not crash on a malformed/empty features
+    vector (CRITICAL_REVIEW_2 M9 finding).
+
+    Previously an empty or wrong-length array crashed with an unhandled
+    ValueError from numpy broadcasting in _gaussian_emission, unlike the
+    neighbouring M6-M8/M10-M13 modules which tolerate degenerate inputs.
+    """
+
+    def test_empty_array_does_not_crash(self) -> None:
+        hmm = M9HMM()
+        result = hmm.compute(np.array([]))
+        assert result["degraded"] is True
+        assert result["method_id"] == "M9"
+        assert result["state"] in (0, 1, 2)
+
+    def test_wrong_length_array_does_not_crash(self) -> None:
+        hmm = M9HMM()
+        result = hmm.compute(np.array([0.1, 0.2]))  # length 2 != n_features=3
+        assert result["degraded"] is True
+
+    def test_degraded_call_does_not_advance_state(self) -> None:
+        """A malformed call should return the last known state rather than
+        silently drifting it via an invalid forward step."""
+        hmm = M9HMM()
+        obs = np.array([0.10, -0.5, 0.001])
+        hmm.compute(obs)
+        alpha_before = hmm._alpha.copy()
+
+        hmm.compute(np.array([]))  # malformed — should not update _alpha
+
+        np.testing.assert_array_equal(hmm._alpha, alpha_before)
+
+    def test_valid_call_after_malformed_recovers(self) -> None:
+        """After a malformed call, a subsequent valid call must work
+        normally (no permanent degradation)."""
+        hmm = M9HMM()
+        hmm.compute(np.array([]))  # malformed, degrades gracefully
+        result = hmm.compute(np.array([0.008, 0.6, 0.00005]))
+        assert result["degraded"] is False
+        assert result["method_id"] == "M9"
+
+    def test_well_formed_call_marked_not_degraded(self) -> None:
+        hmm = M9HMM()
+        result = hmm.compute(np.array([0.01, 0.5, 0.0001]))
+        assert result["degraded"] is False
+
+
 class TestResetToPrior:
     """Reset should restore uniform prior."""
 

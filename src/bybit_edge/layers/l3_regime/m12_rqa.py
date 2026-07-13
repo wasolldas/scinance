@@ -23,6 +23,14 @@ from bybit_edge.config import (
 )
 from bybit_edge.layers.base import BaseModule
 
+# Below this standard deviation, an input series is treated as (near-)
+# constant/frozen (e.g. stuck WS feed, illiquid symbol, repeated last price
+# during a reconnect). Auto-epsilon would otherwise collapse toward the
+# numerical floor, making the recurrence matrix fully recurrent and
+# producing a spurious maximum-confidence "breakout imminent" signal for a
+# market that is not moving at all. See CRITICAL_REVIEW_2 M12 finding.
+_CONSTANT_SERIES_STD_FLOOR: float = 1e-9
+
 
 class M12RQA(BaseModule):
     """Recurrence Quantification Analysis for breakout detection.
@@ -254,13 +262,31 @@ class M12RQA(BaseModule):
                 "signal": 0,
                 "method_id": "M12",
                 "confidence": 0.0,
+                "degenerate": False,
+                "ts": ts,
+            }
+
+        # Guard: a (near-)constant/frozen series must never produce a
+        # high-confidence signal. Report an explicit low-confidence,
+        # degenerate result instead of letting epsilon collapse to its
+        # numerical floor.
+        std = float(np.std(series))
+        if std <= _CONSTANT_SERIES_STD_FLOOR:
+            return {
+                "det": 0.0,
+                "lam": 0.0,
+                "recurrence_rate": 0.0,
+                "breakout_signal": False,
+                "signal": 0,
+                "method_id": "M12",
+                "confidence": 0.0,
+                "degenerate": True,
                 "ts": ts,
             }
 
         # Auto-epsilon: 10% of standard deviation
         if epsilon is None:
-            std = float(np.std(series))
-            epsilon = 0.1 * std if std > 1e-12 else 1e-6
+            epsilon = 0.1 * std
 
         embedded = self._embed(series, self.embedding_dim, self.delay)
         R = self._recurrence_matrix(embedded, epsilon)
@@ -285,6 +311,7 @@ class M12RQA(BaseModule):
             "signal": signal,
             "method_id": "M12",
             "confidence": confidence,
+            "degenerate": False,
             "ts": ts,
         }
 

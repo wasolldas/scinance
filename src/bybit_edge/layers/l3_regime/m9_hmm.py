@@ -13,6 +13,7 @@ Features: [realized_vol_5min, sign(OFI_5min), funding_rate]
 
 from __future__ import annotations
 
+import logging
 import time
 from typing import Any
 
@@ -24,6 +25,8 @@ from bybit_edge.config import (
     HMM_TRAIN_MONTHS,
 )
 from bybit_edge.layers.base import BaseModule
+
+logger = logging.getLogger(__name__)
 
 # State labels
 TREND_UP: int = 0
@@ -315,10 +318,37 @@ class M9HMM(BaseModule):
         -------
         dict
             Keys: state, state_label, state_probs, signal, method_id,
-            confidence, ts.
+            confidence, degraded, ts.
         """
-        if features.ndim == 2:
+        features = np.asarray(features)
+
+        if features.ndim == 2 and features.shape[0] > 0:
             features = features[0]
+
+        # Guard: a malformed/empty features vector (e.g. from an upstream
+        # feature-builder hiccup during a data gap) must degrade gracefully
+        # instead of crashing with an unhandled ValueError in
+        # _gaussian_emission's broadcasting. Unlike M6-M8/M10-M13 in this
+        # layer, M9HMM previously had no such guard. We fall back to the
+        # last known forward state (no update) and flag the result as
+        # degraded, rather than propagating the exception.
+        if features.shape != (self.n_features,):
+            logger.warning(
+                "M9HMM.compute: malformed features shape %s (expected (%d,)); "
+                "returning last known state instead of crashing.",
+                features.shape, self.n_features,
+            )
+            map_state = int(np.argmax(self._alpha))
+            return {
+                "state": map_state,
+                "state_label": _STATE_LABELS[map_state],
+                "state_probs": self._alpha.tolist(),
+                "signal": _STATE_SIGNALS[map_state],
+                "method_id": "M9",
+                "confidence": float(self._alpha[map_state]),
+                "degraded": True,
+                "ts": time.time(),
+            }
 
         alpha = self._forward_step(features)
         map_state: int = int(np.argmax(alpha))
@@ -331,6 +361,7 @@ class M9HMM(BaseModule):
             "signal": _STATE_SIGNALS[map_state],
             "method_id": "M9",
             "confidence": confidence,
+            "degraded": False,
             "ts": time.time(),
         }
 

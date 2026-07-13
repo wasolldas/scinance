@@ -132,6 +132,26 @@ class M8BOCPD(BaseModule):
         dict with changepoint, changepoint_prob, run_length_map,
         signal, method_id, confidence, ts.
         """
+        # Guard: a single non-finite observation (e.g. from a 0/0 division
+        # upstream on the openInterest series) must not poison the
+        # run-length posterior forever. `evidence > 0` is False for NaN, so
+        # the un-normalised (NaN-contaminated) array would otherwise be
+        # adopted as the new state, and every subsequent call — even with
+        # perfectly normal data — would keep returning NaN silently. We
+        # skip the tick entirely and keep the previous (safe) state, which
+        # mirrors the uniform-prior fallback M9HMM._forward_step() takes
+        # when its own evidence sum is degenerate.
+        if not np.isfinite(x):
+            return {
+                "changepoint": False,
+                "changepoint_prob": 0.0,
+                "run_length_map": self._prev_map_rl,
+                "signal": 0,
+                "method_id": "M8",
+                "confidence": 0.0,
+                "ts": time.time(),
+            }
+
         self._t += 1
 
         # ----------------------------------------------------------
