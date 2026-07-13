@@ -8,9 +8,14 @@ serial loop, so at equal ``n_surrogates`` the shift offsets / shifted series
 are bit-identical to the original pipeline regardless of the compute backend
 (numpy / torch-cpu / torch-cuda). The TE/WCOH *statistic computed over* that
 bit-identical ensemble is batched and can differ from the original by
-floating-point summation order (~1e-16 per cell, see ``te_batched.py`` -- this
-never changed a p-value in any tested case, but "bit-identical" applies to the
-offsets/ensemble members, not to every derived floating-point statistic).
+floating-point summation order (~1e-16 per cell, see ``te_batched.py`` for
+the full caveat -- "bit-identical" applies to the offsets/ensemble members,
+not to every derived floating-point statistic). This ~1e-16 deviation can,
+in principle, flip an exactly-tied surrogate-vs-observed ``>=`` comparison
+and shift a p-value; at the registered GL-006 scale (n=3874) no such flip
+was observed in 26 trials, but this is an empirical, scale-dependent
+observation, not a proven invariant -- see ``te_batched.py`` module
+docstring for the demonstrated adversarial counter-example.
 
 REGISTRY-NAMED GPU PRIMITIVES (H-18 Methodik): phase-shuffle surrogates via
 ``rfft``/``irfft`` with randomised phases (amplitude spectrum preserved) and

@@ -82,6 +82,15 @@ GATE_LOG_PATH = "scinance2-impl/state/gate_log.md"
 #: The registered resolution target (registry H-18): 500x the GL-006 N=200.
 FULL_RESOLUTION_N_SURROGATES = 100_000
 
+#: The pre-registered RNG seed (registry H-18 / GL-006 F-LEADLAG methodology).
+#: NOT part of the compute-gating clause (backend/N) — a run with a
+#: non-registered seed can still be ``verdict_carrying`` (backend/N gate is
+#: independent), but it is NOT the pre-registered re-execution and MUST be
+#: flagged honestly (see ``seed_matches_registered`` in the payload / the
+#: CLI summary line and WARNUNG), analogous to the data-binding-vs-GL-006
+#: check above.
+REGISTERED_SEED = 42
+
 #: The archived GL-006 window span (informational — for data-binding display).
 GL006_SPAN_MS = tuple(
     (w["t0_ms"], w["t1_ms"]) for w in GL006_BASELINE["windows"]
@@ -363,6 +372,20 @@ def run(
     """
     resolved_backend = resolve_backend(backend)
     verdict_carrying, verdict_reason = _verdict_carrying(n_surrogates, resolved_backend)
+    seed_matches_registered = seed == REGISTERED_SEED
+    seed_note = (
+        f"seed={seed} entspricht dem vorregistrierten H-18/GL-006-Seed "
+        f"({REGISTERED_SEED})."
+        if seed_matches_registered
+        else (
+            f"ABWEICHUNG: seed={seed} != vorregistrierter Seed "
+            f"{REGISTERED_SEED} — dieser Lauf verwendet NICHT die "
+            "vorregistrierte F-LEADLAG-Methodik (Seed ist kein Teil des "
+            "Compute-Gating, kann also trotzdem verdict_carrying=true sein) "
+            "und darf NICHT als der registrierte GL-006-Aufloesungs-Re-Run "
+            "gelesen werden."
+        )
+    )
 
     ts_a, px_a = pair_a
     ts_b, px_b = pair_b
@@ -434,6 +457,9 @@ def run(
         "n_windows": len(windows),
         "n_surrogates": n_surrogates,
         "seed": seed,
+        "registered_seed": REGISTERED_SEED,
+        "seed_matches_registered": seed_matches_registered,
+        "seed_note": seed_note,
         "fdr_alpha": FDR_ALPHA,
         "grid_ms": grid_ms,
         "n_bins": n_bins,
@@ -628,7 +654,10 @@ def render_markdown(payload: dict[str, Any]) -> str:
     L.append(f"- **Quelle:** `{payload['source']}` (Paar `{payload['symbol_a']}`/`{payload['symbol_b']}`)")
     L.append(
         f"- **Fenster:** {payload['n_windows']} · **Surrogates:** {payload['n_surrogates']} "
-        f"(GL-006: 200) · **Seed:** {payload['seed']} · **BH-FDR alpha:** {payload['fdr_alpha']}"
+        f"(GL-006: 200) · **Seed:** {payload['seed']} "
+        f"(vorregistriert: {payload['registered_seed']}, "
+        f"seed_matches_registered: {_fmt(payload['seed_matches_registered'])}) "
+        f"· **BH-FDR alpha:** {payload['fdr_alpha']}"
     )
     L.append(
         f"- **Backend:** angefordert `{payload['backend']['requested']}` -> "
@@ -646,6 +675,9 @@ def render_markdown(payload: dict[str, Any]) -> str:
             "(Compute-Gating-Pflicht, registry H-18). T1/T2 unten sind "
             "INFORMATIV, kein vorregistriertes T1/T2-Ergebnis."
         )
+        L.append("")
+    if not payload["seed_matches_registered"]:
+        L.append(f"> **WARNUNG (Seed-Abweichung):** {payload['seed_note']}")
         L.append("")
 
     t1 = payload["t1_partial_claim"]

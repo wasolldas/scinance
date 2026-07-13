@@ -73,6 +73,7 @@ from bybit_edge.research.c17_c41_lead_lag.transfer_entropy import (
 from bybit_edge.research.c18_leadlag_audit import stats as c18_stats
 from bybit_edge.research.c18_leadlag_audit.driver import (
     FULL_RESOLUTION_N_SURROGATES,
+    REGISTERED_SEED,
     generate_synthetic_lead_lag_pair,
     gpu_status,
     render_markdown,
@@ -477,6 +478,86 @@ def test_verdict_carrying_false_without_cuda_regardless_of_n():
     assert payload["mode"] == "partial_or_equivalence_run"
     reason = payload["verdict_carrying_reason"].lower()
     assert "verdikt-tragend" in reason and "cuda" in reason
+
+
+def test_seed_matches_registered_true_for_the_registered_seed():
+    """The registered seed (42) must be flagged as matching itself, and the
+    registered-seed constant used by the driver must actually be 42 (the
+    GL-006/H-18 pre-registered value)."""
+    assert REGISTERED_SEED == 42
+    pair_x, pair_y = _independent_pair(seed=3, n_bars=300)
+    payload = run(
+        pair_x, pair_y, symbol_a="BTC", symbol_b="ETH",
+        n_windows=2, n_surrogates=20, lags=(2,), grid_ms=GRID_MS,
+        seed=REGISTERED_SEED, backend="numpy",
+    )
+    assert payload["seed"] == REGISTERED_SEED
+    assert payload["registered_seed"] == REGISTERED_SEED
+    assert payload["seed_matches_registered"] is True
+    assert "seed_note" in payload
+    md = render_markdown(payload)
+    assert "WARNUNG (Seed-Abweichung)" not in md
+
+
+def test_seed_deviation_from_registered_value_is_flagged_in_payload_and_report():
+    """GL-006/H-18 pins the F-LEADLAG re-execution to seed=42 (registry
+    H-18). Seed is NOT part of the backend/N compute-gating clause, so a
+    non-registered seed can still be verdict_carrying — but it must never be
+    silently indistinguishable from the registered re-run: it must be
+    flagged in the payload (machine-readable) AND surfaced in the Markdown
+    report (human-readable), analogous to the existing data-binding-vs-
+    GL-006 check."""
+    pair_x, pair_y = _independent_pair(seed=3, n_bars=300)
+    off_seed = REGISTERED_SEED + 57
+    payload = run(
+        pair_x, pair_y, symbol_a="BTC", symbol_b="ETH",
+        n_windows=2, n_surrogates=20, lags=(2,), grid_ms=GRID_MS,
+        seed=off_seed, backend="numpy",
+    )
+    assert payload["seed"] == off_seed
+    assert payload["registered_seed"] == REGISTERED_SEED
+    assert payload["seed_matches_registered"] is False
+    assert str(off_seed) in payload["seed_note"]
+
+    # Deviation must be visible in the human-readable report, not just JSON.
+    md = render_markdown(payload)
+    assert "WARNUNG (Seed-Abweichung)" in md
+    assert str(off_seed) in md
+
+
+def test_cli_summary_line_surfaces_seed_deviation(tmp_path: Path, capsys):
+    """End-to-end via the CLI entrypoint: a run with a non-registered seed
+    must print seed_matches_registered=False in the one-line summary and
+    emit a WARNUNG on stderr (mirroring the data_binding_ok WARNUNG)."""
+    import csv
+
+    n = 400
+    rng = np.random.default_rng(11)
+    rx = rng.normal(0.0, 1e-3, size=n)
+    ry = rng.normal(0.0, 1e-3, size=n)
+    ts_a, px_a = _ticks_from_log_returns(rx, 50_000.0)
+    ts_b, px_b = _ticks_from_log_returns(ry, 3_000.0)
+    file_a = tmp_path / "a.csv"
+    file_b = tmp_path / "b.csv"
+    for f, (t, p) in ((file_a, (ts_a, px_a)), (file_b, (ts_b, px_b))):
+        with f.open("w", newline="") as fh:
+            w = csv.writer(fh)
+            w.writerow(["ts", "price"])
+            for tt, pp in zip(t, p):
+                w.writerow([f"{tt:.3f}", f"{pp:.4f}"])
+
+    rc = c18_cli.main([
+        "--file-a", str(file_a), "--file-b", str(file_b),
+        "--pair", "BTC,ETH",
+        "--windows", "2", "--surrogates", "20", "--lags", "2",
+        "--grid-ms", str(GRID_MS), "--seed", str(REGISTERED_SEED + 1),
+        "--backend", "numpy", "--out", str(tmp_path / "out"),
+    ])
+    assert rc == 0
+    captured = capsys.readouterr()
+    assert "seed_matches_registered=False" in captured.out
+    assert "WARNUNG" in captured.err
+    assert "eed" in captured.err
 
 
 def _independent_pair(seed: int, n_bars: int = 400, sigma: float = 1e-3):

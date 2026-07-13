@@ -13,6 +13,21 @@ The ONLY tolerated deviation from the serial original is floating-point
 summation order (pairwise vs. sequential over <= b**3 = 27 cells), i.e.
 ~1e-16-level differences; the self-test/unit tests bound this explicitly.
 
+CAVEAT (NOT a proven invariant, do not overstate): this ~1e-16 deviation is
+usually inconsequential for the *value* of a TE statistic, but the p-value
+is a discrete count of ``surrogate_stat >= observed_stat`` (see
+``surrogate_test_te_batched`` below). When a surrogate TE statistic is
+EXACTLY tied with the observed statistic (common with small windows / tie-
+heavy quantised series), the 1-ULP rounding difference between the serial
+(c17) and batched (c18) computation can push that tie to opposite sides of
+the ``>=`` comparison, changing ``n_ge`` by +/-1 and shifting the reported
+p-value -- demonstrated jumps of up to ~0.14 absolute on adversarially
+constructed tie-heavy inputs, with bit-identical surrogate ensembles. At the
+registered GL-006 scale (n=3874, BTC/ETH, the actual re-run inputs) this
+was empirically NOT observed (0 flips in 26 trials), so the risk to the
+registered audit is believed low -- but "never changes a p-value" is a
+scale-dependent empirical observation here, not a general guarantee.
+
 KAPITALFREI: pure directed-information measurement, no tradability logic.
 """
 from __future__ import annotations

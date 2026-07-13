@@ -210,9 +210,11 @@ def main(argv: Optional[list[str]] = None) -> int:
     data_binding_ok = payload.get("data_binding_vs_gl006", {}).get(
         "all_windows_match_gl006"
     )
+    seed_ok = payload.get("seed_matches_registered")
     print(
         f"C18-LEADLAG-AUDIT H-18 | pair={payload['symbol_a']}/{payload['symbol_b']} "
         f"windows={payload['n_windows']} n_surrogates={payload['n_surrogates']} "
+        f"seed={payload['seed']} seed_matches_registered={seed_ok} "
         f"backend={payload['backend']['resolved']} mode={payload['mode']} "
         f"verdict_carrying={payload['verdict_carrying']} "
         f"data_binding_matches_gl006={data_binding_ok} "
@@ -226,6 +228,11 @@ def main(argv: Optional[list[str]] = None) -> int:
             "GL-006-Fenstern ab (all_windows_match_gl006=False) -- T1/T2 sind "
             "NICHT als Aufloesung von GL-006 lesbar, siehe Report-Abschnitt "
             "'Datenbindung vs. GL-006'.",
+            file=sys.stderr,
+        )
+    if seed_ok is False:
+        print(
+            f"C18-LEADLAG-AUDIT WARNUNG: {payload['seed_note']}",
             file=sys.stderr,
         )
     return 0
