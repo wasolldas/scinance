@@ -88,6 +88,18 @@ Retrainings (Pflicht-Leak-Kontrolle) + 3 Ablations-Seeds auf `|Imbalance|`]
 - **Haupt-Null:** exakte Bayes-optimale AUC = 0,5 (kein Resampling); p-Wert
   je Symbol = exakter gepaarter Sign-Test des Median-Seed-AUC gegen diese
   Null.
+  **BEKANNTE EINSCHRÄNKUNG (dokumentiert, bewusst NICHT im Code geändert,
+  da eine Änderung der registrierten p-Wert-Prozedur nachträglich eine
+  Torpfosten-Verschiebung wäre):** Der exakte Sign-Test nimmt Unabhängigkeit
+  der (fwd>rev)-Vorzeichen über die Held-out-Fenster an. Bei Stride=64s und
+  Fensterlänge=512s teilen sich aufeinanderfolgende Fenster jedoch 87,5 %
+  ihrer Rohdaten — die Vorzeichen sind stark positiv korreliert, die
+  effektive unabhängige Stichprobengröße liegt eher bei n/8 als bei n.
+  `Binomial(n, 1/2)` unterschätzt dadurch die wahre Varianz; die p-Werte
+  sind **anti-konservativ** (zu klein) und fließen so in das BH-FDR-Gate
+  (α=0,10 über F-ARROW) ein. Der gate-auditor muss dies bei der
+  WEITER/DROP-Adjudikation als Kontext berücksichtigen (Details:
+  `stats.paired_sign_test_p` Docstring).
 - **Pflicht-Kontrolle (a) Pipeline-Leak:** dieselbe Pipeline auf 20 Tage-
   weisen **IAAFT**-Surrogaten (Schreiber & Schmitz 1996, Ende auf dem
   Amplituden-Schritt → exakte Marginalverteilung, approximatives Spektrum).

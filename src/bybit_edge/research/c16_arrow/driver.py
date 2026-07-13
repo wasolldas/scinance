@@ -69,6 +69,7 @@ from .scalogram import (
 )
 from .stats import (
     AUC_MIN,
+    FAMILY_SIZE,
     FDR_ALPHA,
     LEAK_AUC_MAX,
     N_SYMBOLS_MIN,
@@ -514,6 +515,23 @@ def run(
     (SKIP), so a missing GPU can never silently produce a verdict-shaped
     payload. With ``allow_cpu=True`` (explicit smoke escape hatch) or with
     ``max_days`` set the payload is stamped ``verdict_bearing = False``.
+
+    Family discipline (registry, binding): the F-ARROW BH-FDR family is
+    FIXED at :data:`FAMILY_SIZE` (= ``len(SYMBOLS_DEFAULT)``) cells,
+    ALWAYS, regardless of how many (or which, or duplicated) symbols are
+    passed in ``symbols`` — requesting fewer than the registered symbols,
+    or the same symbol twice, must never shrink or inflate the family BH
+    runs over. Missing/duplicate/failed symbols are padded with p = 1.0
+    sentinel cells (:func:`stats.sentinel_cell`) keyed to the registered
+    symbol set, BEFORE :func:`stats.evaluate_gate` runs. A crash on ONE
+    symbol (torch/CUDA OOM, device-side assert, or any other exception —
+    not just :class:`DataError`) never aborts the whole night run: the
+    per-symbol loop catches everything and turns the failure into a
+    sentinel cell so already-finished symbol cells are never lost and a
+    payload is ALWAYS written. A run in which ZERO symbols were actually
+    measured (pure data outage, e.g. an empty/stale harvester tree) can
+    never be ``verdict_bearing`` — that would make a data outage
+    indistinguishable from a genuine DROP verdict.
     """
     compute = check_gpu()
     if not compute["torch_available"]:
@@ -544,21 +562,83 @@ def run(
     parity = verify_torch_parity(device=device)
     print(f"[c16] torch/numpy scalogram parity: {parity}", file=sys.stderr, flush=True)
 
-    cells: list[dict[str, Any]] = []
+    # Dedupe requested symbols (order-preserving) — a duplicated symbol must
+    # never occupy two BH-family slots (finding 1).
+    requested_symbols = list(dict.fromkeys(symbols))
+    extra_symbols = [s for s in requested_symbols if s not in SYMBOLS_DEFAULT]
+    if extra_symbols:
+        print(f"[c16] WARNUNG: Symbole ausserhalb der registrierten F-ARROW-"
+              f"Familie angefordert (nicht Teil der fixen BH-Familie): "
+              f"{extra_symbols}", file=sys.stderr, flush=True)
+
+    measured_by_symbol: dict[str, dict[str, Any]] = {}
     cell_errors: list[dict[str, str]] = []
-    for symbol_index, symbol in enumerate(symbols):
+    for symbol_index, symbol in enumerate(requested_symbols):
         try:
-            cells.append(measure_symbol(
+            measured_by_symbol[symbol] = measure_symbol(
                 base_dir, symbol, symbol_index,
                 start_date=start_date, end_date=end_date,
                 n_seeds=n_seeds, n_surrogates=n_surrogates,
                 ablation_seeds=ablation_seeds, seed=seed, device=device,
                 epochs=epochs, batch_size=batch_size, lr=lr, max_days=max_days,
+            )
+        except Exception as exc:  # noqa: BLE001 — a per-symbol crash (incl.
+            # torch/CUDA OOM, device-side asserts — anything, not just
+            # DataError) must NEVER abort the whole overnight run and lose
+            # already-finished symbol cells (finding 3); it becomes a
+            # sentinel cell instead, and the run continues.
+            print(f"[c16] {symbol} FAILED ({type(exc).__name__}): {exc}",
+                  file=sys.stderr, flush=True)
+            cell_errors.append({
+                "symbol": symbol,
+                "error": f"{type(exc).__name__}: {exc}",
+            })
+            measured_by_symbol[symbol] = None
+
+    # Fixed F-ARROW family (registry H-16, finding 1): BH ALWAYS runs over
+    # exactly FAMILY_SIZE cells in the registered symbol order, regardless
+    # of how many/which symbols were requested or measured. Any registered
+    # symbol not requested, or whose measurement failed, is padded with a
+    # p = 1.0 sentinel so the BH threshold can never silently loosen.
+    cells: list[dict[str, Any]] = []
+    for symbol in SYMBOLS_DEFAULT:
+        result = measured_by_symbol.get(symbol)
+        if result is not None:
+            cells.append(result)
+        elif symbol in measured_by_symbol:
+            err = next(
+                (e["error"] for e in cell_errors if e["symbol"] == symbol),
+                "measurement failed",
+            )
+            cells.append(sentinel_cell(symbol, err))
+        else:
+            cells.append(sentinel_cell(
+                symbol,
+                "nicht in diesem Lauf angefordert (Registry-Familie F-ARROW "
+                f"erzwungen: {FAMILY_SIZE} Symbole)",
             ))
-        except DataError as exc:
-            print(f"[c16] {symbol} FAILED: {exc}", file=sys.stderr, flush=True)
-            cell_errors.append({"symbol": symbol, "error": str(exc)})
-            cells.append(sentinel_cell(symbol, str(exc)))
+    assert len(cells) == FAMILY_SIZE, (
+        f"F-ARROW family invariant violated: {len(cells)} != {FAMILY_SIZE}"
+    )
+    # extras outside the registered family are surfaced but never enter the
+    # fixed BH-FDR family:
+    extra_cells = [
+        measured_by_symbol[s] for s in extra_symbols
+        if measured_by_symbol.get(s) is not None
+    ]
+
+    n_measured_cells = sum(1 for c in cells if c.get("measured", True))
+    if n_measured_cells < 1:
+        # A run in which every registered symbol failed to load/measure is a
+        # pure DATA OUTAGE, not a genuine DROP measurement — it may never be
+        # verdict_bearing (finding 2), even if the compute gate itself was
+        # satisfied (real CUDA device, max_days unset).
+        verdict_bearing = False
+        non_verdict_reasons.append(
+            "0 von "
+            f"{len(cells)} F-ARROW-Zellen tatsaechlich gemessen (alle "
+            "Sentinel) — reiner Datenausfall, kein Verdikt ableitbar"
+        )
 
     gate = evaluate_gate(cells)
     if not verdict_bearing:
@@ -622,6 +702,8 @@ def run(
         },
         "cells": cells,
         "cell_errors": cell_errors,
+        "extra_symbols": extra_symbols,
+        "extra_cells": extra_cells,
         "gate": gate,
     }
 

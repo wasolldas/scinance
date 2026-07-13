@@ -41,6 +41,7 @@ import pyarrow as pa
 import pyarrow.parquet as pq
 
 from bybit_edge.research.c16_arrow import cnn as cnn_mod
+from bybit_edge.research.c16_arrow import driver as driver_mod
 from bybit_edge.research.c16_arrow.driver import (
     DIFFERENTIATION_NOTE,
     HYPOTHESIS_ID,
@@ -332,6 +333,134 @@ def test_evaluate_gate_family_size_padding_never_shrinks():
     # an all-sentinel family can never be gate-met
     assert gate["n_symbols_gate_met"] == 0
     assert gate["status"] == STATUS_MEASURED  # no measured symbol -> nothing invalid
+
+
+# ----------------------------------------------------------------------------
+# driver.run() level regressions (CRITICAL_REVIEW_2, wave5-c16-arrow):
+#   Bug 1 — F-ARROW BH family size must never shrink/inflate.
+#   Bug 2 — a zero-real-measurement run must never be verdict_bearing.
+#   Bug 3 — a per-symbol crash (not just DataError) must not lose the run.
+# All three drive driver.run() end-to-end with the compute gate and
+# measure_symbol faked out (the sandbox has no torch/GPU), so only the
+# orchestration logic in run() itself is under test.
+# ----------------------------------------------------------------------------
+
+
+_FAKE_COMPUTE = {
+    "torch_available": True,
+    "torch_version": "0.0.0-fake",
+    "cuda_available": True,
+    "device_count": 1,
+    "device_name": "FakeGPU",
+    "verdict_capable": True,
+    "hypothesis": HYPOTHESIS_ID,
+    "note": "fake compute status for driver.run() orchestration tests",
+}
+
+
+def _fake_measured_cell(symbol: str) -> dict:
+    return {
+        "symbol": symbol,
+        "measured": True,
+        "days": {}, "train_days": [], "test_days": [],
+        "n_train_windows": 10, "n_test_windows": 5,
+        "auc_seeds": [0.70], "auc": 0.70,
+        "p_value": 1e-6,
+        "p_value_sign_counts": {"n_pairs": 10, "n_greater": 9, "n_ties": 0},
+        "surrogate_aucs": [0.50, 0.51], "surrogate_p95": 0.51,
+        "leak_auc": 0.50,
+        "ablation_auc_seeds": [0.5], "ablation_auc_unsigned": 0.5,
+    }
+
+
+def test_run_pads_bh_family_to_registered_size_for_partial_symbol_panel(tmp_path, monkeypatch):
+    """Bug 1: requesting < FAMILY_SIZE symbols must not shrink the BH family."""
+    monkeypatch.setattr(driver_mod, "check_gpu", lambda: dict(_FAKE_COMPUTE))
+    monkeypatch.setattr(
+        driver_mod, "measure_symbol",
+        lambda base_dir, symbol, symbol_index, **kw: _fake_measured_cell(symbol),
+    )
+
+    payload = driver_mod.run(
+        tmp_path, ("BTCUSDT", "ETHUSDT"), end_date="2026-04-01", device="cuda",
+    )
+
+    assert len(payload["cells"]) == FAMILY_SIZE
+    assert payload["gate"]["family_size"] == FAMILY_SIZE
+    measured = [c for c in payload["cells"] if c.get("measured", True)]
+    sentinels = [c for c in payload["cells"] if not c.get("measured", True)]
+    assert {c["symbol"] for c in measured} == {"BTCUSDT", "ETHUSDT"}
+    assert len(sentinels) == FAMILY_SIZE - 2
+
+
+def test_run_dedupes_duplicate_symbols_without_inflating_family(tmp_path, monkeypatch):
+    """Bug 1: a duplicated symbol must occupy exactly one BH-family slot."""
+    monkeypatch.setattr(driver_mod, "check_gpu", lambda: dict(_FAKE_COMPUTE))
+    monkeypatch.setattr(
+        driver_mod, "measure_symbol",
+        lambda base_dir, symbol, symbol_index, **kw: _fake_measured_cell(symbol),
+    )
+
+    payload = driver_mod.run(
+        tmp_path, ("BTCUSDT", "BTCUSDT", "ETHUSDT"), end_date="2026-04-01", device="cuda",
+    )
+
+    assert len(payload["cells"]) == FAMILY_SIZE
+    measured = [c for c in payload["cells"] if c.get("measured", True)]
+    assert len(measured) == 2
+    assert sorted(c["symbol"] for c in measured) == ["BTCUSDT", "ETHUSDT"]
+
+
+def test_run_zero_real_measurements_is_never_verdict_bearing(tmp_path, monkeypatch):
+    """Bug 2: ALL symbols failing (pure data outage) must force verdict_bearing=False."""
+    monkeypatch.setattr(driver_mod, "check_gpu", lambda: dict(_FAKE_COMPUTE))
+
+    def always_fail(base_dir, symbol, symbol_index, **kw):
+        raise driver_mod.DataError(f"no parquet for {symbol}")
+
+    monkeypatch.setattr(driver_mod, "measure_symbol", always_fail)
+
+    payload = driver_mod.run(
+        tmp_path, driver_mod.SYMBOLS_DEFAULT, end_date="2026-04-01", device="cuda",
+    )
+
+    assert payload["verdict_bearing"] is False
+    assert any(
+        "0 von" in r or "Datenausfall" in r for r in payload["non_verdict_reasons"]
+    )
+    assert payload["gate"]["status"] == "NOT_VERDICT_BEARING"
+    assert all(not c.get("measured", True) for c in payload["cells"])
+    assert len(payload["cell_errors"]) == FAMILY_SIZE
+
+
+def test_run_survives_exception_in_one_symbol_others_still_measured(tmp_path, monkeypatch):
+    """Bug 3: a non-DataError crash in ONE symbol must not abort the whole run."""
+    monkeypatch.setattr(driver_mod, "check_gpu", lambda: dict(_FAKE_COMPUTE))
+
+    def flaky(base_dir, symbol, symbol_index, **kw):
+        if symbol == "BNBUSDT":
+            raise RuntimeError("CUDA out of memory (simulated device-side assert)")
+        return _fake_measured_cell(symbol)
+
+    monkeypatch.setattr(driver_mod, "measure_symbol", flaky)
+
+    payload = driver_mod.run(
+        tmp_path, driver_mod.SYMBOLS_DEFAULT, end_date="2026-04-01", device="cuda",
+    )
+
+    assert len(payload["cells"]) == FAMILY_SIZE
+    by_symbol = {c["symbol"]: c for c in payload["cells"]}
+    assert by_symbol["BNBUSDT"]["measured"] is False
+    assert "CUDA out of memory" in by_symbol["BNBUSDT"]["sentinel_reason"]
+    for sym in driver_mod.SYMBOLS_DEFAULT:
+        if sym != "BNBUSDT":
+            assert by_symbol[sym]["measured"] is True, f"{sym} cell lost after BNBUSDT crash"
+    assert any(
+        e["symbol"] == "BNBUSDT" and "RuntimeError" in e["error"]
+        for e in payload["cell_errors"]
+    )
+    # 4/5 symbols still measured -> not a data outage, verdict-bearing stands:
+    assert payload["verdict_bearing"] is True
 
 
 # ----------------------------------------------------------------------------

@@ -10,6 +10,23 @@ a fair coin independently per window, so #(fwd > rev) ~ Binomial(n, 1/2)
 (ties dropped — documented operationalisation, fixed before any run;
 respects the pairing, which a naive Mann-Whitney variance would ignore).
 
+KNOWN LIMITATION (documented, NOT fixed in code — fixing it would change the
+registered p-value/threshold procedure post-hoc, which the registry
+forbids; see :func:`paired_sign_test_p`): the independence assumption above
+is VIOLATED in practice. At ``stride_s=64`` and ``window_s=512`` (registry
+H-16 constants, see ``scalogram.py``) consecutive held-out windows share
+87.5% of their raw seconds, so consecutive (fwd>rev) signs are strongly
+positively correlated; the effective independent sample size is closer to
+``n/8`` than to ``n``. ``Binomial(n, 1/2)`` therefore understates the true
+variance of the sign-test statistic and the resulting p-values are
+ANTI-CONSERVATIVE (too small) relative to the true dependence structure —
+this feeds directly into the BH-FDR alpha=0.10 gate over F-ARROW. This is a
+STATISTICAL CAVEAT on the registered, pre-fixed operationalisation, not a
+bug in the exact-binomial arithmetic itself; per the registry's "no
+post-hoc threshold changes" rule (H-16, gate constants verbatim/non-
+negotiable) this is documented here and in ``README_H16.md`` rather than
+silently patched with an ad-hoc effective-n correction.
+
 Gate constants (registry H-16, verbatim, non-negotiable): held-out AUC
 >= 0.60 WITH IAAFT-surrogate-null 95th percentile < 0.53, at >= 4/5 symbols
 after BH-FDR alpha = 0.10 over F-ARROW, AND the phase-randomised leak
@@ -115,6 +132,18 @@ def paired_sign_test_p(fwd_scores: np.ndarray, rev_scores: np.ndarray) -> tuple[
     sign test). Returns ``(p, counts)`` with p = P(Bin(n_eff, 0.5) >= k)
     computed via the regularised incomplete beta function (exact, no scipy
     dependency); counts = {n_pairs, n_greater, n_ties}.
+
+    KNOWN LIMITATION (documented, deliberately NOT changed — see module
+    docstring): the "independent across held-out windows" premise does not
+    hold at the registered ``stride_s=64`` / ``window_s=512`` — consecutive
+    windows overlap 87.5% of their raw seconds, so consecutive signs are
+    strongly positively correlated and the true effective sample size is
+    roughly ``n/8``. ``Binomial(n, 1/2)`` (n = n_eff here) therefore
+    UNDERSTATES the true variance and this p-value is anti-conservative.
+    Changing the operationalisation (e.g. subsampling every 8th window for
+    the sign test) would alter the pre-registered, gate-relevant p-value
+    procedure post-hoc — not permitted without a registry update — so this
+    is a documented statistical caveat, not a code fix.
     """
     f = np.asarray(fwd_scores, dtype=np.float64)
     r = np.asarray(rev_scores, dtype=np.float64)
