@@ -38,6 +38,7 @@ no friction, bps, PnL, Sharpe field anywhere.
 """
 from __future__ import annotations
 
+import math
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
@@ -135,8 +136,37 @@ def compute_window_edges(
     """
     n_nodes = len(node_labels)
     full, abl, nulls = _extract_losses(results, n_nodes, n_null)
-    null_deltas = [paired_null_deltas(nulls[:, i]) for i in range(n_nodes)]
-    q95 = [null_q95(nd) for nd in null_deltas]
+
+    # NaN-poisoning guard (nan-poisoning-false-weiter fix): a single
+    # non-finite OOS loss — checkpointed as JSON `null`, an ordinary
+    # occurrence over ~226 unclipped-gradient trainings per window during
+    # unattended multi-night operation — must NEVER be scored as
+    # "significant". Unguarded, `null_values >= observed` with a NaN
+    # `observed` (or NaN entries inside `null_values`) is always False in
+    # numpy, which silently hands the poisoned edge the MINIMUM possible
+    # p-value via `empirical_p_ge`'s add-one construction — the worst
+    # possible outcome for a falsification gate. Two independent guards:
+    # (1) non-finite null-retrain losses are dropped BEFORE the null-delta
+    #     distribution is built for that target, so they cannot corrupt
+    #     `null_q95`/`empirical_p_ge` for every edge into that target;
+    # (2) any edge whose OWN full/ablation loss is non-finite, or whose
+    #     target has too few finite null losses left to form a null
+    #     distribution, is marked INVALID: `over_null_q95=False`,
+    #     `p_value=1.0` (guaranteed non-significant, never p~0) and
+    #     `is_valid=False` — excluded from the pass criterion rather than
+    #     silently counted as a survivor. It stays IN the p_values list fed
+    #     to BH-FDR so the registered F-PANELLAG family size (198 tests)
+    #     never silently shrinks.
+    null_finite = np.isfinite(nulls)  # (n_null, n_nodes)
+    null_deltas: list[np.ndarray | None] = []
+    for i in range(n_nodes):
+        finite_losses = nulls[null_finite[:, i], i]
+        null_deltas.append(
+            paired_null_deltas(finite_losses) if finite_losses.size >= 2 else None
+        )
+    q95 = [
+        (null_q95(nd) if nd is not None else float("nan")) for nd in null_deltas
+    ]
 
     family: list[dict[str, Any]] = []
     btc_source: list[dict[str, Any]] = []
@@ -144,17 +174,43 @@ def compute_window_edges(
         for i in range(n_nodes):
             if i == j:
                 continue
-            delta = float(abl[j, i] - full[i])
-            rec = {
-                "source": j,
-                "target": i,
-                "source_label": node_labels[j],
-                "target_label": node_labels[i],
-                "delta_log_loss": delta,
-                "null_delta_q95": float(q95[i]),
-                "over_null_q95": bool(delta > q95[i]),
-                "p_value": empirical_p_ge(null_deltas[i], delta),
-            }
+            full_i = float(full[i])
+            abl_ji = float(abl[j, i])
+            nd_i = null_deltas[i]
+            invalid_reason: str | None = None
+            if not math.isfinite(full_i):
+                invalid_reason = "non_finite_full_loss"
+            elif not math.isfinite(abl_ji):
+                invalid_reason = "non_finite_ablation_loss"
+            elif nd_i is None:
+                invalid_reason = "insufficient_finite_null_losses"
+            if invalid_reason is not None:
+                rec = {
+                    "source": j,
+                    "target": i,
+                    "source_label": node_labels[j],
+                    "target_label": node_labels[i],
+                    "delta_log_loss": None,
+                    "null_delta_q95": None,
+                    "over_null_q95": False,
+                    "p_value": 1.0,
+                    "is_valid": False,
+                    "invalid_reason": invalid_reason,
+                }
+            else:
+                delta = abl_ji - full_i
+                rec = {
+                    "source": j,
+                    "target": i,
+                    "source_label": node_labels[j],
+                    "target_label": node_labels[i],
+                    "delta_log_loss": delta,
+                    "null_delta_q95": float(q95[i]),
+                    "over_null_q95": bool(delta > q95[i]),
+                    "p_value": empirical_p_ge(nd_i, delta),
+                    "is_valid": True,
+                    "invalid_reason": None,
+                }
             if node_bases[j] == BTC_BASE:
                 btc_source.append(rec)
             else:
@@ -169,9 +225,19 @@ def compute_window_edges(
         "n_over_null_q95": sum(1 for e in pc_edges if e["over_null_q95"]),
         "ok": bool(any(e["over_null_q95"] for e in pc_edges)),
     }
+    # Informational only (not fed into any statistic): mean over the
+    # FINITE null losses per node, so one poisoned null retraining does not
+    # turn the whole reported mean into NaN.
+    with np.errstate(invalid="ignore"):
+        null_loss_mean = np.where(
+            null_finite.any(axis=0),
+            np.nanmean(np.where(null_finite, nulls, np.nan), axis=0),
+            np.nan,
+        )
     return {
         "full_per_node_log_loss": [float(v) for v in full],
-        "null_loss_mean_per_node": [float(v) for v in np.mean(nulls, axis=0)],
+        "null_loss_mean_per_node": [float(v) for v in null_loss_mean],
+        "n_invalid_family_edges": sum(1 for e in family if not e["is_valid"]),
         "family_edges": family,
         "btc_source_edges": btc_source,
         "positive_control": positive_control,
@@ -223,6 +289,7 @@ def assemble_payload(
             "node_bases": list(w["node_bases"]),
             "coverage": [float(c) for c in w.get("coverage", [])],
             "n_family_edges": len(fam),
+            "n_invalid_edges": sum(1 for e in fam if not e.get("is_valid", True)),
             "n_over_null_q95": sum(1 for e in fam if e["over_null_q95"]),
             "n_fdr_significant": sum(1 for e in fam if e["fdr_significant"]),
             "n_surviving": len(surv),
@@ -536,7 +603,14 @@ def render_markdown(payload: dict[str, Any]) -> str:
             L.append("*Keine ueberlebende Non-BTC-Source-Kante in diesem "
                      "Fenster.*")
         L.append("")
-        top = sorted(w["family_edges"], key=lambda e: -e["delta_log_loss"])[:10]
+        # NaN-poisoning fix: invalid edges carry `delta_log_loss=None` (a
+        # non-finite loss was excluded, not silently coerced into a number)
+        # — sort them last instead of crashing the unary-minus sort key.
+        top = sorted(
+            w["family_edges"],
+            key=lambda e: (-e["delta_log_loss"] if e["delta_log_loss"] is not None
+                            else float("-inf")),
+        )[:10]
         L.append("**Top-10 Familien-Kanten nach Delta-Log-Loss:**")
         L.append("")
         L.append("| Quelle -> Ziel | Delta-Log-Loss | Null-q95 | ueber q95 | "
@@ -553,7 +627,8 @@ def render_markdown(payload: dict[str, Any]) -> str:
         pcs = sorted(
             (e for e in w["btc_source_edges"]
              if e["target_label"] and e["over_null_q95"] is not None),
-            key=lambda e: -e["delta_log_loss"],
+            key=lambda e: (-e["delta_log_loss"] if e["delta_log_loss"] is not None
+                            else float("-inf")),
         )[:6]
         L.append("**BTC-Source-Kanten (NICHT urteilstragend, inkl. "
                  "Positivkontrolle BTC->ETH):**")

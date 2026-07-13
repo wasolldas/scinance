@@ -20,6 +20,29 @@ mirrors the observed statistic's form. With 100 retrainings this yields
 (smallest attainable add-one p ~= 1/9901, well under alpha/m ~= 5e-4 for
 the ~198-test family). Documented in README_H14.md.
 
+KNOWN LIMITATION (statistical-bias-eval-set-asymmetry, documented not fixed
+— see README_H14.md and ``ablation.run_window_plan``): the observed
+statistic and the null-delta distribution above are evaluated on
+per-training-task OOS anchor sets (``panel.valid_sample_indices`` re-derived
+from EACH task's own circularly-shifted panel), not on one shared anchor
+set. Real forward-fill-capped NaN gaps are cross-venue time-correlated
+(outages, quiet hours); after a circular shift each task's own gap
+positions land at different absolute offsets, so the full model's anchor
+composition differs systematically from every surrogate (ablation/null)
+run's. This composition offset could in principle move many edges the same
+direction in both windows, defeating the two-window requirement's
+protection. A full fix (compute ONE common anchor set across full model AND
+all ~226 ablations/null-retrainings of a window, before any shift is
+applied, and evaluate every task's OOS loss only on that shared set) was
+assessed as too invasive to land before the registered GPU run: it would
+require a two-phase orchestration in ``ablation.run_window_plan``
+(precompute every task's shift-induced anchor set — 226 extra `numpy` passes
+per window — intersect them all, THEN train/evaluate), a corresponding
+checkpoint-fingerprint extension (the shared anchor set must also be part
+of the Bug-#1 staleness check, since a resumed checkpoint from a
+differently-sized null/ablation plan implies a different intersection), and
+a real risk of shrinking the OOS set enough to hurt power.
+
 KAPITALFREI: pure statistics. No friction, bps, PnL, Sharpe.
 """
 from __future__ import annotations

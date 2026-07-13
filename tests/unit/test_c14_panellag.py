@@ -408,6 +408,81 @@ def test_positive_control_failure_nulls_weiter_indication_even_with_survivor(
     assert payload["weiter_indication"] is None
 
 
+def test_non_finite_full_loss_invalidates_edges_instead_of_scoring_p_zero() -> None:
+    """Critical-Review-2 Fund #2 regression (nan-poisoning-false-weiter,
+    driver.py compute_window_edges): a single non-finite OOS loss — real
+    scenario: a diverged training checkpointed as JSON `null` (no gradient
+    clipping in `encoder.fit_panel`, ~226 unattended trainings/window) —
+    must NEVER be scored as significant. Pre-fix, `empirical_p_ge` compared
+    a NaN `observed` against the null distribution; `x >= nan` is always
+    False in numpy, so EVERY edge whose target's full-model loss went NaN
+    silently got the MINIMUM possible p-value (best possible fake evidence)
+    instead of being excluded. `None` round-trips to `np.nan` exactly like a
+    real checkpoint (`ablation._write_checkpoint`'s `clean()` already turns
+    non-finite floats into JSON `null`; `_extract_losses` turns JSON `null`
+    back into `np.nan` via `np.asarray(..., dtype=float64)`).
+    """
+    poisoned_i = 7  # binance:SOL — non-BTC-source target node, no boost
+    results = _fake_results(n_null=40, edge_boost={})  # no genuine family signal
+    results["full"]["per_node_log_loss"][poisoned_i] = None
+    stats = compute_window_edges(results, NODE_LABELS, NODE_BASES, n_null=40)
+
+    touched = [e for e in stats["family_edges"] if e["target"] == poisoned_i]
+    assert touched, "test setup: poisoned target must appear in the family"
+    for e in touched:
+        assert e["is_valid"] is False
+        assert e["invalid_reason"] == "non_finite_full_loss"
+        assert e["over_null_q95"] is False  # NEVER counted as a survivor
+        assert e["p_value"] == 1.0          # NEVER scored as p~0/significant
+        assert e["delta_log_loss"] is None  # excluded, not coerced to a number
+
+    untouched = [e for e in stats["family_edges"] if e["target"] != poisoned_i]
+    assert untouched  # sanity: most of the family is unaffected
+    for e in untouched:
+        assert e["is_valid"] is True
+        assert e["over_null_q95"] is False  # no genuine boost anywhere else
+
+
+def test_non_finite_full_loss_never_flips_weiter_indication_end_to_end() -> None:
+    """Critical-Review-2 Fund #2 regression, end-to-end reproduction of the
+    review's exact scenario: with a valid positive control and otherwise NO
+    genuine family signal in either window, a single non-finite full-model
+    loss injected into one window must NOT turn into false BH-significant
+    edges that flip `weiter_indication` from False to True.
+    """
+    poisoned_i = 7  # binance:SOL
+    edge_boost: dict[tuple[int, int], float] = {}
+    for j in BTC_SOURCE_IDX:  # positive control passes (excluded from family)
+        for i in ETH_TARGET_IDX:
+            edge_boost[(j, i)] = 0.05
+    window_stats = []
+    for wi, wlabel in enumerate(("W1", "W2")):
+        results = _fake_results(n_null=40, edge_boost=edge_boost)
+        if wi == 0:
+            results["full"]["per_node_log_loss"][poisoned_i] = None
+        stats = compute_window_edges(results, NODE_LABELS, NODE_BASES, n_null=40)
+        stats.update({
+            "window_label": wlabel, "start_date": "2030-01-01",
+            "end_date": "2030-01-02", "node_labels": NODE_LABELS,
+            "node_bases": NODE_BASES, "coverage": [1.0] * N_NODES,
+        })
+        window_stats.append(stats)
+
+    payload = assemble_payload(
+        window_stats, n_null=40, seed=1, source="x",
+        compute_info=make_compute_info(ran_on_gpu=True),
+    )
+    assert payload["positive_control_ok_all_windows"] is True
+    # No genuine non-BTC-source signal anywhere, and the poisoned target is
+    # excluded rather than counted -> the gate must NOT flip to WEITER.
+    for w in payload["windows"]:
+        for e in w["family_edges"]:
+            if e["target"] == poisoned_i:
+                assert e["fdr_significant"] is False
+                assert e["surviving"] is False
+    assert payload["weiter_indication"] is False
+
+
 # ---------------------------------------------------------------------------
 # (c-continued) full orchestration: task plan + checkpoint/resume
 # ---------------------------------------------------------------------------
@@ -517,6 +592,79 @@ def test_run_window_plan_rejects_resumed_cpu_dummy_checkpoint_when_cuda_required
         run_window_plan(
             win, tasks, ckpt, exploding_train_fn, require_cuda=True, log=False,
         )
+
+
+def test_run_window_plan_rejects_resumed_checkpoint_with_different_window_dates(
+    tmp_path: Path,
+) -> None:
+    """Critical-Review-2 Fund #1 regression (checkpoint-staleness-verdict-
+    corruption): resume was keyed only by (window_label, task_id) and
+    checked only `device` — a checkpoint directory populated by a run over
+    DIFFERENT registered window dates under the SAME label (e.g. a GL-012
+    GPU-feasibility smoke test with a short window, both labelled "W1")
+    would be adopted silently, with the production run reporting
+    gate_valid=true over losses actually computed on unregistered data.
+    Before the fix this resumed with 0 retrains and no error; after the fix
+    it must hard-abort (ValueError) and train_fn must never be called.
+    """
+    win_smoke = _tiny_window("W1", seed=5)
+    win_prod = PanelWindow(
+        label="W1", start_date="2030-06-01", end_date="2030-06-01",
+        node_labels=win_smoke.node_labels, node_exchanges=win_smoke.node_exchanges,
+        node_bases=win_smoke.node_bases, returns=win_smoke.returns,
+        coverage=win_smoke.coverage,
+    )
+    assert win_prod.label == win_smoke.label
+    assert (win_prod.start_date, win_prod.end_date) != (
+        win_smoke.start_date, win_smoke.end_date,
+    )
+    tasks = build_task_plan("W1", N_NODES, n_null=2, seed=5)
+    ckpt = tmp_path / "ckpt"
+
+    # Step 1: the smoke-test run over the WRONG (unregistered) window dates
+    # populates the checkpoint directory under label "W1".
+    run_window_plan(win_smoke, tasks, ckpt, make_dummy_train_fn(N_NODES), log=False)
+
+    # Step 2: the production run has the SAME label and SAME seed, but
+    # DIFFERENT registered window dates -> must reject every resumed
+    # checkpoint and never call train_fn on their behalf.
+    def exploding_train_fn(returns, meta):
+        raise AssertionError(
+            "train_fn must never be called: this task should have been "
+            "rejected at the checkpoint-staleness check, not silently "
+            "resumed nor retrained"
+        )
+
+    with pytest.raises(ValueError, match="(?i)staleness"):
+        run_window_plan(win_prod, tasks, ckpt, exploding_train_fn, log=False)
+
+
+def test_run_window_plan_rejects_resumed_checkpoint_with_different_seed(
+    tmp_path: Path,
+) -> None:
+    """Critical-Review-2 Fund #1 regression, seed variant: a checkpoint dir
+    from a run with a DIFFERENT --seed (task seeds differ deterministically
+    even under the identical window_label/dates, see `_task_seed`) must
+    never be silently resumed either — before the fix nothing compared the
+    stored seed to the current run's task identity.
+    """
+    win = _tiny_window("W1", seed=5)
+    ckpt = tmp_path / "ckpt"
+    tasks_seed1 = build_task_plan(win.label, N_NODES, n_null=2, seed=1)
+    run_window_plan(win, tasks_seed1, ckpt, make_dummy_train_fn(N_NODES), log=False)
+
+    tasks_seed2 = build_task_plan(win.label, N_NODES, n_null=2, seed=2)
+    assert [t.seed for t in tasks_seed1] != [t.seed for t in tasks_seed2]
+
+    def exploding_train_fn(returns, meta):
+        raise AssertionError(
+            "train_fn must never be called: this task should have been "
+            "rejected at the checkpoint-staleness check, not silently "
+            "resumed nor retrained"
+        )
+
+    with pytest.raises(ValueError, match="(?i)staleness"):
+        run_window_plan(win, tasks_seed2, ckpt, exploding_train_fn, log=False)
 
 
 def test_driver_run_never_reports_gate_valid_true_over_mixed_provenance(

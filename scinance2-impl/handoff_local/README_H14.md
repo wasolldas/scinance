@@ -164,6 +164,38 @@ desselben Laufs NICHT ändern, sonst kein Resume), `HANDOFF_DRY_RUN=1`
   Lauf **methodisch invalide** (`validity_status="ungueltig"`, KEIN Verdikt,
   KEIN DROP — Registry wörtlich).
 
+## Bekannte Einschränkung (dokumentiert, NICHT gefixt): Eval-Set-Asymmetrie
+
+Zweite adversariale Review 2026-07-13 (`CRITICAL_REVIEW_2_2026-07-13.md`,
+Lane wave5-c14-panellag, MEDIUM): `T(j->i)` und die Null-Delta-Verteilung
+werden auf per-Task neu berechneten OOS-Anker-Mengen ausgewertet
+(`panel.valid_sample_indices` läuft je Trainings-Task auf dessen EIGENER
+geshifteten Matrix, s. `ablation.run_window_plan`), nicht auf einer
+gemeinsamen Anker-Menge für Vollmodell + alle Ablationen/Null-Retrainings.
+Da reale, gekappte NaN-Lücken cross-venue zeitlich korreliert sind (Ausfälle,
+ruhige Stunden) und ein zirkulärer Shift die Lückenposition jedes Tasks an
+eine andere absolute Stelle verschiebt, unterscheidet sich die
+Anker-Zusammensetzung des Vollmodells systematisch von jedem
+Surrogat-Lauf — ein Komposition-Offset, der im Prinzip viele Kanten in
+BEIDEN Fenstern gleichzeitig über die q95-Schwelle drücken könnte.
+
+Ein vollständiger Fix (EINE gemeinsame Anker-Menge über Vollmodell +
+sämtliche ~226 Ablationen/Null-Retrainings eines Fensters, bestimmt VOR
+jeder Verschiebung, für die OOS-Auswertung aller Tasks) wurde als zu invasiv
+für einen Fix unmittelbar vor dem registrierten GPU-Lauf eingestuft: er
+verlangt eine Zweiphasen-Orchestrierung in `ablation.run_window_plan`
+(Anker-Vorlauf über alle Tasks vor jedem Training, Schnittmengenbildung,
+erst dann Training/Auswertung), eine Erweiterung des
+Checkpoint-Fingerprints (die gemeinsame Anker-Menge müsste Teil des
+Staleness-Checks aus Fund #1 werden, da ein resumeter Checkpoint aus einem
+Lauf mit anderer Null-Größe eine andere Schnittmenge implizieren würde) und
+birgt das Risiko, die OOS-Menge so weit zu schrumpfen, dass die
+Teststärke leidet. Dokumentiert in `stats.py` (Modul-Docstring) statt
+gefixt — der gate-auditor muss dies bei der Verdikt-Adjudikation
+berücksichtigen: ein familienweiter Survivor-Cluster in beiden Fenstern
+ist NICHT automatisch ein starker Beweis, solange diese Einschränkung
+besteht.
+
 ## FDR-Familie
 
 **F-PANELLAG** (neu, eigene Kopie in `stats.py`) — 99 Non-BTC-Source-Kanten

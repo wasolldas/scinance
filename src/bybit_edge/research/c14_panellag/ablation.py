@@ -193,6 +193,15 @@ def run_window_plan(
     ``per_node_log_loss`` (OOS, natural log) and is checkpointed verbatim
     (plus bookkeeping). Returns ``{task_id: result}``.
 
+    Checkpoint staleness (fingerprint check, ALWAYS on, independent of
+    ``require_cuda``): a resumed checkpoint's ``window_start_date`` /
+    ``window_end_date`` / ``seed`` fields are compared against THIS run's
+    ``window`` and each task's (seed-derived) identity. A checkpoint dir is
+    keyed only by ``(window_label, task_id)``, so without this check a
+    checkpoint from a run over different registered window dates or a
+    different ``--seed`` under the same label would be adopted silently — a
+    ``ValueError`` is raised instead.
+
     ``require_cuda``: set by the caller whenever the CURRENT run claims
     ``ran_on_gpu=True`` (i.e. is about to report ``gate_valid=True``). When
     set, EVERY task result — freshly trained now OR resumed from an
@@ -231,10 +240,57 @@ def run_window_plan(
                 f"the production GPU run."
             )
 
+    def _check_fingerprint(task: TrainTask, result: dict[str, Any]) -> None:
+        """Reject a resumed checkpoint whose window dates or seed don't match
+        the CURRENT run (checkpoint-staleness-verdict-corruption fix).
+
+        Resume was previously keyed ONLY by ``(window_label, task_id)`` and
+        checked ONLY ``device`` — a checkpoint directory populated by an
+        earlier run over DIFFERENT registered window dates (e.g. a GPU-
+        feasibility smoke test with a short window, both labelled ``W1``) or
+        a different ``--seed`` was silently adopted, with no window
+        start/end or seed comparison anywhere. That earlier run's losses
+        would then feed the statistics of a run that reports
+        ``gate_valid=true`` over the REGISTERED windows, while every number
+        was actually computed on unregistered data. Hard-abort (matches the
+        existing device-mismatch behaviour above) rather than silently
+        mixing provenance.
+        """
+        mismatches: list[str] = []
+        stored_start = result.get("window_start_date")
+        stored_end = result.get("window_end_date")
+        if stored_start != window.start_date or stored_end != window.end_date:
+            mismatches.append(
+                f"window dates: checkpoint=({stored_start!r}..{stored_end!r}) "
+                f"current run=({window.start_date!r}..{window.end_date!r})"
+            )
+        stored_seed = result.get("seed")
+        if stored_seed != task.seed:
+            mismatches.append(
+                f"task seed: checkpoint={stored_seed!r} current run={task.seed!r} "
+                f"(derived from --seed; a different --seed changes this)"
+            )
+        if mismatches:
+            raise ValueError(
+                f"H-14 checkpoint-staleness violation: "
+                f"{window.label}/{task.task_id} checkpoint does not match the "
+                f"CURRENT run parameters ({'; '.join(mismatches)}). Resume was "
+                f"keyed only by (window_label, task_id); a checkpoint written "
+                f"by a run over different registered window dates, different "
+                f"panel data, or a different --seed under the SAME label "
+                f"would otherwise be adopted silently and poison the "
+                f"statistics with gate_valid=true. Use a separate --ckpt-dir "
+                f"per distinct window/seed combination (e.g. GPU-feasibility "
+                f"smoke tests MUST NOT share --ckpt-dir with the production "
+                f"run), or delete/clear this checkpoint directory before the "
+                f"production run so every task retrains."
+            )
+
     for task in tasks:
         path = _ckpt_path(ckpt, window.label, task.task_id)
         cached = _load_checkpoint(path)
         if cached is not None:
+            _check_fingerprint(task, cached)
             _check_provenance(task.task_id, cached, resumed=True)
             results[task.task_id] = cached
             n_done_before += 1
@@ -246,6 +302,16 @@ def run_window_plan(
             shifted, lookback, horizon, sample_stride=sample_stride,
             t_start=tr_lo, t_end=tr_hi,
         )
+        # KNOWN LIMITATION (statistical-bias-eval-set-asymmetry, documented
+        # NOT fixed — see stats.py module docstring and README_H14.md): this
+        # recomputes the OOS anchor set from THIS task's own shifted panel,
+        # so the full-model run and every ablation/null-retrain run of a
+        # window evaluate on systematically different anchor compositions
+        # (real NaN gaps rotate to different absolute positions per shift).
+        # A shared, once-computed anchor set across all ~226 tasks of a
+        # window would remove this, but was assessed too invasive to add
+        # right before the registered GPU run (would need a two-phase
+        # orchestration here plus a checkpoint-fingerprint extension).
         oos_anchors = valid_sample_indices(
             shifted, lookback, horizon, sample_stride=sample_stride,
             t_start=oo_lo, t_end=oo_hi,
@@ -274,6 +340,8 @@ def run_window_plan(
             "task_id": task.task_id,
             "kind": task.kind,
             "window_label": window.label,
+            "window_start_date": window.start_date,
+            "window_end_date": window.end_date,
             "ablate_node": task.ablate_node,
             "null_index": task.null_index,
             "seed": task.seed,
