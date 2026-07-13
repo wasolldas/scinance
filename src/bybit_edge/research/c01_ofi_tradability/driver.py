@@ -40,6 +40,7 @@ from .net_edge import (
     NET_EDGE_P_MAX,
     NetEdgeResult,
     benjamini_hochberg,
+    block_len_for_overlap,
     bootstrap_mean_le_zero_p,
     sign_permutation_p,
 )
@@ -81,7 +82,14 @@ def _measure(
         # RAW (unsigned-by-position) captured move for the surrogate null.
         raw_captured = captured * signs  # undo the directional multiply
         net_edges = round_trip_net_edges_bps(captured, cost)
-        boot_p = bootstrap_mean_le_zero_p(net_edges, n_bootstrap=n_bootstrap, seed=seed)
+        # Consecutive round-trips share overlapping forward-return windows whenever
+        # delta_s * 1000 > grid_ms (~80% overlap at delta_s=5s/grid_ms=1000ms) — block
+        # the bootstrap resample to that overlap instead of resampling i.i.d. single
+        # round-trips (CRITICAL_REVIEW_2_2026-07-13.md, Lane research-modules).
+        block_len = block_len_for_overlap(delta_s, grid_ms)
+        boot_p = bootstrap_mean_le_zero_p(
+            net_edges, n_bootstrap=n_bootstrap, block_len=block_len, seed=seed,
+        )
         surr_p = sign_permutation_p(
             raw_captured, signs, cost.wall_bps,
             bps_per_logret=BPS_PER_LOGRET, n_surrogates=n_bootstrap, seed=seed,

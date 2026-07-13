@@ -7,8 +7,18 @@ over the F-OFI-INV-TRADE family) on ``>= 2`` disjoint windows, for at least one
 of the GL-010 pass-cells {SOL-δ1s, SOL-δ5s}.
 
 Two nulls per (window, delta) variant, identical contract to H-04b net_edge:
-* **Bootstrap** (primary): one-sided resample of the per-round-trip net edges;
+* **Bootstrap** (primary): one-sided **circular block** resample of the
+  per-round-trip net edges (repo convention: contiguous-block bootstrap,
+  same construction as ``c11_anen.stats.block_bootstrap_p`` /
+  ``c06_xmr.stats.block_bootstrap_ci``);
   ``p = (#{resample_mean <= 0} + 1) / (N + 1)`` — small p => mean net edge > 0.
+  Consecutive round-trips share overlapping forward-return windows whenever
+  ``delta_s * 1000 > grid_ms`` (e.g. ~80% overlap at delta_s=5/grid_ms=1000),
+  so i.i.d. resampling of single round-trips understates the true sampling
+  variance of the mean and yields anti-conservative p-values. The block
+  length is sized to the overlap (``ceil(delta_s * 1000 / grid_ms)``
+  round-trips, see :mod:`driver`) so each resampled block spans roughly one
+  independent forward-return horizon.
 * **Surrogate** (diagnostic): a fade-sign permutation null (randomises the
   position sign) recomputing the mean net edge.
 
@@ -62,21 +72,55 @@ class NetEdgeResult:
         }
 
 
+def block_len_for_overlap(delta_s: int, grid_ms: float) -> int:
+    """Bootstrap block length (in round-trips) sized to the forward-window overlap.
+
+    Consecutive round-trips are spaced ``grid_ms`` apart but each looks
+    ``delta_s * 1000`` ms forward, so they share overlapping return windows
+    whenever ``delta_s * 1000 > grid_ms``. ``ceil(delta_s * 1000 / grid_ms)``
+    round-trips is the smallest block that spans one full non-overlapping
+    forward-return horizon (e.g. 5 round-trips at delta_s=5s/grid_ms=1000ms,
+    where ~80% of consecutive returns overlap). Returns >= 1 (1 = no overlap,
+    degenerates to i.i.d. resampling).
+    """
+    if grid_ms <= 0:
+        return 1
+    return max(1, int(np.ceil(delta_s * 1000.0 / grid_ms)))
+
+
 def bootstrap_mean_le_zero_p(
     net_edges_bps: np.ndarray,
     *,
     n_bootstrap: int = DEFAULT_BOOTSTRAP,
+    block_len: int = 1,
     seed: int = 42,
 ) -> float:
-    """One-sided bootstrap p for ``H0: mean net edge <= 0`` vs ``H1: > 0``."""
+    """One-sided **circular block** bootstrap p for ``H0: mean net edge <= 0`` vs ``H1: > 0``.
+
+    Resamples in contiguous, circularly-wrapped blocks of ``block_len``
+    consecutive round-trips (repo convention: same construction as
+    ``c11_anen.stats.block_bootstrap_p`` / ``c06_xmr.stats.block_bootstrap_ci``)
+    instead of single i.i.d. observations, so the resample preserves the
+    short-range autocorrelation induced by overlapping forward-return
+    windows (see :func:`block_len_for_overlap`). ``block_len=1`` degenerates
+    to the original i.i.d. bootstrap (used only where there is no overlap,
+    e.g. delta_s * 1000 <= grid_ms).
+    """
     x = np.asarray(net_edges_bps, dtype=np.float64)
     n = x.size
     if n < 4 or n_bootstrap < 1:
         return 1.0
+    bs = max(1, min(int(block_len), n))
+    n_blocks = int(np.ceil(n / bs))
     rng = np.random.default_rng(seed)
-    idx = rng.integers(0, n, size=(n_bootstrap, n))
-    means = x[idx].mean(axis=1)
-    n_le = int(np.sum(means <= 0.0))
+    offsets = np.arange(bs)
+    n_le = 0
+    for _ in range(n_bootstrap):
+        starts = rng.integers(0, n, size=n_blocks)
+        idx = (starts[:, None] + offsets[None, :]) % n  # circular contiguous blocks
+        resample = x[idx.reshape(-1)][:n]
+        if float(np.mean(resample)) <= 0.0:
+            n_le += 1
     return (n_le + 1) / (n_bootstrap + 1)
 
 
