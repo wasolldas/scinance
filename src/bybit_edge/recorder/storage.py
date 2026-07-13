@@ -61,9 +61,33 @@ DEFAULT_FLUSH_SECONDS: float = 10.0
 
 # If flushes keep failing, the in-memory buffer is retained for retry (rows
 # are NEVER silently discarded) but it grows unboundedly. Once it exceeds
-# this multiple of ``flush_rows`` an escalated alarm is logged every flush
-# attempt so the operator sees the memory-growth risk long before OOM.
+# this multiple of ``flush_rows`` an escalated alarm is logged (rate-limited,
+# see ALARM_LOG_INTERVAL_SECONDS below) so the operator sees the
+# memory-growth risk long before OOM.
 BUFFER_ALARM_FACTOR: int = 10
+
+# CRITICAL_REVIEW_2_2026-07-13 (resource-exhaustion-regression-from-fix):
+# the 2026-07-09 fix stopped advancing ``_last_flush`` on a failed write, so
+# ``should_flush()`` stays permanently true once a flush starts failing (e.g.
+# a full disk). Because ``RecordingEngine._run_ws_transport`` calls
+# ``_maybe_flush`` after EVERY inbound message, that meant a persistent
+# failure turned into a full synchronous ``pq.write_table`` attempt (Arrow
+# table rebuilt over the whole, ever-growing buffer) on every single message
+# — blocking the event loop, delaying the WS ping, and dropping the
+# connection into a reconnect storm. The fix below keeps the "rows are never
+# discarded" guarantee but rate-limits RETRY ATTEMPTS (and the ALARM log)
+# for a stream whose flush keeps failing, via simple exponential backoff.
+# ``should_flush()``/``_maybe_flush()`` stay cheap and unchanged — they can
+# still be called on every message — because ``flush()`` itself now no-ops
+# (no write attempt, no Arrow rebuild) while a stream is in its backoff
+# cooldown.
+DEFAULT_FLUSH_RETRY_BACKOFF_SECONDS: float = 5.0
+MAX_FLUSH_RETRY_BACKOFF_SECONDS: float = 60.0
+
+# Minimum spacing between ALARM log lines for the same writer, independent of
+# how often ``flush()`` is called or whether it actually attempts a write.
+# Keeps a persistent failure from also turning into a log-volume explosion.
+ALARM_LOG_INTERVAL_SECONDS: float = 30.0
 
 
 # ══════════════════════════════════════════════════════════════════════
@@ -167,6 +191,8 @@ class ParquetStreamWriter:
         flush_rows: int = DEFAULT_FLUSH_ROWS,
         flush_seconds: float = DEFAULT_FLUSH_SECONDS,
         compression: str = PARQUET_COMPRESSION,
+        flush_retry_backoff_seconds: float = DEFAULT_FLUSH_RETRY_BACKOFF_SECONDS,
+        max_flush_retry_backoff_seconds: float = MAX_FLUSH_RETRY_BACKOFF_SECONDS,
     ) -> None:
         if stream not in STREAM_SCHEMAS:
             raise ValueError(
@@ -178,6 +204,8 @@ class ParquetStreamWriter:
         self.flush_rows = flush_rows
         self.flush_seconds = flush_seconds
         self.compression = compression
+        self.flush_retry_backoff_seconds = flush_retry_backoff_seconds
+        self.max_flush_retry_backoff_seconds = max_flush_retry_backoff_seconds
 
         self._buffer: list[dict[str, Any]] = []
         self._last_flush: float = time.time()
@@ -185,6 +213,15 @@ class ParquetStreamWriter:
         self.rows_written: int = 0
         self.segments_written: int = 0
         self.flush_failures: int = 0
+
+        # Retry-storm guard (CRITICAL_REVIEW_2_2026-07-13): consecutive
+        # failure count since the last success, the wall-clock of the last
+        # ATTEMPTED write (success or fail), and the wall-clock of the last
+        # ALARM log line — all start at "no backoff yet" so the first-ever
+        # failure always attempts immediately.
+        self._consecutive_flush_failures: int = 0
+        self._last_flush_attempt: float = 0.0
+        self._last_alarm_log: float = 0.0
 
     # ------------------------------------------------------------------
     def append(self, row: dict[str, Any]) -> None:
@@ -200,25 +237,92 @@ class ParquetStreamWriter:
         now = time.time() if now is None else now
         return (now - self._last_flush) >= self.flush_seconds
 
-    def flush(self) -> Optional[Path]:
+    def _retry_backoff_seconds(self) -> float:
+        """Exponential backoff for the current consecutive-failure streak."""
+        exponent = max(0, self._consecutive_flush_failures - 1)
+        backoff = self.flush_retry_backoff_seconds * (2 ** exponent)
+        return min(backoff, self.max_flush_retry_backoff_seconds)
+
+    def _maybe_log_alarm(self, now: float) -> None:
+        """Rate-limited ALARM for an unboundedly growing retry buffer.
+
+        Evaluated regardless of whether this ``flush()`` call actually
+        attempted a write (vs. being skipped by the backoff cooldown below)
+        so the alarm still fires under a persistent outage, but never more
+        often than ``ALARM_LOG_INTERVAL_SECONDS`` — a stuck writer must not
+        turn into a log-volume problem on top of the retry-storm it already
+        fixed.
+        """
+        if len(self._buffer) <= BUFFER_ALARM_FACTOR * self.flush_rows:
+            return
+        if (now - self._last_alarm_log) < ALARM_LOG_INTERVAL_SECONDS:
+            return
+        self._last_alarm_log = now
+        logger.error(
+            "ALARM: [%s] retry buffer holds %d rows (> %d x "
+            "flush_rows=%d) after repeated flush failures — memory "
+            "keeps growing until a flush succeeds; rows are never "
+            "silently discarded.",
+            self.stream, len(self._buffer),
+            BUFFER_ALARM_FACTOR, self.flush_rows,
+        )
+
+    def flush(self, now: Optional[float] = None, force: bool = False) -> Optional[Path]:
         """Write the buffer to a new Parquet segment, then clear it.
 
-        Returns the written segment path, or ``None`` if the buffer was empty
-        or the write failed. Rows are projected onto the explicit schema
-        (missing columns -> null, unknown columns dropped) so a malformed
-        payload can never corrupt the column layout.
+        Returns the written segment path, or ``None`` if the buffer was
+        empty, the write failed, or a write attempt was skipped because the
+        stream is in its retry-backoff cooldown (see below). Rows are
+        projected onto the explicit schema (missing columns -> null, unknown
+        columns dropped) so a malformed payload can never corrupt the column
+        layout.
+
+        ``force=True`` bypasses the retry-backoff cooldown and always
+        attempts the write. Used by :meth:`close` — graceful shutdown is a
+        one-shot event, not the repeated per-message call the backoff guards
+        against, so it should always make a final, best-effort attempt.
 
         Failure semantics (CRITICAL_REVIEW_2026-07-09, data-loss-write-
         ordering): the buffer is cleared only AFTER ``pq.write_table``
         succeeded. If any step of the write path fails, the rows stay
-        buffered for a retry on the next flush call, an ERROR naming the
-        number of at-risk rows is logged, and the exception is contained
-        here — it must not escape into the WS transport loop (where it would
-        masquerade as a connection loss) or abort the writer-close loop in
+        buffered for a retry, an ERROR naming the number of at-risk rows is
+        logged, and the exception is contained here — it must not escape
+        into the WS transport loop (where it would masquerade as a
+        connection loss) or abort the writer-close loop in
         ``RecordingEngine.stop()``.
+
+        Retry-storm guard (CRITICAL_REVIEW_2_2026-07-13,
+        resource-exhaustion-regression-from-fix): because ``_last_flush`` is
+        only advanced on success, ``should_flush()`` stays permanently true
+        while a stream is failing, and ``RecordingEngine`` calls
+        ``_maybe_flush`` after every inbound message. Without a guard that
+        would mean a full synchronous ``pq.write_table`` attempt — rebuilding
+        the Arrow table over the whole, ever-growing buffer — on every single
+        message for as long as the underlying failure (e.g. a full disk)
+        persists, blocking the event loop long enough to miss Bybit's
+        keepalive and drop the connection. So once a write fails, subsequent
+        ``flush()`` calls no-op (no write attempt, buffer left untouched)
+        until ``_retry_backoff_seconds()`` has elapsed since the last
+        attempt; the wait doubles per consecutive failure up to
+        ``max_flush_retry_backoff_seconds``. Rows are still never dropped —
+        only the ATTEMPT frequency is throttled, not the retention guarantee.
         """
         if not self._buffer:
             return None
+
+        now = time.time() if now is None else now
+
+        if not force and self._consecutive_flush_failures > 0:
+            elapsed = now - self._last_flush_attempt
+            if elapsed < self._retry_backoff_seconds():
+                # Still cooling down from the last failure: skip the
+                # expensive write attempt entirely (this is the fix — no
+                # Arrow rebuild, no pq.write_table call), but still surface
+                # the (rate-limited) growth alarm.
+                self._maybe_log_alarm(now)
+                return None
+
+        self._last_flush_attempt = now
 
         # Snapshot — the buffer is only cleared after a successful write.
         rows = self._buffer
@@ -254,20 +358,14 @@ class ParquetStreamWriter:
             pq.write_table(table, seg_path, compression=self.compression)
         except Exception:
             self.flush_failures += 1
+            self._consecutive_flush_failures += 1
             logger.exception(
                 "[%s] flush FAILED — %d buffered row(s) retained for retry "
-                "on the next flush (failure #%d)",
-                self.stream, len(rows), self.flush_failures,
+                "in >= %.1fs (failure #%d, #%d consecutive)",
+                self.stream, len(rows), self._retry_backoff_seconds(),
+                self.flush_failures, self._consecutive_flush_failures,
             )
-            if len(self._buffer) > BUFFER_ALARM_FACTOR * self.flush_rows:
-                logger.error(
-                    "ALARM: [%s] retry buffer holds %d rows (> %d x "
-                    "flush_rows=%d) after repeated flush failures — memory "
-                    "keeps growing until a flush succeeds; rows are never "
-                    "silently discarded.",
-                    self.stream, len(self._buffer),
-                    BUFFER_ALARM_FACTOR, self.flush_rows,
-                )
+            self._maybe_log_alarm(now)
             return None
 
         # Success: drop exactly the rows that were written. (flush() is
@@ -277,14 +375,20 @@ class ParquetStreamWriter:
         self.rows_written += table.num_rows
         self.segments_written += 1
         self._last_flush = recv_ts
+        self._consecutive_flush_failures = 0
         logger.debug(
             "Flushed %d rows -> %s", table.num_rows, seg_path.name
         )
         return seg_path
 
     def close(self) -> Optional[Path]:
-        """Flush any remaining buffered rows (graceful shutdown)."""
-        seg = self.flush()
+        """Flush any remaining buffered rows (graceful shutdown).
+
+        Bypasses the retry-backoff cooldown (``force=True``): shutdown is a
+        one-shot best-effort attempt, not a hot loop, so it must not skip the
+        final write just because a prior attempt is still cooling down.
+        """
+        seg = self.flush(force=True)
         if self._buffer:
             logger.error(
                 "[%s] close(): %d buffered row(s) could NOT be persisted "

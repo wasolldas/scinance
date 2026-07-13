@@ -141,7 +141,12 @@ class TestFlushFailureRetainsBuffer:
         self, tmp_path, monkeypatch: pytest.MonkeyPatch,
     ) -> None:
         """First flush fails (transient), second succeeds: BOTH original rows
-        plus a newly appended one must be in the written segment."""
+        plus a newly appended one must be in the written segment.
+
+        The second attempt is made *after* the retry-backoff cooldown has
+        elapsed (CRITICAL_REVIEW_2_2026-07-13) — an immediate retry within
+        the cooldown window is exactly the retry-storm behavior the backoff
+        exists to prevent; see TestFlushRetryBackoff below for that case."""
         writer = ParquetStreamWriter("insurance_pool", root=tmp_path)
         writer.append(_insurance_row())
         writer.append(_insurance_row(ts=1718000001000))
@@ -156,9 +161,11 @@ class TestFlushFailureRetainsBuffer:
             return real_write(table, path, **kwargs)
 
         monkeypatch.setattr(storage_mod.pq, "write_table", flaky)
-        assert writer.flush() is None            # transient failure
+        t0 = 1_800_000_000.0
+        assert writer.flush(now=t0) is None       # transient failure
         writer.append(_insurance_row(ts=1718000002000))  # new data keeps coming
-        seg = writer.flush()                      # retry succeeds
+        # Past the backoff cooldown -> retry actually attempts the write.
+        seg = writer.flush(now=t0 + writer.flush_retry_backoff_seconds + 0.1)
 
         assert seg is not None and seg.exists()
         table = pq.read_table(seg)
@@ -218,6 +225,112 @@ class TestFlushFailureRetainsBuffer:
             "could NOT be persisted" in r.getMessage()
             for r in caplog.records if r.levelno == logging.ERROR
         )
+
+
+# ══════════════════════════════════════════════════════════════════════
+# 5c) Retry-storm regression (CRITICAL_REVIEW_2_2026-07-13,
+#     resource-exhaustion-regression-from-fix): the 2026-07-09 fix stopped
+#     advancing ``_last_flush`` on failure, so ``should_flush()`` stayed
+#     permanently true and ``RecordingEngine._run_ws_transport`` (which calls
+#     ``_maybe_flush`` after EVERY inbound message) turned a PERSISTENT flush
+#     failure into a full synchronous ``pq.write_table`` attempt per message
+#     -- blocking the event loop long enough to miss Bybit's keepalive and
+#     drop the WS connection. These tests simulate a sustained failure across
+#     many inbound messages and prove (a) rows are still never dropped and
+#     (b) actual write attempts stay far below the message count thanks to
+#     the retry backoff.
+# ══════════════════════════════════════════════════════════════════════
+class TestFlushRetryBackoff:
+    def test_persistent_failure_throttles_attempts_but_keeps_all_rows(
+        self, tmp_path, monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """20+ inbound messages, pq.write_table permanently failing: no rows
+        lost, and write attempts stay well below the message count."""
+        writer = ParquetStreamWriter(
+            "insurance_pool", root=tmp_path, flush_rows=5, flush_seconds=1.0,
+        )
+
+        attempts = {"n": 0}
+
+        def always_boom(*args, **kwargs):
+            attempts["n"] += 1
+            raise OSError("simulated persistent full-disk error")
+
+        monkeypatch.setattr(storage_mod.pq, "write_table", always_boom)
+
+        n_messages = 40
+        t0 = 1_800_000_000.0
+        # Messages arriving in a tight burst (100ms apart) mirroring
+        # RecordingEngine._run_ws_transport calling _maybe_flush() after
+        # every inbound message.
+        for i in range(n_messages):
+            now = t0 + i * 0.1
+            writer.append(_insurance_row(ts=1718000000000 + i))
+            if writer.should_flush(now=now):
+                writer.flush(now=now)
+
+        # (a) no data loss: every appended row is still buffered for retry.
+        assert len(writer._buffer) == n_messages, "rows must never be dropped"
+
+        # (b) actual write attempts stay far below the inbound message
+        # count -- proof the per-message retry storm is fixed. Without the
+        # backoff, ``attempts["n"]`` would equal ``n_messages`` (minus the
+        # few messages before the first flush trigger).
+        assert 0 < attempts["n"] < n_messages / 3, (
+            f"expected far fewer than {n_messages} write attempts under a "
+            f"persistent failure, got {attempts['n']}"
+        )
+        assert writer.flush_failures == attempts["n"]
+        assert writer._consecutive_flush_failures == attempts["n"]
+
+    def test_backoff_doubles_then_recovers_once_writes_succeed_again(
+        self, tmp_path, monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """Backoff grows across consecutive failures; once the underlying
+        failure clears, the next attempt past the cooldown drains the whole
+        retained buffer -- throttling never abandons a retry."""
+        writer = ParquetStreamWriter(
+            "insurance_pool", root=tmp_path, flush_rows=1000, flush_seconds=9999.0,
+        )
+        real_write = storage_mod.pq.write_table
+        calls = {"n": 0}
+
+        def flaky(table, path, **kwargs):
+            calls["n"] += 1
+            if calls["n"] <= 2:
+                raise OSError("simulated disk error")
+            return real_write(table, path, **kwargs)
+
+        monkeypatch.setattr(storage_mod.pq, "write_table", flaky)
+
+        t0 = 1_800_000_000.0
+        writer.append(_insurance_row())
+        assert writer.flush(now=t0) is None            # attempt #1 fails
+        assert calls["n"] == 1
+
+        writer.append(_insurance_row(ts=1718000001000))
+        # Still inside the (1st-failure) backoff window -> no new attempt.
+        assert writer.flush(now=t0 + 0.5) is None
+        assert calls["n"] == 1, "retry attempted before backoff elapsed"
+
+        # Past the 1st backoff window -> attempt #2 (still failing).
+        t1 = t0 + writer.flush_retry_backoff_seconds + 0.1
+        assert writer.flush(now=t1) is None
+        assert calls["n"] == 2
+
+        # Backoff has doubled after the 2nd consecutive failure; well past
+        # it, the underlying failure has cleared -> attempt #3 succeeds and
+        # drains everything retained so far.
+        t2 = t1 + writer._retry_backoff_seconds() + 0.1
+        seg = writer.flush(now=t2)
+        assert seg is not None and seg.exists()
+        assert writer._buffer == []
+        assert writer.rows_written == 2
+        assert writer._consecutive_flush_failures == 0
+        table = pq.read_table(seg)
+        assert sorted(table.column("ts").to_pylist()) == [
+            1718000000000, 1718000001000,
+        ]
 
 
 # ══════════════════════════════════════════════════════════════════════
