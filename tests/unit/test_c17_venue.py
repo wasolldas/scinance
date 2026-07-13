@@ -258,6 +258,56 @@ def test_loso_folds_symbol_count_mismatch_raises() -> None:
         build_loso_folds(panel, ("BTCUSDT", "ETHUSDT", "NOPEUSDT"))
 
 
+def test_run_fold_single_class_test_period_marked_not_evaluable() -> None:
+    """Audit finding H-2 regression test: a LOSO test period degenerated to
+    a SINGLE venue class (e.g. one venue's backfill for the held-out symbol
+    stops weeks before the other's) must be marked ``evaluable=False`` and
+    NEVER counted as ``passed`` -- however high the (degenerate)
+    single-class-recall balanced accuracy looks.
+    """
+    panel = _dummy_panel(SYMBOLS5, VENUES2, n_days=40)
+    rng = np.random.default_rng(9)
+    panel.x[:] = rng.standard_normal(panel.x.shape).astype(np.float32)
+    folds = build_loso_folds(panel, SYMBOLS5)
+    fold = next(f for f in folds if f.held_out_symbol == "BTCUSDT")
+
+    # Degenerate the held-out symbol's TEST period to a single venue: drop
+    # every "binance" window of BTCUSDT whose date falls in the fold's test
+    # window (simulating a venue-specific data gap in the last 3 weeks).
+    drop = (
+        (panel.symbols == "BTCUSDT") & (panel.venues == "binance")
+        & (panel.dates >= fold.test_start_date) & (panel.dates <= fold.test_end_date)
+    )
+    assert np.any(drop), "test setup: expected some binance/BTCUSDT test windows to drop"
+    keep = ~drop
+    degenerate_panel = Panel(
+        x=panel.x[keep], mask=panel.mask[keep], dates=panel.dates[keep],
+        symbols=panel.symbols[keep], venues=panel.venues[keep],
+    )
+    folds2 = build_loso_folds(degenerate_panel, SYMBOLS5)
+    fold2 = next(f for f in folds2 if f.held_out_symbol == "BTCUSDT")
+    test_venues = np.unique(degenerate_panel.venues[fold2.test_idx])
+    assert test_venues.tolist() == ["bybit"], "test setup: test period must be single-venue"
+
+    def factory(seed: int) -> NumpyFallbackEncoder:
+        return NumpyFallbackEncoder(seed=seed)
+
+    rec = run_fold(degenerate_panel, fold2, encoder_factory=factory,
+                    venue_order=VENUES2, n_perm=2, seed=3, fold_index=0)
+
+    assert rec["evaluable"] is False
+    # single-class recall degenerates to a trivially perfect-looking number;
+    # the point of the fix is that this must NEVER translate into "passed".
+    assert rec["balanced_accuracy"] == pytest.approx(1.0) or rec["balanced_accuracy"] >= 0.0
+
+    # feed through the full driver aggregation (fdr_significant AND
+    # acc_threshold_met alone must not be enough -- evaluable gates "passed").
+    from bybit_edge.research.c17_venue.stats import benjamini_hochberg as _bh
+    rejected, _ = _bh([rec["p_value"]], alpha=0.10)
+    passed = bool(rec["acc_threshold_met"] and rejected[0] and rec["evaluable"])
+    assert passed is False
+
+
 # ---------------------------------------------------------------------------
 # (c) Label-permutation null: group-preserving + full-retraining semantics
 # ---------------------------------------------------------------------------
@@ -520,6 +570,51 @@ def test_driver_run_blocks_verdict_when_achieved_batch_below_minimum() -> None:
         assert rec["min_effective_batch_size"] == 17
 
 
+class _ZeroStepsVerdictCapableEncoder(NumpyFallbackEncoder):
+    """Test-only stub simulating a real torch encoder (verdict-capable,
+    compliant batch size) whose ``fit()`` performed ZERO optimizer steps
+    -- the exact CRITICAL finding: ``--steps 0`` (argparse has no lower
+    bound) trains nothing yet used to report ``trained: True`` with a
+    compliant batch size, so a real-CUDA run could reach
+    ``weiter_indication=True`` with literally zero GPU compute."""
+
+    verdict_bearing = True
+
+    def fit(self, x, mask, node_ids, **kwargs):  # noqa: ANN001, D102
+        self.n_fit_calls += 1
+        return {"trained": True, "steps": 0, "steps_registered_min": 1,
+                "batch_size": 2048, "batch_size_registered_min": 2048}
+
+
+def test_driver_run_blocks_verdict_when_achieved_steps_are_zero() -> None:
+    """Audit finding CRIT-1 regression test: cuda_used=True, a verdict-
+    capable encoder, and a compliant batch_size must still NOT be
+    verdict-bearing if the per-fold ACHIEVED optimizer-step count
+    (fit_info["steps"]) is zero -- the compute gate must inspect what
+    actually happened during training, not just trust batch_size/cuda_used.
+    """
+    nodes = _small_synthetic_nodes(SYMBOLS5, VENUES2, n_days=28, seed=105)
+    payload = run(
+        nodes, n_perm=1, seed=1, cuda_used=True, torch_available=True,
+        batch_size=2048,
+        encoder_factory=lambda s: _ZeroStepsVerdictCapableEncoder(seed=s),
+    )
+    assert payload["compute"]["encoder_verdict_capable"] is True
+    assert payload["compute"]["cuda_used"] is True
+    assert payload["compute"]["batch_size"] >= 2048
+    assert payload["compute"]["verdict_bearing"] is False, (
+        "zero achieved optimizer steps must block the verdict even though "
+        "cuda_used=True, the encoder reports verdict_bearing=True, and the "
+        "requested/achieved batch size is compliant"
+    )
+    assert payload["weiter_indication"] is False
+    reasons_blob = " ".join(payload["compute"]["blocked_reasons"])
+    assert "0" in reasons_blob
+    assert payload["compute"]["min_achieved_steps"] == 0
+    for rec in payload["folds"]:
+        assert rec["min_steps"] == 0
+
+
 # ---------------------------------------------------------------------------
 # (f) --check-gpu-only honestly reports the sandbox (no torch/CUDA)
 # ---------------------------------------------------------------------------
@@ -543,10 +638,45 @@ def test_cli_check_gpu_only_exits_without_full_run(tmp_path: Path) -> None:
     rep = json.loads(proc.stdout)
     assert "torch_available" in rep and "cuda_available" in rep and "verdict_capable" in rep
     if not rep["torch_available"] or not rep["cuda_available"]:
-        assert proc.returncode == 3
+        # RC_SKIP_NO_COMPUTE=2, SAME convention as the sibling Welle-5 CLIs
+        # (c14_panellag.py/c16_arrow.py) -- audit finding: compute-gate
+        # exit-code consistency.
+        assert proc.returncode == 2
         assert rep["verdict_capable"] is False
     # must NOT have written any results files (no full-run side effects).
     assert not (tmp_path / "c17_venue_results.json").exists()
+
+
+def test_cli_full_run_without_cuda_skips_with_dedicated_exit_code(tmp_path: Path) -> None:
+    """Audit finding compute-gate-inconsistency regression test: a FULL run
+    (no ``--check-gpu-only``) without a real CUDA device and WITHOUT
+    ``--allow-cpu-fallback`` must abort with the dedicated
+    ``RC_SKIP_NO_COMPUTE`` (2) exit code -- exactly like the c14_panellag/
+    c16_arrow sibling CLIs -- never silently fall back to the numpy
+    pipeline-smoke encoder and exit 0 indistinguishably from a real,
+    verdict-bearing GPU run. This must trigger BEFORE any data loading, so
+    a nonexistent --base-dir is fine here. ``--device cpu`` forces
+    ``cuda_used=False`` regardless of the environment's real CUDA
+    availability, so this assertion is deterministic everywhere.
+    """
+    out_dir = tmp_path / "out"
+    script = REPO_ROOT / "scripts" / "c17_venue.py"
+    env = {**os.environ, "PYTHONPATH": str(REPO_ROOT / "src")}
+    proc = subprocess.run(
+        [sys.executable, str(script),
+         "--base-dir", str(tmp_path / "nonexistent_harvest"),
+         "--out-dir", str(out_dir),
+         "--start-date", "2026-01-01", "--end-date", "2026-01-05",
+         "--device", "cpu"],
+        capture_output=True, text=True, env=env, timeout=60,
+    )
+    assert proc.returncode == 2, (
+        f"expected RC_SKIP_NO_COMPUTE=2, got {proc.returncode}\n"
+        f"STDOUT:{proc.stdout}\nSTDERR:{proc.stderr}"
+    )
+    assert not (out_dir / "c17_venue_results.json").exists()
+    assert not (out_dir / "c17_venue_results.md").exists()
+    assert "allow-cpu-fallback" in proc.stderr
 
 
 # ---------------------------------------------------------------------------
@@ -604,7 +734,8 @@ def test_end_to_end_cli_produces_valid_json(tmp_path: Path) -> None:
          "--symbols", ",".join(CLI_SYMBOLS),
          "--exchanges", ",".join(CLI_EXCHANGES),
          "--start-date", dates[0], "--end-date", dates[-1],
-         "--n-perm", "2", "--seed", "1", "--device", "cpu"],
+         "--n-perm", "2", "--seed", "1", "--device", "cpu",
+         "--allow-cpu-fallback"],
         capture_output=True, text=True, env=env, timeout=300,
     )
     assert proc.returncode == 0, f"CLI failed:\nSTDOUT{proc.stdout}\nSTDERR{proc.stderr}"

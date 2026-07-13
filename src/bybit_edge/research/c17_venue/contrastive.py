@@ -47,6 +47,15 @@ if TORCH_AVAILABLE:  # pragma: no cover - sandbox has no torch
 #: Registered minimum batch size (registry H-17: Batch-Groesse >= 2048).
 BATCH_SIZE_MIN = 2048
 
+#: Technical floor on optimizer steps (NOT a registered numeric threshold,
+#: analogous to BATCH_SIZE_MIN's role for batch size): ``steps < 1`` performs
+#: ZERO optimizer iterations -- a randomly-initialised encoder, not a trained
+#: one. Audit finding: argparse has no lower bound on ``--steps``, so
+#: ``--steps 0`` on a real CUDA box used to report ``trained: True`` with a
+#: compliant batch size while training nothing at all. Guarded the same way
+#: as ``allow_small_batch`` (explicit dev/smoke override only).
+STEPS_MIN = 1
+
 #: Pre-fixed InfoNCE temperature.
 TEMPERATURE = 0.07
 
@@ -104,6 +113,7 @@ def train_contrastive_encoder(
     temperature: float = TEMPERATURE,
     seed: int = 42,
     allow_small_batch: bool = False,
+    allow_zero_steps: bool = False,
     log_every: int = 200,
 ) -> dict[str, Any]:
     """Full InfoNCE training of a fresh encoder (torch; GPU-intended).
@@ -112,7 +122,11 @@ def train_contrastive_encoder(
     PER permutation replicate (full retraining — never reuse a trained
     model for the null). ``batch_size < BATCH_SIZE_MIN`` raises unless
     ``allow_small_batch`` (dev/smoke only; such runs are marked
-    non-verdict-bearing by the driver).
+    non-verdict-bearing by the driver). ``steps < STEPS_MIN`` (i.e. zero
+    optimizer iterations — a randomly-initialised, untrained encoder) raises
+    unless ``allow_zero_steps`` (dev/smoke only; same non-verdict-bearing
+    contract, enforced independently by ``driver.run()``'s compute gate on
+    the ACHIEVED ``fit_info["steps"]``, mirroring the batch-size guard).
     """
     if not TORCH_AVAILABLE:
         raise RuntimeError("torch nicht verfuegbar — Contrastive-Training unmoeglich")
@@ -120,6 +134,13 @@ def train_contrastive_encoder(
         raise ValueError(
             f"batch_size {batch_size} < registered minimum {BATCH_SIZE_MIN} "
             f"(registry H-17); use allow_small_batch only for non-verdict smokes"
+        )
+    if steps < STEPS_MIN and not allow_zero_steps:
+        raise ValueError(
+            f"steps {steps} < technical floor {STEPS_MIN} — zero optimizer "
+            f"iterations is not training (audit finding: --steps 0 must never "
+            f"masquerade as 'trained: True'); use allow_zero_steps only for "
+            f"non-verdict smokes"
         )
     n = x.shape[0]
     ids_np = np.asarray(node_ids)
@@ -162,8 +183,10 @@ def train_contrastive_encoder(
                   file=sys.stderr, flush=True)
     model.eval()
     return {
-        "trained": True,
+        "trained": bool(steps > 0),
         "steps": int(steps),
+        "steps_registered_min": STEPS_MIN,
+        "zero_steps_override": bool(steps < STEPS_MIN),
         "batch_size": int(eff_batch),
         "batch_size_registered_min": BATCH_SIZE_MIN,
         "small_batch_override": bool(eff_batch < BATCH_SIZE_MIN),
@@ -246,6 +269,7 @@ __all__ = [
     "BATCH_SIZE_MIN",
     "DEFAULT_LR",
     "DEFAULT_STEPS",
+    "STEPS_MIN",
     "TEMPERATURE",
     "infonce_loss_np",
     "probe_predict",

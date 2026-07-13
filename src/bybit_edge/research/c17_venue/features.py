@@ -42,6 +42,7 @@ import sys
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
+from typing import Any
 
 import numpy as np
 
@@ -367,6 +368,19 @@ def load_node_trades(
     Binance aggTrade maker flag ``m`` (buyer-is-maker true -> aggressor
     SELL -> -1; false -> aggressor BUY -> +1). Rows without a resolvable
     price/size/sign are dropped loudly (counted), never silently defaulted.
+
+    DAY-BATCHED (audit finding: resource-exhaustion) -- the ~100-day
+    registered window is never fetched in ONE ``fetchall()`` call: one
+    DuckDB query PER CALENDAR DAY (only that day's parquet partition),
+    read via ``fetchnumpy()`` (columnar numpy arrays straight out of
+    DuckDB, no per-row Python tuple/int/float boxing) instead of
+    ``fetchall()`` + Python list comprehensions. This bounds peak Python
+    memory to roughly ONE day's trade volume instead of the full
+    registered window's (analogous to the per-day-bounded aggregation
+    pattern in c12_frag/panel.py and c14_panellag/panel.py, adapted here
+    to event-level data since the downstream per-day quantile
+    normalisation — features.py — is itself computed per (node, UTC day)
+    and needs no cross-day event data).
     """
     import duckdb
 
@@ -374,22 +388,25 @@ def load_node_trades(
         raise DataError(f"invalid symbol: {symbol!r}")
     dates = _date_list(start_date, end_date)
     base = Path(base_dir)
-    globs = [
-        str(base / "raw" / exchange / stream / f"symbol={symbol}" / f"date={d}" / "*.parquet")
+    date_globs = {
+        d: str(base / "raw" / exchange / stream / f"symbol={symbol}" / f"date={d}" / "*.parquet")
         for d in dates
-    ]
-    present = [g for g in globs if list(Path(g).parent.glob("*.parquet"))]
-    if not present:
+    }
+    present_dates = [d for d in dates if list(Path(date_globs[d]).parent.glob("*.parquet"))]
+    if not present_dates:
         raise DataError(
             f"no parquet for {exchange}/{stream}/{symbol} in "
             f"{dates[0]}..{dates[-1]} under {base}"
         )
+    # SAME overall [start_ms, end_ms) bound as the original single-query
+    # implementation -- applied per-day-query below so the UNION of the
+    # per-day filtered results is numerically identical to the original
+    # combined-file query's result.
     start_ms = int(datetime.strptime(dates[0], "%Y-%m-%d")
                    .replace(tzinfo=timezone.utc).timestamp() * 1000)
     end_ms = int(datetime.strptime(dates[-1], "%Y-%m-%d")
                  .replace(tzinfo=timezone.utc).timestamp() * 1000) + MS_PER_DAY
-    file_list = "[" + ", ".join("'" + g.replace("'", "''") + "'" for g in present) + "]"
-    sql = f"""
+    sql_tmpl = """
         SELECT ts_exchange_ms,
                CAST(COALESCE(json_extract_string(payload_json,'$.price'),
                              json_extract_string(payload_json,'$.p')) AS DOUBLE) AS price,
@@ -405,22 +422,50 @@ def load_node_trades(
                  WHEN lower(json_extract_string(payload_json,'$.m')) = 'false' THEN 1
                  ELSE 0
                END AS sign
-        FROM read_parquet({file_list}, hive_partitioning=1, union_by_name=1)
+        FROM read_parquet({file}, hive_partitioning=1, union_by_name=1)
         WHERE ts_exchange_ms IS NOT NULL
           AND ts_exchange_ms >= {start_ms} AND ts_exchange_ms < {end_ms}
         ORDER BY ts_exchange_ms
     """
+    def _col_f64(col: Any) -> np.ndarray:
+        # fetchnumpy() returns a numpy.ma.MaskedArray (NOT a plain array
+        # with NaN) for a nullable column with NULLs present -- plain
+        # np.asarray() on a MaskedArray silently exposes the UNDERLYING
+        # (garbage) fill data instead of NaN, which would corrupt the
+        # good-row mask below. Must go through .filled(nan) explicitly.
+        if isinstance(col, np.ma.MaskedArray):
+            return col.filled(np.nan).astype(np.float64)
+        return np.asarray(col, dtype=np.float64)
+
+    ts_parts: list[np.ndarray] = []
+    price_parts: list[np.ndarray] = []
+    size_parts: list[np.ndarray] = []
+    sign_parts: list[np.ndarray] = []
+    n_days_used = 0
     con = duckdb.connect()
     try:
-        rows = con.execute(sql).fetchall()
+        for d in present_dates:
+            file_expr = "'" + date_globs[d].replace("'", "''") + "'"
+            sql = sql_tmpl.format(file=file_expr, start_ms=start_ms, end_ms=end_ms)
+            cols = con.execute(sql).fetchnumpy()
+            n = int(cols["ts_exchange_ms"].size)
+            if n == 0:
+                continue
+            n_days_used += 1
+            # ts_exchange_ms is filtered IS NOT NULL in SQL -> plain int64
+            # ndarray from fetchnumpy(), never a MaskedArray.
+            ts_parts.append(np.asarray(cols["ts_exchange_ms"], dtype=np.int64))
+            price_parts.append(_col_f64(cols["price"]))
+            size_parts.append(_col_f64(cols["size"]))
+            sign_parts.append(_col_f64(cols["sign"]))
     finally:
         con.close()
-    if not rows:
+    if not ts_parts:
         raise DataError(f"{exchange}/{symbol}: 0 rows in {dates[0]}..{dates[-1]}")
-    ts = np.array([r[0] for r in rows], dtype=np.int64)
-    price = np.array([r[1] if r[1] is not None else np.nan for r in rows], dtype=np.float64)
-    size = np.array([r[2] if r[2] is not None else np.nan for r in rows], dtype=np.float64)
-    sign = np.array([r[3] for r in rows], dtype=np.float64)
+    ts = np.concatenate(ts_parts)
+    price = np.concatenate(price_parts)
+    size = np.concatenate(size_parts)
+    sign = np.concatenate(sign_parts)
     good = (np.isfinite(price) & (price > 0.0)
             & np.isfinite(size) & (size > 0.0) & (sign != 0.0))
     n_drop = int(np.sum(~good))
@@ -431,7 +476,8 @@ def load_node_trades(
     if ts.size < 2:
         raise DataError(f"{exchange}/{symbol}: < 2 usable trades")
     print(f"[c17_venue] {exchange}:{symbol} {dates[0]}..{dates[-1]}: "
-          f"{ts.size} usable trades", file=sys.stderr, flush=True)
+          f"{ts.size} usable trades ({n_days_used} day-batched queries)",
+          file=sys.stderr, flush=True)
     return ts, price, size, sign
 
 

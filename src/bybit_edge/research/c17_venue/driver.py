@@ -48,7 +48,7 @@ from typing import Any, Callable
 
 import numpy as np
 
-from .contrastive import BATCH_SIZE_MIN, probe_predict, train_linear_probe
+from .contrastive import BATCH_SIZE_MIN, STEPS_MIN, probe_predict, train_linear_probe
 from .encoder import NumpyFallbackEncoder
 from .features import NodeWindows
 from .redundancy import (
@@ -202,6 +202,13 @@ def run_fold(
     x_te, m_te = panel.x[te], panel.mask[te]
     y_tr = _venue_to_int(panel.venues[tr], venue_order)
     y_te = _venue_to_int(panel.venues[te], venue_order)
+    # Audit finding H-2: a LOSO test period can degenerate to a SINGLE venue
+    # class (e.g. one venue's backfill for the held-out symbol stops weeks
+    # before the other's) -- balanced_accuracy then collapses to plain
+    # single-class recall, trivially reachable by a venue-biased probe. Such
+    # a fold is NOT AUSWERTBAR and must never be scored as "passed", however
+    # high the recall or however low the resulting p-value looks.
+    evaluable = bool(np.unique(y_te).size >= 2)
     groups_tr = np.array(
         [f"{s}|{d}" for s, d in zip(panel.symbols[tr], panel.dates[tr])],
         dtype=object)
@@ -247,12 +254,20 @@ def run_fold(
         int(fi["batch_size"]) for fi in all_fit_infos if "batch_size" in fi
     ]
     min_effective_batch_size = min(achieved_batches) if achieved_batches else None
+    # Audit finding CRIT-1: the compute gate must see the ACHIEVED optimizer
+    # step count too, not just report it -- aggregate the minimum over the
+    # main fit AND every null retraining in this fold (same pattern as
+    # min_effective_batch_size above), so `--steps 0` can never silently
+    # produce a "trained: True" verdict-bearing payload.
+    achieved_steps = [int(fi["steps"]) for fi in all_fit_infos if "steps" in fi]
+    min_steps = min(achieved_steps) if achieved_steps else None
     return {
         "held_out_symbol": fold.held_out_symbol,
         "test_start_date": fold.test_start_date,
         "test_end_date": fold.test_end_date,
         "n_train_windows": int(tr.size),
         "n_test_windows": int(te.size),
+        "evaluable": evaluable,
         "balanced_accuracy": float(acc),
         "acc_threshold": BALANCED_ACC_MIN,
         "acc_threshold_met": bool(acc >= BALANCED_ACC_MIN),
@@ -266,6 +281,7 @@ def run_fold(
         "p_value": float(p_value),
         "fit_info": fit_info,
         "min_effective_batch_size": min_effective_batch_size,
+        "min_steps": min_steps,
         # carried for pooled accuracy + daily distance series (stripped
         # from the JSON payload by run()):
         "_y_true": y_te,
@@ -333,7 +349,10 @@ def run(
     rejected, p_crit = benjamini_hochberg(p_values, FDR_ALPHA)
     for r, rej in zip(fold_records, rejected):
         r["fdr_significant"] = bool(rej)
-        r["passed"] = bool(r["acc_threshold_met"] and rej)
+        # Audit finding H-2: a fold whose test period degenerated to a
+        # single venue class is NEVER counted as passed, however high its
+        # (degenerate) balanced accuracy or however low its p-value.
+        r["passed"] = bool(r["acc_threshold_met"] and rej and r["evaluable"])
 
     # pooled balanced accuracy over ALL held-out test windows.
     y_true_all = np.concatenate([r["_y_true"] for r in fold_records])
@@ -383,6 +402,25 @@ def run(
             f"registriertes Minimum {BATCH_SIZE_MIN} (mind. ein Fold/"
             f"Retraining unterschritt das Minimum trotz angefordertem "
             f"Batch {batch_size})")
+    # Audit finding CRIT-1: the compute gate never inspected the ACHIEVED
+    # optimizer step count -- `--steps 0` (argparse has no lower bound)
+    # trained NOTHING (a randomly-initialised encoder) yet reported
+    # `trained: True` with a compliant batch size, so a real-CUDA run could
+    # reach a genuine `weiter_indication=True` with literally zero GPU
+    # compute. Aggregate the minimum achieved steps over every fold/
+    # retraining (same pattern as the batch-size check above) and force
+    # non-verdict-bearing if any of them trained zero steps.
+    achieved_steps_all = [
+        r["min_steps"] for r in fold_records if r.get("min_steps") is not None
+    ]
+    min_achieved_steps = min(achieved_steps_all) if achieved_steps_all else None
+    if achieved_steps_all and min_achieved_steps < STEPS_MIN:
+        verdict_bearing = False
+        blocked_reasons.append(
+            f"tatsaechlich erreichte Optimizer-Schritte {min_achieved_steps} < "
+            f"technische Untergrenze {STEPS_MIN} (mind. ein Fold/Retraining "
+            f"trainierte null Schritte -- randominitialisierter Encoder, "
+            f"kein echtes Training)")
     if len(symbols) != N_FOLDS:
         verdict_bearing = False
         blocked_reasons.append(
@@ -432,6 +470,8 @@ def run(
             "encoder_verdict_capable": encoder_verdict_capable,
             "batch_size": int(batch_size),
             "batch_size_registered_min": BATCH_SIZE_MIN,
+            "min_achieved_steps": min_achieved_steps,
+            "steps_technical_min": STEPS_MIN,
             "verdict_bearing": verdict_bearing,
             "blocked_reasons": blocked_reasons,
             "note": COMPUTE_NOTE,
@@ -451,6 +491,7 @@ def run(
         },
         "folds": fold_records,
         "n_folds_passed": int(n_folds_passed),
+        "n_folds_evaluable": int(sum(1 for r in fold_records if r["evaluable"])),
         "folds_criterion_met": folds_ok,
         "pooled_balanced_accuracy": float(pooled_acc),
         "pooled_acc_ok": pooled_ok,
@@ -505,6 +546,8 @@ def render_markdown(payload: dict[str, Any]) -> str:
     L.append(f"- **Compute-Gate:** torch={_fmt(c['torch_available'])} · "
              f"CUDA={_fmt(c['cuda_used'])} · Batch {c['batch_size']} "
              f"(Min {c['batch_size_registered_min']}) · "
+             f"erreichte Schritte (Min) {_fmt(c.get('min_achieved_steps'), 0)} "
+             f"(techn. Min {c['steps_technical_min']}) · "
              f"**verdikt-tragend: {_fmt(c['verdict_bearing'])}**"
              + (f" · blockiert: {'; '.join(c['blocked_reasons'])}"
                 if c["blocked_reasons"] else ""))
@@ -521,6 +564,7 @@ def render_markdown(payload: dict[str, Any]) -> str:
     L.append(f"**WEITER-Indikation:** {_fmt(payload['weiter_indication'])} · "
              f"Folds bestanden: {payload['n_folds_passed']}/{payload['fdr_family_size']} "
              f"({_fmt(payload['folds_criterion_met'])}) · "
+             f"Folds auswertbar: {payload['n_folds_evaluable']}/{payload['fdr_family_size']} · "
              f"Pooled-Balanced-Accuracy: {_fmt(payload['pooled_balanced_accuracy'])} "
              f"(>= {payload['gate_thresholds']['pooled_acc_min']}: "
              f"{_fmt(payload['pooled_acc_ok'])})")
@@ -528,8 +572,8 @@ def render_markdown(payload: dict[str, Any]) -> str:
     L.append("## Folds (Gate-Kern)")
     L.append("")
     L.append("| Fold (Symbol out) | Test-Zeitraum | Train/Test-Fenster | "
-             "Balanced Acc (>= 0,60) | Null (min..max) | p | FDR-sig | bestanden |")
-    L.append("|---|---|---:|---:|---|---:|:---:|:---:|")
+             "Balanced Acc (>= 0,60) | Null (min..max) | p | FDR-sig | auswertbar | bestanden |")
+    L.append("|---|---|---:|---:|---|---:|:---:|:---:|:---:|")
     for r in payload["folds"]:
         nulls = r["null_accuracies"]
         nul = f"{min(nulls):.3f}..{max(nulls):.3f}" if nulls else "n/a"
@@ -538,7 +582,7 @@ def render_markdown(payload: dict[str, Any]) -> str:
             f"{r['test_end_date']} | {r['n_train_windows']}/{r['n_test_windows']} "
             f"| {_fmt(r['balanced_accuracy'])} ({_fmt(r['acc_threshold_met'])}) "
             f"| {nul} | {_fmt(r['p_value'])} | {_fmt(r['fdr_significant'])} "
-            f"| {_fmt(r['passed'])} |"
+            f"| {_fmt(r['evaluable'])} | {_fmt(r['passed'])} |"
         )
     L.append("")
     L.append("## Non-Redundanz-Gate gegen c12_frag/H-12 (vorregistriert, bindend)")

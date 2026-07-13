@@ -18,15 +18,24 @@ adjudicates. KAPITALFREI.
                                  [--start-date 2026-03-27] [--end-date 2026-07-04]
                                  [--n-perm 20] [--steps 10000] [--batch-size 2048]
                                  [--c12-results PATH] [--device auto] [--seed 42]
-                                 [--check-gpu-only]
+                                 [--check-gpu-only] [--allow-cpu-fallback]
 
-COMPUTE GATING (verbindlich): ``--check-gpu-only`` reports torch/CUDA
-availability and exits WITHOUT running anything else — use it first on the
-target machine. A full run WITHOUT a real CUDA device (or without torch)
-falls back to a deterministic numpy pipeline-smoke encoder and the JSON
-payload is marked ``compute.verdict_bearing: false`` — such a run must
-NEVER be treated as a gate verdict (registry H-17: the >= 2048 batch regime
-is part of the method).
+COMPUTE GATING (verbindlich, SAME rc=2 "SKIP: no compute" convention as the
+sibling Welle-5 CLIs c14_panellag.py/c15_grammar.py/c16_arrow.py):
+  * ``--check-gpu-only`` reports torch/CUDA availability and exits WITHOUT
+    running anything else — use it first on the target machine.
+  * A full run WITHOUT a real CUDA device (or without torch) is NEVER
+    verdict-bearing (registry H-17: the >= 2048 batch regime is part of the
+    method) -- WITHOUT the explicit ``--allow-cpu-fallback`` escape hatch it
+    now aborts BEFORE any data loading/training with exit code
+    ``RC_SKIP_NO_COMPUTE`` (2), instead of silently completing a multi-hour
+    numpy pipeline-smoke run and exiting 0 indistinguishably from a real
+    verdict-bearing run. With ``--allow-cpu-fallback`` the run proceeds on
+    the numpy fallback encoder but the JSON payload is still clearly marked
+    ``compute.verdict_bearing: false``.
+
+Exit codes: 0 = OK, 1 = error, 2 = compute gate SKIP (no torch/CUDA and
+--allow-cpu-fallback not passed, or --check-gpu-only reports not capable).
 
 No write access to the harvester tree. Mirrors the c12_frag CLI conventions.
 """
@@ -43,6 +52,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
 from bybit_edge.research.c17_venue.contrastive import (  # noqa: E402
     BATCH_SIZE_MIN,
     DEFAULT_STEPS,
+    STEPS_MIN,
 )
 from bybit_edge.research.c17_venue.driver import (  # noqa: E402
     N_PERMUTATIONS,
@@ -63,6 +73,13 @@ from bybit_edge.research.c17_venue.features import (  # noqa: E402
     DataError,
     load_panel,
 )
+from bybit_edge.research.c17_venue.redundancy import (  # noqa: E402
+    validate_c12_payload_shape,
+)
+
+RC_OK = 0
+RC_ERROR = 1
+RC_SKIP_NO_COMPUTE = 2
 
 
 def _dumps(payload) -> str:
@@ -96,7 +113,14 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--n-perm", type=int, default=N_PERMUTATIONS,
                    help="Permutation-null retrainings per fold (registry: 20).")
     p.add_argument("--steps", type=int, default=DEFAULT_STEPS,
-                   help="InfoNCE optimizer steps per (re)training.")
+                   help="InfoNCE optimizer steps per (re)training "
+                        f"(technical floor {STEPS_MIN}; use --allow-zero-steps "
+                        "for a non-verdict-bearing --steps 0 smoke).")
+    p.add_argument("--allow-zero-steps", action="store_true",
+                   help="Dev/smoke override for --steps < technical floor "
+                        f"({STEPS_MIN}) -- forces non-verdict-bearing. Without "
+                        "this flag --steps 0 is rejected at startup instead "
+                        "of silently 'training' for zero optimizer iterations.")
     p.add_argument("--batch-size", type=int, default=BATCH_SIZE_MIN,
                    help=f"Contrastive batch size (registry min {BATCH_SIZE_MIN}).")
     p.add_argument("--allow-small-batch", action="store_true",
@@ -112,42 +136,63 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--check-gpu-only", action="store_true",
                    help="Report torch/CUDA availability and exit (no run). "
                         "Compute-gating requirement (registry H-17).")
+    p.add_argument("--allow-cpu-fallback", action="store_true",
+                   help="TEST-ONLY escape hatch: run the full pipeline "
+                        "without a real CUDA device anyway (numpy pipeline-"
+                        "smoke encoder). Result is NEVER verdict-bearing. "
+                        "Without this flag a full run without CUDA aborts "
+                        "immediately with RC_SKIP_NO_COMPUTE (2).")
     args = p.parse_args(argv)
+
+    if args.steps < STEPS_MIN and not args.allow_zero_steps:
+        print(f"[c17_venue] FATAL: --steps {args.steps} < technische "
+              f"Untergrenze {STEPS_MIN} — null Optimizer-Schritte ist kein "
+              f"Training (Audit-Fund: --steps 0 darf niemals als "
+              f"'trained: True' erscheinen). Fuer einen NICHT-verdikt-"
+              f"tragenden Test-/Pipeline-Lauf --allow-zero-steps setzen.",
+              file=sys.stderr, flush=True)
+        return RC_ERROR
 
     if args.check_gpu_only:
         rep = gpu_report()
         print(json.dumps(rep, indent=2))
         print(f"[c17_venue] check-gpu-only: verdict_capable={rep['verdict_capable']}",
               file=sys.stderr, flush=True)
-        return 0 if rep["verdict_capable"] else 3
+        return RC_OK if rep["verdict_capable"] else RC_SKIP_NO_COMPUTE
+
+    # COMPUTE GATE (audit finding: consistency with c14/c15/c16 sibling
+    # CLIs): checked BEFORE any data loading/training. Without a real CUDA
+    # device a full run is NEVER verdict-bearing (registry H-17); without
+    # the explicit --allow-cpu-fallback opt-in this must SKIP with a
+    # dedicated exit code, never silently complete a numpy pipeline-smoke
+    # run and exit 0 indistinguishably from a real GPU verdict.
+    cuda_used = bool(args.device != "cpu" and cuda_available())
+    use_torch = bool(TORCH_AVAILABLE and args.device != "cpu")
+    gpu_ready = bool(use_torch and cuda_used)
+    if not gpu_ready and not args.allow_cpu_fallback:
+        print(
+            "[c17_venue] SKIP: kein echtes CUDA-Device (torch/CUDA fehlt "
+            "oder --device cpu) und --allow-cpu-fallback nicht gesetzt. Ein "
+            "voller Lauf ohne CUDA ist NIEMALS verdikt-tragend (Registry "
+            "H-17: Batch >= 2048 ist Teil der Methode). Fuer einen NICHT-"
+            "verdikt-tragenden Test-/Pipeline-Lauf --allow-cpu-fallback "
+            "setzen.", file=sys.stderr, flush=True,
+        )
+        return RC_SKIP_NO_COMPUTE
+    if not use_torch:
+        print("[c17_venue] WARNING: torch/CUDA nicht verfuegbar oder "
+              "--device cpu erzwungen — numpy Pipeline-Smoke-Encoder, "
+              "Lauf ist NICHT verdikt-tragend (--allow-cpu-fallback gesetzt).",
+              file=sys.stderr, flush=True)
 
     symbols = tuple(s.strip() for s in args.symbols.split(",") if s.strip())
     exchanges = tuple(e.strip() for e in args.exchanges.split(",") if e.strip())
     base = Path(args.base_dir)
     print(f"[c17_venue] base-dir={base.resolve()} symbols={list(symbols)} "
           f"exchanges={list(exchanges)} window={args.start_date}..{args.end_date} "
-          f"n_perm={args.n_perm} batch_size={args.batch_size}",
+          f"n_perm={args.n_perm} batch_size={args.batch_size} "
+          f"gpu_ready={gpu_ready} allow_cpu_fallback={args.allow_cpu_fallback}",
           file=sys.stderr, flush=True)
-
-    try:
-        nodes = load_panel(base, symbols, args.start_date, args.end_date,
-                           exchanges=exchanges)
-    except DataError as exc:
-        print(f"[c17_venue] FATAL: panel not loadable: {exc}",
-              file=sys.stderr, flush=True)
-        return 1
-    print(f"[c17_venue] loaded {len(nodes)} nodes, "
-          f"{sum(n.x.shape[0] for n in nodes)} windows total",
-          file=sys.stderr, flush=True)
-
-    cuda_used = bool(args.device != "cpu" and cuda_available())
-    use_torch = bool(TORCH_AVAILABLE and args.device != "cpu")
-    if not use_torch:
-        print("[c17_venue] WARNING: torch/CUDA nicht verfuegbar oder "
-              "--device cpu erzwungen — numpy Pipeline-Smoke-Encoder, "
-              "Lauf ist NICHT verdikt-tragend.", file=sys.stderr, flush=True)
-    encoder_factory = make_encoder_factory(
-        use_torch=use_torch, device=args.device, seed=args.seed)
 
     c12_payload = None
     if args.c12_results:
@@ -158,11 +203,37 @@ def main(argv: list[str] | None = None) -> int:
             print(f"[c17_venue] WARNING: c12-results nicht lesbar "
                   f"({c12_path}): {exc} — Redundanz-Gate bleibt nicht "
                   f"auswertbar.", file=sys.stderr, flush=True)
+        else:
+            # Audit finding (late-failure-total-compute-loss): validate the
+            # c12 payload SHAPE right here, in milliseconds, BEFORE the
+            # 1-2 GPU-day run below -- not only after all folds finished,
+            # deep inside redundancy_gate.
+            try:
+                validate_c12_payload_shape(c12_payload)
+            except ValueError as exc:
+                print(f"[c17_venue] FATAL: c12-results ({c12_path}) hat ein "
+                      f"unerwartetes Schema: {exc}", file=sys.stderr, flush=True)
+                return RC_ERROR
+
+    try:
+        nodes = load_panel(base, symbols, args.start_date, args.end_date,
+                           exchanges=exchanges)
+    except DataError as exc:
+        print(f"[c17_venue] FATAL: panel not loadable: {exc}",
+              file=sys.stderr, flush=True)
+        return RC_ERROR
+    print(f"[c17_venue] loaded {len(nodes)} nodes, "
+          f"{sum(n.x.shape[0] for n in nodes)} windows total",
+          file=sys.stderr, flush=True)
+
+    encoder_factory = make_encoder_factory(
+        use_torch=use_torch, device=args.device, seed=args.seed)
 
     fit_kwargs: dict = {}
     if use_torch:
         fit_kwargs = dict(batch_size=args.batch_size, steps=args.steps,
-                          seed=args.seed, allow_small_batch=args.allow_small_batch)
+                          seed=args.seed, allow_small_batch=args.allow_small_batch,
+                          allow_zero_steps=args.allow_zero_steps)
 
     source = f"{base}/raw/{{{','.join(exchanges)}}}/publicTrade ({args.start_date}..{args.end_date})"
     try:
@@ -174,7 +245,7 @@ def main(argv: list[str] | None = None) -> int:
         )
     except ValueError as exc:
         print(f"[c17_venue] FATAL: {exc}", file=sys.stderr, flush=True)
-        return 1
+        return RC_ERROR
 
     out_dir = Path(args.out_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
@@ -194,7 +265,7 @@ def main(argv: list[str] | None = None) -> int:
         f"weiter_indication={payload['weiter_indication']}",
         file=sys.stderr, flush=True,
     )
-    return 0
+    return RC_OK
 
 
 if __name__ == "__main__":

@@ -101,6 +101,13 @@ def extract_c12_daily_series(
     Reads ``payload["windows"][*]["days"][*]`` records with
     ``analyzed == True`` (the exact structure ``c12_frag.driver.run``
     emits) and returns ``({date: lambda2}, {date: ipr_v2})``.
+
+    A day with ``analyzed == True`` but ``lambda2``/``ipr_v2`` serialised
+    as JSON ``null`` (the exact NaN convention ``c17_venue``'s own
+    ``_dumps`` uses) is skipped rather than raising ``float(None)`` --
+    such a day simply contributes no data point to the overlap series
+    (gross structural mismatches are caught EARLIER by
+    ``validate_c12_payload_shape`` before the expensive run, not here).
     """
     lam2: dict[str, float] = {}
     ipr2: dict[str, float] = {}
@@ -108,10 +115,71 @@ def extract_c12_daily_series(
         for day in win.get("days", []):
             if not day.get("analyzed"):
                 continue
+            l2_raw, iv_raw = day.get("lambda2"), day.get("ipr_v2")
+            if l2_raw is None or iv_raw is None:
+                continue
+            try:
+                l2, iv = float(l2_raw), float(iv_raw)
+            except (TypeError, ValueError):
+                continue
+            if not (np.isfinite(l2) and np.isfinite(iv)):
+                continue
             date = str(day["date"])
-            lam2[date] = float(day["lambda2"])
-            ipr2[date] = float(day["ipr_v2"])
+            lam2[date] = l2
+            ipr2[date] = iv
     return lam2, ipr2
+
+
+def validate_c12_payload_shape(c12_payload: Any) -> None:
+    """Eagerly validate the c12_frag JSON shape (audit finding: late-crash).
+
+    Raises ``ValueError`` with a precise, actionable message on the FIRST
+    structural problem. Meant to be called at CLI startup, in milliseconds,
+    BEFORE the (1-2 GPU-day) H-17 run -- the alternative is
+    ``extract_c12_daily_series``/``redundancy_gate`` raising an uncaught
+    AttributeError/KeyError/TypeError only at the very END of ``run()``,
+    destroying every fold's training. Checks exactly the field-access
+    pattern ``extract_c12_daily_series`` performs: ``payload["windows"]``
+    (list) -> each window's ``"days"`` (list) -> each analyzed day needs
+    the KEYS ``date``/``lambda2``/``ipr_v2`` present (their VALUES may
+    legitimately be JSON ``null`` -- that is a supported NaN convention,
+    handled gracefully by ``extract_c12_daily_series``, not a shape error).
+    """
+    if not isinstance(c12_payload, dict):
+        raise ValueError(
+            f"c12-results Payload muss ein JSON-Objekt sein, ist "
+            f"{type(c12_payload).__name__} (z.B. Array-Root)"
+        )
+    windows = c12_payload.get("windows")
+    if not isinstance(windows, list):
+        raise ValueError(
+            "c12-results Payload: 'windows' fehlt oder ist keine Liste"
+        )
+    for wi, win in enumerate(windows):
+        if not isinstance(win, dict):
+            raise ValueError(f"c12-results Payload: windows[{wi}] ist kein Objekt")
+        days = win.get("days")
+        if not isinstance(days, list):
+            raise ValueError(
+                f"c12-results Payload: windows[{wi}]['days'] fehlt oder "
+                f"ist keine Liste"
+            )
+        for di, day in enumerate(days):
+            if not isinstance(day, dict):
+                raise ValueError(
+                    f"c12-results Payload: windows[{wi}].days[{di}] ist "
+                    f"kein Objekt"
+                )
+            if not day.get("analyzed"):
+                continue
+            missing = [f for f in ("date", "lambda2", "ipr_v2") if f not in day]
+            if missing:
+                raise ValueError(
+                    f"c12-results Payload: windows[{wi}].days[{di}] hat "
+                    f"analyzed=true, aber fehlende Felder {missing} "
+                    f"(erwartet: date, lambda2, ipr_v2 -- Werte duerfen "
+                    f"null sein, die Schluessel muessen aber vorhanden sein)"
+                )
 
 
 def redundancy_gate(
@@ -184,4 +252,5 @@ __all__ = [
     "daily_embedding_distance_series",
     "extract_c12_daily_series",
     "redundancy_gate",
+    "validate_c12_payload_shape",
 ]
