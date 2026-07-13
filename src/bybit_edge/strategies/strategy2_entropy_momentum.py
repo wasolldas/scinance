@@ -236,10 +236,26 @@ class Strategy2EntropyMomentum:
         return True, "all_conditions_met"
 
     def _is_entropy_collapsed(self, h_combined: float) -> bool:
-        """Check if entropy is below Median - 2*sigma."""
+        """Check if entropy is below Median - 2*sigma.
+
+        BUGFIX (2026-07-13, CRITICAL_REVIEW_2 statistical-self-reference-bias):
+        ``h_combined`` is the value most recently appended to
+        ``self._entropy_history`` (appended one line before this is called,
+        in ``on_data``). Computing median/std over the FULL history therefore
+        tests ``h_combined`` against a reference distribution that already
+        contains ``h_combined`` itself. Near the minimum-sample threshold
+        this self-reference pulls the median toward, and inflates the std
+        around, an extreme current value — making the collapse test
+        systematically harder to trigger exactly when entropy is most
+        collapsed. Excluding the just-appended sample (``[:-1]``) restores
+        an out-of-sample reference distribution without touching append
+        ordering used elsewhere (e.g. the exit-path median check).
+        """
         if len(self._entropy_history) < _MIN_ENTROPY_SAMPLES:
             return False
-        h_arr = np.array(list(self._entropy_history), dtype=np.float64)
+        h_arr = np.array(list(self._entropy_history)[:-1], dtype=np.float64)
+        if h_arr.size == 0:
+            return False
         h_median: float = float(np.median(h_arr))
         h_std: float = float(np.std(h_arr))
         if h_std < 1e-12:
@@ -283,6 +299,21 @@ class Strategy2EntropyMomentum:
     # ------------------------------------------------------------------
     # Utility
     # ------------------------------------------------------------------
+
+    def reset_position_state(self) -> None:
+        """Clear any in-flight position without touching learned/model state.
+
+        Used at walk-forward fold boundaries (TRAIN -> TEST) to discard a
+        position that was still open when TRAIN warmup ended, while
+        preserving the warmed-up M6/M2/M22/M7 state that TRAIN exists to
+        build. Mirrors exactly the fields cleared on a normal exit in
+        ``on_ticker`` above.
+        """
+        self._in_trade = False
+        self._entry_price = 0.0
+        self._entry_direction = 0
+        self._entry_ts = 0.0
+        self._entry_ofi_sign = 0
 
     def reset(self) -> None:
         """Reset all internal state."""

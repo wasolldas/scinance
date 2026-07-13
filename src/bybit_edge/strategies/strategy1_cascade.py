@@ -262,10 +262,25 @@ class Strategy1CascadeDetector:
         return True, "all_conditions_met"
 
     def _is_b_value_extreme(self, b_val: float) -> bool:
-        """Check if b-value is below mean - 2*sigma (large events dominant)."""
+        """Check if b-value is below mean - 2*sigma (large events dominant).
+
+        BUGFIX (2026-07-13, CRITICAL_REVIEW_2 statistical-self-reference-bias):
+        ``b_val`` is the value most recently appended to ``self._b_history``
+        (appended one line before this is called, in ``on_data``). Computing
+        mean/std over the FULL history therefore tests ``b_val`` against a
+        reference distribution that already contains ``b_val`` itself. Near
+        the minimum-sample threshold this self-reference pulls the mean
+        toward, and inflates the std around, an extreme current value —
+        making the extreme-value test systematically harder to trigger
+        exactly when the underlying event is most extreme. Excluding the
+        just-appended sample (``[:-1]``) restores an out-of-sample reference
+        distribution without touching append ordering used elsewhere.
+        """
         if len(self._b_history) < _MIN_B_SAMPLES:
             return False
-        b_arr = np.array(list(self._b_history), dtype=np.float64)
+        b_arr = np.array(list(self._b_history)[:-1], dtype=np.float64)
+        if b_arr.size == 0:
+            return False
         b_mean: float = float(np.mean(b_arr))
         b_std: float = float(np.std(b_arr))
         if b_std < 1e-12:
@@ -322,6 +337,21 @@ class Strategy1CascadeDetector:
     # ------------------------------------------------------------------
     # Utility
     # ------------------------------------------------------------------
+
+    def reset_position_state(self) -> None:
+        """Clear any in-flight position without touching learned/model state.
+
+        Used at walk-forward fold boundaries (TRAIN -> TEST) to discard a
+        position that was still open when TRAIN warmup ended, while
+        preserving the warmed-up Hawkes/GR-Omori/Kyle-Lambda/SIR state that
+        TRAIN exists to build. Mirrors exactly the fields cleared on a
+        normal exit in ``on_data`` above.
+        """
+        self._in_trade = False
+        self._entry_price = 0.0
+        self._entry_direction = 0
+        self._entry_ts = 0.0
+        self._pre_cascade_oi = 0.0
 
     def reset(self) -> None:
         """Reset all internal state."""

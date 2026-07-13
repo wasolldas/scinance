@@ -157,6 +157,59 @@ def test_no_lookahead(persist: PersistenceLayer) -> None:
                 assert e.timestamp_ms <= ts_ms
 
 
+def test_tie_break_ingests_trade_before_ticker_at_equal_ts(
+    persist: PersistenceLayer,
+) -> None:
+    """At an EXACTLY equal effective timestamp, a trade/liq event must sort
+    before a ticker event in the merged stream.
+
+    The pipeline tick fires on the ticker and reads whatever is already in
+    trade_buffer/liq_buffer; the documented invariant is "events with
+    ts <= t are already ingested". If the ticker sorted first on a tie, the
+    tick evaluating at ts==t would miss the same-ts trade/liq -- exactly the
+    scenario a liquidation cascade or trade burst can produce when multiple
+    rows share one timestamp. Regression for CRITICAL_REVIEW_2
+    replay_backtester.py:490 (causality-ordering).
+    """
+    tied_ts = _BASE_TS + 5_000
+    persist.write_tickers_batch([_ticker(0, ts=tied_ts)])
+    persist.write_trades_batch(
+        [
+            TradeEvent(
+                timestamp_ms=tied_ts,
+                price=30_000.0,
+                volume=1.0,
+                side="Buy",
+                is_block=False,
+            )
+        ],
+        symbol=_SYMBOL,
+    )
+    persist.write_liquidations_batch(
+        [
+            LiquidationEvent(
+                timestamp_ms=tied_ts,
+                symbol=_SYMBOL,
+                side="Sell",
+                volume=1.0,
+                price=30_000.0,
+                usd_value=3.0e4,
+            )
+        ]
+    )
+
+    bt = _new_bt(persist)
+    n = bt.load_events()
+    assert n == 3
+
+    kinds_at_tied_ts = [e[1] for e in bt._events if e[0] == tied_ts]
+    assert kinds_at_tied_ts == ["trade", "liq", "ticker"], (
+        f"tie-break order at equal ts was {kinds_at_tied_ts!r}, expected "
+        "data-ingestion events (trade, liq) to precede the evaluating "
+        "ticker event"
+    )
+
+
 def test_seconds_to_settlement_uses_event_time() -> None:
     # next_funding_time is 600 s after the event ts; expect ~600, not a
     # wall-clock-derived value.
@@ -568,6 +621,72 @@ class TestReplayWalkForward:
             )
         # At least one trade in the test window (toggle fires every tick).
         assert results["S1"].n_trades >= 1
+
+    # ------------------------------------------------------------------
+    # 2b) Strategy-internal in-trade flag is reset at the fold boundary
+    # ------------------------------------------------------------------
+    def test_walkforward_resets_strategy_in_trade_at_fold_boundary(
+        self, persist: PersistenceLayer
+    ) -> None:
+        """A strategy still ``_in_trade`` internally at end-of-TRAIN must
+        have that flag (and entry bookkeeping) cleared before the first
+        TEST-phase tick.
+
+        Before the fix, only the backtester's own ``open_pos`` mirror was
+        reset at the fold boundary -- the strategy OBJECT's ``_in_trade``
+        stayed True, so it kept evaluating exit- instead of entry-conditions
+        into TEST (dropping real entries), and if/when its stale TRAIN-era
+        exit eventually fired, ``open_pos[sid]`` was already ``None`` so
+        even that exit was silently dropped. Regression for
+        CRITICAL_REVIEW_2 replay_backtester.py:1461
+        (position-accounting-desync).
+        """
+        n = 2 * 1440 + 60
+        _persist_ticker_grid(persist, n=n, step_ms=60_000)
+
+        bt = _new_bt(persist)
+        bt.load_events()
+
+        train_end = _BASE_TS + 1 * _MS_PER_DAY
+        test_start = train_end + 30 * _MS_PER_MIN
+
+        state = {"opened": False}
+        observed_at_first_test_tick: list[bool] = []
+
+        def probe_eval(strategy_id: str, strategy: Any, ticker_data: dict,
+                       ts_seconds: float) -> dict:
+            if strategy_id != "S1":
+                return {"action": "wait", "direction": 0, "strategy": strategy_id}
+            now_ms = int(ts_seconds * 1000)
+            if now_ms < train_end:
+                # Simulate S1 opening a position early in TRAIN and never
+                # exiting before TRAIN ends -- mutate the *real* strategy
+                # instance directly, exactly as a genuine on_data() entry
+                # would, so the fold-boundary reset is exercised honestly.
+                if not state["opened"]:
+                    state["opened"] = True
+                    strategy._in_trade = True
+                    strategy._entry_direction = 1
+                return {"action": "wait", "direction": 0, "strategy": "S1"}
+            if now_ms >= test_start and not observed_at_first_test_tick:
+                observed_at_first_test_tick.append(bool(strategy._in_trade))
+            return {"action": "wait", "direction": 0, "strategy": "S1"}
+
+        bt._eval_strategy = probe_eval  # type: ignore[assignment]
+
+        bt.run_walkforward(
+            pipeline_interval_seconds=60.0,
+            train_days=1,
+            test_days=1,
+            embargo_minutes=30,
+            min_train_events=10,
+        )
+
+        assert observed_at_first_test_tick == [False], (
+            "strategy._in_trade leaked True from TRAIN into the first "
+            "TEST tick -- fold-boundary reset did not clear "
+            "strategy-internal position state"
+        )
 
     # ------------------------------------------------------------------
     # 3) Embargo skips events

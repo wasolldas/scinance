@@ -23,6 +23,7 @@ from bybit_edge.strategies.strategy2_entropy_momentum import (
     Strategy2EntropyMomentum,
     _MIN_ENTROPY_SAMPLES,
 )
+from bybit_edge.config import S1_B_ZSCORE, S2_ENTROPY_ZSCORE
 from bybit_edge.strategies.strategy4_pattern_ensemble import (
     Strategy4PatternEnsemble,
 )
@@ -330,6 +331,67 @@ class TestStrategy1CascadeDetector:
         assert result["reason"] == "omori_decay"
         assert strat.in_trade is False
 
+    def test_s1_b_value_extreme_excludes_self_from_reference_distribution(
+        self,
+    ) -> None:
+        """Regression for CRITICAL_REVIEW_2 statistical-self-reference-bias
+        (strategy1_cascade.py:268): ``_is_b_value_extreme`` must judge the
+        current b-value against the history EXCLUDING the current value
+        itself (which ``on_data`` has already appended one line earlier),
+        not including it.
+
+        We warm up a history of known values, append one strongly deviant
+        "current" value (as ``on_data`` does), and assert the extremity
+        decision matches mean/std computed WITHOUT the current sample
+        (out-of-sample reference), not WITH it (self-referential,
+        pre-fix behaviour).
+        """
+        strat = Strategy1CascadeDetector()
+
+        rng = np.random.default_rng(7)
+        warm_up = 1.0 + rng.uniform(-0.05, 0.05, size=_MIN_B_SAMPLES + 20)
+        for v in warm_up:
+            strat._b_history.append(float(v))
+
+        # A current value deviant enough to sit right at the boundary
+        # between "extreme w.r.t. history-without-self" (True) and
+        # "extreme w.r.t. history-with-self" (False) -- exactly the
+        # self-damping regime the bug report describes.
+        b_mean_before = float(np.mean(warm_up))
+        b_std_before = float(np.std(warm_up))
+        current = b_mean_before - 2.05 * b_std_before  # just past pre-fix
+        # threshold when measured against the OLD (self-inclusive) stats,
+        # but the self-inclusive mean/std shift enough with n ~= 70 that
+        # the pre-fix code would call this "not extreme".
+
+        # Simulate on_data's append-then-test ordering.
+        strat._b_history.append(current)
+
+        # Reference computed WITHOUT the current sample (correct, post-fix).
+        without_self = np.array(warm_up, dtype=np.float64)
+        mean_wo = float(np.mean(without_self))
+        std_wo = float(np.std(without_self))
+        expected_extreme = current < mean_wo - S1_B_ZSCORE * std_wo
+
+        # Reference computed WITH the current sample (buggy, pre-fix).
+        with_self = np.array(list(warm_up) + [current], dtype=np.float64)
+        mean_w = float(np.mean(with_self))
+        std_w = float(np.std(with_self))
+        buggy_extreme = current < mean_w - S1_B_ZSCORE * std_w
+
+        # The two must disagree for this fixture to actually exercise the
+        # fix (self-reference measurably dampens the extremity call).
+        assert expected_extreme is True
+        assert buggy_extreme is False
+        assert expected_extreme != buggy_extreme
+
+        actual = strat._is_b_value_extreme(current)
+        assert actual == expected_extreme, (
+            "_is_b_value_extreme must compute mean/std over the history "
+            "EXCLUDING the just-appended current value (out-of-sample), "
+            "not including it (self-reference bias)"
+        )
+
 
 # ═══════════════════════════════════════════════════════════════════
 # Strategy 2: Entropie-Momentum
@@ -420,9 +482,18 @@ class TestStrategy2EntropyMomentum:
             "signal": 0, "method_id": "M7",
             "confidence": 0.0, "ts": time.time(),
         }):
+            # NOTE: jittered (not bit-identical) warm-up values, matching the
+            # S1 b-value fixture style. A perfectly constant history has
+            # zero variance once the just-appended current sample is
+            # excluded from the reference distribution (self-reference-bias
+            # fix, CRITICAL_REVIEW_2 2026-07-13) and would trip the
+            # std<1e-12 guard instead of exercising the intended
+            # pe_no_greenlight short-circuit below.
             strat._entropy_history.clear()
-            for _ in range(200):
-                strat._entropy_history.append(2.0)
+            for i in range(200):
+                strat._entropy_history.append(
+                    2.0 + np.random.default_rng(i).uniform(-0.05, 0.05)
+                )
 
             result = strat.on_ticker(
                 bid_sizes=np.ones(20),
@@ -476,6 +547,60 @@ class TestStrategy2EntropyMomentum:
 
         assert result["action"] == "exit"
         assert result["reason"] == "ofi_sign_flip"
+
+    def test_s2_entropy_collapsed_excludes_self_from_reference_distribution(
+        self,
+    ) -> None:
+        """Regression for CRITICAL_REVIEW_2 statistical-self-reference-bias
+        (strategy2_entropy_momentum.py, analogous to strategy1_cascade.py:268):
+        ``_is_entropy_collapsed`` must judge the current entropy value
+        against the history EXCLUDING the current value itself (already
+        appended one line earlier by ``on_ticker``), not including it.
+
+        Same construction as the S1 regression: warm up a known history,
+        pick a deviant "current" value that flips from "collapsed" to
+        "not collapsed" depending on whether it is included in its own
+        reference distribution, and assert the strategy uses the
+        out-of-sample (post-fix) statistics.
+        """
+        strat = Strategy2EntropyMomentum()
+
+        rng = np.random.default_rng(11)
+        warm_up = 2.0 + rng.uniform(-0.05, 0.05, size=_MIN_ENTROPY_SAMPLES + 20)
+        for v in warm_up:
+            strat._entropy_history.append(float(v))
+
+        median_before = float(np.median(warm_up))
+        std_before = float(np.std(warm_up))
+        current = median_before - 2.03 * std_before
+
+        # Simulate on_ticker's append-then-test ordering.
+        strat._entropy_history.append(current)
+
+        # Reference computed WITHOUT the current sample (correct, post-fix).
+        without_self = np.array(warm_up, dtype=np.float64)
+        median_wo = float(np.median(without_self))
+        std_wo = float(np.std(without_self))
+        expected_collapsed = current < median_wo - S2_ENTROPY_ZSCORE * std_wo
+
+        # Reference computed WITH the current sample (buggy, pre-fix).
+        with_self = np.array(list(warm_up) + [current], dtype=np.float64)
+        median_w = float(np.median(with_self))
+        std_w = float(np.std(with_self))
+        buggy_collapsed = current < median_w - S2_ENTROPY_ZSCORE * std_w
+
+        # The two must disagree for this fixture to actually exercise the
+        # fix (self-reference measurably dampens the collapse call).
+        assert expected_collapsed is True
+        assert buggy_collapsed is False
+        assert expected_collapsed != buggy_collapsed
+
+        actual = strat._is_entropy_collapsed(current)
+        assert actual == expected_collapsed, (
+            "_is_entropy_collapsed must compute median/std over the "
+            "history EXCLUDING the just-appended current value "
+            "(out-of-sample), not including it (self-reference bias)"
+        )
 
 
 # ═══════════════════════════════════════════════════════════════════

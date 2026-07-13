@@ -318,6 +318,22 @@ class Strategy4PatternEnsemble:
     # Utility
     # ------------------------------------------------------------------
 
+    def reset_position_state(self) -> None:
+        """Clear any in-flight position without touching learned/model state.
+
+        Used at walk-forward fold boundaries (TRAIN -> TEST) to discard a
+        position that was still open when TRAIN warmup ended, while
+        preserving the warmed-up M5/M16/M18/M20 state that TRAIN exists to
+        build. Mirrors exactly the fields cleared on a normal exit in
+        ``on_data`` above.
+        """
+        self._in_trade = False
+        self._entry_price = 0.0
+        self._entry_direction = 0
+        self._entry_ts = 0.0
+        self._ticks_since_entry = 0
+        self._last_consensus_direction = 0
+
     def reset(self) -> None:
         """Reset all internal state."""
         self.m5 = M5FFD()

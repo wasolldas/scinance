@@ -482,12 +482,15 @@ class ReplayBacktester:
         # else the ``recv_ts``-fallback for legacy ts=0 tickers), so legacy
         # ts=0 tickers interleave with real-ts trades instead of clumping at
         # the front of the stream. Tie-break by a fixed kind order so that at
-        # equal effective ts we deterministically ingest market data first
-        # (ticker, trade, liq, ob) — never a future event before a past one.
-        # The OB snapshot lands last among equal-ts events so that the depth
-        # profile observed at ts==T reflects state after all other market
-        # events at T.
-        kind_order = {"ticker": 0, "trade": 1, "liq": 2, "ob": 3}
+        # equal effective ts we deterministically ingest *data* events
+        # (trade, liq) into their buffers before any *evaluating* event
+        # (ticker) fires the pipeline tick that reads those buffers — this
+        # preserves the documented invariant "events with ts <= t are already
+        # ingested" for the tick evaluating at ts==t. ``ob`` lands last among
+        # equal-ts events so that the depth profile observed at ts==T
+        # reflects state after all other market events at T. Never a future
+        # event before a past one.
+        kind_order = {"trade": 0, "liq": 1, "ticker": 2, "ob": 3}
         events.sort(key=lambda e: (e[0], kind_order[e[1]]))
 
         self._events = events
@@ -1460,9 +1463,33 @@ class ReplayBacktester:
             )
             # Clear any open positions accumulated during train so that the
             # test phase starts flat — the strategy *state* is what we want
-            # to keep, not the in-flight position.
-            for sid in strategies:
+            # to keep, not the in-flight position. Critically, the strategy
+            # objects' OWN internal ``_in_trade``/entry bookkeeping must be
+            # cleared here too, not just the backtester's ``open_pos``
+            # mirror: otherwise a strategy that was still holding a
+            # position at end-of-train enters TEST believing it is already
+            # in a trade, evaluates only exit (not entry) conditions until
+            # its stale TRAIN-era exit eventually fires, and by then
+            # ``open_pos[sid]`` is already None so even that exit is
+            # silently dropped — desyncing backtester and strategy state
+            # and unpredictably suppressing trades/Sharpe for the fold.
+            # ``reset_position_state()`` clears only the in-flight-position
+            # fields (mirroring each strategy's own exit-branch), leaving
+            # the warmed-up model state (Hawkes/HMM/entropy history/etc.)
+            # that TRAIN exists to build fully intact.
+            for sid, strat in strategies.items():
                 open_pos[sid] = None
+                reset_position_state = getattr(
+                    strat, "reset_position_state", None
+                )
+                if reset_position_state is not None:
+                    reset_position_state()
+                else:
+                    # Defensive fallback for any strategy implementation
+                    # that has not (yet) grown a dedicated
+                    # ``reset_position_state`` method.
+                    if hasattr(strat, "_in_trade"):
+                        strat._in_trade = False
 
             # 2) EMBARGO — events in [train_end, test_start) are NOT replayed.
             # Strategy state stays exactly as it was at end-of-train.
