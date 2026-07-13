@@ -620,6 +620,59 @@ class TestGateDeviationChecks:
         reasons = payload["gate_valid_reasons"]
         assert not any("registered 5-symbol panel" in r for r in reasons), reasons
 
+    def test_wrong_seed_values_same_count_voids_gate_valid(self) -> None:
+        """Bug #4 (CRITICAL_REVIEW_2): only len(seeds) was checked against
+        N_SEEDS, never the registered seed VALUES (42, 43, 44). Seed-shopping
+        (--seeds 7,8,9) or degenerate duplicate seeds (--seeds 42,42,42) must
+        both be flagged even though the count matches."""
+        payload = self._small_payload(seeds=(7, 8, 9))
+        assert payload["gate_valid"] is False
+        reasons = payload["gate_valid_reasons"]
+        assert any("!= registered seed values" in r for r in reasons), reasons
+
+    def test_duplicate_seed_values_same_count_voids_gate_valid(self) -> None:
+        payload = self._small_payload(seeds=(42, 42, 42))
+        reasons = payload["gate_valid_reasons"]
+        assert any("!= registered seed values" in r for r in reasons), reasons
+
+    def test_correct_seed_values_no_identity_reason(self) -> None:
+        payload = self._small_payload(seeds=c15_driver.DEFAULT_SEEDS)
+        reasons = payload["gate_valid_reasons"]
+        assert not any("registered seed values" in r for r in reasons), reasons
+
+    def test_wrong_data_window_voids_gate_valid(self) -> None:
+        """Bug #3 (CRITICAL_REVIEW_2): the registered ~100-day window
+        (DEFAULT_DATA_START..DEFAULT_DATA_END) was never checked in the
+        gate_valid deviation check — free --data-start/--data-end CLI flags
+        allowed silent post-hoc window-shopping. Any window other than the
+        ONE registered window must be flagged."""
+        days = _day_grid("2026-05-01", 20)  # >= 15 days, inside registry grid
+        events = {
+            "BTCUSDT": _make_stream("BTCUSDT", days, 30, seed=1),
+            "ETHUSDT": _make_stream("ETHUSDT", days, 30, seed=2),
+        }
+        payload = c15_driver.run(
+            events, days, mode="mechanics", n_folds=2, embargo_days=1,
+            seeds=(42,), n_surrogates=3,
+        )
+        assert payload["gate_valid"] is False
+        reasons = payload["gate_valid_reasons"]
+        assert any("data window" in r and "!= registered" in r for r in reasons), reasons
+
+    def test_registered_data_window_no_window_reason(self) -> None:
+        days = c15_driver.daily_grid(
+            c15_driver.DEFAULT_DATA_START, c15_driver.DEFAULT_DATA_END)
+        events = {
+            "BTCUSDT": _make_stream("BTCUSDT", days, 30, seed=1),
+            "ETHUSDT": _make_stream("ETHUSDT", days, 30, seed=2),
+        }
+        payload = c15_driver.run(
+            events, days, mode="mechanics", n_folds=2, embargo_days=1,
+            seeds=(42,), n_surrogates=3,
+        )
+        reasons = payload["gate_valid_reasons"]
+        assert not any("data window" in r for r in reasons), reasons
+
 
 # ----------------------------------------------------------------------------
 # (h) per-symbol checkpoint/resume (Bug #3, option b) — a timeout/crash must
@@ -698,6 +751,87 @@ class TestSymbolCheckpointResume:
             seeds=(42, 43), n_surrogates=3, ckpt_dir=ckpt_dir,
         )
         assert set(calls) == {"BTCUSDT", "ETHUSDT"}, calls
+
+    def test_events_capped_mismatch_forces_recompute(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """HIGH (CRITICAL_REVIEW_2 Bug #2): the fingerprint used to omit
+        events_capped/max_events_per_day. An uncapped run must NOT silently
+        adopt a per-day-capped run's checkpoints -- the resulting payload
+        would stamp gate_valid: true while every statistic underneath was
+        computed on capped, non-registered data."""
+        days, events = self._events()
+        ckpt_dir = tmp_path / "ckpt"
+        # 1) a per-day-capped debug run populates the shared checkpoint dir.
+        c15_driver.run(
+            events, days, mode="mechanics", n_folds=2, embargo_days=1,
+            seeds=(42,), n_surrogates=3, ckpt_dir=ckpt_dir,
+            events_capped=True, max_events_per_day=5,
+        )
+
+        calls: list[str] = []
+        real_run_fold = c15_driver._run_fold
+
+        def counting_run_fold(ev, fold, cfg, **kw):
+            calls.append(ev.symbol)
+            return real_run_fold(ev, fold, cfg, **kw)
+
+        monkeypatch.setattr(c15_driver, "_run_fold", counting_run_fold)
+        # 2) a later uncapped run against the SAME ckpt_dir must recompute
+        # every symbol, not resume from the capped checkpoints.
+        c15_driver.run(
+            events, days, mode="mechanics", n_folds=2, embargo_days=1,
+            seeds=(42,), n_surrogates=3, ckpt_dir=ckpt_dir,
+            events_capped=False, max_events_per_day=0,
+        )
+        assert set(calls) == {"BTCUSDT", "ETHUSDT"}, (
+            f"uncapped run resumed from capped checkpoints instead of "
+            f"retraining: {calls}")
+
+    def test_mode_mismatch_resume_rejected(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """CRITICAL (CRITICAL_REVIEW_2 Bug #1): the fingerprint used to omit
+        mode/device/ran_on_gpu. A `full` GPU run must NEVER silently adopt a
+        `mechanics` (CPU) run's checkpoints -- doing so would stamp
+        gate_valid: true / ran_on_gpu: true on a result with zero GPU
+        training behind it, a direct Wave-5 compute-gate violation."""
+        days, events = self._events()
+        ckpt_dir = tmp_path / "ckpt"
+        run_kwargs = dict(n_folds=2, embargo_days=1, seeds=(42,),
+                           n_surrogates=3, ckpt_dir=ckpt_dir)
+
+        # 1) a mechanics (CPU) run populates the shared checkpoint dir.
+        c15_driver.run(events, days, mode="mechanics", **run_kwargs)
+
+        # 2) fake a CUDA device so `full` mode is permitted to start, and
+        # stub _run_fold so the test never needs a real GPU/torch -- the
+        # only thing under test is whether run() RESUMES (bug) or
+        # RETRAINS (fix) when only mode/device/ran_on_gpu differ.
+        monkeypatch.setattr(
+            c15_driver, "torch_cuda_status",
+            lambda: {"torch_available": True, "torch_version": "fake",
+                      "cuda_available": True, "cuda_device_count": 1,
+                      "cuda_device_name": "fake-gpu"},
+        )
+        calls: list[str] = []
+
+        def fake_run_fold(ev, fold, cfg, **kw):
+            calls.append(ev.symbol)
+            public = {
+                "fold_index": fold.index,
+                "n_scored_test_tokens": 100,
+                "best_markov_ce": 1.0,
+                "transformer_ce_mean_seeds": 0.8,
+            }
+            surrogate_gaps = np.full(kw["n_surrogates"], 0.05)
+            return {"public": public, "surrogate_gaps": surrogate_gaps}
+
+        monkeypatch.setattr(c15_driver, "_run_fold", fake_run_fold)
+        c15_driver.run(events, days, mode="full", **run_kwargs)
+        assert set(calls) == {"BTCUSDT", "ETHUSDT"}, (
+            f"full-mode (GPU) run resumed from mechanics (CPU) checkpoints "
+            f"instead of retraining: {calls}")
 
 
 # ----------------------------------------------------------------------------

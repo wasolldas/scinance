@@ -207,6 +207,7 @@ def main(argv: list[str] | None = None) -> int:
             seeds=seeds, n_surrogates=args.n_surrogates,
             block_len=args.block_len, use_tick_direction=args.use_tick_direction,
             events_capped=bool(args.max_events_per_day),
+            max_events_per_day=args.max_events_per_day,
             source=source,
             ckpt_dir=ckpt_dir,
         )

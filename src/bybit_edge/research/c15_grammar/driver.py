@@ -340,8 +340,16 @@ def prepare_fold(
 # back and skips re-training that symbol entirely. A ``fingerprint`` of the
 # registered run parameters is stored alongside the result and re-checked on
 # load — a checkpoint from a run with different folds/seeds/surrogates/
-# architecture/data-grid is treated as stale (recomputed, never silently
-# reused) so resume can never mix results from two different configurations.
+# architecture/data-grid/mode/device/GPU-provenance/event-cap is treated as
+# stale (recomputed, never silently reused) so resume can never mix results
+# from two different configurations. In particular ``mode``/``device``/
+# ``ran_on_gpu`` MUST be part of the fingerprint: without them a CPU
+# ``mechanics`` run's checkpoints would be silently adopted by a later
+# ``full`` GPU run, stamping ``gate_valid=true``/``ran_on_gpu=true`` on a
+# result with zero GPU training behind it (Wave-5 compute-gate violation).
+# Likewise ``events_capped``/``max_events_per_day`` MUST be part of the
+# fingerprint: without them an uncapped run could adopt a per-day-capped
+# run's checkpoints while itself reporting ``events_capped=False``.
 # ----------------------------------------------------------------------------
 
 def _run_fingerprint(
@@ -354,8 +362,18 @@ def _run_fingerprint(
     block_len: int,
     use_tick_direction: bool,
     days: list[str],
+    mode: str,
+    device: str,
+    ran_on_gpu: bool,
+    events_capped: bool,
+    max_events_per_day: int,
 ) -> dict[str, Any]:
     return {
+        "mode": mode,
+        "device": device,
+        "ran_on_gpu": bool(ran_on_gpu),
+        "events_capped": bool(events_capped),
+        "max_events_per_day": int(max_events_per_day),
         "n_folds": int(n_folds),
         "embargo_days": int(embargo_days),
         "seeds": list(seeds),
@@ -447,6 +465,7 @@ def run(
     use_tick_direction: bool = False,
     surrogate_seed: int = 20260709,
     events_capped: bool = False,
+    max_events_per_day: int = 0,
     source: str = "",
     ckpt_dir: Path | str | None = None,
 ) -> dict[str, Any]:
@@ -460,10 +479,15 @@ def run(
 
     ``ckpt_dir``: if given, EVERY completed symbol is atomically checkpointed
     to ``<ckpt_dir>/<symbol>.json`` (fingerprinted against the run's
-    registered parameters); re-calling ``run()`` with the SAME ``ckpt_dir``
-    resumes by skipping already-checkpointed symbols instead of re-training
-    them — a timeout/crash loses at most the symbol that was in flight, not
-    the whole multi-hour run (see audit_h15.md Bug #3).
+    registered parameters — including ``mode``/``device``/``ran_on_gpu``/
+    ``events_capped``/``max_events_per_day``); re-calling ``run()`` with the
+    SAME ``ckpt_dir`` resumes by skipping already-checkpointed symbols
+    instead of re-training them — a timeout/crash loses at most the symbol
+    that was in flight, not the whole multi-hour run (see audit_h15.md
+    Bug #3). A checkpoint written under a different mode/device/GPU-
+    provenance/event-cap is treated as stale and recomputed, never silently
+    reused (a CPU ``mechanics`` checkpoint must never be adopted by a later
+    ``full`` GPU run).
     """
     if mode not in ("full", "mechanics"):
         raise ValueError(f"unknown mode {mode!r}")
@@ -501,6 +525,12 @@ def run(
         gate_valid_reasons.append(f"embargo_days={embargo_days} != registered {EMBARGO_DAYS}")
     if len(seeds) != N_SEEDS:
         gate_valid_reasons.append(f"{len(seeds)} seeds != registered {N_SEEDS}")
+    elif tuple(sorted(seeds)) != tuple(sorted(DEFAULT_SEEDS)):
+        # Same COUNT of seeds is not enough — reject seed-shopping
+        # (e.g. --seeds 7,8,9) and degenerate duplicate seeds
+        # (e.g. --seeds 42,42,42) that would otherwise pass the len() check.
+        gate_valid_reasons.append(
+            f"seeds={list(seeds)} != registered seed values {list(DEFAULT_SEEDS)}")
     if n_surrogates < N_SURROGATES_DEFAULT:
         gate_valid_reasons.append(
             f"n_surrogates={n_surrogates} < registered minimum {N_SURROGATES_DEFAULT}")
@@ -508,6 +538,13 @@ def run(
         gate_valid_reasons.append(f"block_len={block_len} != registered {BLOCK_LEN_EVENTS}")
     if events_capped:
         gate_valid_reasons.append("per-day event cap active — data binding changed")
+    if days[0] != DEFAULT_DATA_START or days[-1] != DEFAULT_DATA_END:
+        # The registered ~100-day window is ONE fixed window (audit_h15.md);
+        # free --data-start/--data-end CLI flags must not allow post-hoc
+        # window-shopping to pass the deviation check unnoticed.
+        gate_valid_reasons.append(
+            f"data window {days[0]}..{days[-1]} != registered "
+            f"{DEFAULT_DATA_START}..{DEFAULT_DATA_END}")
     if use_tick_direction:
         gate_valid_reasons.append(
             "tick-direction vocab extension (256) enabled — registered base is 128")
@@ -529,6 +566,8 @@ def run(
         cfg=cfg, n_folds=n_folds, embargo_days=embargo_days, seeds=seeds,
         n_surrogates=n_surrogates, block_len=block_len,
         use_tick_direction=use_tick_direction, days=days,
+        mode=mode, device=device, ran_on_gpu=ran_on_gpu,
+        events_capped=events_capped, max_events_per_day=max_events_per_day,
     )
 
     per_symbol: list[dict[str, Any]] = []
