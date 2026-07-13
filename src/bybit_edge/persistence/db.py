@@ -185,6 +185,22 @@ class PersistenceLayer:
             )
         """)
 
+        # ``kline_1min`` has NO interval/granularity column — it is a flat,
+        # single time series per symbol (see ``count_klines`` docstring).
+        # This manifest table tracks which (symbol, interval) backfills have
+        # actually completed, so ``BackfillManager.backfill_klines``'s
+        # ``skip_if_exists`` check can be interval-aware instead of treating
+        # ANY row count > 0 as "this interval is already backfilled" — see
+        # CRITICAL_REVIEW_2_2026-07-13.md silent-data-loss-wrong-granularity.
+        self.conn.execute("""
+            CREATE TABLE IF NOT EXISTS kline_backfill_manifest (
+                symbol VARCHAR NOT NULL,
+                interval VARCHAR NOT NULL,
+                row_count BIGINT,
+                completed_at BIGINT
+            )
+        """)
+
         # L2 orderbook snapshots — one row per (snapshot, side, level).
         # With depth=20 this yields 40 rows per snapshot. The flat layout makes
         # ingestion and per-level analytics straightforward.
@@ -229,6 +245,10 @@ class PersistenceLayer:
             self.conn.execute(
                 "CREATE INDEX IF NOT EXISTS idx_funding_sym_ts "
                 "ON funding_history(symbol, ts)"
+            )
+            self.conn.execute(
+                "CREATE INDEX IF NOT EXISTS idx_kline_manifest_sym_int "
+                "ON kline_backfill_manifest(symbol, interval)"
             )
         except duckdb.CatalogException:
             pass  # indices already exist
@@ -632,17 +652,59 @@ class PersistenceLayer:
     # ------------------------------------------------------------------
 
     def count_klines(self, symbol: str, interval: str = "1") -> int:
-        """Return number of kline_1min rows for ``symbol``.
+        """Return the TOTAL number of kline_1min rows for ``symbol``.
 
-        ``interval`` is accepted for API symmetry — the kline table is a
-        single time series; callers running multi-interval backfills should
-        partition their data accordingly.
+        WARNING — NOT interval-aware: ``kline_1min`` has no interval/
+        granularity column and stores a single flat time series per symbol.
+        ``interval`` is accepted only for API symmetry with the other
+        ``count_*`` helpers and is otherwise ignored — this method cannot
+        tell a 1-minute backfill apart from a 5-minute backfill for the same
+        symbol. Do NOT use ``count_klines(...) > 0`` as an "already
+        backfilled for interval X" check (that was the root cause of a
+        confirmed silent-data-loss-wrong-granularity bug — see
+        CRITICAL_REVIEW_2_2026-07-13.md). Use
+        :meth:`kline_backfill_complete` / :meth:`record_kline_backfill`
+        instead for interval-aware idempotency.
         """
         _ = interval
         r = self.conn.execute(
             "SELECT COUNT(*) FROM kline_1min WHERE symbol = ?", [symbol]
         ).fetchone()
         return int(r[0]) if r else 0
+
+    def kline_backfill_complete(self, symbol: str, interval: str) -> bool:
+        """True iff a kline backfill for this EXACT ``(symbol, interval)``
+        pair has previously run to completion (see
+        :meth:`record_kline_backfill`).
+
+        Unlike ``count_klines(...) > 0`` this correctly distinguishes
+        intervals, since ``kline_1min`` itself has no interval column.
+        """
+        r = self.conn.execute(
+            "SELECT COUNT(*) FROM kline_backfill_manifest "
+            "WHERE symbol = ? AND interval = ?",
+            [symbol, interval],
+        ).fetchone()
+        return bool(r and int(r[0]) > 0)
+
+    def record_kline_backfill(
+        self, symbol: str, interval: str, row_count: int,
+    ) -> None:
+        """Mark a ``(symbol, interval)`` kline backfill as completed.
+
+        Idempotent (replaces any prior manifest entry for the same pair).
+        Callers should only invoke this after a backfill run has finished
+        WITHOUT error — a partial/aborted run must not be recorded as
+        complete, or a later retry would be silently skipped.
+        """
+        self.conn.execute(
+            "DELETE FROM kline_backfill_manifest WHERE symbol = ? AND interval = ?",
+            [symbol, interval],
+        )
+        self.conn.execute(
+            "INSERT INTO kline_backfill_manifest VALUES (?, ?, ?, ?)",
+            [symbol, interval, int(row_count), int(time.time() * 1000)],
+        )
 
     def count_funding(self, symbol: str) -> int:
         """Return number of ``funding_history`` rows for ``symbol``."""

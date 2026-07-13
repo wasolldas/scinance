@@ -116,9 +116,17 @@ class BackfillManager:
         """Lädt OHLCV-Klines paginiert rückwärts und schreibt sie in DuckDB.
 
         Returns die Anzahl neu eingefügter Zeilen. Bei ``skip_if_exists`` und
-        bereits vorhandenen Klines für ``symbol`` werden 0 Calls ausgeführt.
+        einem bereits ABGESCHLOSSENEN Backfill für genau dieses
+        ``(symbol, interval)``-Paar werden 0 Calls ausgeführt.
+
+        Der Skip-Check ist interval-genau (``PersistenceLayer.
+        kline_backfill_complete``) — ``kline_1min`` hat keine
+        Interval-Spalte und ein reiner Row-Count (``count_klines``) würde
+        einen 5-Minuten-Backfill fälschlich als "1-Minuten bereits
+        vorhanden" erkennen (silent-data-loss-wrong-granularity, siehe
+        CRITICAL_REVIEW_2_2026-07-13.md).
         """
-        if skip_if_exists and self.persist.count_klines(symbol, interval) > 0:
+        if skip_if_exists and self.persist.kline_backfill_complete(symbol, interval):
             logger.info("Klines %s/%s bereits vorhanden – skip.", symbol, interval)
             return 0
 
@@ -173,6 +181,13 @@ class BackfillManager:
 
         if batch:
             total += self.persist.write_klines_batch(batch)
+
+        # Nur bei erfolgreichem, vollständigem Durchlauf (kein Except
+        # dazwischen) als "fertig" markieren — sonst würde ein späterer
+        # Retry nach einem Netzwerkfehler fälschlich übersprungen (siehe
+        # analoges Muster in scripts/backfill.py, silent-data-loss-partial-
+        # backfill).
+        self.persist.record_kline_backfill(symbol, interval, total)
 
         logger.info("Backfill Klines %s/%s: %d Zeilen", symbol, interval, total)
         return total

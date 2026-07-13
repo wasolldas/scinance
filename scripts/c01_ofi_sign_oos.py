@@ -70,6 +70,7 @@ def main(argv: list[str] | None = None) -> int:
           f"windows={list(win_starts)} max_ticks={args.max_ticks}", file=sys.stderr, flush=True)
 
     symbol_windows: dict[str, list] = {}
+    missing_symbols: list[str] = []
     for sym in symbols:
         wins = []
         ok = True
@@ -85,8 +86,17 @@ def main(argv: list[str] | None = None) -> int:
         if ok and len(wins) >= 2:
             symbol_windows[sym] = wins
         else:
-            print(f"[h05b] symbol {sym} dropped (could not load both windows)",
+            # Bug fix (silent-fdr-family-shrinkage, CRITICAL_REVIEW_2_2026-07-13.md):
+            # a symbol that fails to load both windows must NOT just vanish from
+            # the run — it is padded into F-OFI-INV as a p=1.0 sentinel so BH-FDR
+            # never runs on a silently shrunken registered 5-symbol family (mirrors
+            # c09_bunch.py / c13_tailshape.py's established sentinel-padding CLI
+            # convention).
+            print(f"[h05b] symbol {sym} dropped (could not load both windows) "
+                  f"— padded into F-OFI-INV as a p=1.0 sentinel (family size stays "
+                  f"fixed at the registered 5-symbol universe)",
                   file=sys.stderr, flush=True)
+            missing_symbols.append(sym)
 
     if not symbol_windows:
         print("[h05b] FATAL: no symbol loaded both OOS windows — check junction/coverage.",
@@ -94,7 +104,10 @@ def main(argv: list[str] | None = None) -> int:
         return 1
 
     source = f"{base}/raw/bybit/publicTrade (windows {win_starts[0]} + {win_starts[1]})"
-    payload = run_oos(symbol_windows, window_labels=win_labels, source=source, **kwargs)
+    payload = run_oos(
+        symbol_windows, window_labels=win_labels, source=source,
+        missing_symbols=tuple(missing_symbols), **kwargs,
+    )
 
     out_dir = Path(args.out_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
@@ -106,12 +119,28 @@ def main(argv: list[str] | None = None) -> int:
     print(f"[h05b] wrote {json_path}", file=sys.stderr, flush=True)
     print(f"[h05b] wrote {md_path}", file=sys.stderr, flush=True)
     print(
-        f"[h05b] DONE: symbols={len(symbol_windows)} fdr_p_crit={payload['fdr_p_crit']:.4f} "
+        f"[h05b] DONE: symbols={len(symbol_windows)} missing_symbols={missing_symbols} "
+        f"family_size_deviation={payload['family_size_deviation']} "
+        f"fdr_p_crit={payload['fdr_p_crit']:.4f} "
         f"n_fdr_sig={payload['n_fdr_significant']} "
         f"inverse_consistent_cells={payload['n_inverse_consistent_cells']} "
         f"any_inverse_consistent={payload['any_inverse_consistent']}",
         file=sys.stderr, flush=True,
     )
+    # Ein fehlendes Symbol darf NIE lautlos verschwinden: statt die Familie
+    # zu schrumpfen, füllen wir sie mit p=1.0-Sentinels auf (siehe run_oos())
+    # und setzen ``family_size_deviation`` im Payload — der gate-auditor
+    # bzw. Automatisierung liest dieses Flag, nicht den Exit-Code (mirrors
+    # c09_bunch.py / c13_tailshape.py: rc=0 bleibt auch bei Sentinels, die
+    # Partial-Run-Info lebt explizit im Payload statt implizit im rc).
+    if payload["family_size_deviation"]:
+        print(
+            f"[h05b] WARNING: family_size_deviation=True — partial run "
+            f"({len(missing_symbols)} symbol(s) missing: {missing_symbols}). "
+            f"rc=0 nonetheless (see payload['family_size_deviation'] / "
+            f"payload['missing_symbols'] for automation gating).",
+            file=sys.stderr, flush=True,
+        )
     return 0
 
 

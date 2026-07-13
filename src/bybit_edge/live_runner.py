@@ -356,8 +356,17 @@ class LiveRunner:
                         "RISK FORCE-CLOSE: max drawdown — schließe %s.",
                         self._position_side,
                     )
-                    await self.executor.close_position()
-                    self._position_side = ""
+                    close_result = await self.executor.close_position()
+                    if close_result.get("retCode") == 0:
+                        self._position_side = ""
+                    else:
+                        logger.error(
+                            "RISK FORCE-CLOSE FEHLGESCHLAGEN: retCode=%s retMsg=%s "
+                            "— interner Status bleibt %s, echte Position evtl. noch offen!",
+                            close_result.get("retCode"),
+                            close_result.get("retMsg"),
+                            self._position_side,
+                        )
                 self._journal({
                     "ts_iso": time.strftime("%Y-%m-%d %H:%M:%S"),
                     "ts_unix": time.time(),
@@ -375,8 +384,18 @@ class LiveRunner:
 
             # Gegenposition schließen
             if self._position_side:
-                await self.executor.close_position()
-                self._position_side = ""
+                close_result = await self.executor.close_position()
+                if close_result.get("retCode") == 0:
+                    self._position_side = ""
+                else:
+                    logger.error(
+                        "GEGENPOSITION-CLOSE FEHLGESCHLAGEN: retCode=%s retMsg=%s "
+                        "— interner Status bleibt %s, kein Entry gesendet.",
+                        close_result.get("retCode"),
+                        close_result.get("retMsg"),
+                        self._position_side,
+                    )
+                    return
             # Order-Größe aus Notional
             raw_qty = EXECUTION_ORDER_USD / price
             # Vol-Scaling (opt-in) vor dem qty-Rounding anwenden.
@@ -442,7 +461,16 @@ class LiveRunner:
                     "ret_code": result.get("retCode"),
                     "order_id": result.get("result", {}).get("orderId", ""),
                 })
-                self._position_side = ""
+                if result.get("retCode") == 0:
+                    self._position_side = ""
+                else:
+                    logger.error(
+                        "EXIT-CLOSE FEHLGESCHLAGEN: retCode=%s retMsg=%s "
+                        "— interner Status bleibt %s, echte Position evtl. noch offen!",
+                        result.get("retCode"),
+                        result.get("retMsg"),
+                        self._position_side,
+                    )
 
     # ------------------------------------------------------------------
     # Hauptschleife

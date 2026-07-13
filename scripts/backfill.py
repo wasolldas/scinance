@@ -33,6 +33,7 @@ Custom Symbol-Liste, nur Funding + OI, Force-Refresh::
 from __future__ import annotations
 
 import argparse
+import logging
 import sys
 from typing import Callable
 
@@ -131,9 +132,29 @@ def main() -> int:
         print("=" * 72)
 
         totals: dict[str, int] = {}
+        failed_symbols: list[str] = []
         for sym in symbols:
             print(f"\n[ {sym} ]")
-            counts = runner(sym)
+            # Pro-Symbol-Fehlerbehandlung: ein Netzwerk-/API-Fehler bei EINEM
+            # Symbol darf die restlichen Symbole nicht mitreißen — sonst
+            # bleiben bereits geschriebene Teildaten stumm als "vollständig"
+            # in DuckDB liegen und die übrigen Symbole werden nie verarbeitet
+            # (silent-data-loss-partial-backfill, siehe
+            # CRITICAL_REVIEW_2_2026-07-13.md). Mirrors BackfillManager.
+            # backfill_universe()'s bereits bestehendes Try/Except-Muster.
+            try:
+                counts = runner(sym)
+            except Exception as exc:  # noqa: BLE001 — Backfill für andere Symbole soll weiterlaufen
+                print(f"  FEHLER: {sym} — {exc!r} — übersprungen, weiter mit nächstem Symbol.")
+                logging.getLogger(__name__).exception(
+                    "Backfill %s fehlgeschlagen — Teildaten (falls vorhanden) "
+                    "bleiben in DuckDB, gelten aber NICHT als vollständig "
+                    "(skip_if_exists prüft für Klines das Backfill-Manifest, "
+                    "nicht nur den Row-Count).",
+                    sym,
+                )
+                failed_symbols.append(sym)
+                continue
             for src, n in counts.items():
                 print(f"  {src:<20} {n:>10} Zeilen")
                 totals[src] = totals.get(src, 0) + n
@@ -148,10 +169,16 @@ def main() -> int:
         for tbl, n in sorted(mgr.persist.row_counts().items()):
             print(f"  {tbl:<24} {n:>12}")
         print("=" * 72)
+
+        if failed_symbols:
+            print(
+                f"\n{len(failed_symbols)}/{len(symbols)} Symbol(e) fehlgeschlagen: "
+                f"{', '.join(failed_symbols)}"
+            )
     finally:
         mgr.close()
 
-    return 0
+    return 1 if failed_symbols else 0
 
 
 if __name__ == "__main__":

@@ -558,6 +558,91 @@ class TestLiveRunnerDecision:
         assert received[0] == pytest.approx(0.004, rel=1e-6)
         ex.place_market_order.assert_awaited_once()
 
+    @pytest.mark.asyncio
+    async def test_act_exit_close_failure_keeps_position_side(self, monkeypatch):
+        """Ein fehlgeschlagenes Close (retCode != 0) darf ``_position_side``
+        NICHT auf 'flat' zurücksetzen — sonst desynchronisiert der interne
+        Status lautlos von der echten Exchange-Position."""
+        monkeypatch.setattr("bybit_edge.live_runner.EXECUTION_ENABLED", True)
+        r = LiveRunner("BTCUSDT")
+        r._on_ticker(_ticker_msg())
+        r._position_side = "Buy"
+        ex = AsyncMock()
+        ex.close_position = AsyncMock(
+            return_value={"retCode": 110007, "retMsg": "insufficient margin"}
+        )
+        r.executor = ex
+        await r._act_on_decision(
+            {"action": "exit", "direction": 0, "strategy_id": "S3",
+             "position_size_pct": 0.0, "confidence": 0.5}
+        )
+        ex.close_position.assert_awaited_once()
+        assert r._position_side == "Buy"
+
+    @pytest.mark.asyncio
+    async def test_force_close_failure_keeps_position_side(self, monkeypatch, tmp_path):
+        """Risk-Force-Close: schlägt close_position() fehl, bleibt
+        ``_position_side`` unverändert (kein lautloses "flat")."""
+        from bybit_edge.risk import RiskBudget
+        monkeypatch.setattr("bybit_edge.live_runner.EXECUTION_ENABLED", True)
+        monkeypatch.setattr("bybit_edge.live_runner.EXECUTION_ORDER_USD", 100.0)
+        r = LiveRunner("BTCUSDT")
+        r._journal_path = tmp_path / "journal.csv"
+        r._on_ticker(_ticker_msg())
+        r._position_side = "Sell"
+        ex = AsyncMock()
+        ex.round_qty = lambda q: 0.002
+        ex.place_market_order = AsyncMock(return_value={"retCode": 0})
+        ex.close_position = AsyncMock(
+            return_value={"retCode": 10006, "retMsg": "rate limit"}
+        )
+        r.executor = ex
+
+        rb = RiskBudget(
+            daily_loss_pct=-0.50,
+            max_dd_pct=-0.15,
+            vol_scaling_enabled=False,
+            vol_target_bps=50.0,
+            state_path=tmp_path / "risk_state.json",
+        )
+        rb.load(current_equity=1000.0)
+        rb.on_equity_update(equity=2000.0)  # peak
+        rb.on_equity_update(equity=1600.0)  # -20% vom peak → max_drawdown
+        assert rb.should_force_close() is True
+        r.risk_budget = rb
+
+        await r._act_on_decision(
+            {"action": "long", "direction": 1, "strategy_id": "S3",
+             "position_size_pct": 0.1, "confidence": 0.6}
+        )
+        ex.close_position.assert_awaited_once()
+        ex.place_market_order.assert_not_awaited()
+        assert r._position_side == "Sell"
+
+    @pytest.mark.asyncio
+    async def test_opposite_close_failure_blocks_entry_and_keeps_side(self, monkeypatch):
+        """Schlägt das Schließen der Gegenposition fehl, wird KEIN neuer
+        Entry gesendet und ``_position_side`` bleibt auf der alten Seite."""
+        monkeypatch.setattr("bybit_edge.live_runner.EXECUTION_ENABLED", True)
+        monkeypatch.setattr("bybit_edge.live_runner.EXECUTION_ORDER_USD", 100.0)
+        r = LiveRunner("BTCUSDT")
+        r._on_ticker(_ticker_msg())
+        r._position_side = "Sell"
+        ex = AsyncMock()
+        ex.round_qty = lambda q: 0.002
+        ex.place_market_order = AsyncMock(return_value={"retCode": 0})
+        ex.close_position = AsyncMock(
+            return_value={"retCode": 110043, "retMsg": "reduce-only rejected"}
+        )
+        r.executor = ex
+        await r._act_on_decision(
+            {"action": "long", "direction": 1, "strategy_id": "S3",
+             "position_size_pct": 0.1, "confidence": 0.6}
+        )
+        ex.close_position.assert_awaited_once()
+        ex.place_market_order.assert_not_awaited()
+        assert r._position_side == "Sell"
+
 
 # ──────────────────────────────────────────────────────────────────
 # Risk-Loop Robustness — transient timeouts, backoff escalation

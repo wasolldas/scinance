@@ -51,6 +51,16 @@ MIN_WINDOWS = 2  # registered (>= 2 disjoint windows, discovery cell excluded)
 #: H-05 default tick cap (registry / DEC-11 / DEC-15: 300k per symbol per window).
 WINDOW_MAX_TICKS = 300_000
 
+#: Registered F-OFI-INV family size: 5 symbols x 2 pre-registered DEC-15
+#: windows x 5 deltas (1/5/15/60/300s) = 50. A symbol that fails to load
+#: BOTH windows must NOT silently shrink the family below this — it is
+#: padded in as a p=1.0 sentinel (mirrors c09_bunch/c13_tailshape's
+#: established sentinel-padding convention; see run_oos()).
+REGISTERED_N_SYMBOLS = 5
+REGISTERED_N_WINDOWS = MIN_WINDOWS
+REGISTERED_N_DELTAS = len(DEFAULT_LAGS_S)
+REGISTERED_FAMILY_SIZE = REGISTERED_N_SYMBOLS * REGISTERED_N_WINDOWS * REGISTERED_N_DELTAS
+
 #: The discovery cell, excluded by construction (April/May OOS contains no June).
 DISCOVERY_CELL = "ETHUSDT / June-collector w0 / delta=1s (not present in April-May OOS)"
 
@@ -171,6 +181,43 @@ def load_harvest_window(
     return TradeArrays(ts=ts, price=price, volume=volume, side=side)
 
 
+def _sentinel_variant(symbol: str, window_index: int, delta_s: int) -> dict[str, Any]:
+    """p=1.0 sentinel variant for a registered (symbol, window, delta) cell
+    whose symbol failed to load BOTH pre-registered DEC-15 windows.
+
+    Keeps the F-OFI-INV family at its registered size (5 symbols x 2 windows
+    x 5 deltas = 50) — BH-FDR must never run anti-conservatively on a
+    silently shrunken family (mirrors c09_bunch._sentinel_cell /
+    c13_tailshape._sentinel_cell). A sentinel can never be FDR-significant
+    and never makes the BH threshold easier for the other cells.
+    """
+    return {
+        "delta_s": float(delta_s),
+        "n_pairs": 0,
+        "corr": 0.0,
+        "sign_direction": 0,
+        "abs_corr": 0.0,
+        "hit_rate": 0.5,
+        "surrogate_p": 1.0,
+        "n_surrogates": 0,
+        "surrogate_corr_mean": 0.0,
+        "label": f"{symbol}_w{window_index}_d{delta_s}s",
+        "sentinel_missing_data": True,
+    }
+
+
+def _sentinel_result(
+    symbol: str, window_index: int, lags_s: tuple[int, ...],
+) -> WindowSymbolResult:
+    return WindowSymbolResult(
+        symbol=symbol,
+        window_index=window_index,
+        t0_ms=0.0,
+        t1_ms=0.0,
+        variants=[_sentinel_variant(symbol, window_index, d) for d in lags_s],
+    )
+
+
 # ----------------------------------------------------------------------------
 # OOS run over explicit pre-registered windows
 # ----------------------------------------------------------------------------
@@ -185,6 +232,7 @@ def run_oos(
     seed: int = 42,
     max_ticks_per_window: int = WINDOW_MAX_TICKS,
     source: str = "",
+    missing_symbols: tuple[str, ...] = (),
 ) -> dict[str, Any]:
     """Run the inverse OFI-sign gate over EXPLICIT pre-registered windows.
 
@@ -192,8 +240,18 @@ def run_oos(
     symbol. Mirrors ``driver.run`` cell-by-cell (reusing ``_build_variants``),
     but with H-05b framing + a per-(symbol, delta) >= 2-window inverse-
     consistency rollup. Gate-neutral: the gate-auditor adjudicates.
+
+    ``missing_symbols`` lists REQUESTED symbols that failed to load BOTH
+    pre-registered windows: they are padded into the F-OFI-INV family as
+    p=1.0 sentinel cells (one per window x delta) so BH-FDR never runs on a
+    silently shrunken family. Any sentinel (or a family size other than the
+    registered 50) sets ``family_size_deviation=True`` in the payload —
+    NEVER a silent rc=0 on a shrunken family (CRITICAL_REVIEW_2_2026-07-13.md,
+    silent-fdr-family-shrinkage).
     """
     symbols = tuple(symbol_windows.keys())
+    missing_symbols = tuple(s for s in missing_symbols if s not in symbols)
+    requested_symbols = symbols + missing_symbols
     n_windows = max((len(w) for w in symbol_windows.values()), default=0)
     if n_windows < MIN_WINDOWS:
         raise DataError(f"H-05b needs >= {MIN_WINDOWS} windows, got {n_windows}")
@@ -213,12 +271,31 @@ def run_oos(
                 n_surrogates=n_surrogates, seed=seed,
             ))
 
-    # BH-FDR over the WHOLE F-OFI-INV family (all delta x symbol x window).
+    # Registered symbols that failed to load are padded into the family as
+    # p=1.0 sentinel cells (one per window x delta) — the F-OFI-INV family
+    # size never silently shrinks below the registered 5-symbol universe.
+    for sym in missing_symbols:
+        for wi in range(n_windows):
+            all_results.append(_sentinel_result(sym, wi, lags_s))
+            print(
+                f"[h05b] {sym} window {wi}: SENTINEL cells (missing data, "
+                f"p=1.0) — family padded, family_size_deviation will be True",
+                file=sys.stderr, flush=True,
+            )
+
+    # BH-FDR over the WHOLE F-OFI-INV family (all delta x symbol x window,
+    # sentinels included — the registered family size is never shrunk).
     flat = [v for r in all_results for v in r.variants]
     p_values = [float(v["surrogate_p"]) for v in flat]
     rejected, p_crit = benjamini_hochberg(p_values, FDR_ALPHA)
     for v, rej in zip(flat, rejected):
         v["fdr_significant"] = bool(rej)
+        if v.get("sentinel_missing_data"):
+            v["magnitude_floor_met"] = False
+            v["abs_corr_floor_met"] = False
+            v["inverse_hit_rate_floor_met"] = False
+            v["inverse_significant"] = False
+            continue
         sd = int(v["sign_direction"])
         mag_ok = (v["abs_corr"] >= ABS_CORR_FLOOR) or (v["hit_rate"] <= (1.0 - HIT_RATE_FLOOR))
         v["magnitude_floor_met"] = bool(mag_ok)
@@ -227,6 +304,11 @@ def run_oos(
         v["inverse_hit_rate_floor_met"] = bool(v["hit_rate"] <= (1.0 - HIT_RATE_FLOOR))
         # INVERSE significance per H-05b: negative sign, FDR sig, magnitude floor.
         v["inverse_significant"] = bool(sd < 0 and v["fdr_significant"] and mag_ok)
+
+    n_sentinel_variants = sum(1 for v in flat if v.get("sentinel_missing_data"))
+    family_size_deviation = bool(
+        n_sentinel_variants > 0 or len(flat) != REGISTERED_FAMILY_SIZE
+    )
 
     # Per-(symbol, delta) >= 2-window inverse-consistency rollup (gate core).
     by_cell: dict[tuple[str, int], list[dict[str, Any]]] = {}
@@ -260,6 +342,8 @@ def run_oos(
         "generated_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
         "source": source,
         "symbols": list(symbols),
+        "requested_symbols": list(requested_symbols),
+        "missing_symbols": list(missing_symbols),
         "window_labels": list(window_labels),
         "n_windows": n_windows,
         "n_surrogates": n_surrogates,
@@ -271,6 +355,14 @@ def run_oos(
         "max_ticks_per_window": int(max_ticks_per_window),
         "discovery_cell": DISCOVERY_CELL,
         "discovery_cell_excluded_by_construction": True,
+        # Family-integrity flags (silent-fdr-family-shrinkage fix, see
+        # CRITICAL_REVIEW_2_2026-07-13.md): a missing symbol pads the family
+        # with p=1.0 sentinels instead of silently shrinking it; this flag
+        # tells the gate-auditor the run is a partial run even though rc=0.
+        "registered_family_size": REGISTERED_FAMILY_SIZE,
+        "actual_family_size": len(flat),
+        "n_sentinel_variants": int(n_sentinel_variants),
+        "family_size_deviation": bool(family_size_deviation),
         "gate_thresholds": {
             "surrogate_p_max": SURROGATE_P_MAX,
             "abs_corr_floor": ABS_CORR_FLOOR,
@@ -323,6 +415,17 @@ def render_markdown_oos(payload: dict[str, Any]) -> str:
              f"· **p_crit:** {payload['fdr_p_crit']:.4f}")
     L.append(f"- **Entdeckungszelle ausgeschlossen (per Konstruktion):** {payload['discovery_cell']}")
     L.append(f"- **KAPITALFREI:** ja — reiner Vorzeichen-/Korrelations-Test, keine bps/Edge/PnL.")
+    L.append(
+        f"- **Familien-Integrität (F-OFI-INV):** {payload['actual_family_size']}/"
+        f"{payload['registered_family_size']} Zellen"
+        + (
+            f" · **ABWEICHUNG:** {payload['n_sentinel_variants']} Sentinel-Zelle(n) "
+            f"(fehlende Symbole: {', '.join(payload['missing_symbols'])}) — "
+            "PARTIAL RUN trotz rc=0, siehe `family_size_deviation`"
+            if payload["family_size_deviation"]
+            else " · vollständig, keine Sentinels"
+        )
+    )
     L.append("")
     L.append("> Gate-Urteil faellt der gate-auditor gegen H-05b. WEITER (inverse Mess-Existenz) "
              "verlangt: sign=- UND p<=0.05 (BH-FDR F-OFI-INV) UND inverse-Konsistenz in >=2 "

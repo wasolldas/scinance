@@ -179,11 +179,13 @@ class TestKlineBackfill:
     def test_backfill_klines_skip_if_exists(
         self, mem_db: PersistenceLayer, monkeypatch: pytest.MonkeyPatch
     ) -> None:
-        """Vorbefüllt → keine API-Calls, return 0."""
+        """Backfill für (symbol, interval) bereits im Manifest als
+        abgeschlossen markiert → keine API-Calls, return 0."""
         mem_db.write_kline(
             ts=1, symbol="BTCUSDT", open_=1.0, high=1.0, low=1.0,
             close=1.0, volume=1.0, turnover=1.0,
         )
+        mem_db.record_kline_backfill("BTCUSDT", "1", row_count=1)
         called: list[str] = []
         monkeypatch.setattr(
             backfill_mod.urllib.request, "urlopen",
@@ -193,6 +195,57 @@ class TestKlineBackfill:
         n = mgr.backfill_klines("BTCUSDT", interval="1", months=1)
         assert n == 0
         assert called == []  # kein einziger Call
+
+    def test_backfill_klines_different_interval_not_skipped(
+        self, mem_db: PersistenceLayer, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """Regression: ein Backfill von Intervall '5' (5-Minuten-Klines) darf
+        einen SPÄTEREN Backfill von Intervall '1' für dasselbe Symbol NICHT
+        als "bereits vorhanden" überspringen — ``kline_1min`` hat keine
+        Interval-Spalte, ein reiner Row-Count wäre granularitäts-blind
+        (silent-data-loss-wrong-granularity, CRITICAL_REVIEW_2_2026-07-13.md).
+        """
+        now_ms = int(time.time() * 1000)
+        # Erster Lauf: Intervall "5" -> Manifest-Eintrag für ("BTCUSDT", "5").
+        page5 = _kline_page(now_ms - 5 * 5 * 60_000, n=5, step_ms=5 * 60_000)
+        monkeypatch.setattr(
+            backfill_mod.urllib.request, "urlopen",
+            make_urlopen_mock([page5]),
+        )
+        mgr = BackfillManager(persist=mem_db)
+        n5 = mgr.backfill_klines("BTCUSDT", interval="5", months=1)
+        assert n5 == 5
+        assert mem_db.kline_backfill_complete("BTCUSDT", "5") is True
+        assert mem_db.kline_backfill_complete("BTCUSDT", "1") is False
+
+        # Zweiter Lauf: Intervall "1" für dasselbe Symbol -> MUSS echte
+        # API-Calls auslösen (nicht durch den "5"-Manifest-Eintrag skippen).
+        called: list[str] = []
+        page1 = _kline_page(now_ms - 5 * 60_000, n=5, step_ms=60_000)
+        monkeypatch.setattr(
+            backfill_mod.urllib.request, "urlopen",
+            make_urlopen_mock([page1], capture=called),
+        )
+        n1 = mgr.backfill_klines("BTCUSDT", interval="1", months=1)
+        assert n1 == 5
+        assert called, "Intervall '1' wurde fälschlich durch '5' geskippt"
+        assert mem_db.kline_backfill_complete("BTCUSDT", "1") is True
+
+    def test_backfill_klines_not_recorded_complete_on_exception(
+        self, mem_db: PersistenceLayer, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """Bricht der HTTP-Call mit einer Exception ab, darf der Backfill
+        NICHT im Manifest als abgeschlossen markiert werden (sonst würde ein
+        späterer Retry fälschlich übersprungen)."""
+
+        def _boom(url: str, timeout: int = 15):  # noqa: ARG001
+            raise TimeoutError("simulated network failure")
+
+        monkeypatch.setattr(backfill_mod.urllib.request, "urlopen", _boom)
+        mgr = BackfillManager(persist=mem_db)
+        with pytest.raises(TimeoutError):
+            mgr.backfill_klines("BTCUSDT", interval="1", months=1)
+        assert mem_db.kline_backfill_complete("BTCUSDT", "1") is False
 
 
 class TestFundingBackfill:
@@ -375,3 +428,90 @@ class TestEdgeCases:
         assert counts["funding_history"] == 1
         assert counts["open_interest"] == 1
         assert counts["long_short_ratio"] == 1
+
+
+# ======================================================================
+# scripts/backfill.py CLI — per-Symbol Resilienz
+# ======================================================================
+#
+# Regression für silent-data-loss-partial-backfill (CRITICAL_REVIEW_2_
+# 2026-07-13.md, scripts/backfill.py:134): main()'s Symbol-Schleife hatte
+# nur try/finally (kein except) um den Runner-Call — ein Netzwerkfehler bei
+# EINEM Symbol brach das gesamte Script ab und die restlichen Symbole
+# wurden nie verarbeitet.
+
+class TestBackfillCLIResilience:
+    def test_main_continues_after_per_symbol_failure(
+        self, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture,
+    ) -> None:
+        """Ein fehlschlagendes Symbol darf die übrigen Symbole nicht
+        verhindern; der Exit-Code muss den Teil-Fehlschlag widerspiegeln."""
+        import sys
+        from types import SimpleNamespace
+
+        import scripts.backfill as backfill_cli
+
+        attempted: list[str] = []
+
+        class _FakeMgr:
+            def __init__(self) -> None:
+                self.persist = SimpleNamespace(row_counts=lambda: {"kline_1min": 0})
+
+            def backfill_all(self, sym: str, **_kwargs: Any) -> dict[str, int]:
+                attempted.append(sym)
+                if sym == "ETHUSDT":
+                    raise TimeoutError("simulated network failure")
+                return {
+                    "klines": 1, "funding": 1,
+                    "open_interest": 1, "long_short_ratio": 1,
+                }
+
+            def close(self) -> None:
+                pass
+
+        monkeypatch.setattr(backfill_cli, "BackfillManager", lambda: _FakeMgr())
+        monkeypatch.setattr(
+            sys, "argv",
+            ["backfill.py", "--symbols", "BTCUSDT,ETHUSDT,SOLUSDT", "--what", "all"],
+        )
+        rc = backfill_cli.main()
+
+        # Alle drei Symbole wurden versucht — ETHUSDT's Fehler hat die
+        # Schleife NICHT abgebrochen.
+        assert attempted == ["BTCUSDT", "ETHUSDT", "SOLUSDT"]
+        # Teil-Fehlschlag -> abweichender Exit-Code (nicht rc=0 wie bei einem
+        # vollständigen Lauf).
+        assert rc == 1
+        captured = capsys.readouterr()
+        assert "ETHUSDT" in captured.out
+        assert "FEHLER" in captured.out
+
+    def test_main_returns_zero_when_all_symbols_succeed(
+        self, monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """Kein Fehlschlag -> rc=0 (Backcompat mit bisherigem Verhalten)."""
+        import sys
+        from types import SimpleNamespace
+
+        import scripts.backfill as backfill_cli
+
+        class _FakeMgr:
+            def __init__(self) -> None:
+                self.persist = SimpleNamespace(row_counts=lambda: {"kline_1min": 0})
+
+            def backfill_all(self, sym: str, **_kwargs: Any) -> dict[str, int]:
+                return {
+                    "klines": 1, "funding": 1,
+                    "open_interest": 1, "long_short_ratio": 1,
+                }
+
+            def close(self) -> None:
+                pass
+
+        monkeypatch.setattr(backfill_cli, "BackfillManager", lambda: _FakeMgr())
+        monkeypatch.setattr(
+            sys, "argv",
+            ["backfill.py", "--symbols", "BTCUSDT,ETHUSDT", "--what", "all"],
+        )
+        rc = backfill_cli.main()
+        assert rc == 0

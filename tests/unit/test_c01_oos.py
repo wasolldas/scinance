@@ -223,3 +223,121 @@ def test_run_oos_detects_inverse_consistency() -> None:
     # sign must be negative in the per-window variants (inverse construction)
     signs = [int(v["sign_direction"]) for r in out["results"] for v in r["variants"]]
     assert all(s <= 0 for s in signs), f"inverse construction must yield sign<=0, got {signs}"
+
+
+# ---------------------------------------------------------------------------
+# missing_symbols sentinel-padding — silent-fdr-family-shrinkage regression
+# (CRITICAL_REVIEW_2_2026-07-13.md, scripts/c01_ofi_sign_oos.py:85). A symbol
+# that fails to load both DEC-15 windows must NOT just vanish from the
+# F-OFI-INV family — it is padded in as p=1.0 sentinel cells and
+# family_size_deviation must be set, never a silent rc=0-looking full run.
+# ---------------------------------------------------------------------------
+
+def test_run_oos_without_missing_symbols_has_no_family_deviation_by_symbol_count() -> None:
+    """Sanity: with the FULL registered universe (5 symbols x 2 windows x 5
+    deltas) and no missing symbols, the family matches the registered size
+    exactly and ``family_size_deviation`` is False."""
+    from bybit_edge.research.c01_ofi_sign.oos import REGISTERED_FAMILY_SIZE
+
+    symbols = ("BTCUSDT", "ETHUSDT", "SOLUSDT", "BNBUSDT", "XRPUSDT")
+    sw = {
+        sym: [_inverse_window(2000, i * 10 + 1), _inverse_window(2000, i * 10 + 2)]
+        for i, sym in enumerate(symbols)
+    }
+    out = run_oos(sw, window_labels=("A", "B"), n_surrogates=20, seed=1)
+    assert out["actual_family_size"] == REGISTERED_FAMILY_SIZE
+    assert out["n_sentinel_variants"] == 0
+    assert out["family_size_deviation"] is False
+    assert out["missing_symbols"] == []
+
+
+def test_run_oos_missing_symbol_padded_as_sentinel_not_dropped() -> None:
+    """The core regression: a symbol that failed to load must appear in the
+    F-OFI-INV family as p=1.0 sentinel cells (one per window x delta),
+    NOT silently disappear from ``results``/``inverse_consistency``."""
+    loaded = {
+        "ETHUSDT": [_inverse_window(4000, 1), _inverse_window(4000, 2)],
+        "BTCUSDT": [_inverse_window(4000, 3), _inverse_window(4000, 4)],
+    }
+    out = run_oos(
+        loaded, window_labels=("A", "B"), lags_s=(1, 5), n_surrogates=30, seed=5,
+        missing_symbols=("SOLUSDT",),
+    )
+    assert out["missing_symbols"] == ["SOLUSDT"]
+    assert out["requested_symbols"] == ["ETHUSDT", "BTCUSDT", "SOLUSDT"]
+    # SOLUSDT must still show up with sentinel cells, not just vanish.
+    sol_variants = [
+        v for r in out["results"] if r["symbol"] == "SOLUSDT" for v in r["variants"]
+    ]
+    assert len(sol_variants) == 2 * 2  # 2 windows x 2 deltas
+    assert all(v["sentinel_missing_data"] is True for v in sol_variants)
+    assert all(v["surrogate_p"] == 1.0 for v in sol_variants)
+    assert all(v["fdr_significant"] is False for v in sol_variants)
+    assert all(v["inverse_significant"] is False for v in sol_variants)
+    # SOLUSDT sentinel cells must also enter the BH-FDR family (not skipped).
+    n_total_variants = sum(len(r["variants"]) for r in out["results"])
+    assert n_total_variants == 3 * 2 * 2  # 3 symbols x 2 windows x 2 deltas
+    # Family-integrity flags must surface the partial run — never silent.
+    assert out["n_sentinel_variants"] == 4
+    assert out["family_size_deviation"] is True
+    # SOLUSDT inverse-consistency rollup exists and is non-passing.
+    sol_cells = [c for c in out["inverse_consistency"] if c["symbol"] == "SOLUSDT"]
+    assert len(sol_cells) == 2  # one per delta
+    assert all(c["inverse_consistent"] is False for c in sol_cells)
+    assert all(c["n_windows_inverse_significant"] == 0 for c in sol_cells)
+    # markdown must surface the deviation, not render a clean/complete report.
+    md = render_markdown_oos(out)
+    assert "ABWEICHUNG" in md
+    assert "SOLUSDT" in md
+
+
+def test_run_oos_missing_symbol_already_loaded_is_not_double_counted() -> None:
+    """If a symbol somehow appears in BOTH ``symbol_windows`` and
+    ``missing_symbols`` (defensive edge case), it must not be padded twice —
+    the loaded data wins (mirrors c09_bunch.run's dedup convention)."""
+    loaded = {"ETHUSDT": [_inverse_window(3000, 1), _inverse_window(3000, 2)]}
+    out = run_oos(
+        loaded, window_labels=("A", "B"), lags_s=(1,), n_surrogates=20, seed=2,
+        missing_symbols=("ETHUSDT",),
+    )
+    assert out["missing_symbols"] == []
+    assert out["requested_symbols"] == ["ETHUSDT"]
+    eth_variants = [
+        v for r in out["results"] if r["symbol"] == "ETHUSDT" for v in r["variants"]
+    ]
+    assert not any(v.get("sentinel_missing_data") for v in eth_variants)
+
+
+def test_cli_main_pads_missing_symbol_instead_of_dropping(tmp_path: Path) -> None:
+    """CLI-level regression: scripts/c01_ofi_sign_oos.py's main() must NOT
+    silently drop a symbol whose harvester data is missing — it must show up
+    in the written JSON payload as a sentinel with family_size_deviation=True,
+    and rc must still be 0 (matches the c09_bunch/c13_tailshape convention:
+    partial-run info lives in the payload, not in the exit code)."""
+    import scripts.c01_ofi_sign_oos as oos_cli
+
+    start_a = _midnight_ms("2026-04-15")
+    start_b = _midnight_ms("2026-05-15")
+    # ETHUSDT has data for BOTH windows; SOLUSDT has NONE (harvester gap).
+    _write_raw_backfill(tmp_path, "ETHUSDT", "2026-04-15", 3000, start_a, side_value="Buy")
+    _write_raw_backfill(tmp_path, "ETHUSDT", "2026-05-15", 3000, start_b, side_value="Buy")
+
+    out_dir = tmp_path / "out"
+    rc = oos_cli.main([
+        "--base-dir", str(tmp_path),
+        "--symbols", "ETHUSDT,SOLUSDT",
+        "--out-dir", str(out_dir),
+        "--n-surrogates", "20",
+        "--lags", "1",
+    ])
+    assert rc == 0  # partial run still exits 0 — signalled via the payload
+    payload = json.loads((out_dir / "h05b_oos_results.json").read_text())
+    assert payload["missing_symbols"] == ["SOLUSDT"]
+    assert payload["family_size_deviation"] is True
+    # SOLUSDT must be present as sentinel cells, not absent from the payload.
+    sol_results = [r for r in payload["results"] if r["symbol"] == "SOLUSDT"]
+    assert sol_results, "SOLUSDT vanished from the payload instead of being sentinel-padded"
+    assert all(
+        v.get("sentinel_missing_data") is True
+        for r in sol_results for v in r["variants"]
+    )
