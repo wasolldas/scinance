@@ -99,11 +99,20 @@ class MultiSymbolRunner:
                 self.persist = None
 
         # Pro Symbol ein LiveRunner (Execution-Override pro Symbol).
+        #
+        # KRITISCH: execution_override=True fuer das execution_symbol wuerde
+        # den EXECUTION_ENABLED-Master-Switch VOLLSTAENDIG umgehen (siehe
+        # LiveRunner._execution_active(): bei einem gesetzten bool-Override
+        # wird EXECUTION_ENABLED gar nicht mehr gelesen). Fuer das
+        # execution_symbol daher None uebergeben (deferred -> EXECUTION_ENABLED
+        # entscheidet weiterhin, der Master-Switch bleibt wirksam); fuer alle
+        # anderen Symbole explizit False (hart deaktiviert, unabhaengig von
+        # EXECUTION_ENABLED -- nur EIN Symbol darf je Order-Execution haben).
         self.runners: list[LiveRunner] = [
             LiveRunner(
                 symbol=sym,
                 shared_persist=self.persist,
-                execution_override=(sym == self.execution_symbol),
+                execution_override=(None if sym == self.execution_symbol else False),
             )
             for sym in self.symbols
         ]

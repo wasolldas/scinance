@@ -89,8 +89,36 @@ class TestExecutionAssignment:
         m = MultiSymbolRunner(["BTCUSDT", "ETHUSDT"], execution_symbol="BTCUSDT")
         assert m.execution_symbol == "BTCUSDT"
         runners_by_sym = {r.symbol: r for r in m.runners}
-        assert runners_by_sym["BTCUSDT"]._execution_override is True
+        # None (not True!) for the execution_symbol: a hardcoded True would
+        # bypass the EXECUTION_ENABLED master switch entirely, since
+        # LiveRunner._execution_active() only consults EXECUTION_ENABLED when
+        # the override is None. False for every other symbol hard-disables
+        # them regardless of EXECUTION_ENABLED (only one symbol may ever
+        # execute).
+        assert runners_by_sym["BTCUSDT"]._execution_override is None
         assert runners_by_sym["ETHUSDT"]._execution_override is False
+
+    def test_execution_symbol_still_gated_by_execution_enabled(self, monkeypatch):
+        """Regression test for the critical bypass found by the second
+        adversarial review round: even the designated execution_symbol's
+        runner must stay OFF when the global EXECUTION_ENABLED master switch
+        is False -- MultiSymbolRunner must never force execution on."""
+        monkeypatch.setattr("bybit_edge.multi_runner.PERSIST_ENABLED", False)
+        monkeypatch.setattr("bybit_edge.live_runner.EXECUTION_ENABLED", False)
+        m = MultiSymbolRunner(["BTCUSDT", "ETHUSDT"], execution_symbol="BTCUSDT")
+        runners_by_sym = {r.symbol: r for r in m.runners}
+        assert runners_by_sym["BTCUSDT"]._execution_active() is False
+        assert runners_by_sym["ETHUSDT"]._execution_active() is False
+
+    def test_execution_symbol_active_when_execution_enabled_true(self, monkeypatch):
+        """Complementary case: with the master switch ON, exactly the
+        execution_symbol's runner is active, no other."""
+        monkeypatch.setattr("bybit_edge.multi_runner.PERSIST_ENABLED", False)
+        monkeypatch.setattr("bybit_edge.live_runner.EXECUTION_ENABLED", True)
+        m = MultiSymbolRunner(["BTCUSDT", "ETHUSDT"], execution_symbol="BTCUSDT")
+        runners_by_sym = {r.symbol: r for r in m.runners}
+        assert runners_by_sym["BTCUSDT"]._execution_active() is True
+        assert runners_by_sym["ETHUSDT"]._execution_active() is False
 
     def test_execution_symbol_not_in_list_logs_warning_and_no_execution(
         self, monkeypatch, caplog
