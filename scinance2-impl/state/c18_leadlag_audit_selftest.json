@@ -1,0 +1,71 @@
+{
+  "mode": "equivalence_selftest",
+  "not_a_resolution_audit": true,
+  "note": "Aequivalenz-Test (N=500), KEIN Aufloesungs-Audit — vergleicht die c18-Batch-Pipeline gegen die ORIGINALE c17_c41_lead_lag-Pipeline auf identischem synthetischem Input.",
+  "backend": "torch-cuda",
+  "n_surrogates": 500,
+  "n_bars": 900,
+  "injected_lag": 3,
+  "variants": [
+    {
+      "label": "TE_fwd_lag2",
+      "point_estimate_original": 0.0076800285644107276,
+      "point_estimate_batched": 0.0076800285644105975,
+      "point_estimate_abs_diff": 1.3010426069826053e-16,
+      "point_estimate_match": true,
+      "p_original": 0.656686626746507,
+      "p_batched": 0.656686626746507,
+      "p_exact_match": true,
+      "surrogate_stats_bit_identical": false
+    },
+    {
+      "label": "TE_rev_lag2",
+      "point_estimate_original": 0.013995380201805232,
+      "point_estimate_batched": 0.013995380201805206,
+      "point_estimate_abs_diff": 2.6020852139652106e-17,
+      "point_estimate_match": true,
+      "p_original": 0.11177644710578842,
+      "p_batched": 0.11177644710578842,
+      "p_exact_match": true,
+      "surrogate_stats_bit_identical": false
+    },
+    {
+      "label": "TE_fwd_lag3",
+      "point_estimate_original": 0.9347299025473891,
+      "point_estimate_batched": 0.9347299025473891,
+      "point_estimate_abs_diff": 0.0,
+      "point_estimate_match": true,
+      "p_original": 0.001996007984031936,
+      "p_batched": 0.001996007984031936,
+      "p_exact_match": true,
+      "surrogate_stats_bit_identical": false
+    },
+    {
+      "label": "TE_rev_lag3",
+      "point_estimate_original": 0.009700930399959734,
+      "point_estimate_batched": 0.009700930399959678,
+      "point_estimate_abs_diff": 5.551115123125783e-17,
+      "point_estimate_match": true,
+      "p_original": 0.37924151696606784,
+      "p_batched": 0.37924151696606784,
+      "p_exact_match": true,
+      "surrogate_stats_bit_identical": false
+    },
+    {
+      "label": "WCOH",
+      "point_estimate_original": 0.9423823294291612,
+      "point_estimate_batched": 0.9423823294291611,
+      "point_estimate_abs_diff": 1.1102230246251565e-16,
+      "point_estimate_match": true,
+      "lead_seconds_original": 1.9103880121123806,
+      "lead_seconds_batched": 1.910388012112382,
+      "p_original": 0.001996007984031936,
+      "p_batched": 0.001996007984031936,
+      "p_exact_match": true,
+      "surrogate_stats_bit_identical": false
+    }
+  ],
+  "all_point_estimates_match": true,
+  "all_p_values_exact_match": true,
+  "equivalence_holds": true
+}

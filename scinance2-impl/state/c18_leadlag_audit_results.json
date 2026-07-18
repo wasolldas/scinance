@@ -1,0 +1,740 @@
+{
+  "schema_version": 1,
+  "audit_id": "H-18",
+  "base_gate": "GL-006",
+  "base_hypothesis": "H-04",
+  "hypothesis_registry": "scinance2-impl/state/hypothesis_registry.md",
+  "gate_log_not_written_by_this_module": "scinance2-impl/state/gate_log.md",
+  "non_verdict_clause": "H-18 ist KEINE neue empirische Hypothese, sondern ein Aufloesungs-Audit der bereits adjudizierten GL-006/H-04-Pipeline (n_surrogates 200 -> 100.000). Das GL-006-Verdikt (WEITER, Mess-Existenz; Kapital-Status PARK) bleibt append-only UNVERAENDERT stehen. Ein abdriftender Stage-1-Survivor faelsifiziert NICHT GL-006 selbst — er markiert das stehende Messungen-WEITER als aufloesungsbedingt fragil (Audit-Finding). Dieses Modul schreibt NICHT gate_log.md; ein neuer, eigener GL-Eintrag (GL-014ff.) wird SPAETER manuell aus diesem Payload erstellt.",
+  "capital_free": true,
+  "generated_at": "2026-07-17T16:07:35+00:00",
+  "source": "E:\\Claude\\Projects\\scinance\\data\\bybit_edge.duckdb::trades",
+  "symbol_a": "BTCUSDT",
+  "symbol_b": "ETHUSDT",
+  "n_windows": 2,
+  "n_surrogates": 100000,
+  "seed": 42,
+  "registered_seed": 42,
+  "seed_matches_registered": true,
+  "seed_note": "seed=42 entspricht dem vorregistrierten H-18/GL-006-Seed (42).",
+  "fdr_alpha": 0.1,
+  "grid_ms": 1000.0,
+  "n_bins": 3,
+  "lags": [
+    1,
+    2,
+    3,
+    5,
+    10
+  ],
+  "axes": [
+    "TE (C-17)",
+    "WCOH (C-41)"
+  ],
+  "max_ticks_per_window": 150000,
+  "n_ticks_total": {
+    "a": 5313259,
+    "b": 5278059
+  },
+  "backend": {
+    "requested": "cuda",
+    "resolved": "torch-cuda"
+  },
+  "mode": "resolution_audit",
+  "verdict_carrying": true,
+  "verdict_carrying_reason": "voller 100k-Surrogat-Lauf auf echtem CUDA-Device.",
+  "gate_thresholds_reused_from_gl006": {
+    "surrogate_p_max": 0.05,
+    "min_windows": 2,
+    "lead_symbol_stable_required": true
+  },
+  "t1_partial_claim": {
+    "claim": "T1: alle 12 GL-006-Stage-1-FDR-Survivor messen bei p <= 1e-3 neu und bleiben unter dem neu berechneten BH-Step-up signifikant",
+    "p_threshold": 0.001,
+    "n_survivors": 12,
+    "n_holding": 4,
+    "drifting_survivors": [
+      "w0:TE_BTCUSDT->ETHUSDT_lag1",
+      "w0:TE_ETHUSDT->BTCUSDT_lag1",
+      "w0:TE_ETHUSDT->BTCUSDT_lag2",
+      "w0:TE_BTCUSDT->ETHUSDT_lag3",
+      "w0:TE_ETHUSDT->BTCUSDT_lag3",
+      "w0:TE_BTCUSDT->ETHUSDT_lag5",
+      "w1:TE_ETHUSDT->BTCUSDT_lag1",
+      "w1:TE_BTCUSDT->ETHUSDT_lag2"
+    ],
+    "t1_holds": false,
+    "cells": [
+      {
+        "window": 0,
+        "label": "TE_BTCUSDT->ETHUSDT_lag1",
+        "measured": true,
+        "p_gl006": 0.024875621890547265,
+        "p_new": 0.012419875801241988,
+        "mc_se_new": 0.00035022310726626405,
+        "p_le_threshold": false,
+        "fdr_significant_new": true,
+        "holds": false
+      },
+      {
+        "window": 0,
+        "label": "TE_ETHUSDT->BTCUSDT_lag1",
+        "measured": true,
+        "p_gl006": 0.06467661691542288,
+        "p_new": 0.06898931010689893,
+        "mc_se_new": 0.0008014348707029977,
+        "p_le_threshold": false,
+        "fdr_significant_new": true,
+        "holds": false
+      },
+      {
+        "window": 0,
+        "label": "TE_BTCUSDT->ETHUSDT_lag2",
+        "measured": true,
+        "p_gl006": 0.009950248756218905,
+        "p_new": 0.0005599944000559995,
+        "mc_se_new": 7.481181767126805e-05,
+        "p_le_threshold": true,
+        "fdr_significant_new": true,
+        "holds": true
+      },
+      {
+        "window": 0,
+        "label": "TE_ETHUSDT->BTCUSDT_lag2",
+        "measured": true,
+        "p_gl006": 0.06965174129353234,
+        "p_new": 0.02814971850281497,
+        "mc_se_new": 0.000523042176607463,
+        "p_le_threshold": false,
+        "fdr_significant_new": true,
+        "holds": false
+      },
+      {
+        "window": 0,
+        "label": "TE_BTCUSDT->ETHUSDT_lag3",
+        "measured": true,
+        "p_gl006": 0.014925373134328358,
+        "p_new": 0.004499955000449996,
+        "mc_se_new": 0.00021165314562850043,
+        "p_le_threshold": false,
+        "fdr_significant_new": true,
+        "holds": false
+      },
+      {
+        "window": 0,
+        "label": "TE_ETHUSDT->BTCUSDT_lag3",
+        "measured": true,
+        "p_gl006": 0.01990049751243781,
+        "p_new": 0.03041969580304197,
+        "mc_se_new": 0.0005430868982979829,
+        "p_le_threshold": false,
+        "fdr_significant_new": true,
+        "holds": false
+      },
+      {
+        "window": 0,
+        "label": "TE_BTCUSDT->ETHUSDT_lag5",
+        "measured": true,
+        "p_gl006": 0.04477611940298507,
+        "p_new": 0.025569744302556974,
+        "mc_se_new": 0.0004991586168630051,
+        "p_le_threshold": false,
+        "fdr_significant_new": true,
+        "holds": false
+      },
+      {
+        "window": 0,
+        "label": "WCOH_BTCUSDT/ETHUSDT",
+        "measured": true,
+        "p_gl006": 0.004975124378109453,
+        "p_new": 9.99990000099999e-06,
+        "mc_se_new": 9.99990000099999e-06,
+        "p_le_threshold": true,
+        "fdr_significant_new": true,
+        "holds": true
+      },
+      {
+        "window": 1,
+        "label": "TE_BTCUSDT->ETHUSDT_lag1",
+        "measured": true,
+        "p_gl006": 0.004975124378109453,
+        "p_new": 9.99990000099999e-06,
+        "mc_se_new": 9.99990000099999e-06,
+        "p_le_threshold": true,
+        "fdr_significant_new": true,
+        "holds": true
+      },
+      {
+        "window": 1,
+        "label": "TE_ETHUSDT->BTCUSDT_lag1",
+        "measured": true,
+        "p_gl006": 0.004975124378109453,
+        "p_new": 0.0036499635003649964,
+        "mc_se_new": 0.00019069979724192158,
+        "p_le_threshold": false,
+        "fdr_significant_new": true,
+        "holds": false
+      },
+      {
+        "window": 1,
+        "label": "TE_BTCUSDT->ETHUSDT_lag2",
+        "measured": true,
+        "p_gl006": 0.01990049751243781,
+        "p_new": 0.012319876801231987,
+        "mc_se_new": 0.00034882800112425686,
+        "p_le_threshold": false,
+        "fdr_significant_new": true,
+        "holds": false
+      },
+      {
+        "window": 1,
+        "label": "WCOH_BTCUSDT/ETHUSDT",
+        "measured": true,
+        "p_gl006": 0.004975124378109453,
+        "p_new": 9.99990000099999e-06,
+        "mc_se_new": 9.99990000099999e-06,
+        "p_le_threshold": true,
+        "fdr_significant_new": true,
+        "holds": true
+      }
+    ],
+    "non_verdict_clause": "Jeder abdriftende Survivor falsifiziert NICHT das GL-006-Verdikt selbst — er markiert das stehende Messungen-WEITER als aufloesungsbedingt fragil (Audit-Finding). KEIN Goalpost-Move, KEINE Ruecknahme von GL-006."
+  },
+  "t2_partial_claim": {
+    "claim": "T2: die zwei Lesart-Entscheidungszellen ETH->BTC F0 Lag1/Lag2 loesen sich mit > 5 MC-SE Abstand von p_crit auf eine Seite auf",
+    "min_se_distance": 5.0,
+    "cells": [
+      {
+        "window": 0,
+        "label": "TE_ETHUSDT->BTCUSDT_lag1",
+        "measured": true,
+        "p_new": 0.06898931010689893,
+        "p_crit_new": 0.06898931010689893,
+        "mc_se": 0.0008014348707029977,
+        "distance_se": 0.0,
+        "side": "signifikant",
+        "resolved": false
+      },
+      {
+        "window": 0,
+        "label": "TE_ETHUSDT->BTCUSDT_lag2",
+        "measured": true,
+        "p_new": 0.02814971850281497,
+        "p_crit_new": 0.06898931010689893,
+        "mc_se": 0.000523042176607463,
+        "distance_se": 78.08087651549675,
+        "side": "signifikant",
+        "resolved": true
+      }
+    ],
+    "t2_holds": false
+  },
+  "data_binding_vs_gl006": {
+    "purpose": "Datenbindung: identisch GL-006 (archivierte Fenster F0/F1). Observed-Statistiken haengen NICHT von n_surrogates ab und muessen daher exakt reproduzieren, wenn die Fenster stimmen.",
+    "windows": [
+      {
+        "index": 0,
+        "in_baseline": true,
+        "span_match": true,
+        "n_bars": {
+          "new": 3874,
+          "gl006": 3874
+        },
+        "t0_ms": {
+          "new": 1780611314526.0,
+          "gl006": 1780611314526.0
+        },
+        "t1_ms": {
+          "new": 1780615189170.0,
+          "gl006": 1780615189170.0
+        },
+        "observed_stats_match": false,
+        "max_observed_stat_deviation": 7.1301890240205515e-06,
+        "matches": false
+      },
+      {
+        "index": 1,
+        "in_baseline": true,
+        "span_match": true,
+        "n_bars": {
+          "new": 3875,
+          "gl006": 3875
+        },
+        "t0_ms": {
+          "new": 1780615190990.0,
+          "gl006": 1780615190990.0
+        },
+        "t1_ms": {
+          "new": 1780619066816.0,
+          "gl006": 1780619066816.0
+        },
+        "observed_stats_match": false,
+        "max_observed_stat_deviation": 5.624364450422612e-06,
+        "matches": false
+      }
+    ],
+    "max_observed_stat_deviation": 7.1301890240205515e-06,
+    "all_windows_match_gl006": false
+  },
+  "per_window_existence_informational": [
+    true,
+    true
+  ],
+  "lead_symbols_informational": [
+    "BTCUSDT",
+    "BTCUSDT"
+  ],
+  "lead_symbol_stable_informational": true,
+  "windows": [
+    {
+      "index": 0,
+      "n_bars": 3874,
+      "t0_ms": 1780611314526.0,
+      "t1_ms": 1780615189170.0,
+      "best_variant": "WCOH_BTCUSDT/ETHUSDT",
+      "criteria": {
+        "surrogate_p": {
+          "value": 9.99990000099999e-06,
+          "threshold": 0.05,
+          "fdr_significant": true,
+          "passed": true,
+          "registry_text": "identisch GL-006 (informativ — kein neues Verdikt, s. Nicht-Verdikt-Klausel)"
+        },
+        "lead_symbol": {
+          "value": "BTCUSDT",
+          "axis": "TE",
+          "variant": "TE_BTCUSDT->ETHUSDT_lag2",
+          "lag_ms": 2000.0
+        },
+        "fdr_p_crit": 0.06898931010689893,
+        "n_fdr_significant": 8
+      },
+      "variants": [
+        {
+          "axis": "TE",
+          "label": "TE_BTCUSDT->ETHUSDT_lag1",
+          "lag": 1,
+          "lag_ms": 1000.0,
+          "source": "BTCUSDT",
+          "target": "ETHUSDT",
+          "surrogate": {
+            "axis": "TE",
+            "lag": 1,
+            "observed_stat": 0.005352066511254645,
+            "p_value": 0.012419875801241988,
+            "n_surrogates": 100000,
+            "surrogate_mean": 0.0024834026444187254,
+            "surrogate_p95": 0.004338443389984473
+          },
+          "fdr_significant": true
+        },
+        {
+          "axis": "TE",
+          "label": "TE_ETHUSDT->BTCUSDT_lag1",
+          "lag": 1,
+          "lag_ms": 1000.0,
+          "source": "ETHUSDT",
+          "target": "BTCUSDT",
+          "surrogate": {
+            "axis": "TE",
+            "lag": 1,
+            "observed_stat": 0.004010215775156471,
+            "p_value": 0.06898931010689893,
+            "n_surrogates": 100000,
+            "surrogate_mean": 0.0023955184751011105,
+            "surrogate_p95": 0.004191674123368391
+          },
+          "fdr_significant": true
+        },
+        {
+          "axis": "TE",
+          "label": "TE_BTCUSDT->ETHUSDT_lag2",
+          "lag": 2,
+          "lag_ms": 2000.0,
+          "source": "BTCUSDT",
+          "target": "ETHUSDT",
+          "surrogate": {
+            "axis": "TE",
+            "lag": 2,
+            "observed_stat": 0.007375978400582524,
+            "p_value": 0.0005599944000559995,
+            "n_surrogates": 100000,
+            "surrogate_mean": 0.0024876326636492367,
+            "surrogate_p95": 0.00437895792681357
+          },
+          "fdr_significant": true
+        },
+        {
+          "axis": "TE",
+          "label": "TE_ETHUSDT->BTCUSDT_lag2",
+          "lag": 2,
+          "lag_ms": 2000.0,
+          "source": "ETHUSDT",
+          "target": "BTCUSDT",
+          "surrogate": {
+            "axis": "TE",
+            "lag": 2,
+            "observed_stat": 0.004620608005775751,
+            "p_value": 0.02814971850281497,
+            "n_surrogates": 100000,
+            "surrogate_mean": 0.002402770739453719,
+            "surrogate_p95": 0.004210597977759864
+          },
+          "fdr_significant": true
+        },
+        {
+          "axis": "TE",
+          "label": "TE_BTCUSDT->ETHUSDT_lag3",
+          "lag": 3,
+          "lag_ms": 3000.0,
+          "source": "BTCUSDT",
+          "target": "ETHUSDT",
+          "surrogate": {
+            "axis": "TE",
+            "lag": 3,
+            "observed_stat": 0.005917146931627329,
+            "p_value": 0.004499955000449996,
+            "n_surrogates": 100000,
+            "surrogate_mean": 0.0024849100310215745,
+            "surrogate_p95": 0.004371564736150892
+          },
+          "fdr_significant": true
+        },
+        {
+          "axis": "TE",
+          "label": "TE_ETHUSDT->BTCUSDT_lag3",
+          "lag": 3,
+          "lag_ms": 3000.0,
+          "source": "ETHUSDT",
+          "target": "BTCUSDT",
+          "surrogate": {
+            "axis": "TE",
+            "lag": 3,
+            "observed_stat": 0.004604703003269684,
+            "p_value": 0.03041969580304197,
+            "n_surrogates": 100000,
+            "surrogate_mean": 0.002399912182260648,
+            "surrogate_p95": 0.004218495914586735
+          },
+          "fdr_significant": true
+        },
+        {
+          "axis": "TE",
+          "label": "TE_BTCUSDT->ETHUSDT_lag5",
+          "lag": 5,
+          "lag_ms": 5000.0,
+          "source": "BTCUSDT",
+          "target": "ETHUSDT",
+          "surrogate": {
+            "axis": "TE",
+            "lag": 5,
+            "observed_stat": 0.004830438430654255,
+            "p_value": 0.025569744302556974,
+            "n_surrogates": 100000,
+            "surrogate_mean": 0.0024870102699027312,
+            "surrogate_p95": 0.004347412005467186
+          },
+          "fdr_significant": true
+        },
+        {
+          "axis": "TE",
+          "label": "TE_ETHUSDT->BTCUSDT_lag5",
+          "lag": 5,
+          "lag_ms": 5000.0,
+          "source": "ETHUSDT",
+          "target": "BTCUSDT",
+          "surrogate": {
+            "axis": "TE",
+            "lag": 5,
+            "observed_stat": 0.0028671517104673673,
+            "p_value": 0.2817671823281767,
+            "n_surrogates": 100000,
+            "surrogate_mean": 0.00240568247322919,
+            "surrogate_p95": 0.00423648541221755
+          },
+          "fdr_significant": false
+        },
+        {
+          "axis": "TE",
+          "label": "TE_BTCUSDT->ETHUSDT_lag10",
+          "lag": 10,
+          "lag_ms": 10000.0,
+          "source": "BTCUSDT",
+          "target": "ETHUSDT",
+          "surrogate": {
+            "axis": "TE",
+            "lag": 10,
+            "observed_stat": 0.003722831127745895,
+            "p_value": 0.11910880891191088,
+            "n_surrogates": 100000,
+            "surrogate_mean": 0.002492034054459622,
+            "surrogate_p95": 0.004367282528193257
+          },
+          "fdr_significant": false
+        },
+        {
+          "axis": "TE",
+          "label": "TE_ETHUSDT->BTCUSDT_lag10",
+          "lag": 10,
+          "lag_ms": 10000.0,
+          "source": "ETHUSDT",
+          "target": "BTCUSDT",
+          "surrogate": {
+            "axis": "TE",
+            "lag": 10,
+            "observed_stat": 0.002197930063899572,
+            "p_value": 0.5362646373536265,
+            "n_surrogates": 100000,
+            "surrogate_mean": 0.002401163510270348,
+            "surrogate_p95": 0.004240885927146965
+          },
+          "fdr_significant": false
+        },
+        {
+          "axis": "WCOH",
+          "label": "WCOH_BTCUSDT/ETHUSDT",
+          "lag": 0,
+          "lag_ms": 1261.345196745793,
+          "source": "BTCUSDT",
+          "target": "ETHUSDT",
+          "lead_seconds": 1.261345196745793,
+          "surrogate": {
+            "axis": "WCOH",
+            "lag": 0,
+            "observed_stat": 0.9027590658833281,
+            "p_value": 9.99990000099999e-06,
+            "n_surrogates": 100000,
+            "surrogate_mean": 0.32425323311830895,
+            "surrogate_p95": 0.3474456710156349
+          },
+          "fdr_significant": true
+        }
+      ]
+    },
+    {
+      "index": 1,
+      "n_bars": 3875,
+      "t0_ms": 1780615190990.0,
+      "t1_ms": 1780619066816.0,
+      "best_variant": "WCOH_BTCUSDT/ETHUSDT",
+      "criteria": {
+        "surrogate_p": {
+          "value": 9.99990000099999e-06,
+          "threshold": 0.05,
+          "fdr_significant": true,
+          "passed": true,
+          "registry_text": "identisch GL-006 (informativ — kein neues Verdikt, s. Nicht-Verdikt-Klausel)"
+        },
+        "lead_symbol": {
+          "value": "BTCUSDT",
+          "axis": "TE",
+          "variant": "TE_BTCUSDT->ETHUSDT_lag1",
+          "lag_ms": 1000.0
+        },
+        "fdr_p_crit": 0.012319876801231987,
+        "n_fdr_significant": 4
+      },
+      "variants": [
+        {
+          "axis": "TE",
+          "label": "TE_BTCUSDT->ETHUSDT_lag1",
+          "lag": 1,
+          "lag_ms": 1000.0,
+          "source": "BTCUSDT",
+          "target": "ETHUSDT",
+          "surrogate": {
+            "axis": "TE",
+            "lag": 1,
+            "observed_stat": 0.008671179251157925,
+            "p_value": 9.99990000099999e-06,
+            "n_surrogates": 100000,
+            "surrogate_mean": 0.00227550524081531,
+            "surrogate_p95": 0.003979389542068109
+          },
+          "fdr_significant": true
+        },
+        {
+          "axis": "TE",
+          "label": "TE_ETHUSDT->BTCUSDT_lag1",
+          "lag": 1,
+          "lag_ms": 1000.0,
+          "source": "ETHUSDT",
+          "target": "BTCUSDT",
+          "surrogate": {
+            "axis": "TE",
+            "lag": 1,
+            "observed_stat": 0.0054546177375848146,
+            "p_value": 0.0036499635003649964,
+            "n_surrogates": 100000,
+            "surrogate_mean": 0.002267556425735421,
+            "surrogate_p95": 0.003934816111396934
+          },
+          "fdr_significant": true
+        },
+        {
+          "axis": "TE",
+          "label": "TE_BTCUSDT->ETHUSDT_lag2",
+          "lag": 2,
+          "lag_ms": 2000.0,
+          "source": "BTCUSDT",
+          "target": "ETHUSDT",
+          "surrogate": {
+            "axis": "TE",
+            "lag": 2,
+            "observed_stat": 0.004912932286701592,
+            "p_value": 0.012319876801231987,
+            "n_surrogates": 100000,
+            "surrogate_mean": 0.0022809058798403696,
+            "surrogate_p95": 0.003991279499488104
+          },
+          "fdr_significant": true
+        },
+        {
+          "axis": "TE",
+          "label": "TE_ETHUSDT->BTCUSDT_lag2",
+          "lag": 2,
+          "lag_ms": 2000.0,
+          "source": "ETHUSDT",
+          "target": "BTCUSDT",
+          "surrogate": {
+            "axis": "TE",
+            "lag": 2,
+            "observed_stat": 0.0027641677258096013,
+            "p_value": 0.26764732352676474,
+            "n_surrogates": 100000,
+            "surrogate_mean": 0.0022663004456840007,
+            "surrogate_p95": 0.00392943882795426
+          },
+          "fdr_significant": false
+        },
+        {
+          "axis": "TE",
+          "label": "TE_BTCUSDT->ETHUSDT_lag3",
+          "lag": 3,
+          "lag_ms": 3000.0,
+          "source": "BTCUSDT",
+          "target": "ETHUSDT",
+          "surrogate": {
+            "axis": "TE",
+            "lag": 3,
+            "observed_stat": 0.0016912341845551192,
+            "p_value": 0.7168828311716883,
+            "n_surrogates": 100000,
+            "surrogate_mean": 0.0022858723867448167,
+            "surrogate_p95": 0.003995560265444793
+          },
+          "fdr_significant": false
+        },
+        {
+          "axis": "TE",
+          "label": "TE_ETHUSDT->BTCUSDT_lag3",
+          "lag": 3,
+          "lag_ms": 3000.0,
+          "source": "ETHUSDT",
+          "target": "BTCUSDT",
+          "surrogate": {
+            "axis": "TE",
+            "lag": 3,
+            "observed_stat": 0.0035687798699935366,
+            "p_value": 0.09003909960900391,
+            "n_surrogates": 100000,
+            "surrogate_mean": 0.002266272689343485,
+            "surrogate_p95": 0.003931224379602633
+          },
+          "fdr_significant": false
+        },
+        {
+          "axis": "TE",
+          "label": "TE_BTCUSDT->ETHUSDT_lag5",
+          "lag": 5,
+          "lag_ms": 5000.0,
+          "source": "BTCUSDT",
+          "target": "ETHUSDT",
+          "surrogate": {
+            "axis": "TE",
+            "lag": 5,
+            "observed_stat": 0.003731237623858671,
+            "p_value": 0.07541924580754192,
+            "n_surrogates": 100000,
+            "surrogate_mean": 0.0022813886667702723,
+            "surrogate_p95": 0.004000371478744306
+          },
+          "fdr_significant": false
+        },
+        {
+          "axis": "TE",
+          "label": "TE_ETHUSDT->BTCUSDT_lag5",
+          "lag": 5,
+          "lag_ms": 5000.0,
+          "source": "ETHUSDT",
+          "target": "BTCUSDT",
+          "surrogate": {
+            "axis": "TE",
+            "lag": 5,
+            "observed_stat": 0.002389644799527537,
+            "p_value": 0.4030259697403026,
+            "n_surrogates": 100000,
+            "surrogate_mean": 0.0022651493075961228,
+            "surrogate_p95": 0.003936979274671426
+          },
+          "fdr_significant": false
+        },
+        {
+          "axis": "TE",
+          "label": "TE_BTCUSDT->ETHUSDT_lag10",
+          "lag": 10,
+          "lag_ms": 10000.0,
+          "source": "BTCUSDT",
+          "target": "ETHUSDT",
+          "surrogate": {
+            "axis": "TE",
+            "lag": 10,
+            "observed_stat": 0.001214228686910894,
+            "p_value": 0.8972510274897251,
+            "n_surrogates": 100000,
+            "surrogate_mean": 0.002286187713428617,
+            "surrogate_p95": 0.004008802274693857
+          },
+          "fdr_significant": false
+        },
+        {
+          "axis": "TE",
+          "label": "TE_ETHUSDT->BTCUSDT_lag10",
+          "lag": 10,
+          "lag_ms": 10000.0,
+          "source": "ETHUSDT",
+          "target": "BTCUSDT",
+          "surrogate": {
+            "axis": "TE",
+            "lag": 10,
+            "observed_stat": 0.0008939346561759112,
+            "p_value": 0.962510374896251,
+            "n_surrogates": 100000,
+            "surrogate_mean": 0.0022722539826285732,
+            "surrogate_p95": 0.003937143821445132
+          },
+          "fdr_significant": false
+        },
+        {
+          "axis": "WCOH",
+          "label": "WCOH_BTCUSDT/ETHUSDT",
+          "lag": 0,
+          "lag_ms": 2232.576272990734,
+          "source": "BTCUSDT",
+          "target": "ETHUSDT",
+          "lead_seconds": 2.2325762729907344,
+          "surrogate": {
+            "axis": "WCOH",
+            "lag": 0,
+            "observed_stat": 0.9076288590213232,
+            "p_value": 9.99990000099999e-06,
+            "n_surrogates": 100000,
+            "surrogate_mean": 0.45724365092341507,
+            "surrogate_p95": 0.47429064921258074
+          },
+          "fdr_significant": true
+        }
+      ]
+    }
+  ]
+}

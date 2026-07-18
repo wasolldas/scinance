@@ -623,3 +623,55 @@ Hartes Ein-Fenster-Kriterium mehrfach ausgelöst (0 FDR-Survivor in beiden Fenst
 
 ### Programm-Bilanz (nach GL-013)
 Welle 1: H-01/H-02/H-03 DROP. Welle 2: H-04 WEITER (kapitalfrei) · H-04b PARK · H-05 DROP · H-06 DROP. Welle 3: H-05b WEITER (kapitalfrei) · H-05c PARK · H-07 DROP (strukturell) · **H-08 DROP (empirisch)**. 2 kapitalfreie Mess-WEITER, beide Tradability-PARK; **0 handelbare Kanten**. 13 Gate-Verdikte, 0 Torpfosten-Verschiebungen.
+
+---
+
+## GL-014 · 2026-07-18 · H-18 · C18 GL-006/H-04 Lead-Lag High-N-Surrogat-Auflösungs-Audit (Welle 5, KAPITALFREI) — **AUDIT-BEFUND dokumentiert (kein Hypothesen-Verdikt; GL-006 bleibt unverändert)**
+
+**Sonderstatus (Registry H-18, wörtlich):** H-18 ist KEINE neue empirische Hypothese über die Welt, sondern ein Auflösungs-Audit des bereits adjudizierten GL-006 (H-04, WEITER kapitalfrei, Kapital PARK) — byte-identische F-LEADLAG-Pipeline mit GENAU EINER vorab deklarierten Änderung: `n_surrogates` 200 → 100.000. **Das GL-006-Verdikt bleibt append-only UNVERÄNDERT.** Ein abdriftender GL-006-Survivor falsifiziert NICHT GL-006, sondern markiert das Messungen-WEITER als „auflösungsbedingt fragil" (Audit-Finding, vorregistriert). Dieser Eintrag vergibt daher KEIN WEITER/DROP/GRAUBEREICH, sondern dokumentiert den Audit-Befund.
+
+**Quelle:** `state/c18_leadlag_audit_results.{json,md}` (archiviert aus `handoff_local/results/h18_20260717_160409/h18/`), erzeugt 2026-07-17 16:07:35 UTC auf der Nutzer-Maschine (RTX 5060 Ti, torch 2.11.0+cu128, backend `torch-cuda`). Läufe: H18_SELFTEST rc=0 (Methodik-Äquivalenz gegen die ORIGINALE c17_c41-Pipeline bei N=500, `equivalence_holds=true`, 12 s) → H18_GPU_CHECK rc=0 → H18_AUDIT rc=0 (192 s — die Registry-Schätzung ~1 h wurde 18-fach unterboten). **`verdict_carrying=true`** (echtes CUDA-Device + volle 100.000 Surrogate + Seed 42 = registriert; Compute-Gating-Pflicht erfüllt).
+
+### Datenbindung vs. GL-006 (`all_windows_match_gl006=False` — ehrlich eingeordnet, nicht überstimmt)
+Beide Fenster sind **byte-identisch** zu den archivierten GL-006-Fenstern (F0: 2026-06-04 22:15:14–23:19:49 UTC, 3874 Bars · F1: 23:19:50–00:24:26 UTC, 3875 Bars; `t0_ms`/`t1_ms`/`n_bars` exakt gleich, `span_match=true`). Die **Observed-Statistiken** weichen jedoch bis max. **7,13e-6** von den GL-006-Archivwerten ab und reißen damit die strikte Bindungstoleranz (atol 1e-9 / rtol 1e-6). Einordnung: Das ist die Signatur von **Library-Versions-Drift** — der GL-006-Lauf (2026-06-17) lief im damaligen Umgebungs-Stack, dieser Lauf im frisch aufgesetzten venv (numpy 2.4.6, Python 3.13); Quantil-Binning-Kanten verschieben sich dabei um O(1e-6). KEINE Fenster- oder Datenabweichung. Konsequenz (streng, wie vom Runner geflaggt): Dieser Lauf ist formal eine **Re-Messung derselben Fenster unter leicht anderem Numerik-Stack**, kein byte-identischer Replay — T1/T2 werden unten trotzdem berichtet, tragen aber diesen Vorbehalt. Der Flag wird bewusst NICHT wegdiskutiert.
+
+### T1 — 12 GL-006-Stage-1-FDR-Survivor bei N=100.000 (vorregistriert: alle bei p ≤ 1e-3 UND BH-signifikant)
+
+| F | Zelle | p (GL-006, N=200) | p (neu, N=100k) | MC-SE | p≤1e-3 | BH-sig (neu) | hält |
+|---|---|---:|---:|---:|:---:|:---:|:---:|
+| 0 | TE BTC→ETH lag1 | 0,02488 | 0,012420 | 3,5e-4 | nein | ja | nein |
+| 0 | TE ETH→BTC lag1 | 0,06468 | 0,068989 | 8,0e-4 | nein | ja | nein |
+| 0 | TE BTC→ETH lag2 | 0,00995 | **0,000560** | 7,5e-5 | **ja** | ja | **ja** |
+| 0 | TE ETH→BTC lag2 | 0,06965 | 0,028150 | 5,2e-4 | nein | ja | nein |
+| 0 | TE BTC→ETH lag3 | 0,01493 | 0,004500 | 2,1e-4 | nein | ja | nein |
+| 0 | TE ETH→BTC lag3 | 0,01990 | 0,030420 | 5,4e-4 | nein | ja | nein |
+| 0 | TE BTC→ETH lag5 | 0,04478 | 0,025570 | 5,0e-4 | nein | ja | nein |
+| 0 | WCOH BTC/ETH | 0,00498 (Floor) | **0,000010 (neuer Floor)** | 1,0e-5 | **ja** | ja | **ja** |
+| 1 | TE BTC→ETH lag1 | 0,00498 (Floor) | **0,000010 (neuer Floor)** | 1,0e-5 | **ja** | ja | **ja** |
+| 1 | TE ETH→BTC lag1 | 0,00498 (Floor) | 0,003650 | 1,9e-4 | nein | ja | nein |
+| 1 | TE BTC→ETH lag2 | 0,01990 | 0,012320 | 3,5e-4 | nein | ja | nein |
+| 1 | WCOH BTC/ETH | 0,00498 (Floor) | **0,000010 (neuer Floor)** | 1,0e-5 | **ja** | ja | **ja** |
+
+**`t1_holds=false` — 4/12 halten die strenge p≤1e-3-Schranke.** ABER: **12/12 bleiben BH-FDR-signifikant (α=0,10) auch bei 500-facher Auflösung** — der Mess-Existenz-Befund von GL-006 verschwindet nicht, er wird präzisiert:
+- **3 Zellen sitzen auch bei N=100.000 noch am Floor** (p < 1e-5): beide WCOH-Zellen + TE BTC→ETH lag1 in F1 — bei N=200 als p=0,00498 gefloort, tatsächlich ≥500× stärker. Plus TE BTC→ETH lag2 F0 mit p=5,6e-4. Diese 4 sind bei extremer Auflösung **hart bestätigt**.
+- **8 Zellen driften** auf echte p-Werte im Bereich 3,65e-3 … 6,9e-2 — bei N=200 nicht von „sehr stark" unterscheidbar, jetzt als **moderat (aber BH-haltbar)** aufgelöst. Vorregistrierte Lesart: diese 8 Zellen sind ab jetzt als „**auflösungsbedingt fragil**" etikettiert.
+- **Richtungsmuster (deskriptiv):** ALLE 4 harten Zellen sind BTC→ETH bzw. symmetrische Kohärenz; ALLE ETH→BTC-TE-Zellen (4 von 4 unter den Survivorn) driften. Die Auflösung schärft die Asymmetrie: die BTC-führt-Kante ist das robuste Substrat des GL-006-Befunds.
+
+### T2 — die zwei Lesart-Entscheidungszellen (vorregistriert: Auflösung mit > 5 MC-SE Abstand von p_crit)
+
+| Zelle (F0) | p (neu) | p_crit (neu) | Distanz | Seite | aufgelöst |
+|---|---:|---:|---:|---|:---:|
+| TE ETH→BTC lag2 | 0,028150 | 0,068989 | **78,1 MC-SE** | signifikant | **ja** |
+| TE ETH→BTC lag1 | 0,068989 | 0,068989 | **0,0 MC-SE** | signifikant | nein |
+
+**`t2_holds=false`, aber differenziert:** Lag2 löst sich **entschieden** auf die signifikante Seite auf (78 MC-SE — bei N=200 war die Zelle < 1 MC-SE von p_crit, jetzt eindeutig). Lag1 ist ein **struktureller Sonderfall**: p_neu == p_crit EXAKT, weil die Zelle selbst die BH-Step-up-Grenze definiert (die größte akzeptierte p-Zelle hat per Konstruktion Distanz 0 zu p_crit). Das vorregistrierte „>5 MC-SE"-Kriterium ist für die grenzdefinierende Zelle prinzipiell unerfüllbar — kein MC-Auflösungsproblem, sondern eine strukturelle Eigenschaft des BH-Verfahrens, die bei der T2-Formulierung nicht antizipiert wurde. Die Zelle IST signifikant (letzte akzeptierte), bleibt aber definitionsgemäß marginal.
+
+### AUDIT-BEFUND (kein Verdikt)
+1. **GL-006 wird NICHT falsifiziert.** 12/12 Survivor bleiben bei 500× Auflösung BH-signifikant; das Messungen-WEITER steht.
+2. **Präzisierung:** 4 Zellen (WCOH ×2, BTC→ETH lag1 F1, BTC→ETH lag2 F0) sind hart bestätigt (3 davon < 1e-5); 8 Zellen — darunter ALLE ETH→BTC-Kanten — tragen ab jetzt das vorregistrierte Etikett **„auflösungsbedingt fragil"** (echte p 3,7e-3…6,9e-2). Jede künftige Arbeit, die auf der ETH→BTC-Richtung aufbaut, muss diese Fragilität zitieren.
+3. **T2-Lesart:** Die GL-006-Unentscheidbarkeit von ETH→BTC F0 lag2 ist AUFGELÖST (signifikant, 78 MC-SE); lag1 bleibt strukturell marginal (BH-grenzdefinierend — Distanz 0 per Konstruktion).
+4. **Vorbehalt:** Datenbindung formal nicht byte-identisch (Observed-Stat-Drift ≤ 7,13e-6 bei identischen Fenstern; Library-Versions-Signatur). Für eine byte-identische Reproduktion müsste der Juni-Umgebungs-Stack eingefroren nachgebaut werden — angesichts der Größenordnung (1e-6 auf Statistiken von O(1e-2)) wird das als nicht verhältnismäßig eingestuft, aber offen dokumentiert.
+5. **Kapitalfrei bestätigt:** keine bps/Edge/PnL-Metrik im gesamten Payload; H-18 impliziert keine Tradability-Folge.
+
+### Programm-Bilanz (nach GL-014)
+Welle 1: H-01/H-02/H-03 DROP. Welle 2: H-04 WEITER (kapitalfrei) · H-04b PARK · H-05 DROP · H-06 DROP. Welle 3: H-05b WEITER (kapitalfrei) · H-05c PARK · H-07 DROP (strukturell) · H-08 DROP (empirisch). Welle 5 (laufend): **H-18 Auflösungs-Audit abgeschlossen** (GL-006 präzisiert: 4 harte + 8 fragile Zellen; kein neues Verdikt) · H-14…H-17 ausstehend (H-16-Lauf 1 durch PC-Neustart abgebrochen). Weiterhin 2 kapitalfreie Mess-WEITER, beide Tradability-PARK; 0 handelbare Kanten. 14 GL-Einträge, 0 Torpfosten-Verschiebungen.
