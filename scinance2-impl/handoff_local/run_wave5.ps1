@@ -93,10 +93,24 @@ $Plan = @(
        done_glob='results\h14_*\h14\c14_panellag_results.json' }
 )
 
-if ($Only.Count -gt 0) {
+# Robust gegen BEIDE Aufrufarten: nativer Aufruf (.\run_wave5.ps1 -Only h15,h14
+# -> echtes Array) UND powershell -File (-Only h15,h14 kommt als EIN String
+# "h15,h14" an - -File parst keine PowerShell-Array-Syntax). Deshalb jedes
+# Element zusaetzlich an Komma/Leerzeichen splitten + lowercase-normalisieren.
+$OnlyIds = @()
+foreach ($o in $Only) {
+    foreach ($tok in ($o -split '[,\s]+')) {
+        if ($tok) { $OnlyIds += $tok.ToLower() }
+    }
+}
+if ($OnlyIds.Count -gt 0) {
     $sel = @()
-    foreach ($p in $Plan) { if ($Only -contains $p.id) { $sel += ,$p } }
+    foreach ($p in $Plan) { if ($OnlyIds -contains $p.id) { $sel += ,$p } }
     $Plan = $sel
+    if ($Plan.Count -eq 0) {
+        Log-Line ("FEHLER: -Only '" + ($OnlyIds -join ',') + "' matcht keine Hypothese (gueltig: h14,h15,h16,h17,h18) - Abbruch.")
+        exit 1
+    }
 }
 
 $StartTime = Get-Date
