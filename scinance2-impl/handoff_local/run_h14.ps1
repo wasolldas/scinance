@@ -203,9 +203,9 @@ if (-not $HarvestOk) {
 }
 
 # -- Zusammenfassung -----------------------------------------------------
-$ok = ($Script:Results | Where-Object { $_.Status -eq 'OK' }).Count
-$fail = ($Script:Results | Where-Object { $_.Status -eq 'FAIL' }).Count
-$skip = ($Script:Results | Where-Object { $_.Status -eq 'SKIP' }).Count
+$ok = @($Script:Results | Where-Object { $_.Status -eq 'OK' }).Count
+$fail = @($Script:Results | Where-Object { $_.Status -eq 'FAIL' }).Count
+$skip = @($Script:Results | Where-Object { $_.Status -eq 'SKIP' }).Count
 $exit = 0
 if ($fail -gt 0) { $exit = 1 } elseif ($skip -gt 0) { $exit = 2 }
 
