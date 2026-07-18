@@ -10,9 +10,11 @@ exclusively a T3 LOCAL_LONG concern on the user's RTX machine.
 """
 from __future__ import annotations
 
+import gc
 import json
 import subprocess
 import sys
+import weakref
 from datetime import date, timedelta
 from pathlib import Path
 
@@ -894,6 +896,257 @@ class TestBenjaminiHochberg:
         # only the smallest p-value (idx 1) can plausibly reject here
         assert rejected[1] is True
         assert rejected[0] is False
+
+
+# ----------------------------------------------------------------------------
+# (j) memory discipline (Wave-2 T3-OOM fixes) — structural + bit-identity
+# regressions: lazy per-symbol loading (peak event-RAM = O(one symbol)),
+# chunked count lookups, shared interp count tables, small-dtype token
+# storage. NONE of these may change any statistic — every test here asserts
+# either structure (loader lifetimes) or EXACT numerical identity.
+# ----------------------------------------------------------------------------
+
+
+class TestMemoryDiscipline:
+    def _days(self) -> list[str]:
+        return _day_grid("2026-01-01", 20)
+
+    def test_lazy_loader_called_once_and_events_released(self) -> None:
+        """run() with loader callables: each loader fires exactly once, the
+        previous symbol's EventStream is ALREADY freed when the next symbol
+        loads (peak = one symbol), and nothing survives run()."""
+        days = self._days()
+        calls = {"BTCUSDT": 0, "ETHUSDT": 0}
+        refs: dict[str, weakref.ref] = {}
+
+        def make_loader(sym: str, seed: int):
+            def load() -> c15_driver.EventStream:
+                if sym == "ETHUSDT":
+                    gc.collect()
+                    assert refs["BTCUSDT"]() is None, (
+                        "BTCUSDT events still alive while ETHUSDT loads — "
+                        "peak event-RAM is not O(one symbol)")
+                calls[sym] += 1
+                ev = _make_stream(sym, days, 30, seed=seed)
+                refs[sym] = weakref.ref(ev)
+                return ev
+            return load
+
+        loaders = {
+            "BTCUSDT": make_loader("BTCUSDT", 1),
+            "ETHUSDT": make_loader("ETHUSDT", 2),
+        }
+        payload = c15_driver.run(
+            loaders, days, mode="mechanics", n_folds=2, embargo_days=1,
+            seeds=(42,), n_surrogates=3,
+        )
+        assert calls == {"BTCUSDT": 1, "ETHUSDT": 1}
+        gc.collect()
+        assert refs["BTCUSDT"]() is None
+        assert refs["ETHUSDT"]() is None
+        assert [s["symbol"] for s in payload["per_symbol"]] == \
+            ["BTCUSDT", "ETHUSDT"]
+
+    def test_lazy_and_eager_payloads_identical(self) -> None:
+        """Loader-based run must be statistically indistinguishable from the
+        old eager-dict run on identical streams (pure lifetime change)."""
+        days = self._days()
+
+        def streams() -> dict[str, c15_driver.EventStream]:
+            return {
+                "BTCUSDT": _make_stream("BTCUSDT", days, 30, seed=1),
+                "ETHUSDT": _make_stream("ETHUSDT", days, 30, seed=2),
+            }
+
+        kwargs = dict(mode="mechanics", n_folds=2, embargo_days=1,
+                      seeds=(42,), n_surrogates=3)
+        eager = c15_driver.run(streams(), days, **kwargs)
+        lazy = c15_driver.run(
+            {sym: (lambda s=sym: streams()[s]) for sym in streams()},
+            days, **kwargs,
+        )
+        for se, sl in zip(eager["per_symbol"], lazy["per_symbol"]):
+            assert se["symbol"] == sl["symbol"]
+            assert se["best_markov_ce"] == sl["best_markov_ce"]
+            assert se["fold_weights_scored_tokens"] == sl["fold_weights_scored_tokens"]
+            for fe, fl in zip(se["folds"], sl["folds"]):
+                assert fe["markov_ces"] == fl["markov_ces"]
+                assert fe["tokenizer_size_edges"] == fl["tokenizer_size_edges"]
+                assert fe["tokenizer_iat_edges"] == fl["tokenizer_iat_edges"]
+                assert fe["surrogate_gap_p95"] == fl["surrogate_gap_p95"] or (
+                    np.isnan(_nan(fe["surrogate_gap_p95"]))
+                    and np.isnan(_nan(fl["surrogate_gap_p95"])))
+
+    def test_resume_never_invokes_loader(self, tmp_path: Path) -> None:
+        """Checkpoint-resumed symbols must be skipped WITHOUT loading their
+        events at all (with lazy loaders a resume costs ~zero RAM/time)."""
+        days = self._days()
+        ckpt_dir = tmp_path / "ckpt"
+        kwargs = dict(mode="mechanics", n_folds=2, embargo_days=1,
+                      seeds=(42,), n_surrogates=3, ckpt_dir=ckpt_dir)
+        events = {
+            "BTCUSDT": _make_stream("BTCUSDT", days, 30, seed=1),
+            "ETHUSDT": _make_stream("ETHUSDT", days, 30, seed=2),
+        }
+        c15_driver.run(events, days, **kwargs)
+
+        def poisoned_loader() -> c15_driver.EventStream:
+            raise AssertionError("loader invoked despite valid checkpoint")
+
+        second = c15_driver.run(
+            {"BTCUSDT": poisoned_loader, "ETHUSDT": poisoned_loader},
+            days, **kwargs,
+        )
+        assert [s["symbol"] for s in second["per_symbol"]] == \
+            ["BTCUSDT", "ETHUSDT"]
+
+    def test_prepare_fold_small_dtype_storage(self) -> None:
+        """Fold token/hour arrays are stored int16/int8 (vocab <= 256,
+        hours 0..23) — 4-8x less resident RAM than the old int64 arrays."""
+        days = self._days()
+        fold = _make_fold(days[:10], days[12:], days[10:12])
+        events = _make_stream("BTCUSDT", days, 30, seed=3)
+        spec, train_tok, test_tok, test_hours = c15_driver.prepare_fold(events, fold)
+        assert train_tok.dtype == np.int16
+        assert test_tok.dtype == np.int16
+        assert test_hours.dtype == np.int8
+        assert int(train_tok.min()) >= 0
+        assert int(train_tok.max()) < spec.vocab_size
+
+    def test_lookup_chunking_bitidentical(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """Chunked _SortedCounts.lookup must be BIT-identical to the old
+        single-shot formulation (element-wise independent, no float path)."""
+        rng = np.random.default_rng(0)
+        codes = rng.integers(0, 500, size=20_000)
+        sc = c15_markov._SortedCounts.from_codes(codes)
+        queries = rng.integers(0, 700, size=10_000)  # includes absent keys
+        # reference: the pre-fix unchunked formulation, verbatim
+        idx = np.searchsorted(sc.keys, queries)
+        idx_c = np.clip(idx, 0, sc.keys.size - 1)
+        found = sc.keys[idx_c] == queries
+        expected = np.where(found, sc.vals[idx_c], 0)
+        # force many, unevenly-cut chunks
+        monkeypatch.setattr(c15_markov, "_LOOKUP_CHUNK", 997)
+        got = sc.lookup(queries)
+        assert got.dtype == np.int64
+        np.testing.assert_array_equal(got, expected)
+
+    def test_interp_shares_tables_and_is_bitidentical(self) -> None:
+        """fit_all_baselines: the interpolated model must (a) SHARE the
+        fixed-order models' count tables (no duplicate copy) and (b) produce
+        BIT-identical log-probs to an independent fit()."""
+        rng = np.random.default_rng(1)
+        train = rng.integers(0, 8, size=30_000)
+        test = rng.integers(0, 8, size=5_000)
+        models = c15_markov.fit_all_baselines(train, vocab_size=8)
+        shared = models[f"interp_k{c15_markov.MAX_ORDER}"]
+        for k in range(c15_markov.MAX_ORDER + 1):
+            assert shared._pair[k] is models[f"kt_k{k}"]._pair, k
+            assert shared._ctx[k] is models[f"kt_k{k}"]._ctx, k
+        direct = c15_markov.InterpolatedMarkov(
+            max_order=c15_markov.MAX_ORDER, vocab_size=8).fit(train)
+        np.testing.assert_array_equal(
+            direct.log_probs(test), shared.log_probs(test))
+
+    def test_markov_small_dtype_bitidentical(self) -> None:
+        """int16 token storage must give BIT-identical log-probs/CE to int64
+        storage for both baseline families (all code arithmetic upcasts)."""
+        rng = np.random.default_rng(5)
+        train64 = rng.integers(0, 128, size=50_000).astype(np.int64)
+        test64 = rng.integers(0, 128, size=8_000).astype(np.int64)
+        train16 = train64.astype(np.int16)
+        test16 = test64.astype(np.int16)
+        for order in (0, 2, 4):
+            m64 = c15_markov.MarkovKT(order=order, vocab_size=128).fit(train64)
+            m16 = c15_markov.MarkovKT(order=order, vocab_size=128).fit(train16)
+            np.testing.assert_array_equal(
+                m64.log_probs(test64), m16.log_probs(test16))
+        i64 = c15_markov.InterpolatedMarkov(max_order=4, vocab_size=128).fit(train64)
+        i16 = c15_markov.InterpolatedMarkov(max_order=4, vocab_size=128).fit(train16)
+        np.testing.assert_array_equal(i64.log_probs(test64), i16.log_probs(test16))
+
+    def test_hour_block_shuffle_preserves_dtype_and_values(self) -> None:
+        """Surrogates keep the input dtype (no int64 blow-up copy) and the
+        int16 path permutes EXACTLY like the int64 path (same rng seed)."""
+        rng = np.random.default_rng(9)
+        n = 4000
+        tokens64 = rng.integers(0, 128, size=n).astype(np.int64)
+        hours64 = rng.integers(0, 24, size=n).astype(np.int64)
+        surr64 = c15_stats.hour_block_shuffle(
+            tokens64, hours64, block_len=16, rng=np.random.default_rng(7))
+        surr16 = c15_stats.hour_block_shuffle(
+            tokens64.astype(np.int16), hours64.astype(np.int8),
+            block_len=16, rng=np.random.default_rng(7))
+        assert surr64.dtype == np.int64
+        assert surr16.dtype == np.int16
+        np.testing.assert_array_equal(surr64, surr16.astype(np.int64))
+
+
+def _nan(v) -> float:
+    try:
+        return float(v)
+    except (TypeError, ValueError):
+        return float("nan")
+
+
+# ----------------------------------------------------------------------------
+# (k) count_trade_events — the CLI's cheap fail-fast pre-pass must agree with
+# the real loader on the usable-event count (same predicates, no arrays).
+# ----------------------------------------------------------------------------
+
+
+class TestCountTradeEvents:
+    @staticmethod
+    def _write_day(base: Path, symbol: str, day: str, rows: list[tuple]) -> None:
+        pa = pytest.importorskip("pyarrow")
+        pq = pytest.importorskip("pyarrow.parquet")
+        d = base / "raw" / "bybit" / "publicTrade" / f"symbol={symbol}" / f"date={day}"
+        d.mkdir(parents=True, exist_ok=True)
+        table = pa.table({
+            "ts_exchange_ms": pa.array([r[0] for r in rows], type=pa.int64()),
+            "payload_json": pa.array([r[1] for r in rows], type=pa.string()),
+        })
+        pq.write_table(table, d / "part-0.parquet")
+
+    def _populate(self, base: Path, symbol: str, days: list[str]) -> None:
+        for i, day in enumerate(days):
+            t0 = _epoch_day(day) * _MS_PER_DAY
+            rows = [
+                # good rows: backfill keys and live keys, strictly rising ts
+                (t0 + 10, '{"side": "Buy", "price": "100.5", "size": "0.5"}'),
+                (t0 + 20, '{"S": "Sell", "p": "99.1", "v": "1.2"}'),
+                (t0 + 30, '{"side": "Sell", "price": "98.7", "size": "2.0"}'),
+                (t0 + 40, '{"S": "Buy", "p": "101.0", "v": "0.1"}'),
+                (t0 + 50, '{"side": "Buy", "price": "100.0", "size": "3.5"}'),
+                # malformed: non-positive price/size -> dropped by BOTH paths
+                (t0 + 60, '{"side": "Buy", "price": "0", "size": "1.0"}'),
+                (t0 + 70, '{"side": "Sell", "price": "100.0", "size": "-3"}'),
+                # missing side/S key -> dropped by the shared inner SQL
+                (t0 + 80, '{"price": "100.0", "size": "1.0"}'),
+                # NULL exchange timestamp -> dropped by the shared inner SQL
+                (None, '{"side": "Buy", "price": "100.0", "size": "1.0"}'),
+            ]
+            self._write_day(base, symbol, day, rows)
+
+    def test_count_matches_load_with_and_without_cap(self, tmp_path: Path) -> None:
+        pytest.importorskip("duckdb")
+        days = ["2026-01-01", "2026-01-02"]
+        self._populate(tmp_path, "TESTUSDT", days)
+        for cap in (0, 3):
+            n = c15_driver.count_trade_events(
+                tmp_path, "TESTUSDT", days, max_events_per_day=cap)
+            ev = c15_driver.load_trade_events(
+                tmp_path, "TESTUSDT", days, max_events_per_day=cap)
+            assert n == ev.n_events, f"cap={cap}: count {n} != load {ev.n_events}"
+        # uncapped: exactly the 5 good rows per day survive
+        assert c15_driver.count_trade_events(tmp_path, "TESTUSDT", days) == 10
+
+    def test_count_missing_symbol_raises_dataerror(self, tmp_path: Path) -> None:
+        pytest.importorskip("duckdb")
+        days = ["2026-01-01"]
+        self._populate(tmp_path, "TESTUSDT", days)
+        with pytest.raises(c15_driver.DataError):
+            c15_driver.count_trade_events(tmp_path, "NOPEUSDT", days)
 
 
 # ----------------------------------------------------------------------------

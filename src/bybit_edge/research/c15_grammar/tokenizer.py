@@ -98,7 +98,11 @@ def derive_event_features(
     ts = np.asarray(ts_ms, dtype=np.int64)
     px = np.asarray(price, dtype=np.float64)
     sz = np.asarray(size, dtype=np.float64)
-    sd = np.asarray(side, dtype=np.int64)
+    # keep an integer side array WITHOUT forcing an int64 copy (the loader
+    # stores int8; values are only ever 0/1, so any int dtype is exact)
+    sd = np.asarray(side)
+    if sd.dtype.kind not in "iu":
+        sd = sd.astype(np.int64)
     n = ts.size
     if not (px.size == n and sz.size == n and sd.size == n):
         raise TokenizerError("ts/price/size/side length mismatch")

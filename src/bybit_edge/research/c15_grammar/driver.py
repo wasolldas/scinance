@@ -59,11 +59,13 @@ KAPITALFREI: ``capital_free: true`` — no capital metric of any kind anywhere.
 """
 from __future__ import annotations
 
+import gc
 import json
 import math
 import os
 import re
 import sys
+from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
@@ -102,6 +104,7 @@ from .transformer import (
     GrammarTransformerConfig,
     evaluate_ce,
     num_parameters,
+    release_device_memory,
     torch_cuda_status,
     train_transformer,
 )
@@ -158,7 +161,9 @@ class EventStream:
     ts_ms: np.ndarray   # int64, non-decreasing
     price: np.ndarray   # float64, > 0
     size: np.ndarray    # float64, > 0
-    side: np.ndarray    # int64: 1 = taker Buy, 0 = taker Sell
+    side: np.ndarray    # int (0/1): 1 = taker Buy, 0 = taker Sell — the
+    #                     loader stores int8 (values are only ever 0/1;
+    #                     every consumer upcasts at the point of use)
 
     def __post_init__(self) -> None:
         n = self.ts_ms.size
@@ -199,6 +204,59 @@ def _iso_to_epoch_day(d: str) -> int:
     return (_iso(d) - date(1970, 1, 1)).days
 
 
+def _trade_events_sql_parts(
+    base_dir: Path | str,
+    symbol: str,
+    days: list[str],
+    *,
+    exchange: str,
+    stream: str,
+    max_events_per_day: int,
+) -> tuple[str, str]:
+    """Shared SQL fragments for ``load_trade_events``/``count_trade_events``.
+
+    Returns ``(inner, per_day_limit)``. Raises ``DataError`` when no parquet
+    is present — SAME fail-fast surface for both the counting pre-pass and
+    the real load.
+    """
+    if not _SYMBOL_RE.match(symbol):
+        raise DataError(f"invalid symbol: {symbol!r}")
+    base = Path(base_dir)
+    globs = [
+        str(base / "raw" / exchange / stream / f"symbol={symbol}" / f"date={d}" / "*.parquet")
+        for d in days
+    ]
+    present = [g for g in globs if list(Path(g).parent.glob("*.parquet"))]
+    if not present:
+        raise DataError(
+            f"no parquet for {exchange}/{stream}/{symbol} in "
+            f"{days[0]}..{days[-1]} under {base}"
+        )
+    file_list = "[" + ", ".join("'" + g.replace("'", "''") + "'" for g in present) + "]"
+    inner = f"""
+        SELECT ts_exchange_ms AS ts,
+               CASE WHEN lower(COALESCE(json_extract_string(payload_json,'$.side'),
+                                        json_extract_string(payload_json,'$.S'))) = 'buy'
+                    THEN 1 ELSE 0 END AS side,
+               CAST(COALESCE(json_extract_string(payload_json,'$.price'),
+                             json_extract_string(payload_json,'$.p')) AS DOUBLE) AS price,
+               CAST(COALESCE(json_extract_string(payload_json,'$.size'),
+                             json_extract_string(payload_json,'$.v')) AS DOUBLE) AS size
+        FROM read_parquet({file_list}, hive_partitioning=1, union_by_name=1)
+        WHERE ts_exchange_ms IS NOT NULL
+          AND (json_extract_string(payload_json,'$.side') IS NOT NULL
+               OR json_extract_string(payload_json,'$.S') IS NOT NULL)
+    """
+    per_day_limit = ""
+    if max_events_per_day and max_events_per_day > 0:
+        per_day_limit = f"""
+            QUALIFY row_number() OVER (
+                PARTITION BY ts // {_MS_PER_DAY} ORDER BY ts
+            ) <= {int(max_events_per_day)}
+        """
+    return inner, per_day_limit
+
+
 def load_trade_events(
     base_dir: Path | str,
     symbol: str,
@@ -220,41 +278,10 @@ def load_trade_events(
     """
     import duckdb
 
-    if not _SYMBOL_RE.match(symbol):
-        raise DataError(f"invalid symbol: {symbol!r}")
-    base = Path(base_dir)
-    globs = [
-        str(base / "raw" / exchange / stream / f"symbol={symbol}" / f"date={d}" / "*.parquet")
-        for d in days
-    ]
-    present = [g for g in globs if list(Path(g).parent.glob("*.parquet"))]
-    if not present:
-        raise DataError(
-            f"no parquet for {exchange}/{stream}/{symbol} in "
-            f"{days[0]}..{days[-1]} under {base}"
-        )
-    file_list = "[" + ", ".join("'" + g.replace("'", "''") + "'" for g in present) + "]"
-    per_day_limit = ""
-    inner = f"""
-        SELECT ts_exchange_ms AS ts,
-               CASE WHEN lower(COALESCE(json_extract_string(payload_json,'$.side'),
-                                        json_extract_string(payload_json,'$.S'))) = 'buy'
-                    THEN 1 ELSE 0 END AS side,
-               CAST(COALESCE(json_extract_string(payload_json,'$.price'),
-                             json_extract_string(payload_json,'$.p')) AS DOUBLE) AS price,
-               CAST(COALESCE(json_extract_string(payload_json,'$.size'),
-                             json_extract_string(payload_json,'$.v')) AS DOUBLE) AS size
-        FROM read_parquet({file_list}, hive_partitioning=1, union_by_name=1)
-        WHERE ts_exchange_ms IS NOT NULL
-          AND (json_extract_string(payload_json,'$.side') IS NOT NULL
-               OR json_extract_string(payload_json,'$.S') IS NOT NULL)
-    """
-    if max_events_per_day and max_events_per_day > 0:
-        per_day_limit = f"""
-            QUALIFY row_number() OVER (
-                PARTITION BY ts // {_MS_PER_DAY} ORDER BY ts
-            ) <= {int(max_events_per_day)}
-        """
+    inner, per_day_limit = _trade_events_sql_parts(
+        base_dir, symbol, days,
+        exchange=exchange, stream=stream, max_events_per_day=max_events_per_day,
+    )
     sql = f"SELECT ts, side, price, size FROM ({inner}) {per_day_limit} ORDER BY ts"
     con = duckdb.connect()
     try:
@@ -262,20 +289,64 @@ def load_trade_events(
     finally:
         con.close()
     ts = np.asarray(arrs["ts"], dtype=np.int64)
-    side = np.asarray(arrs["side"], dtype=np.int64)
+    # side is only ever 0/1 — int8 storage saves 7 bytes/event on
+    # multi-hundred-million-event streams; consumers upcast at use.
+    side = np.asarray(arrs["side"]).astype(np.int8)
     price = np.asarray(arrs["price"], dtype=np.float64)
     size = np.asarray(arrs["size"], dtype=np.float64)
+    del arrs
     good = np.isfinite(price) & np.isfinite(size) & (price > 0) & (size > 0)
     n_bad = int((~good).sum())
     if n_bad:
         print(f"[c15_grammar] {symbol}: dropped {n_bad} malformed rows",
               file=sys.stderr, flush=True)
         ts, side, price, size = ts[good], side[good], price[good], size[good]
+    del good
     if ts.size == 0:
         raise DataError(f"{symbol}: 0 usable trade events in {days[0]}..{days[-1]}")
     print(f"[c15_grammar] {symbol}: {ts.size} events "
           f"({days[0]}..{days[-1]})", file=sys.stderr, flush=True)
     return EventStream(symbol=symbol, ts_ms=ts, price=price, size=size, side=side)
+
+
+def count_trade_events(
+    base_dir: Path | str,
+    symbol: str,
+    days: list[str],
+    *,
+    exchange: str = "bybit",
+    stream: str = "publicTrade",
+    max_events_per_day: int = 0,
+) -> int:
+    """Count USABLE trade events for one symbol WITHOUT materialising arrays.
+
+    Cheap fail-fast pre-pass for the CLI: same glob/``DataError`` surface and
+    the same usability predicate as ``load_trade_events`` (ts + side present
+    via the shared inner SQL; per-day cap via the shared QUALIFY clause;
+    price/size finite and > 0 — the SQL ``isfinite(...)/> 0`` filter mirrors
+    the loader's numpy good-mask, with SQL NULL comparing like numpy NaN:
+    excluded either way), but as a DuckDB ``count(*)`` — no ORDER BY, no
+    transfer of hundreds of millions of rows into Python. This lets the CLI
+    keep its report-every-broken-symbol-BEFORE-training behaviour without
+    holding all five symbols' arrays in RAM upfront.
+    """
+    import duckdb
+
+    inner, per_day_limit = _trade_events_sql_parts(
+        base_dir, symbol, days,
+        exchange=exchange, stream=stream, max_events_per_day=max_events_per_day,
+    )
+    sql = (
+        f"SELECT count(*) FROM ("
+        f"SELECT ts, side, price, size FROM ({inner}) {per_day_limit}"
+        f") WHERE isfinite(price) AND isfinite(size) AND price > 0 AND size > 0"
+    )
+    con = duckdb.connect()
+    try:
+        row = con.execute(sql).fetchone()
+    finally:
+        con.close()
+    return int(row[0]) if row else 0
 
 
 # ----------------------------------------------------------------------------
@@ -296,6 +367,12 @@ def prepare_fold(
     are derived on the full stream — each is strictly causal (position t uses
     only data <= t), so a test event's IAT referencing the previous
     (embargo) event's timestamp is past information, not leakage.
+
+    Storage dtypes (memory, NOT numerics): token ids are < 256 and hours are
+    0..23, so the returned arrays are held as int16 / int8. Every consumer
+    (Markov code arithmetic, torch embedding input) upcasts to int64/long at
+    the point of use — values, and therefore all statistics, are identical
+    to int64 storage, at 4-8x less resident RAM per fold.
     """
     feats = derive_event_features(events.ts_ms, events.price, events.size, events.side)
     ev_days = events.epoch_days()
@@ -317,13 +394,13 @@ def prepare_fold(
         spec, feats["side"][train_mask], feats["signed_size"][train_mask],
         feats["log_iat"][train_mask],
         feats["tick_dir"][train_mask] if use_tick_direction else None,
-    )
+    ).astype(np.int16)  # vocab <= 256: values exact in int16 (see docstring)
     test_tokens = tokenize(
         spec, feats["side"][test_mask], feats["signed_size"][test_mask],
         feats["log_iat"][test_mask],
         feats["tick_dir"][test_mask] if use_tick_direction else None,
-    )
-    test_hours = events.hours_of_day()[test_mask]
+    ).astype(np.int16)
+    test_hours = events.hours_of_day()[test_mask].astype(np.int8)  # 0..23
     return spec, train_tokens, test_tokens, test_hours
 
 
@@ -452,7 +529,7 @@ def _load_symbol_checkpoint(
 # ----------------------------------------------------------------------------
 
 def run(
-    symbol_events: dict[str, EventStream],
+    symbol_events: dict[str, EventStream | Callable[[], EventStream]],
     days: list[str],
     *,
     mode: str = "full",
@@ -470,6 +547,17 @@ def run(
     ckpt_dir: Path | str | None = None,
 ) -> dict[str, Any]:
     """Run the H-15 grammar gate; return the gate-neutral payload.
+
+    ``symbol_events``: per symbol either an ``EventStream`` (eager, as
+    before) or a zero-argument LOADER callable returning one (lazy). With
+    loaders the peak event-RAM is O(one symbol) instead of O(whole panel):
+    each symbol is loaded right before its folds run, and its arrays are
+    explicitly released (``del`` + ``gc.collect()``) once the symbol is
+    aggregated/checkpointed — the ~450M-event 5-symbol panel then never
+    sits in memory at once (the upfront-dict variant kept ~all of it
+    resident for the entire multi-hour run). Checkpoint-resumed symbols are
+    never loaded at all. Processing order, RNG consumption and every
+    statistic are identical in both variants.
 
     ``mode="full"``: verdict-capable — REFUSES to start without torch+CUDA
     (``ComputeUnavailableError``); trains on ``cuda``.
@@ -582,7 +670,10 @@ def run(
                 per_symbol.append(cached)
                 continue
 
-        events = symbol_events[symbol]
+        entry = symbol_events[symbol]
+        # lazy loader: load THIS symbol's events only now (post-resume-check,
+        # so checkpoint-resumed symbols are never loaded at all)
+        events = entry() if callable(entry) else entry
         print(f"[c15_grammar] === {symbol}: {events.n_events} events, "
               f"{len(folds)} folds ===", file=sys.stderr, flush=True)
         fold_rows: list[dict[str, Any]] = []
@@ -608,6 +699,12 @@ def run(
             print(f"[c15_grammar] {symbol}: checkpointed to "
                   f"{_symbol_ckpt_path(ckpt_dir, symbol)}",
                   file=sys.stderr, flush=True)
+        # Release this symbol's event arrays BEFORE the next symbol loads —
+        # with loader entries this drops the only remaining reference, so
+        # peak event-RAM stays O(one symbol). Harmless no-op for eager
+        # dicts (the caller's dict still holds its reference).
+        del events, entry
+        gc.collect()
 
     # BH-FDR over the F-GRAMMAR family (one p per symbol).
     p_for_bh = [
@@ -723,16 +820,29 @@ def _run_fold(
     transformer_arm: bool,
     surrogate_seed: int,
 ) -> dict[str, Any]:
-    """One (symbol, fold) cell: tokenize, both arms, surrogate gap null."""
+    """One (symbol, fold) cell: tokenize, both arms, surrogate gap null.
+
+    Memory discipline (pure lifetime management — zero numeric effect):
+    the five non-best baseline models are dropped once the best is fixed,
+    ``train_tokens`` is dropped after the last seed finishes training, each
+    surrogate stream is dropped as soon as its gap scalar is recorded, and
+    the seed models (GPU) are released after the surrogate loop. Only
+    scalars/small dicts survive the fold.
+    """
     spec, train_tokens, test_tokens, test_hours = prepare_fold(
         events, fold, use_tick_direction=use_tick_direction,
     )
-    n_scored = max(0, test_tokens.size - CE_WARMUP)
+    n_train_tokens = int(train_tokens.size)
+    n_test_tokens = int(test_tokens.size)
+    n_scored = max(0, n_test_tokens - CE_WARMUP)
 
     # Baseline arm (CPU) — fixed BEFORE surrogates: best on the observed OOS.
     baselines = fit_all_baselines(train_tokens, spec.vocab_size)
     best_name, best_ce, all_ces = best_baseline_ce(baselines, test_tokens)
     best_model = baselines.get(best_name)
+    # Only the best baseline is ever used again (D2) — free the other
+    # models' count tables before the transformer arm allocates.
+    del baselines
 
     # Transformer arm — 3 seeds, OOS CE = mean over seeds (registry).
     seed_models: list[Any] = []
@@ -747,6 +857,8 @@ def _run_fold(
                   f"transformer_ce={ce:.4f} (params={num_parameters(model)})",
                   file=sys.stderr, flush=True)
     trans_ce = float(np.mean(seed_ces)) if seed_ces else float("nan")
+    # Training is over — the train stream is not needed for the null.
+    del train_tokens
 
     # Surrogate null: re-EVALUATE both trained arms on each surrogate (D2).
     rng = np.random.default_rng(surrogate_seed)
@@ -761,18 +873,25 @@ def _run_fold(
         else:
             t_ce = float("nan")
         surr_gaps[r] = m_ce - t_ce
+        del surr  # only the gap SCALAR is kept per surrogate
+    # Seed models are finished after the null — drop them and release
+    # torch's cached CUDA blocks before the next fold trains.
+    if seed_models:
+        seed_models.clear()
+        gc.collect()
+        release_device_memory(device)
 
     obs_gap = best_ce - trans_ce if np.isfinite(best_ce) and np.isfinite(trans_ce) \
         else float("nan")
     print(f"[c15_grammar] {events.symbol} fold {fold.index}: "
           f"markov[{best_name}]={best_ce:.4f} transformer={trans_ce:.4f} "
-          f"gap={obs_gap:.5f} (n_test_tokens={test_tokens.size})",
+          f"gap={obs_gap:.5f} (n_test_tokens={n_test_tokens})",
           file=sys.stderr, flush=True)
 
     public = {
         "fold": fold.index,
-        "n_train_events": int(train_tokens.size),
-        "n_test_events": int(test_tokens.size),
+        "n_train_events": n_train_tokens,
+        "n_test_events": n_test_tokens,
         "n_scored_test_tokens": int(n_scored),
         "tokenizer_size_edges": list(spec.size_edges),
         "tokenizer_iat_edges": list(spec.iat_edges),
@@ -952,6 +1071,7 @@ __all__ = [
     "HYPOTHESIS_ID",
     "REGISTRY_PATH",
     "SCHEMA_VERSION",
+    "count_trade_events",
     "daily_grid",
     "load_trade_events",
     "prepare_fold",

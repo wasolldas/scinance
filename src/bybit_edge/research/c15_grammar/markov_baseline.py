@@ -47,9 +47,33 @@ MAX_ORDER = 4
 #: are excluded from CE for EVERY model (see module docstring).
 CE_WARMUP = MAX_ORDER
 
+#: Chunk size (elements) for the vectorised count lookups. A single
+#: full-width lookup on a ~30M-token surrogate materialises FOUR ~230-MiB
+#: int64 temporaries at once (searchsorted idx, clipped idx, found mask,
+#: where-result); chunking caps the transient footprint at ~30 MB while
+#: staying BIT-IDENTICAL (every lookup is element-wise independent — no
+#: float accumulation crosses a chunk boundary).
+_LOOKUP_CHUNK = 4_000_000
+
 
 class MarkovError(ValueError):
     """Raised on malformed Markov-model usage."""
+
+
+def _as_token_array(tokens: np.ndarray) -> np.ndarray:
+    """Integer token array WITHOUT forcing an int64 copy.
+
+    Token ids fit in int16 for the registered vocabs (<= 256); every
+    context/pair-code computation upcasts to int64 AT THE POINT OF USE
+    (``_context_codes`` / the explicit ``.astype(np.int64)`` on next-token
+    slices), so small-dtype STORAGE is bit-identical to int64 storage while
+    using 4-8x less RAM on multi-hundred-million-token folds. Non-integer
+    input keeps the old behaviour (cast to int64).
+    """
+    arr = np.asarray(tokens)
+    if arr.dtype.kind not in "iu":
+        arr = arr.astype(np.int64)
+    return arr
 
 
 def _context_codes(tokens: np.ndarray, order: int, vocab_size: int,
@@ -87,13 +111,22 @@ class _SortedCounts:
         return cls(keys.astype(np.int64), vals.astype(np.int64))
 
     def lookup(self, queries: np.ndarray) -> np.ndarray:
-        """Counts for ``queries`` (0 where absent), vectorised."""
+        """Counts for ``queries`` (0 where absent), vectorised.
+
+        Chunked over ``_LOOKUP_CHUNK`` elements to cap peak temporaries
+        (see the constant's comment) — bit-identical to the unchunked
+        formulation since every element's lookup is independent.
+        """
         if self.keys.size == 0:
             return np.zeros(queries.size, dtype=np.int64)
-        idx = np.searchsorted(self.keys, queries)
-        idx_c = np.clip(idx, 0, self.keys.size - 1)
-        found = self.keys[idx_c] == queries
-        return np.where(found, self.vals[idx_c], 0)
+        out = np.empty(queries.size, dtype=np.int64)
+        for s in range(0, queries.size, _LOOKUP_CHUNK):
+            q = queries[s: s + _LOOKUP_CHUNK]
+            idx = np.searchsorted(self.keys, q)
+            idx_c = np.clip(idx, 0, self.keys.size - 1)
+            found = self.keys[idx_c] == q
+            out[s: s + _LOOKUP_CHUNK] = np.where(found, self.vals[idx_c], 0)
+        return out
 
 
 def _fit_order_counts(tokens: np.ndarray, order: int, vocab_size: int
@@ -124,7 +157,7 @@ class MarkovKT:
         self._ctx: _SortedCounts | None = None
 
     def fit(self, train_tokens: np.ndarray) -> "MarkovKT":
-        tokens = np.asarray(train_tokens, dtype=np.int64)
+        tokens = _as_token_array(train_tokens)
         _check_tokens(tokens, self.vocab_size)
         self._pair, self._ctx = _fit_order_counts(tokens, self.order, self.vocab_size)
         return self
@@ -138,7 +171,7 @@ class MarkovKT:
         """
         if self._pair is None or self._ctx is None:
             raise MarkovError("fit() before log_probs()")
-        tokens = np.asarray(tokens, dtype=np.int64)
+        tokens = _as_token_array(tokens)
         _check_tokens(tokens, self.vocab_size)
         n = tokens.size
         if n <= CE_WARMUP:
@@ -175,7 +208,7 @@ class InterpolatedMarkov:
         self._ctx: list[_SortedCounts] = []
 
     def fit(self, train_tokens: np.ndarray) -> "InterpolatedMarkov":
-        tokens = np.asarray(train_tokens, dtype=np.int64)
+        tokens = _as_token_array(train_tokens)
         _check_tokens(tokens, self.vocab_size)
         self._pair, self._ctx = [], []
         for k in range(self.max_order + 1):
@@ -184,11 +217,34 @@ class InterpolatedMarkov:
             self._ctx.append(c)
         return self
 
+    def fit_from_counts(
+        self,
+        pair: list[_SortedCounts],
+        ctx: list[_SortedCounts],
+    ) -> "InterpolatedMarkov":
+        """Adopt per-order count tables fitted elsewhere (SHARED, not copied).
+
+        Bit-identical to ``fit(tokens)`` iff the tables are the
+        ``_fit_order_counts(tokens, k, vocab_size)`` results for
+        k = 0..max_order on the same stream — ``fit`` computes exactly those
+        tables. Used by ``fit_all_baselines`` so the interpolated model
+        re-uses the fixed-order models' tables instead of holding a second,
+        duplicate copy (halves baseline RAM on multi-hundred-M-token folds).
+        """
+        if len(pair) != self.max_order + 1 or len(ctx) != self.max_order + 1:
+            raise MarkovError(
+                f"fit_from_counts needs {self.max_order + 1} pair/ctx tables, "
+                f"got {len(pair)}/{len(ctx)}"
+            )
+        self._pair = list(pair)
+        self._ctx = list(ctx)
+        return self
+
     def log_probs(self, tokens: np.ndarray) -> np.ndarray:
         """Natural-log probabilities for positions ``CE_WARMUP..n-1``."""
         if not self._pair:
             raise MarkovError("fit() before log_probs()")
-        tokens = np.asarray(tokens, dtype=np.int64)
+        tokens = _as_token_array(tokens)
         _check_tokens(tokens, self.vocab_size)
         n = tokens.size
         if n <= CE_WARMUP:
@@ -216,13 +272,23 @@ def fit_all_baselines(train_tokens: np.ndarray, vocab_size: int
     """Fit the full registered baseline family on ONE train fold.
 
     Returns {"kt_k0".."kt_k4", "interp_k4"} — all Markov with k <= 4.
+
+    Memory note: the interpolated model SHARES the fixed-order models'
+    count tables via ``fit_from_counts`` (bit-identical to an independent
+    ``fit`` on the same stream — see there) instead of re-fitting a
+    duplicate set, which would double the baseline arm's resident RAM.
     """
+    tokens = _as_token_array(train_tokens)
     models: dict[str, MarkovKT | InterpolatedMarkov] = {}
     for k in range(MAX_ORDER + 1):
-        models[f"kt_k{k}"] = MarkovKT(order=k, vocab_size=vocab_size).fit(train_tokens)
-    models[f"interp_k{MAX_ORDER}"] = InterpolatedMarkov(
-        max_order=MAX_ORDER, vocab_size=vocab_size,
-    ).fit(train_tokens)
+        models[f"kt_k{k}"] = MarkovKT(order=k, vocab_size=vocab_size).fit(tokens)
+    interp = InterpolatedMarkov(max_order=MAX_ORDER, vocab_size=vocab_size)
+    _check_tokens(tokens, vocab_size)  # same validation fit() would run
+    interp.fit_from_counts(
+        [models[f"kt_k{k}"]._pair for k in range(MAX_ORDER + 1)],
+        [models[f"kt_k{k}"]._ctx for k in range(MAX_ORDER + 1)],
+    )
+    models[f"interp_k{MAX_ORDER}"] = interp
     return models
 
 

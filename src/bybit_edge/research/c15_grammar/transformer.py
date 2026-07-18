@@ -145,6 +145,23 @@ if _TORCH_AVAILABLE:
             return self.head(self.ln_f(h))
 
 
+def release_device_memory(device: str) -> None:
+    """Best-effort release of torch's cached CUDA allocator memory.
+
+    Called by the driver after a fold's seed models have been dropped so
+    the ~200-surrogate evaluation of the NEXT fold does not sit on top of
+    stale cached GPU blocks (and their host-side bookkeeping). Safe no-op
+    without torch, without CUDA, or on CPU devices — never raises.
+    """
+    if not _TORCH_AVAILABLE:
+        return
+    try:
+        if str(device).startswith("cuda") and torch.cuda.is_available():
+            torch.cuda.empty_cache()
+    except Exception:  # pragma: no cover - defensive
+        pass
+
+
 def num_parameters(model: Any) -> int:
     """Trainable parameter count (0 without torch)."""
     if not _TORCH_AVAILABLE or model is None:
@@ -153,16 +170,22 @@ def num_parameters(model: Any) -> int:
 
 
 def _chunk_stream(tokens: np.ndarray, chunk_len: int) -> np.ndarray:
-    """Non-overlapping (chunk_len)-windows over a token stream (2-D int64).
+    """Non-overlapping (chunk_len)-windows over a token stream (2-D int).
 
     Chunks of length ``chunk_len`` with stride ``chunk_len - 1`` so every
     position (except the very first of each chunk) is a prediction target
     exactly once; the trailing remainder shorter than 2 is dropped.
+
+    Dtype: keeps a SIGNED integer input dtype (int16 storage for vocab
+    <= 256 — the -1 padding needs a signed type); anything else is held as
+    int64 as before. Token VALUES are unchanged either way; the torch side
+    casts to ``torch.long`` per batch.
     """
+    dtype = tokens.dtype if tokens.dtype.kind == "i" else np.int64
     n = tokens.size
     stride = chunk_len - 1
     if n < 2:
-        return np.zeros((0, chunk_len), dtype=np.int64)
+        return np.zeros((0, chunk_len), dtype=dtype)
     starts = list(range(0, max(1, n - 1), stride))
     rows = []
     for s in starts:
@@ -171,9 +194,9 @@ def _chunk_stream(tokens: np.ndarray, chunk_len: int) -> np.ndarray:
             continue
         rows.append(chunk)
     if not rows:
-        return np.zeros((0, chunk_len), dtype=np.int64)
+        return np.zeros((0, chunk_len), dtype=dtype)
     width = max(r.size for r in rows)
-    out = np.full((len(rows), width), -1, dtype=np.int64)
+    out = np.full((len(rows), width), -1, dtype=dtype)
     for i, r in enumerate(rows):
         out[i, : r.size] = r
     return out
@@ -195,7 +218,9 @@ def train_transformer(
     Raises ``ComputeUnavailableError`` without torch.
     """
     _require_torch()
-    tokens = np.asarray(train_tokens, dtype=np.int64)
+    tokens = np.asarray(train_tokens)
+    if tokens.dtype.kind != "i":
+        tokens = tokens.astype(np.int64)
     if tokens.size < cfg.context_len + 1:
         # short streams still trainable (single shorter chunk) — honest
         # degradation, flagged by the caller through n_train_tokens.
@@ -221,7 +246,8 @@ def train_transformer(
         ep_losses: list[float] = []
         for b0 in range(0, chunks.shape[0], cfg.batch_size):
             idx = order[b0: b0 + cfg.batch_size]
-            batch = torch.from_numpy(chunks[idx]).to(device)
+            # explicit long cast: chunks may be stored int16 (values exact)
+            batch = torch.from_numpy(chunks[idx]).to(device=device, dtype=torch.long)
             inp = batch[:, :-1].clamp_min(0)  # -1 padding -> token 0 input
             tgt = batch[:, 1:]                # -1 padding ignored by loss
             optim.zero_grad()
@@ -253,7 +279,9 @@ def evaluate_ce(
     within a chunk the causal mask guarantees position t sees only < t.
     """
     _require_torch()
-    tokens = np.asarray(tokens, dtype=np.int64)
+    tokens = np.asarray(tokens)
+    if tokens.dtype.kind != "i":
+        tokens = tokens.astype(np.int64)
     n = tokens.size
     if n <= CE_WARMUP:
         return float("nan")
@@ -268,7 +296,8 @@ def evaluate_ce(
     with torch.no_grad():
         for b0 in range(0, chunks.shape[0], eval_batch_size):
             batch_np = chunks[b0: b0 + eval_batch_size]
-            batch = torch.from_numpy(batch_np).to(device)
+            # explicit long cast: chunks may be stored int16 (values exact)
+            batch = torch.from_numpy(batch_np).to(device=device, dtype=torch.long)
             inp = batch[:, :-1].clamp_min(0)
             tgt = batch[:, 1:]
             logits = model(inp)
@@ -294,6 +323,7 @@ __all__ = [
     "GrammarTransformerConfig",
     "evaluate_ce",
     "num_parameters",
+    "release_device_memory",
     "torch_cuda_status",
     "train_transformer",
     "_TORCH_AVAILABLE",

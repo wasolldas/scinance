@@ -191,9 +191,14 @@ def hour_block_shuffle(
     the null therefore tests structure BEYOND short-range order, as
     registered. A group with <= block_len events has a single block and is
     left unchanged (degenerate case, exact identity).
+
+    Dtype: the surrogate keeps the INPUT token dtype (a pure permutation
+    never changes values, so int16 in -> int16 out is bit-identical in
+    content while avoiding a full int64 copy of a ~30M-token test stream
+    per surrogate — 200+ such copies per fold otherwise).
     """
-    tokens = np.asarray(tokens, dtype=np.int64)
-    hours = np.asarray(hours, dtype=np.int64)
+    tokens = np.asarray(tokens)
+    hours = np.asarray(hours)
     if tokens.shape != hours.shape:
         raise FoldError("tokens and hours must share shape")
     if block_len < 1:

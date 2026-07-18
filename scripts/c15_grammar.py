@@ -41,6 +41,7 @@ from bybit_edge.research.c15_grammar.driver import (  # noqa: E402
     DEFAULT_SEEDS,
     DEFAULT_SYMBOLS,
     DataError,
+    count_trade_events,
     daily_grid,
     load_trade_events,
     render_markdown,
@@ -167,10 +168,26 @@ def main(argv: list[str] | None = None) -> int:
               f"or --check-gpu-only.", file=sys.stderr, flush=True)
         return 1
 
+    # Fail-fast pre-pass (cheap): COUNT usable events per symbol via DuckDB
+    # count(*) — no array materialisation, no transfer of hundreds of
+    # millions of rows into Python. Every DataError/MIN_EVENTS floor
+    # violation for ANY symbol still surfaces BEFORE the first expensive
+    # training starts (unchanged fail-fast contract). The actual arrays are
+    # then loaded LAZILY inside run(), one symbol at a time, and freed after
+    # each symbol completes — peak event-RAM is O(one symbol), not O(panel)
+    # (the previous upfront dict kept all ~5 symbols resident for the whole
+    # multi-hour run and was the main driver of the T3 OOM).
+    def _make_loader(sym: str):
+        def _load():
+            return load_trade_events(
+                base, sym, days, max_events_per_day=args.max_events_per_day,
+            )
+        return _load
+
     symbol_events = {}
     for symbol in symbols:
         try:
-            symbol_events[symbol] = load_trade_events(
+            n_usable = count_trade_events(
                 base, symbol, days,
                 max_events_per_day=args.max_events_per_day,
             )
@@ -178,11 +195,15 @@ def main(argv: list[str] | None = None) -> int:
             print(f"[c15_grammar] FATAL: {symbol} not loadable: {exc}",
                   file=sys.stderr, flush=True)
             return 1
-        if symbol_events[symbol].n_events < MIN_EVENTS_PER_SYMBOL:
+        print(f"[c15_grammar] {symbol}: {n_usable} usable events "
+              f"(pre-count, lazy load at training time)",
+              file=sys.stderr, flush=True)
+        if n_usable < MIN_EVENTS_PER_SYMBOL:
             print(f"[c15_grammar] FATAL: {symbol} has only "
-                  f"{symbol_events[symbol].n_events} events "
+                  f"{n_usable} events "
                   f"(< floor {MIN_EVENTS_PER_SYMBOL})", file=sys.stderr, flush=True)
             return 1
+        symbol_events[symbol] = _make_loader(symbol)
 
     cfg = GrammarTransformerConfig(
         vocab_size=256 if args.use_tick_direction else 128,
