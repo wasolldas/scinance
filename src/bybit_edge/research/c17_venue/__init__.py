@@ -27,6 +27,7 @@ from .features import (  # noqa: F401
     DataError,
     NodeWindows,
     build_node_windows,
+    build_node_windows_lazy,
     load_panel,
 )
 from .redundancy import redundancy_gate  # noqa: F401

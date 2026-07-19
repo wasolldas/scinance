@@ -750,3 +750,247 @@ def test_end_to_end_cli_produces_valid_json(tmp_path: Path) -> None:
     blob = json.dumps(payload).lower()
     for tok in ("bps", "pnl", "sharpe", "friction", "edge_"):
         assert tok not in blob
+
+
+# ---------------------------------------------------------------------------
+# (h) OOM-fix regression tests (build_node_windows boundary scan, lazy
+#     loaders + raw-trade release, dtype downcasts) — the memory rewrite
+#     must be BIT-IDENTICAL to the previous implementation, verified against
+#     an inline legacy reference (the pre-fix code, reproduced verbatim).
+# ---------------------------------------------------------------------------
+
+import gc
+import weakref
+
+from bybit_edge.research.c17_venue.features import (
+    MIN_EVENTS_PER_WINDOW,
+    MS_PER_DAY,
+    MS_PER_MINUTE,
+    SEQ_LEN,
+    WINDOW_MINUTES,
+    build_node_windows_lazy,
+    extract_raw_channels,
+    load_panel,
+    per_day_quantile_normalize,
+    quantile_normalize,
+    tick_direction,
+)
+
+
+def _legacy_tick_direction(price: np.ndarray) -> np.ndarray:
+    """Pre-fix per-event Python-loop tick rule (verbatim old code)."""
+    p = np.asarray(price, dtype=np.float64)
+    n = p.size
+    out = np.zeros(n, dtype=np.float64)
+    last = 0.0
+    for i in range(1, n):
+        d = p[i] - p[i - 1]
+        if d > 0:
+            last = 1.0
+        elif d < 0:
+            last = -1.0
+        out[i] = last
+    return out
+
+
+def _legacy_extract_raw_channels(ts_ms, price, size, sign):
+    """Pre-fix extract (np.diff check, column_stack, int64 day_index)."""
+    ts_ms = np.asarray(ts_ms, dtype=np.int64)
+    price = np.asarray(price, dtype=np.float64)
+    size = np.asarray(size, dtype=np.float64)
+    sign = np.asarray(sign, dtype=np.float64)
+    if np.any(np.diff(ts_ms) < 0):
+        order = np.argsort(ts_ms, kind="mergesort")
+        ts_ms, price, size, sign = ts_ms[order], price[order], size[order], sign[order]
+    dur = np.diff(ts_ms).astype(np.float64)
+    tick = _legacy_tick_direction(price)[1:]
+    log_size = np.log(np.maximum(size[1:], 1e-12))
+    agg = sign[1:]
+    channels = np.column_stack([dur, log_size, agg, tick])
+    ts_kept = ts_ms[1:]
+    day_index = (ts_kept // MS_PER_DAY).astype(np.int64)
+    return ts_kept, channels, day_index
+
+
+def _legacy_per_day_quantile_normalize(channels, day_index):
+    """Pre-fix copy-based per-day boolean-mask normalisation (verbatim)."""
+    ch = np.asarray(channels, dtype=np.float64)
+    day_index = np.asarray(day_index)
+    out = np.empty_like(ch)
+    for day in np.unique(day_index):
+        sel = day_index == day
+        for c in range(ch.shape[1]):
+            out[sel, c] = quantile_normalize(ch[sel, c])
+    return out
+
+
+def _legacy_build_node_windows(ts_ms, price, size, sign, *, exchange, symbol,
+                                seq_len=SEQ_LEN, min_events=MIN_EVENTS_PER_WINDOW,
+                                window_minutes=WINDOW_MINUTES, normalize=True):
+    """Pre-fix build_node_windows: np.unique(return_index) bucketing."""
+    ts_kept, raw, day_index = _legacy_extract_raw_channels(ts_ms, price, size, sign)
+    norm = _legacy_per_day_quantile_normalize(raw, day_index) if normalize else raw
+    bucket = ts_kept // (window_minutes * MS_PER_MINUTE)
+    xs, masks, dates, counts = [], [], [], []
+    uniq, starts = np.unique(bucket, return_index=True)
+    order = np.argsort(starts)
+    uniq, starts = uniq[order], starts[order]
+    ends = np.append(starts[1:], bucket.size)
+    for _b, s, e in zip(uniq, starts, ends):
+        n_ev = int(e - s)
+        if n_ev < min_events:
+            continue
+        take = min(n_ev, seq_len)
+        w = np.zeros((N_CHANNELS, seq_len), dtype=np.float32)
+        m = np.zeros(seq_len, dtype=bool)
+        w[:, :take] = norm[s:s + take, :].T
+        m[:take] = True
+        xs.append(w)
+        masks.append(m)
+        from datetime import datetime, timezone
+        dates.append((datetime(1970, 1, 1, tzinfo=timezone.utc)
+                      + timedelta(days=int(day_index[s]))).strftime("%Y-%m-%d"))
+        counts.append(take)
+    assert xs, "legacy reference: no window built (test setup broken)"
+    return NodeWindows(exchange=exchange, symbol=symbol, x=np.stack(xs),
+                       mask=np.stack(masks), dates=np.array(dates, dtype=object),
+                       n_events=np.array(counts, dtype=np.int64))
+
+
+def _multiday_trades_with_ties(seed: int, n: int = 30_000):
+    """Multi-day stream with tied timestamps, price plateaus, tied sizes,
+    >5-min gaps (empty buckets) and sparse buckets (< min_events)."""
+    rng = np.random.default_rng(seed)
+    from datetime import datetime, timezone
+    start_ms = int(datetime(2026, 3, 1, tzinfo=timezone.utc).timestamp() * 1000)
+    gaps = rng.choice(
+        np.array([0, 1, 5, 40, 900, 65_000, 400_000], dtype=np.int64),
+        size=n, p=[0.15, 0.25, 0.25, 0.2, 0.12, 0.02, 0.01])
+    ts = start_ms + np.cumsum(gaps)
+    price = np.round(
+        100.0 + np.cumsum(rng.choice([-0.01, 0.0, 0.01], size=n, p=[0.3, 0.4, 0.3])), 2)
+    size = np.maximum(np.round(rng.lognormal(0.0, 0.5, size=n), 2), 0.01)
+    sign = rng.choice(np.array([1.0, -1.0]), size=n)
+    return ts, price, size, sign
+
+
+def test_build_node_windows_bitidentical_to_legacy_reference() -> None:
+    """OOM-fix regression (a): the boundary-scan windowing + in-place
+    normalisation + int32 day_index + vectorized tick + column-wise channel
+    fill must reproduce the pre-fix ``np.unique(return_index)`` pipeline
+    BIT-identically — on chronologically sorted AND unsorted inputs, with
+    and without the per-day quantile normalisation."""
+    ts, price, size, sign = _multiday_trades_with_ties(seed=42)
+    rng = np.random.default_rng(7)
+    perm = rng.permutation(ts.size)
+    variants = {
+        "sorted": (ts, price, size, sign),
+        "unsorted": (ts[perm], price[perm], size[perm], sign[perm]),
+    }
+    kw = dict(exchange="bybit", symbol="BTCUSDT", min_events=16)
+    for name, arrs in variants.items():
+        for normalize in (True, False):
+            ref = _legacy_build_node_windows(*arrs, normalize=normalize, **kw)
+            new = build_node_windows(*arrs, normalize=normalize, **kw)
+            lazy = build_node_windows_lazy(
+                lambda arrs=arrs: tuple(a.copy() for a in arrs),
+                normalize=normalize, **kw)
+            for got, label in ((new, "build_node_windows"),
+                               (lazy, "build_node_windows_lazy")):
+                ctx = f"{label}/{name}/normalize={normalize}"
+                assert got.x.dtype == ref.x.dtype == np.float32, ctx
+                assert np.array_equal(ref.x, got.x), ctx
+                assert np.array_equal(ref.mask, got.mask), ctx
+                assert ref.dates.tolist() == got.dates.tolist(), ctx
+                assert np.array_equal(ref.n_events, got.n_events), ctx
+    # the fixture must actually exercise the interesting structure:
+    ref = _legacy_build_node_windows(ts, price, size, sign, **kw)
+    assert len(set(ref.dates.tolist())) >= 2, "fixture spans too few days"
+    assert ref.x.shape[0] >= 5, "fixture yields too few windows"
+
+
+def test_load_panel_lazy_loader_called_once_and_raw_trades_freed() -> None:
+    """OOM-fix regression (b): ``load_panel`` pulls each node's raw trades
+    through its loader EXACTLY once, and the four raw arrays of a node are
+    garbage-collected once the node's windows are built — verified via a
+    spy loader that asserts (weakref) all PREVIOUS nodes' raw arrays are
+    already dead before it materialises the next node's."""
+    calls: dict[tuple[str, str], int] = {}
+    refs: dict[tuple[str, str], list] = {}
+    node_seed = {}
+
+    def spy_loader(exchange: str, symbol: str):
+        key = (exchange, symbol)
+        calls[key] = calls.get(key, 0) + 1
+        gc.collect()
+        for k, wl in refs.items():
+            assert all(w() is None for w in wl), (
+                f"raw trade arrays of node {k} still resident while "
+                f"loading node {key} — O(one node) property violated")
+        node_seed[key] = len(node_seed)
+        rng = np.random.default_rng(1000 + node_seed[key])
+        ts, price, size, sign = _synthetic_node_trades(
+            rng, n_events=3000, duration_scale_ms=300.0)
+        refs[key] = [weakref.ref(a) for a in (ts, price, size, sign)]
+        return ts, price, size, sign
+
+    symbols = ("AAAUSDT", "BBBUSDT")
+    venues = ("bybit", "binance")
+    nodes = load_panel("unused-base", symbols, "2026-01-01", "2026-01-01",
+                       exchanges=venues, min_events=16, trade_loader=spy_loader)
+    assert len(nodes) == len(symbols) * len(venues)
+    expected_keys = {(v, s) for v in venues for s in symbols}
+    assert set(calls) == expected_keys
+    assert all(c == 1 for c in calls.values()), f"loader re-called: {calls}"
+    gc.collect()
+    for k, wl in refs.items():
+        assert all(w() is None for w in wl), (
+            f"raw trade arrays of node {k} still alive after load_panel")
+
+
+def test_day_index_int32_downcast_exact_and_public_normalize_unchanged() -> None:
+    """OOM-fix regression (c): the only dtype change of the rewrite is
+    ``day_index`` int64 -> int32; its VALUES are exact (epoch-day ids), and
+    the final float32 window features stay bit-identical (asserted in the
+    legacy-reference test above). The public ``per_day_quantile_normalize``
+    keeps its copy semantics (input never mutated) and matches the pre-fix
+    mask-based reference on sorted AND unsorted day ids bit-exactly —
+    channel values deliberately remain float64 through the rank transform
+    (float32 could merge ties / change ranks, i.e. touch the registered
+    statistic)."""
+    rng = np.random.default_rng(11)
+    ts, price, size, sign = _synthetic_node_trades(
+        rng, n_events=4000, duration_scale_ms=60_000.0)  # spans several days
+    ts_kept, ch, day_index = extract_raw_channels(ts, price, size, sign)
+    assert day_index.dtype == np.int32
+    assert np.array_equal(day_index.astype(np.int64), ts_kept // MS_PER_DAY)
+    assert np.unique(day_index).size >= 2, "fixture spans too few days"
+    assert ch.dtype == np.float64  # rank inputs stay f64 (registered stat)
+
+    ch_before = ch.copy()
+    out = per_day_quantile_normalize(ch, day_index)
+    assert np.array_equal(ch, ch_before), "public API must not mutate input"
+    ref = _legacy_per_day_quantile_normalize(ch, day_index)
+    assert np.array_equal(out, ref)
+
+    perm = rng.permutation(ch.shape[0])  # unsorted day ids -> fallback path
+    out_u = per_day_quantile_normalize(ch[perm], day_index[perm])
+    ref_u = _legacy_per_day_quantile_normalize(ch[perm], day_index[perm])
+    assert np.array_equal(out_u, ref_u)
+
+
+def test_tick_direction_vectorized_matches_loop_reference() -> None:
+    """OOM/CPU-fix regression: the vectorized tick rule (int8 signs +
+    forward-fill via maximum.accumulate) is bit-identical to the original
+    per-event Python loop, including leading plateaus and zero-tick carry."""
+    rng = np.random.default_rng(5)
+    p = 100.0 + np.cumsum(rng.choice([-0.5, 0.0, 0.0, 0.5], size=4000))
+    p[:7] = p[0]                      # leading flat run -> zeros, then carry
+    got = tick_direction(p)
+    ref = _legacy_tick_direction(p)
+    assert got.dtype == np.float64
+    assert np.array_equal(ref, got)
+    assert np.all(got[:8] == 0.0) or got[7] != 0.0  # leading zeros preserved
+    # degenerate sizes
+    assert np.array_equal(tick_direction(np.array([5.0])), np.zeros(1))
+    assert tick_direction(np.empty(0)).size == 0
