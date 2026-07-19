@@ -57,6 +57,24 @@ param(
 )
 $ErrorActionPreference = 'Continue'
 
+# ------------------------------------------------------------------------
+# CONCURRENCY-SCHUTZ: Am 2026-07-18 liefen drei run_wave5-Instanzen
+# gleichzeitig (12:51 Voll-Lauf + 13:11 -Only h16 + 13:14 -Only h15,h14)
+# und haben sich gegenseitig RAM/GPU weggenommen — zwei OOMs und ein
+# 8h-Timeout waren die direkte Folge. Ein benannter System-Mutex laesst
+# nur EINE Instanz zu; eine zweite bricht sofort laut ab. Der Mutex wird
+# vom OS freigegeben, wenn der Prozess endet (auch bei Fenster-Schliessen
+# oder Absturz) — kein stale-Lock-Risiko wie bei Lock-Dateien.
+# ------------------------------------------------------------------------
+$WaveMutex = New-Object System.Threading.Mutex($false, 'Local\scinance_run_wave5')
+if (-not $WaveMutex.WaitOne(0)) {
+    Write-Host ("FEHLER: Eine andere run_wave5.ps1-Instanz laeuft bereits auf dieser " +
+                "Maschine. Parallele Instanzen konkurrieren um GPU/RAM und haben am " +
+                "2026-07-18 OOMs verursacht. Erst die laufende Instanz beenden " +
+                "(oder auslaufen lassen), dann neu starten.") -ForegroundColor Red
+    exit 1
+}
+
 $ScriptDir = $PSScriptRoot
 Set-Location $ScriptDir
 
@@ -188,4 +206,6 @@ Log-Line ("WAVE5 ENDE | Summary: " + $SummaryPath)
 
 $exit = 0
 if ($AnyFail) { $exit = 1 } elseif ($AnySkip) { $exit = 2 }
+$WaveMutex.ReleaseMutex()
+$WaveMutex.Dispose()
 exit $exit
