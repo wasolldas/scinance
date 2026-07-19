@@ -18,12 +18,23 @@ volatility-asymmetry ablation on |imbalance| (report-only).
                                 [--ablation-seeds 3] [--seed 42]
                                 [--start-date 2026-03-27] [--end-date ...]
                                 [--max-days N] [--out-dir DIR]
+                                [--ckpt-dir DIR] [--no-ckpt]
 
 Exit codes: 0 = OK (full run written, gate-neutral payload — gate-auditor
 adjudicates), 2 = SKIP (compute gate failed: no torch / no CUDA and
 --allow-cpu not passed — a full run may NEVER be verdict-bearing on CPU),
 1 = error. ``--check-gpu-only`` performs ONLY the honest compute report (no
 data access, no training) and writes ``c16_gpu_check.json``.
+
+Checkpoint/resume (default ON — the full plan is ~125-145 trainings /
+~45-55 GPU-h and realistically NEVER survives one uninterrupted
+invocation): every completed single training is immediately persisted to
+``--ckpt-dir`` (default ``<out-dir>/c16_arrow_ckpt``; the runner passes a
+STABLE, non-timestamped directory) and re-running with the SAME --ckpt-dir
+resumes — an interrupt loses at most the training in flight. Checkpoints
+are fingerprinted over all result-relevant parameters; a mismatch aborts
+hard (rc 1) instead of silently mixing stale results. ``--no-ckpt`` opts
+out (then ANY interrupt loses everything — smoke runs only).
 
 DIFFERENTIATION (registry-mandated): this is NOT a duplicate of the locked
 information-theory / nonlinear-dynamics cluster — see
@@ -100,15 +111,27 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--max-days", type=int, default=None,
                    help="SMOKE ONLY: cap valid days per symbol (forces verdict_bearing=False).")
     p.add_argument("--out-dir", default=".", help="Output directory for results.")
+    p.add_argument("--ckpt-dir", default=None,
+                   help="Checkpoint directory for resume (default: <out-dir>/c16_arrow_ckpt). "
+                        "Keep STABLE across restarts — same path = resume; a different "
+                        "configuration under the same path aborts hard (fingerprint check).")
+    p.add_argument("--no-ckpt", action="store_true",
+                   help="Disable checkpoint/resume (any interrupt then loses ALL progress "
+                        "of the ~45-55h plan — smoke runs only).")
     args = p.parse_args(argv)
 
     symbols = tuple(s.strip().upper() for s in args.symbols.split(",") if s.strip())
     base = Path(args.base_dir)
     out_dir = Path(args.out_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
+    if args.no_ckpt:
+        ckpt_dir = None
+    else:
+        ckpt_dir = Path(args.ckpt_dir) if args.ckpt_dir else out_dir / "c16_arrow_ckpt"
     print(f"[c16] base-dir={base.resolve()} symbols={list(symbols)} "
           f"check_gpu_only={args.check_gpu_only} allow_cpu={args.allow_cpu} "
-          f"n_seeds={args.n_seeds} n_surrogates={args.n_surrogates} seed={args.seed}",
+          f"n_seeds={args.n_seeds} n_surrogates={args.n_surrogates} seed={args.seed} "
+          f"ckpt_dir={ckpt_dir if ckpt_dir is not None else 'DISABLED (--no-ckpt)'}",
           file=sys.stderr, flush=True)
 
     if args.check_gpu_only:
@@ -147,7 +170,7 @@ def main(argv: list[str] | None = None) -> int:
             ablation_seeds=args.ablation_seeds, seed=args.seed,
             device=device, allow_cpu=args.allow_cpu,
             epochs=args.epochs, batch_size=args.batch_size, lr=args.lr,
-            max_days=args.max_days, source=source,
+            max_days=args.max_days, source=source, ckpt_dir=ckpt_dir,
         )
     except ComputeError as exc:
         print(f"[c16] SKIP (ComputeError): {exc}", file=sys.stderr, flush=True)

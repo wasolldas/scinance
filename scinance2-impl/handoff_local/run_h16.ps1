@@ -17,20 +17,49 @@
 # (Zeit-Irreversibilitaet statt Komplexitaet), exakte Bayes-Null statt
 # geschaetztem Schwellenwert.
 #
-# Ablauf: (1) H16_GPU_CHECK via --check-gpu-only (rc 2 = kein CUDA -> SKIP,
-# der volle Lauf startet dann NICHT), (2) nur bei rc 0: H16_ARROW voller Lauf
-# (5 Symbole, 5 Seeds Haupt-C2ST + 20 IAAFT-Surrogat-Retrainings + 3
-# Ablations-Seeds je Symbol, F-ARROW BH-FDR a=0.10). Gate-neutral - der
-# gate-auditor urteilt gegen H-16; eine Leak-Kontrolle > 0.52 markiert das
-# Modul selbst als METHOD_INVALID_NO_VERDICT (eigener Zustand, KEIN DROP).
+# **EXTREME LAUFZEIT (~125-145 volle Trainings a ~20-25 min, ~45-55 GPU-h
+# auf der RTX-Karte) - DIESER RUNNER IST RESUME-FAEHIG / EINFACH ERNEUT
+# STARTEN.** Jedes abgeschlossene Einzeltraining (Symbol x {seed, surrogate,
+# ablation} x Index) schreibt SOFORT einen eigenen Checkpoint (atomic write)
+# nach einem STABILEN, NICHT zeitgestempelten Verzeichnis
+# (results\h16_checkpoints\<Symbol>\). Ein Windows-Neustart, ein TIMEOUT
+# dieses Runners oder ein geschlossenes Fenster verliert HOECHSTENS das
+# gerade laufende einzelne Training (~20-25 min) - nicht den restlichen
+# Fortschritt. EINFACH DIESES SKRIPT ERNEUT STARTEN: es laedt automatisch
+# alle bereits abgeschlossenen Trainings aus results\h16_checkpoints\ und
+# trainiert nur die fehlenden weiter. Der volle Lauf braucht typischerweise
+# MEHRERE Aufrufe ueber mehrere Naechte (Default-Budget pro Aufruf s.u.) -
+# das ist der VORGESEHENE Betriebsmodus, kein Fehler. Die Checkpoints sind
+# gegen die Lauf-Parameter gefingerprintet: ein Parameterwechsel (anderes
+# Datenfenster/Seed/Device/...) unter demselben Checkpoint-Pfad bricht HART
+# ab statt stillschweigend stale Ergebnisse zu mischen.
 #
-# Exit-Code: 0 = OK * 1 = FAIL * 2 = SKIP (kein CUDA-Device gefunden).
+# Ablauf: (1) H16_GPU_CHECK via --check-gpu-only (rc 2 = kein CUDA -> SKIP,
+# der volle Lauf startet dann NICHT), (2) nur bei rc 0: H16_ARROW voller
+# (Teil-)Lauf innerhalb des Zeitbudgets dieses Aufrufs (5 Symbole, 5 Seeds
+# Haupt-C2ST + 20 IAAFT-Surrogat-Retrainings + 3 Ablations-Seeds je Symbol,
+# F-ARROW BH-FDR a=0.10); schreibt c16_arrow_results.{json,md} NUR wenn ALLE
+# Trainings fertig sind (sonst TIMEOUT/FAIL bei diesem Aufruf, aber der
+# Fortschritt bleibt in results\h16_checkpoints\ erhalten -> naechster
+# Aufruf macht weiter). Gate-neutral - der gate-auditor urteilt gegen H-16;
+# eine Leak-Kontrolle > 0.52 markiert das Modul selbst als
+# METHOD_INVALID_NO_VERDICT (eigener Zustand, KEIN DROP).
+#
+# Exit-Code: 0 = OK (voller Lauf komplett, Ergebnis-JSON geschrieben) *
+#            1 = FAIL (inkl. TIMEOUT dieses Aufrufs bei unvollstaendigem
+#                Plan - KEIN Datenverlust, einfach erneut starten) *
+#            2 = SKIP (kein CUDA-Device gefunden).
 # Ergebnisse: scinance2-impl\handoff_local\results\h16_<timestamp>\
-#             + SUMMARY_<datum>.md.
+#             + SUMMARY_<datum>.md. Checkpoints (STABIL, ueberlebt Neustarts):
+#             scinance2-impl\handoff_local\results\h16_checkpoints\<Symbol>\*.json
 #
 # Optionale Env-Overrides: HARVEST_DIR, HANDOFF_DRY_RUN=1 (+HANDOFF_DRY_RC),
-# H16_END_DATE (Cutoff, default = gestern UTC), H16_N_SEEDS, H16_N_SURROGATES,
-# H16_ABLATION_SEEDS, H16_TIMEOUT_SEC (Default 8h Budget).
+# H16_END_DATE (Cutoff, default = gestern UTC; NICHT zwischen Aufrufen
+# desselben Laufs aendern - der Checkpoint-Fingerprint bricht sonst hart ab),
+# H16_N_SEEDS, H16_N_SURROGATES, H16_ABLATION_SEEDS, H16_TIMEOUT_SEC
+# (Default 28800 = 8h Budget PRO AUFRUF - der Gesamtlauf braucht mehrere
+# Aufrufe, s.o.), H16_CKPT_DIR (Default results\h16_checkpoints, NICHT
+# aendern zwischen Aufrufen desselben Laufs - sonst kein Resume!).
 # PS 5.1-kompatibel (handle-cache + BelowNormal + ASCII-Body).
 # ========================================================================
 $ErrorActionPreference = 'Continue'
@@ -41,13 +70,31 @@ $HarvestDir = if ($env:HARVEST_DIR) { $env:HARVEST_DIR } else { Join-Path $RepoR
 
 $Symbols   = 'BTCUSDT,ETHUSDT,SOLUSDT,BNBUSDT,XRPUSDT'
 $StartDate = '2026-03-27'
-$EndDate   = if ($env:H16_END_DATE) { $env:H16_END_DATE } else { (Get-Date).ToUniversalTime().AddDays(-1).ToString('yyyy-MM-dd') }
 $Seed      = 42
 $NSeeds       = if ($env:H16_N_SEEDS) { [int]$env:H16_N_SEEDS } else { 5 }
 $NSurrogates  = if ($env:H16_N_SURROGATES) { [int]$env:H16_N_SURROGATES } else { 20 }
 $AblationSeeds = if ($env:H16_ABLATION_SEEDS) { [int]$env:H16_ABLATION_SEEDS } else { 3 }
 $TmoGpuCheck = 120
-$TmoFull   = if ($env:H16_TIMEOUT_SEC) { [int]$env:H16_TIMEOUT_SEC } else { 28800 }  # 8h Default
+$TmoFull   = if ($env:H16_TIMEOUT_SEC) { [int]$env:H16_TIMEOUT_SEC } else { 28800 }  # 8h Budget PRO AUFRUF (Resume, s. Kopf)
+$CkptDir = if ($env:H16_CKPT_DIR) { $env:H16_CKPT_DIR } else { Join-Path $ScriptDir 'results\h16_checkpoints' }
+New-Item -ItemType Directory -Force -Path $CkptDir | Out-Null
+
+# Cutoff (End-Datum) PINNEN: Default ist "gestern UTC", aber ein Resume-Lauf
+# ueber mehrere Naechte MUSS dasselbe registrierte Datenfenster behalten -
+# sonst bricht der Checkpoint-Fingerprint (absichtlich) hart ab. Der beim
+# ERSTEN Aufruf benutzte Cutoff wird deshalb neben den Checkpoints
+# festgeschrieben und bei jedem weiteren Aufruf wiederverwendet
+# (H16_END_DATE-Env uebersteuert; dann bei geaenderten Werten Checkpoints
+# loeschen oder H16_CKPT_DIR wechseln).
+$EndDatePin = Join-Path $CkptDir 'H16_END_DATE.pin'
+if ($env:H16_END_DATE) {
+    $EndDate = $env:H16_END_DATE
+} elseif (Test-Path $EndDatePin) {
+    $EndDate = (Get-Content -Path $EndDatePin -TotalCount 1).Trim()
+} else {
+    $EndDate = (Get-Date).ToUniversalTime().AddDays(-1).ToString('yyyy-MM-dd')
+}
+Set-Content -Path $EndDatePin -Value $EndDate
 
 $PythonExe = if ($env:PYTHON) { $env:PYTHON } else { 'python' }
 $SrcPath = Join-Path $RepoRoot 'src'
@@ -76,7 +123,11 @@ function Record-Step {
 
 function Invoke-Step {
     param([string]$Name, [int]$TimeoutSec, [string[]]$CmdArgs, [string]$SkipDetail)
-    # rc 2 des CLI = kein Compute-Gate -> Status SKIP (kein FAIL).
+    # rc 2 des CLI = kein Compute-Gate -> Status SKIP (kein FAIL). Ein
+    # TIMEOUT bei H16_ARROW (unvollstaendiger ~125-145-Trainings-Plan) ist
+    # NORMAL - Checkpoints in $CkptDir bleiben erhalten (je Einzeltraining
+    # atomar geschrieben), verloren geht hoechstens das gerade laufende
+    # Training; naechster Aufruf resumed automatisch (s. Kopf-Kommentar).
     $log = Join-Path $RunDir ($Name + '.log')
     $errLog = Join-Path $RunDir ($Name + '.err.log')
     Write-Host ("[" + (Get-Date -Format 'HH:mm:ss') + "] START " + $Name + ": " + $PythonExe + " " + ($CmdArgs -join ' '))
@@ -100,7 +151,7 @@ function Invoke-Step {
             if (-not $p.WaitForExit($TimeoutSec * 1000)) {
                 try { $p.Kill() } catch { }
                 $rc = 124
-                $detail = "TIMEOUT nach $TimeoutSec s"
+                $detail = "TIMEOUT nach $TimeoutSec s (Plan unvollstaendig - Checkpoints erhalten, naechster Aufruf resumed)"
             } else {
                 $rc = $p.ExitCode
                 if ($null -eq $rc) { $rc = -2; $detail = 'ExitCode war null (Handle-Quirk) - Log pruefen' }
@@ -121,9 +172,11 @@ function Invoke-Step {
 }
 
 Write-Host ("RUN_H16 (T3) - Repo: " + $RepoRoot + " - Ergebnisse: " + $RunDir)
-Write-Host ("Harvest: " + $HarvestDir + " | Symbole: " + $Symbols + " | Fenster: " + $StartDate + ".." + $EndDate)
+Write-Host ("Harvest: " + $HarvestDir + " | Symbole: " + $Symbols + " | Fenster: " + $StartDate + ".." + $EndDate + " (Cutoff gepinnt in " + $EndDatePin + ")")
 Write-Host ("Seeds=" + $NSeeds + " Surrogate=" + $NSurrogates + " Ablation=" + $AblationSeeds + " Seed=" + $Seed)
+Write-Host ("Checkpoints (STABIL ueber Neustarts): " + $CkptDir)
 Write-Host ("H-16 ist GPU ZWINGEND: erst ehrlicher Compute-Check, dann (nur bei echtem CUDA) voller Lauf.")
+Write-Host ("RESUME-FAEHIG: bereits abgeschlossene Einzeltrainings werden uebersprungen - einfach erneut starten (s. Kopf-Kommentar).")
 if ($DryRun) { Write-Host "ACHTUNG: HANDOFF_DRY_RUN aktiv - keine echten Laeufe." }
 
 $SkipMsg = 'H-16 SKIP - kein verdikt-taugliches CUDA-Device gefunden (torch/CUDA-Check negativ)'
@@ -152,6 +205,7 @@ if (-not $HarvestOk) {
             '--n-seeds', "$NSeeds", '--n-surrogates', "$NSurrogates",
             '--ablation-seeds', "$AblationSeeds", '--seed', "$Seed",
             '--device', 'cuda',
+            '--ckpt-dir', $CkptDir,
             '--out-dir', (Join-Path $RunDir 'h16')
         ))
     } elseif ($rcGpu -eq 2) {
@@ -173,10 +227,12 @@ $sb = New-Object System.Text.StringBuilder
 [void]$sb.AppendLine("- **Erzeugt:** " + (Get-Date).ToUniversalTime().ToString('yyyy-MM-dd HH:mm:ss') + " UTC")
 [void]$sb.AppendLine("- **Run-Dir:** ``" + $RunDir + "``")
 [void]$sb.AppendLine("- **Harvest:** ``" + $HarvestDir + "`` (read-only) | Symbole: " + $Symbols)
-[void]$sb.AppendLine("- **Fenster:** " + $StartDate + ".." + $EndDate + " | Held-out-Day-Split (letzte 20% valide Tage)")
+[void]$sb.AppendLine("- **Checkpoints (STABIL, ueberlebt Neustarts):** ``" + $CkptDir + "``")
+[void]$sb.AppendLine("- **Fenster:** " + $StartDate + ".." + $EndDate + " (Cutoff gepinnt in ``" + $EndDatePin + "``) | Held-out-Day-Split (letzte 20% valide Tage)")
 [void]$sb.AppendLine("- **Methodik (vorregistriert):** Morlet-CWT-Log-Power-Scalogram (64 Skalen 2s-256s x 512 Zeit-Bins, Stride 64s), ResNet-18, Reversal auf Roh-Serie VOR CWT, " + $NSeeds + " Seeds, " + $NSurrogates + " IAAFT-Surrogat-Retrainings (Pflicht-Leak-Kontrolle <=0.52), " + $AblationSeeds + " Ablations-Seeds auf |Imbalance| (Pflicht-Report, nicht urteilstragend), Seed " + $Seed + " | F-ARROW BH-FDR a=0.10")
 [void]$sb.AppendLine("- **KAPITALFREI** - reine Struktur-/Existenzfrage, KEINE Kosten-/Ertragsrechnung.")
 [void]$sb.AppendLine("- **DIFFERENZIERUNG (Registry-Pflicht):** KEIN Duplikat des gesperrten Informationstheorie-/Nichtlineare-Dynamik-Clusters (PE/TE/RQA/MFDFA/TDA) - kein Entropie-Schaetzer, gemessene Eigenschaft ist Zeit-Irreversibilitaet statt Komplexitaet/Vorhersagbarkeit, exakte Bayes-Null AUC=0.5 statt geschaetztem Schwellenwert.")
+[void]$sb.AppendLine("- **RESUME-FAEHIG:** ~125-145 Trainings, ~45-55 GPU-h total - dieser Runner braucht typischerweise MEHRERE Aufrufe ueber mehrere Naechte; jeder Aufruf setzt aus den Checkpoints in ``" + $CkptDir + "`` fort (je Einzeltraining atomar geschrieben). Ein TIMEOUT/FAIL bei unvollstaendigem Plan ist NORMAL, kein Datenverlust - ein Abbruch kostet hoechstens das gerade laufende Einzeltraining (~20-25 min).")
 [void]$sb.AppendLine("")
 [void]$sb.AppendLine("## Schritte")
 [void]$sb.AppendLine("")
@@ -190,6 +246,13 @@ foreach ($r in $Script:Results) {
 [void]$sb.AppendLine("")
 if ($exit -eq 2) {
     [void]$sb.AppendLine("*SKIP: " + $SkipMsg + ". Ein voller Lauf ohne echtes CUDA-Device ist NIEMALS verdikt-tragend (Registry H-16) und wurde deshalb NICHT gestartet.*")
+} elseif ($exit -eq 1) {
+    [void]$sb.AppendLine("*FAIL/TIMEOUT bei diesem Aufruf. Pruefe ``" + (Join-Path $RunDir 'H16_ARROW.err.log') + "``. Falls TIMEOUT: das ist bei ~125-145 Trainings ERWARTET -")
+    [void]$sb.AppendLine("Fortschritt liegt sicher in ``" + $CkptDir + "`` (atomic writes je abgeschlossenem Einzeltraining; verloren ging hoechstens das")
+    [void]$sb.AppendLine("gerade laufende Training). EINFACH DIESES SKRIPT ERNEUT STARTEN - es ueberspringt alle bereits abgeschlossenen Trainings und macht")
+    [void]$sb.AppendLine("nur mit den fehlenden weiter (Cutoff bleibt ueber ``" + $EndDatePin + "`` gepinnt). c16_arrow_results.json wird erst geschrieben,")
+    [void]$sb.AppendLine("wenn ALLE Trainings fertig sind (rc=0). Steht im err.log eine CheckpointMismatchError: Lauf-Parameter wurden zwischen Aufrufen")
+    [void]$sb.AppendLine("geaendert - Checkpoints loeschen ODER H16_CKPT_DIR wechseln ODER die alten Parameter wiederherstellen; NIEMALS mischen.*")
 } else {
     [void]$sb.AppendLine("*Gate-Urteil faellt der gate-auditor gegen H-16 (Roh-JSON unter ``h16\c16_arrow_results.json``).")
     [void]$sb.AppendLine("WEITER verlangt: Held-out-Day-Forward-vs-Reversed-AUC >=0.60 MIT IAAFT-Surrogat-Null-95.-Perzentil<0.53,")

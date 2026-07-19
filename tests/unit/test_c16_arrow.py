@@ -747,3 +747,254 @@ def test_windows_for_days_unsigned_ablation_applies_abs_to_raw_series():
     unsigned = windows_for_days(series_by_day, ["d1"], unsigned=True)
     assert np.all(signed[0] == -2.0)
     assert np.all(unsigned[0] == 2.0)
+
+
+# ----------------------------------------------------------------------------
+# Checkpoint/resume regressions (wave2 hardening after ~36 lost GPU-hours:
+# c16 previously wrote its result JSON only at the very END of the ~45-55h
+# plan, so every interrupt lost everything). Sandbox has no torch/CUDA —
+# the checkpoint logic is exercised through driver.run() with check_gpu,
+# load_symbol_days and train_forward_reverse_classifier faked out; the
+# checkpoint code itself is torch-free by construction.
+#   (a) one checkpoint per completed training + resume trains only missing,
+#   (b) fingerprint mismatch (data window / seed values / device) -> hard
+#       CheckpointMismatchError (a ValueError), never silently mixed,
+#   (c) resumed run payload == uninterrupted run payload (bit-identical on
+#       synthetic data, modulo generated_at/checkpointing audit fields),
+#   (d) ckpt_dir=None (--no-ckpt) writes nothing,
+# plus fingerprint field coverage / JSON round-trip and CLI flag wiring.
+# ----------------------------------------------------------------------------
+
+
+def _synthetic_symbol_days(symbol: str):
+    """10 valid synthetic days (>= MIN_VALID_DAYS) of short raw series."""
+    rng = np.random.default_rng(sum(ord(c) for c in symbol))
+    days = [f"2026-04-{d:02d}" for d in range(1, 11)]
+    series = {d: rng.standard_normal(2 * WINDOW_S) for d in days}
+    info = {
+        "n_days_scanned": len(days), "n_days_valid": len(days),
+        "n_days_invalid": 0, "min_active_seconds": 8640,
+        "first_day": days[0], "last_day": days[-1],
+    }
+    return days, series, info
+
+
+def _make_fake_train(counter: dict, fail_after: int | None = None):
+    """Deterministic fake trainer: result is a pure function of (seed, data).
+
+    The data-dependence (mean of the train windows) matters: it makes the
+    resume-identity test sensitive to any drift in the surrogate DATA rng —
+    if resuming shifted a later surrogate's seed derivation, its windows
+    (and thus the fake AUC) would change. ``fail_after=k`` raises on the
+    (k+1)-th call to simulate an interrupt AFTER k persisted trainings.
+    """
+
+    def fake(train_windows, test_windows, *, seed, device,
+             epochs=6, batch_size=64, lr=1e-3, **kw):
+        counter["calls"] += 1
+        if fail_after is not None and counter["calls"] > fail_after:
+            raise RuntimeError("simulated interrupt (window closed / reboot)")
+        auc = 0.5 + (seed % 89) / 1000.0 + float(np.mean(train_windows)) * 1e-3
+        return {
+            "auc": float(auc),
+            "p_value_sign_test": float(min(1.0, 1e-4 + (seed % 7) / 100.0)),
+            "sign_counts": {"n_pairs": int(test_windows.shape[0]),
+                            "n_greater": 1, "n_ties": 0},
+            "n_train_windows": int(train_windows.shape[0]),
+            "n_test_windows": int(test_windows.shape[0]),
+            "epochs": int(epochs), "batch_size": int(batch_size),
+            "lr": float(lr), "seed": int(seed),
+            "train_bce_history": [], "device": str(device),
+        }
+
+    return fake
+
+
+def _patch_for_ckpt_run(monkeypatch, fake_train):
+    monkeypatch.setattr(driver_mod, "check_gpu", lambda: dict(_FAKE_COMPUTE))
+    monkeypatch.setattr(
+        driver_mod, "load_symbol_days",
+        lambda base_dir, symbol, start_date, end_date, max_days=None:
+            _synthetic_symbol_days(symbol),
+    )
+    monkeypatch.setattr(driver_mod, "train_forward_reverse_classifier", fake_train)
+
+
+def _run_c16(tmp_path, ckpt_dir, *, end_date="2026-04-30", seed=42,
+             device="cuda", allow_cpu=False):
+    return driver_mod.run(
+        tmp_path, ("BTCUSDT",), end_date=end_date, seed=seed, device=device,
+        allow_cpu=allow_cpu, n_seeds=2, n_surrogates=2, ablation_seeds=1,
+        ckpt_dir=ckpt_dir,
+    )  # -> 5 trainings total for the one requested symbol
+
+
+def test_ckpt_written_per_training_and_resume_trains_only_missing(tmp_path, monkeypatch):
+    """(a) One checkpoint file per completed training; resume retrains nothing."""
+    counter = {"calls": 0}
+    _patch_for_ckpt_run(monkeypatch, _make_fake_train(counter))
+    ckpt = tmp_path / "ck"
+    payload1 = _run_c16(tmp_path, ckpt)
+
+    assert counter["calls"] == 5
+    files = sorted(p.name for p in (ckpt / "BTCUSDT").glob("*.json"))
+    assert files == [
+        "ablation_000.json", "seed_000.json", "seed_001.json",
+        "surrogate_000.json", "surrogate_001.json",
+    ]
+    one = json.loads((ckpt / "BTCUSDT" / "seed_000.json").read_text(encoding="utf-8"))
+    assert one["fingerprint"]["end_date"] == "2026-04-30"
+    assert one["task"] == {"symbol": "BTCUSDT", "kind": "seed", "index": 0,
+                           "train_seed": 42}
+    assert isinstance(one["result"]["auc"], float)
+    assert payload1["checkpointing"]["enabled"] is True
+
+    # second call, same ckpt_dir: EVERYTHING resumed, zero trainings run,
+    # identical cells (NaN-safe comparison via JSON text).
+    counter2 = {"calls": 0}
+    _patch_for_ckpt_run(monkeypatch, _make_fake_train(counter2))
+    payload2 = _run_c16(tmp_path, ckpt)
+    assert counter2["calls"] == 0
+    assert (json.dumps(payload2["cells"], sort_keys=True)
+            == json.dumps(payload1["cells"], sort_keys=True))
+
+
+def test_ckpt_fingerprint_mismatch_raises_hard_valueerror(tmp_path, monkeypatch):
+    """(b) Stale checkpoints (other window/seed/device) abort HARD, never mix."""
+    counter = {"calls": 0}
+    _patch_for_ckpt_run(monkeypatch, _make_fake_train(counter))
+    ckpt = tmp_path / "ck"
+    _run_c16(tmp_path, ckpt)
+
+    # different data window under the SAME ckpt dir -> hard abort
+    with pytest.raises(driver_mod.CheckpointMismatchError) as ei:
+        _run_c16(tmp_path, ckpt, end_date="2026-05-15")
+    assert isinstance(ei.value, ValueError)
+    assert "end_date" in str(ei.value)
+
+    # different seed VALUES -> hard abort (never silently adopted)
+    with pytest.raises(driver_mod.CheckpointMismatchError) as ei:
+        _run_c16(tmp_path, ckpt, seed=43)
+    assert "training_seeds" in str(ei.value)
+
+    # CPU-provenance mismatch (device class) -> hard abort: a GPU run must
+    # never adopt CPU-smoke checkpoints and vice versa (c15 round-2 lesson)
+    with pytest.raises(driver_mod.CheckpointMismatchError) as ei:
+        _run_c16(tmp_path, ckpt, device="cpu", allow_cpu=True)
+    assert "device" in str(ei.value)
+
+    # and the mismatch is NEVER degraded to a sentinel cell: no partial
+    # payload was produced above (each call raised straight through).
+
+
+def test_resumed_run_payload_identical_to_uninterrupted_run(tmp_path, monkeypatch):
+    """(c) interrupt -> resume yields the bit-identical payload of one pass."""
+    # reference: uninterrupted run (its own fresh ckpt dir)
+    c_full = {"calls": 0}
+    _patch_for_ckpt_run(monkeypatch, _make_fake_train(c_full))
+    payload_full = _run_c16(tmp_path, tmp_path / "ck_full")
+    assert c_full["calls"] == 5
+
+    # interrupted run: crash after 3 completed (and persisted) trainings
+    c_int = {"calls": 0}
+    _patch_for_ckpt_run(monkeypatch, _make_fake_train(c_int, fail_after=3))
+    ckpt = tmp_path / "ck_resume"
+    payload_interrupted = _run_c16(tmp_path, ckpt)
+    by_symbol = {c["symbol"]: c for c in payload_interrupted["cells"]}
+    assert by_symbol["BTCUSDT"]["measured"] is False  # crash -> sentinel
+    assert sorted(p.name for p in (ckpt / "BTCUSDT").glob("*.json")) == [
+        "seed_000.json", "seed_001.json", "surrogate_000.json",
+    ]
+
+    # resume: only the 2 missing trainings run
+    c_res = {"calls": 0}
+    _patch_for_ckpt_run(monkeypatch, _make_fake_train(c_res))
+    payload_resumed = _run_c16(tmp_path, ckpt)
+    assert c_res["calls"] == 2
+
+    # identical payloads modulo wall-clock + checkpoint-audit fields
+    for p in (payload_full, payload_resumed):
+        p.pop("generated_at")
+        p.pop("checkpointing")
+    assert (json.dumps(payload_full, sort_keys=True)
+            == json.dumps(payload_resumed, sort_keys=True))
+
+
+def test_no_ckpt_writes_nothing(tmp_path, monkeypatch):
+    """(d) ckpt_dir=None (--no-ckpt): zero checkpoint writes, zero files."""
+    counter = {"calls": 0}
+    _patch_for_ckpt_run(monkeypatch, _make_fake_train(counter))
+    writes: list = []
+    orig_write = driver_mod._write_training_checkpoint
+
+    def spy_write(*a, **k):
+        writes.append((a, k))
+        return orig_write(*a, **k)
+
+    monkeypatch.setattr(driver_mod, "_write_training_checkpoint", spy_write)
+    payload = _run_c16(tmp_path, None)
+    assert counter["calls"] == 5  # everything trained...
+    assert writes == []           # ...but nothing checkpointed
+    assert list(Path(tmp_path).rglob("*.json")) == []
+    assert payload["checkpointing"] == {"enabled": False, "ckpt_dir": None}
+
+
+def test_run_fingerprint_covers_result_relevant_params_and_roundtrips():
+    fp = driver_mod.make_run_fingerprint(
+        symbols=["BTCUSDT", "ETHUSDT"], start_date="2026-03-27",
+        end_date="2026-07-04", seed=42, n_seeds=5, n_surrogates=20,
+        ablation_seeds=3, device="cuda", epochs=6, batch_size=64, lr=1e-3,
+        max_days=None,
+    )
+    for key in (
+        "device", "ran_on_cuda", "symbols", "start_date", "end_date", "seed",
+        "n_seeds", "n_surrogates", "ablation_seeds", "max_days",
+        "training_seeds", "surrogate_data_seed_scheme", "window_s",
+        "stride_s", "n_scales", "period_min_s", "period_max_s",
+        "morlet_omega0", "test_day_frac", "min_valid_days",
+        "min_active_seconds_frac", "architecture", "epochs", "batch_size",
+        "lr", "weight_decay",
+    ):
+        assert key in fp, f"fingerprint lacks result-relevant field {key!r}"
+    # JSON-stable (stored fingerprint compares verbatim against a rebuild)
+    assert json.loads(json.dumps(fp)) == fp
+    # derived per-training seed VALUES are explicit (not just the base seed):
+    assert fp["training_seeds"]["ETHUSDT"]["surrogate"][0] == 42 + 1000 + 100
+    assert fp["training_seeds"]["BTCUSDT"]["seed"] == [42, 43, 44, 45, 46]
+    assert fp["training_seeds"]["BTCUSDT"]["ablation"] == [542, 543, 544]
+
+
+def _cli_module():
+    spec = importlib.util.spec_from_file_location(
+        "c16_arrow_cli_ckpt", REPO_ROOT / "scripts" / "c16_arrow.py")
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    return mod
+
+
+def test_cli_ckpt_dir_wiring_default_override_and_no_ckpt(tmp_path, monkeypatch):
+    """--ckpt-dir defaults to <out-dir>/c16_arrow_ckpt; --no-ckpt passes None."""
+    mod = _cli_module()
+    seen: dict = {}
+
+    def fake_run(base, symbols, **kw):
+        seen["ckpt_dir"] = kw.get("ckpt_dir")
+        return {"hypothesis": "H-16", "cells": [], "verdict_bearing": False,
+                "gate": {}}
+
+    monkeypatch.setattr(mod, "run", fake_run)
+    monkeypatch.setattr(mod, "check_gpu", lambda: dict(_FAKE_COMPUTE))
+    monkeypatch.setattr(mod, "render_markdown", lambda payload: "md")
+    out = tmp_path / "out"
+
+    assert mod.main(["--end-date", "2026-04-01", "--out-dir", str(out)]) == 0
+    assert seen["ckpt_dir"] == out / "c16_arrow_ckpt"
+
+    assert mod.main(["--end-date", "2026-04-01", "--out-dir", str(out),
+                     "--no-ckpt"]) == 0
+    assert seen["ckpt_dir"] is None
+
+    custom = tmp_path / "stable_ckpt"
+    assert mod.main(["--end-date", "2026-04-01", "--out-dir", str(out),
+                     "--ckpt-dir", str(custom)]) == 0
+    assert seen["ckpt_dir"] == custom

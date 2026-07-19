@@ -30,6 +30,24 @@ CUDA device (``cnn.gpu_status()["verdict_capable"]``). Without it
 torch scalogram path is cross-checked against the numpy reference at run
 start (:func:`scalogram.verify_torch_parity`) before anything trains.
 
+Checkpoint/resume (H-14/H-15 pattern — ``c14_panellag/ablation.py`` +
+``c15_grammar/driver.py`` — added after three GPU runs burned ~36 h with
+ZERO persisted numbers because the result JSON was only written at the very
+end of the ~45-55 h plan): with ``ckpt_dir`` set (CLI default
+``<out-dir>/c16_arrow_ckpt``; runner: STABLE ``results\\h16_checkpoints``),
+EVERY completed single training — (symbol, kind, index) with kind in
+{seed, surrogate, ablation} — is written IMMEDIATELY as one small JSON
+(atomic tmp+rename, :func:`_write_training_checkpoint`); a re-run with the
+SAME ``ckpt_dir`` loads finished trainings back and only trains what is
+missing, so an interrupt loses at most the training in flight (~20-25 min).
+Every checkpoint carries a fingerprint over ALL result-relevant run
+parameters (:func:`make_run_fingerprint`); ANY mismatch raises
+:class:`CheckpointMismatchError` — stale checkpoints are NEVER silently
+mixed (c14/c15 bug-hunt round-2 checkpoint-staleness discipline, applied
+here from day 1). A run assembled from checkpoints produces the IDENTICAL
+payload as an uninterrupted run (verdict/gate logic untouched); see the
+RNG-identity audit note at the checkpoint section below.
+
 DIFFERENTIATION (registry-mandated, verbatim below in
 ``DIFFERENTIATION_NOTE``): this is NOT a duplicate of the locked
 information-theory / nonlinear-dynamics cluster.
@@ -39,12 +57,15 @@ Read-only harvester access (Schutzgut). Reports in German (repo convention).
 """
 from __future__ import annotations
 
+import json
 import math
+import os
 import re
 import sys
+import time
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any
+from typing import Any, Callable
 
 import numpy as np
 
@@ -53,6 +74,7 @@ from .cnn import (
     ComputeError,
     EPOCHS_DEFAULT,
     LR_DEFAULT,
+    WEIGHT_DECAY_DEFAULT,
     gpu_status,
     train_forward_reverse_classifier,
 )
@@ -370,6 +392,281 @@ def check_gpu() -> dict[str, Any]:
 
 
 # ----------------------------------------------------------------------------
+# Checkpoint/resume (per completed single training; H-14/H-15 pattern)
+#
+# CHANGELOG (2026-07, added BEFORE the first successful H-16 run): three GPU
+# runs (~36 h total) were lost to reboot/timeout/window-close because c16
+# wrote its result JSON only at the very end. This section adds per-training
+# checkpoints exactly in the discipline of c14_panellag/ablation.py (atomic
+# tmp+rename per task, hard staleness abort) and c15_grammar/driver.py
+# (fingerprint over ALL result-relevant parameters, incl. device/GPU
+# provenance and data caps — the bug-hunt round-2 staleness findings).
+#
+# RNG-IDENTITY AUDIT (requirement for resume == uninterrupted run): every
+# training ALREADY derives its RNG deterministically and INDEPENDENTLY from
+# (base seed, symbol_index, kind, index) — the torch training seed is
+# ``seed + 1000*symbol_index + kind_offset + index`` (see _training_seed;
+# values UNCHANGED vs. the pre-checkpoint code), and the IAAFT surrogate
+# DATA rng is ``np.random.SeedSequence([seed, symbol_index,
+# surrogate_index, day_index])`` per day (surrogate_series_by_day,
+# unchanged). NO global/consecutive RNG stream is consumed across
+# trainings, so skipping already-checkpointed trainings cannot shift any
+# later training's randomness: a resumed run is result-identical to an
+# uninterrupted one. The surrogate-seed derivation did NOT need to change.
+# ----------------------------------------------------------------------------
+
+#: Checkpoint file schema version (bump on incompatible layout changes).
+CKPT_SCHEMA_VERSION = 1
+
+#: The three training kinds of one F-ARROW symbol cell, in execution order.
+TRAINING_KINDS: tuple[str, ...] = ("seed", "surrogate", "ablation")
+
+#: Per-kind seed offsets (UNCHANGED pre-checkpoint values; assumes
+#: n_seeds <= 100 and n_surrogates <= 400 — registered sizes are 5/20/3).
+_KIND_SEED_OFFSET = {"seed": 0, "surrogate": 100, "ablation": 500}
+
+
+class CheckpointMismatchError(ValueError):
+    """A checkpoint's fingerprint/task identity contradicts the CURRENT run.
+
+    Raised (hard abort, NEVER silently mixed or degraded to a sentinel
+    cell) when a checkpoint under ``ckpt_dir`` was written by a run with
+    different result-relevant parameters — e.g. another data window, other
+    seed values, another device class, or other scalogram/architecture
+    constants. Same discipline as the c14/c15 round-2 staleness fixes.
+    """
+
+
+def _training_seed(seed: int, symbol_index: int, kind: str, index: int) -> int:
+    """THE per-training torch seed (deterministic, no global stream).
+
+    Identical to the pre-checkpoint inline derivation (behaviour-neutral):
+    ``seed + 1000*symbol_index + {seed: 0, surrogate: 100, ablation: 500}
+    + index``.
+    """
+    if kind not in _KIND_SEED_OFFSET:
+        raise ValueError(f"unknown training kind {kind!r} (want {TRAINING_KINDS})")
+    return int(seed) + 1000 * int(symbol_index) + _KIND_SEED_OFFSET[kind] + int(index)
+
+
+def make_run_fingerprint(
+    *,
+    symbols: list[str] | tuple[str, ...],
+    start_date: str,
+    end_date: str,
+    seed: int,
+    n_seeds: int,
+    n_surrogates: int,
+    ablation_seeds: int,
+    device: str,
+    epochs: int,
+    batch_size: int,
+    lr: float,
+    max_days: int | None,
+) -> dict[str, Any]:
+    """Fingerprint over ALL result-relevant H-16 run parameters.
+
+    Stored in every checkpoint and compared VERBATIM on load (JSON-stable
+    types only, so ``json.loads(json.dumps(fp)) == fp``). Covers — c15
+    round-2 lesson, binding list: compute provenance (``device`` /
+    ``ran_on_cuda``: a CPU smoke run's checkpoints must never be adopted by
+    a GPU run that stamps ``verdict_bearing=True``), the requested symbol
+    universe IN ORDER (``symbol_index`` enters every training seed), the
+    data window, seed COUNTS and the fully derived per-training seed VALUES,
+    the surrogate-data seed derivation scheme, the scalogram/window
+    constants, the network architecture + training config, the split
+    constants, and the ``max_days`` data cap (c16's events-cap analogue).
+    """
+    symbols = [str(s) for s in symbols]
+    return {
+        "ckpt_schema_version": CKPT_SCHEMA_VERSION,
+        "hypothesis": HYPOTHESIS_ID,
+        "device": str(device),
+        "ran_on_cuda": bool(str(device).startswith("cuda")),
+        "symbols": symbols,
+        "start_date": str(start_date),
+        "end_date": str(end_date),
+        "seed": int(seed),
+        "n_seeds": int(n_seeds),
+        "n_surrogates": int(n_surrogates),
+        "ablation_seeds": int(ablation_seeds),
+        "max_days": None if max_days is None else int(max_days),
+        # fully derived per-training seed VALUES (not just the base seed):
+        "training_seeds": {
+            sym: {
+                "seed": [_training_seed(seed, i, "seed", k) for k in range(n_seeds)],
+                "surrogate": [
+                    _training_seed(seed, i, "surrogate", k) for k in range(n_surrogates)
+                ],
+                "ablation": [
+                    _training_seed(seed, i, "ablation", k) for k in range(ablation_seeds)
+                ],
+            }
+            for i, sym in enumerate(symbols)
+        },
+        "surrogate_data_seed_scheme": (
+            "np.random.SeedSequence([seed, symbol_index, surrogate_index, "
+            "day_index]) je Tag (surrogate_series_by_day)"
+        ),
+        # scalogram/window constants (a change here changes every image):
+        "window_s": int(WINDOW_S),
+        "stride_s": int(STRIDE_S),
+        "n_scales": int(N_SCALES),
+        "period_min_s": float(PERIOD_MIN_S),
+        "period_max_s": float(PERIOD_MAX_S),
+        "morlet_omega0": float(MORLET_OMEGA0),
+        # split / data-hygiene constants:
+        "test_day_frac": float(TEST_DAY_FRAC),
+        "min_valid_days": int(MIN_VALID_DAYS),
+        "min_active_seconds_frac": float(MIN_ACTIVE_SECONDS_FRAC),
+        # network architecture + training config:
+        "architecture": (
+            "ResNet-18 single-channel 1-logit (cnn.ArrowResNet18: BasicBlock "
+            "[2,2,2,2], ch 64/128/256/512, 7x7 stem, AdamW+cosine, BCE)"
+        ),
+        "epochs": int(epochs),
+        "batch_size": int(batch_size),
+        "lr": float(lr),
+        "weight_decay": float(WEIGHT_DECAY_DEFAULT),
+    }
+
+
+def _training_ckpt_path(ckpt_dir: Path, symbol: str, kind: str, index: int) -> Path:
+    return Path(ckpt_dir) / symbol / f"{kind}_{int(index):03d}.json"
+
+
+def _ckpt_clean(v: Any) -> Any:
+    """Non-finite floats -> JSON null (same convention as the final payload)."""
+    if isinstance(v, float) and not math.isfinite(v):
+        return None
+    if isinstance(v, dict):
+        return {k: _ckpt_clean(x) for k, x in v.items()}
+    if isinstance(v, (list, tuple)):
+        return [_ckpt_clean(x) for x in v]
+    return v
+
+
+def _write_training_checkpoint(
+    path: Path,
+    *,
+    fingerprint: dict[str, Any],
+    task: dict[str, Any],
+    result: dict[str, Any],
+    wall_seconds: float,
+) -> None:
+    """Atomic tmp+rename write of ONE finished training (H-14 pattern)."""
+    path.parent.mkdir(parents=True, exist_ok=True)
+    tmp = path.with_suffix(".json.tmp")
+    payload = {
+        "ckpt_schema_version": CKPT_SCHEMA_VERSION,
+        "task": task,
+        "fingerprint": fingerprint,
+        "wall_seconds": round(float(wall_seconds), 3),
+        "written_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
+        "result": result,
+    }
+    tmp.write_text(json.dumps(_ckpt_clean(payload), indent=2), encoding="utf-8")
+    os.replace(tmp, path)
+
+
+#: Result keys a checkpoint must carry to be resumable, per training kind
+#: (the fields the per-symbol payload consumes downstream).
+_REQUIRED_RESULT_KEYS = {
+    "seed": ("auc", "p_value_sign_test", "sign_counts"),
+    "surrogate": ("auc",),
+    "ablation": ("auc",),
+}
+
+
+def _load_training_checkpoint(
+    path: Path,
+    *,
+    fingerprint: dict[str, Any],
+    task: dict[str, Any],
+) -> dict[str, Any] | None:
+    """Load one training checkpoint; ``None`` = retrain, mismatch = ABORT.
+
+    Semantics (deliberately asymmetric, c14/c15 round-2 discipline):
+      * missing file / unreadable / corrupt JSON / result lacking the
+        required fields -> ``None`` (the training is simply redone);
+      * fingerprint OR task identity (symbol/kind/index/train_seed)
+        mismatch -> :class:`CheckpointMismatchError` (HARD abort): a
+        checkpoint written under different result-relevant parameters in
+        the same ``ckpt_dir`` must never be mixed into this run, and
+        continuing without it would poison every later resume of the
+        directory. Use a separate --ckpt-dir per configuration (smoke runs
+        MUST NOT share the production checkpoint dir) or delete the
+        directory to retrain everything.
+    """
+    if not path.exists():
+        return None
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return None
+    if not isinstance(payload, dict) or "result" not in payload or "fingerprint" not in payload:
+        return None
+    stored_fp = payload.get("fingerprint")
+    if stored_fp != fingerprint:
+        diff_keys = sorted(
+            k for k in (set(fingerprint) | set(stored_fp if isinstance(stored_fp, dict) else {}))
+            if not isinstance(stored_fp, dict) or stored_fp.get(k) != fingerprint.get(k)
+        )
+        raise CheckpointMismatchError(
+            f"H-16 checkpoint-staleness violation: {path} was written by a run "
+            f"with DIFFERENT result-relevant parameters (mismatching fingerprint "
+            f"keys: {diff_keys}). Stale checkpoints are NEVER silently mixed "
+            f"(c14/c15 round-2 discipline). Fix: use a separate --ckpt-dir per "
+            f"configuration (smoke/CPU runs must not share the production "
+            f"checkpoint dir), or delete the checkpoint directory to retrain "
+            f"everything under the current parameters."
+        )
+    stored_task = payload.get("task")
+    if stored_task != task:
+        raise CheckpointMismatchError(
+            f"H-16 checkpoint-identity violation: {path} carries task "
+            f"{stored_task!r} but this run expects {task!r} (file "
+            f"renamed/copied, or the seed derivation changed). Delete/clear "
+            f"the checkpoint directory — never mix mismatched checkpoints."
+        )
+    result = payload["result"]
+    if not isinstance(result, dict):
+        return None
+    for key in _REQUIRED_RESULT_KEYS[task["kind"]]:
+        if key not in result:
+            return None
+    if not isinstance(result.get("auc"), (int, float)):
+        return None  # NaN round-trips as null -> unusable, retrain honestly
+    return result
+
+
+def count_existing_checkpoints(
+    ckpt_dir: Path | str,
+    symbols: list[str] | tuple[str, ...],
+    *,
+    n_seeds: int,
+    n_surrogates: int,
+    ablation_seeds: int,
+) -> tuple[int, int]:
+    """(present, total) checkpoint files over the run's full training plan.
+
+    Existence-only pre-count for the start-of-run log — the binding
+    fingerprint/identity check still happens on every actual load.
+    """
+    ckpt = Path(ckpt_dir)
+    n_have = 0
+    n_total = 0
+    per_kind = {"seed": n_seeds, "surrogate": n_surrogates, "ablation": ablation_seeds}
+    for symbol in symbols:
+        for kind, count in per_kind.items():
+            for index in range(count):
+                n_total += 1
+                if _training_ckpt_path(ckpt, symbol, kind, index).exists():
+                    n_have += 1
+    return n_have, n_total
+
+
+# ----------------------------------------------------------------------------
 # Per-symbol measurement
 # ----------------------------------------------------------------------------
 
@@ -402,8 +699,23 @@ def measure_symbol(
     batch_size: int,
     lr: float,
     max_days: int | None,
+    ckpt_dir: Path | str | None = None,
+    fingerprint: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
-    """One F-ARROW cell: main C2ST + both mandatory controls for one symbol."""
+    """One F-ARROW cell: main C2ST + both mandatory controls for one symbol.
+
+    Checkpoint/resume: with ``ckpt_dir`` set (requires ``fingerprint``),
+    every completed training is immediately persisted to
+    ``<ckpt_dir>/<symbol>/<kind>_<index>.json`` (atomic tmp+rename) and a
+    later call with the SAME ``ckpt_dir`` resumes it instead of retraining.
+    Surrogate DATA generation (day-wise IAAFT) is skipped entirely for
+    resumed surrogate trainings — safe because each surrogate derives its
+    rng independently (see the RNG-identity audit note above). Per-training
+    seeds come from :func:`_training_seed` (identical values to the
+    pre-checkpoint inline derivation), so a resumed run is result-identical
+    to an uninterrupted one. A stale checkpoint raises
+    :class:`CheckpointMismatchError` (never silently mixed).
+    """
     days, series_by_day, day_info = load_symbol_days(
         base_dir, symbol, start_date, end_date, max_days=max_days
     )
@@ -419,13 +731,54 @@ def measure_symbol(
           f"held-out days -> {xtr.shape[0]} train / {xte.shape[0]} test windows",
           file=sys.stderr, flush=True)
 
+    ckpt = Path(ckpt_dir) if ckpt_dir is not None else None
+    if ckpt is not None and fingerprint is None:
+        raise ValueError("measure_symbol: ckpt_dir set but fingerprint missing")
+    n_resumed = 0
+    n_trained = 0
+
+    def _one_training(
+        kind: str, index: int,
+        data_fn: Callable[[], tuple[np.ndarray, np.ndarray]],
+    ) -> dict[str, Any]:
+        """Resume (symbol, kind, index) from checkpoint or train + persist.
+
+        ``data_fn`` is LAZY so resumed surrogate trainings never pay for
+        IAAFT surrogate generation.
+        """
+        nonlocal n_resumed, n_trained
+        train_seed = _training_seed(seed, symbol_index, kind, index)
+        path = None
+        task = {
+            "symbol": symbol, "kind": kind, "index": int(index),
+            "train_seed": int(train_seed),
+        }
+        if ckpt is not None:
+            path = _training_ckpt_path(ckpt, symbol, kind, index)
+            cached = _load_training_checkpoint(path, fingerprint=fingerprint, task=task)
+            if cached is not None:
+                n_resumed += 1
+                print(f"[c16] {symbol} {kind} {index}: RESUMED from checkpoint "
+                      f"({path})", file=sys.stderr, flush=True)
+                return cached
+        t0 = time.time()
+        a, b = data_fn()
+        res = train_forward_reverse_classifier(
+            a, b, seed=train_seed, device=device,
+            epochs=epochs, batch_size=batch_size, lr=lr,
+        )
+        n_trained += 1
+        if path is not None:
+            _write_training_checkpoint(
+                path, fingerprint=fingerprint, task=task, result=res,
+                wall_seconds=time.time() - t0,
+            )
+        return res
+
     # --- main C2ST: n_seeds full trainings -------------------------------
     seed_results: list[dict[str, Any]] = []
     for si in range(n_seeds):
-        res = train_forward_reverse_classifier(
-            xtr, xte, seed=seed + 1000 * symbol_index + si, device=device,
-            epochs=epochs, batch_size=batch_size, lr=lr,
-        )
+        res = _one_training("seed", si, lambda: (xtr, xte))
         print(f"[c16] {symbol} seed {si + 1}/{n_seeds}: auc={res['auc']:.4f} "
               f"p_sign={res['p_value_sign_test']:.3e}", file=sys.stderr, flush=True)
         seed_results.append(res)
@@ -434,16 +787,17 @@ def measure_symbol(
     # --- control (a): pipeline-leak / surrogate null (full retrainings) ---
     surrogate_aucs: list[float] = []
     for gi in range(n_surrogates):
-        sur = surrogate_series_by_day(
-            series_by_day, days, seed=seed, symbol_index=symbol_index,
-            surrogate_index=gi,
-        )
-        res = train_forward_reverse_classifier(
-            windows_for_days(sur, train_days),
-            windows_for_days(sur, test_days),
-            seed=seed + 1000 * symbol_index + 100 + gi, device=device,
-            epochs=epochs, batch_size=batch_size, lr=lr,
-        )
+        def _surrogate_data(gi: int = gi) -> tuple[np.ndarray, np.ndarray]:
+            sur = surrogate_series_by_day(
+                series_by_day, days, seed=seed, symbol_index=symbol_index,
+                surrogate_index=gi,
+            )
+            return (
+                windows_for_days(sur, train_days),
+                windows_for_days(sur, test_days),
+            )
+
+        res = _one_training("surrogate", gi, _surrogate_data)
         print(f"[c16] {symbol} surrogate {gi + 1}/{n_surrogates}: "
               f"auc={res['auc']:.4f}", file=sys.stderr, flush=True)
         surrogate_aucs.append(float(res["auc"]))
@@ -455,13 +809,13 @@ def measure_symbol(
     xte_u = windows_for_days(series_by_day, test_days, unsigned=True)
     ablation_aucs: list[float] = []
     for si in range(ablation_seeds):
-        res = train_forward_reverse_classifier(
-            xtr_u, xte_u, seed=seed + 1000 * symbol_index + 500 + si,
-            device=device, epochs=epochs, batch_size=batch_size, lr=lr,
-        )
+        res = _one_training("ablation", si, lambda: (xtr_u, xte_u))
         print(f"[c16] {symbol} ablation seed {si + 1}/{ablation_seeds}: "
               f"auc={res['auc']:.4f}", file=sys.stderr, flush=True)
         ablation_aucs.append(float(res["auc"]))
+    if ckpt is not None:
+        print(f"[c16] {symbol}: {n_resumed} Trainings aus Checkpoints geladen, "
+              f"{n_trained} neu trainiert", file=sys.stderr, flush=True)
 
     return {
         "symbol": symbol,
@@ -507,8 +861,23 @@ def run(
     lr: float = LR_DEFAULT,
     max_days: int | None = None,
     source: str = "",
+    ckpt_dir: Path | str | None = None,
 ) -> dict[str, Any]:
     """Full H-16 run over the F-ARROW family. Gate-neutral payload.
+
+    ``ckpt_dir``: if given, EVERY completed single training is immediately
+    checkpointed (atomic tmp+rename) to
+    ``<ckpt_dir>/<symbol>/<kind>_<index>.json`` and a re-run with the SAME
+    ``ckpt_dir`` resumes finished trainings instead of retraining — an
+    interrupt (timeout, reboot, closed window) loses at most the single
+    training in flight, never the ~45-55 h plan. Checkpoints are
+    fingerprinted over all result-relevant parameters
+    (:func:`make_run_fingerprint`); a mismatch raises
+    :class:`CheckpointMismatchError` and is NEVER degraded to a sentinel
+    cell (unlike genuine per-symbol crashes below) — silently continuing
+    over a poisoned checkpoint directory would corrupt every later resume.
+    A run assembled from checkpoints produces the identical payload as an
+    uninterrupted run; the gate/verdict logic is untouched by resuming.
 
     Raises :class:`ComputeError` when the compute gate fails (no torch /
     no CUDA) and ``allow_cpu`` is False — the CLI maps that to exit 2
@@ -571,6 +940,28 @@ def run(
               f"Familie angefordert (nicht Teil der fixen BH-Familie): "
               f"{extra_symbols}", file=sys.stderr, flush=True)
 
+    # Checkpoint/resume setup: fingerprint over the RESOLVED device and the
+    # deduped, ORDERED symbol list (symbol_index enters every training seed).
+    ckpt_fingerprint: dict[str, Any] | None = None
+    if ckpt_dir is not None:
+        ckpt_fingerprint = make_run_fingerprint(
+            symbols=requested_symbols, start_date=start_date, end_date=end_date,
+            seed=seed, n_seeds=n_seeds, n_surrogates=n_surrogates,
+            ablation_seeds=ablation_seeds, device=device, epochs=epochs,
+            batch_size=batch_size, lr=lr, max_days=max_days,
+        )
+        n_have, n_total = count_existing_checkpoints(
+            ckpt_dir, requested_symbols, n_seeds=n_seeds,
+            n_surrogates=n_surrogates, ablation_seeds=ablation_seeds,
+        )
+        print(f"[c16] Checkpoint/Resume aktiv: {ckpt_dir} — {n_have}/{n_total} "
+              f"Trainings bereits als Checkpoint vorhanden, {n_total - n_have} "
+              f"noch offen (Fingerprint wird bei jedem Laden geprueft).",
+              file=sys.stderr, flush=True)
+    else:
+        print("[c16] Checkpointing DEAKTIVIERT — ein Abbruch verliert den "
+              "GESAMTEN Fortschritt dieses Laufs.", file=sys.stderr, flush=True)
+
     measured_by_symbol: dict[str, dict[str, Any]] = {}
     cell_errors: list[dict[str, str]] = []
     for symbol_index, symbol in enumerate(requested_symbols):
@@ -581,7 +972,15 @@ def run(
                 n_seeds=n_seeds, n_surrogates=n_surrogates,
                 ablation_seeds=ablation_seeds, seed=seed, device=device,
                 epochs=epochs, batch_size=batch_size, lr=lr, max_days=max_days,
+                ckpt_dir=ckpt_dir, fingerprint=ckpt_fingerprint,
             )
+        except CheckpointMismatchError:
+            # HARD abort (round-2 staleness discipline): a stale/foreign
+            # checkpoint must never be degraded to a sentinel cell — the
+            # run would "succeed" while the checkpoint dir keeps poisoning
+            # every later resume. The operator must resolve the --ckpt-dir
+            # conflict first (message carries the fix).
+            raise
         except Exception as exc:  # noqa: BLE001 — a per-symbol crash (incl.
             # torch/CUDA OOM, device-side asserts — anything, not just
             # DataError) must NEVER abort the whole overnight run and lose
@@ -669,6 +1068,13 @@ def run(
         "ablation_seeds": int(ablation_seeds),
         "fdr_family": FDR_FAMILY,
         "fdr_alpha": FDR_ALPHA,
+        # Audit trail only — deliberately NO resumed/trained counters here:
+        # a checkpoint-assembled run must produce the IDENTICAL payload as
+        # an uninterrupted run (checkpointing is result-neutral).
+        "checkpointing": {
+            "enabled": ckpt_dir is not None,
+            "ckpt_dir": str(ckpt_dir) if ckpt_dir is not None else None,
+        },
         "differentiation_note": DIFFERENTIATION_NOTE,
         "methodology": {
             "series": "1s signed trade imbalance (buy - sell taker volume), "
@@ -807,6 +1213,7 @@ def render_markdown(payload: dict[str, Any]) -> str:
 __all__ = [
     "ABLATION_SEEDS_DEFAULT",
     "BASE_START_DATE",
+    "CKPT_SCHEMA_VERSION",
     "DIFFERENTIATION_NOTE",
     "FDR_FAMILY",
     "HYPOTHESIS_ID",
@@ -817,9 +1224,13 @@ __all__ = [
     "SECONDS_PER_DAY",
     "SYMBOLS_DEFAULT",
     "TEST_DAY_FRAC",
+    "TRAINING_KINDS",
+    "CheckpointMismatchError",
     "ComputeError",
     "DataError",
     "check_gpu",
+    "count_existing_checkpoints",
+    "make_run_fingerprint",
     "list_available_dates",
     "load_day_imbalance",
     "load_symbol_days",
