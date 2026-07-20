@@ -96,6 +96,25 @@ def _context_codes(tokens: np.ndarray, order: int, vocab_size: int,
     return codes
 
 
+def _context_codes_at(tokens: np.ndarray, order: int, vocab_size: int,
+                      positions: np.ndarray) -> np.ndarray:
+    """Context codes at SELECTED positions (each ``>= order``).
+
+    Elementwise identical to ``_context_codes(tokens, order, ...)`` restricted
+    to ``positions`` — same gather ``tokens[t-j]``, same int64 upcast, same
+    multiplier accumulation order, hence bit-identical codes.
+    """
+    pos = np.asarray(positions, dtype=np.int64)
+    if pos.size and int(pos.min()) < order:
+        raise MarkovError("positions must be >= order")
+    codes = np.zeros(pos.size, dtype=np.int64)
+    mult = 1
+    for j in range(1, order + 1):
+        codes += tokens[pos - j].astype(np.int64) * mult
+        mult *= vocab_size
+    return codes
+
+
 class _SortedCounts:
     """Sorted-key count table with vectorised binary-search lookup."""
 
@@ -183,6 +202,30 @@ class MarkovKT:
         den = self._ctx.lookup(ctx).astype(np.float64) + self.alpha * V
         return np.log(num / den)
 
+    def log_probs_at(self, tokens: np.ndarray, positions: np.ndarray) -> np.ndarray:
+        """Log-probs at SELECTED positions (each ``>= CE_WARMUP``).
+
+        Bit-identical to ``log_probs(tokens)[positions - CE_WARMUP]``: every
+        per-position operation (context-code gather, count lookup, the
+        ``log((c+alpha)/(C+alpha*V))`` float arithmetic) is elementwise
+        independent, so restricting to a position subset never changes any
+        value. Used by ``surrogate_cross_entropy`` to recompute only the
+        few positions a block shuffle actually disturbs.
+        """
+        if self._pair is None or self._ctx is None:
+            raise MarkovError("fit() before log_probs_at()")
+        tokens = _as_token_array(tokens)
+        _check_tokens(tokens, self.vocab_size)
+        pos = np.asarray(positions, dtype=np.int64)
+        if pos.size and (int(pos.min()) < CE_WARMUP or int(pos.max()) >= tokens.size):
+            raise MarkovError("positions must be in [CE_WARMUP, n)")
+        V = self.vocab_size
+        ctx = _context_codes_at(tokens, self.order, V, pos)
+        nxt = tokens[pos].astype(np.int64)
+        num = self._pair.lookup(ctx * V + nxt).astype(np.float64) + self.alpha
+        den = self._ctx.lookup(ctx).astype(np.float64) + self.alpha * V
+        return np.log(num / den)
+
     def cross_entropy(self, tokens: np.ndarray) -> float:
         """Mean OOS CE in nats over positions >= CE_WARMUP."""
         lp = self.log_probs(tokens)
@@ -260,6 +303,33 @@ class InterpolatedMarkov:
             p = (num + beta * p) / (den + beta)
         return np.log(p)
 
+    def log_probs_at(self, tokens: np.ndarray, positions: np.ndarray) -> np.ndarray:
+        """Log-probs at SELECTED positions (each ``>= CE_WARMUP``).
+
+        Bit-identical to ``log_probs(tokens)[positions - CE_WARMUP]`` — the
+        backoff recursion is elementwise over positions (per-order lookups,
+        the ``(num + beta*p)/(den + beta)`` update and the final ``log`` are
+        all per-element float ops), so a position subset yields the exact
+        same values as the full pass restricted to that subset.
+        """
+        if not self._pair:
+            raise MarkovError("fit() before log_probs_at()")
+        tokens = _as_token_array(tokens)
+        _check_tokens(tokens, self.vocab_size)
+        pos = np.asarray(positions, dtype=np.int64)
+        if pos.size and (int(pos.min()) < CE_WARMUP or int(pos.max()) >= tokens.size):
+            raise MarkovError("positions must be in [CE_WARMUP, n)")
+        V = self.vocab_size
+        beta = self.beta
+        nxt = tokens[pos].astype(np.int64)
+        p = np.full(pos.size, 1.0 / V, dtype=np.float64)  # base case p_{-1}
+        for k in range(self.max_order + 1):
+            ctx = _context_codes_at(tokens, k, V, pos)
+            num = self._pair[k].lookup(ctx * V + nxt).astype(np.float64)
+            den = self._ctx[k].lookup(ctx).astype(np.float64)
+            p = (num + beta * p) / (den + beta)
+        return np.log(p)
+
     def cross_entropy(self, tokens: np.ndarray) -> float:
         lp = self.log_probs(tokens)
         if lp.size == 0:
@@ -307,6 +377,68 @@ def best_baseline_ce(models: dict[str, MarkovKT | InterpolatedMarkov],
     return best_name, float(finite[best_name]), ces
 
 
+def surrogate_cross_entropy(
+    model: MarkovKT | InterpolatedMarkov,
+    surr_tokens: np.ndarray,
+    src: np.ndarray,
+    base_log_probs: np.ndarray,
+) -> float:
+    """CE of a permutation surrogate via log-prob REUSE — bit-identical.
+
+    ``surr_tokens`` must be ``original[src]`` for the SAME original stream
+    on which ``base_log_probs = model.log_probs(original)`` was computed
+    once per fold. Key observation for the registered block-shuffle null
+    (block length 256 >> max order 4): a Markov log-prob at position ``t``
+    depends only on the ``(CE_WARMUP+1)``-gram ``surr[t-CE_WARMUP .. t]``.
+    Wherever the shuffle maps that whole window contiguously
+    (``src[t-j] == src[t]-j`` for j=1..CE_WARMUP — everywhere except the
+    first CE_WARMUP positions after a block/hour seam, ~4 of every 256
+    positions), the value is EXACTLY ``base_log_probs[src[t]-CE_WARMUP]``;
+    only the seam positions are recomputed via ``log_probs_at`` (same
+    elementwise arithmetic — see there).
+
+    Bit-identity to the direct path ``model.cross_entropy(surr_tokens)``:
+    the assembled per-position array equals ``model.log_probs(surr_tokens)``
+    element for element (reused entries by the contiguity argument above,
+    recomputed entries by ``log_probs_at``'s elementwise identity), and the
+    final ``-np.mean`` runs over the same float64 array in the same stream
+    order — identical pairwise summation, identical bits. Regression test:
+    ``test_markov_surrogate_fastpath_equals_direct`` asserts exact equality.
+
+    Cost: O(n) gather + O(n/block_len * CE_WARMUP) lookups instead of O(n)
+    lookups per surrogate — the ~200-surrogate Markov arm drops from
+    minutes to seconds per surrogate on ~30M-token folds.
+    """
+    surr = _as_token_array(surr_tokens)
+    src = np.asarray(src, dtype=np.int64)
+    if surr.size != src.size:
+        raise MarkovError("surr_tokens and src must share length")
+    n = src.size
+    if n <= CE_WARMUP:
+        return float("nan")
+    if base_log_probs.size != n - CE_WARMUP:
+        raise MarkovError(
+            f"base_log_probs has {base_log_probs.size} entries, "
+            f"expected {n - CE_WARMUP}"
+        )
+    # contig[t]: surrogate position t continues the SAME original run as t-1.
+    contig = np.empty(n, dtype=bool)
+    contig[0] = False
+    contig[1:] = src[1:] == src[:-1] + 1
+    # clean[i] (position t = i + CE_WARMUP): the whole context window
+    # src[t-CE_WARMUP..t] maps contiguously -> src[t] >= CE_WARMUP holds
+    # automatically (src[t] = src[t-CE_WARMUP] + CE_WARMUP >= CE_WARMUP).
+    clean = contig[CE_WARMUP:]
+    for j in range(1, CE_WARMUP):
+        clean = clean & contig[CE_WARMUP - j: n - j]
+    lp = np.empty(n - CE_WARMUP, dtype=np.float64)
+    lp[clean] = base_log_probs[src[CE_WARMUP:][clean] - CE_WARMUP]
+    dirty = np.nonzero(~clean)[0]
+    if dirty.size:
+        lp[dirty] = model.log_probs_at(surr, dirty + CE_WARMUP)
+    return float(-np.mean(lp))
+
+
 def _check_tokens(tokens: np.ndarray, vocab_size: int) -> None:
     if tokens.ndim != 1:
         raise MarkovError("tokens must be 1-D")
@@ -325,4 +457,5 @@ __all__ = [
     "MarkovKT",
     "best_baseline_ce",
     "fit_all_baselines",
+    "surrogate_cross_entropy",
 ]

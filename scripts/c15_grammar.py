@@ -127,16 +127,19 @@ def main(argv: list[str] | None = None) -> int:
                         "(0 = no cap, registered data binding). Voids gate_valid.")
     p.add_argument("--out-dir", default=".", help="Output directory for results.")
     p.add_argument("--ckpt-dir", default=None,
-                   help="Per-symbol checkpoint directory (default: "
-                        "<out-dir>/c15_grammar_ckpt). Each completed symbol "
-                        "is atomically checkpointed there; re-running with "
-                        "the SAME --ckpt-dir (and identical registered "
-                        "parameters) RESUMES by skipping already-finished "
-                        "symbols instead of re-training them, so a timeout/"
-                        "crash loses at most the in-flight symbol. Pass "
-                        "--no-ckpt to disable.")
+                   help="Checkpoint directory (default: "
+                        "<out-dir>/c15_grammar_ckpt). Checkpoints are "
+                        "written per completed symbol, per completed "
+                        "(symbol, fold) AND — inside a fold's surrogate "
+                        "null — every 10 surrogates (plus the fold's "
+                        "trained seed models), all atomically and "
+                        "fingerprinted; re-running with the SAME "
+                        "--ckpt-dir (and identical registered parameters) "
+                        "RESUMES bit-identically, so a timeout/crash loses "
+                        "at most ~10 surrogate evaluations (~minutes). "
+                        "Pass --no-ckpt to disable.")
     p.add_argument("--no-ckpt", action="store_true",
-                   help="Disable per-symbol checkpointing entirely.")
+                   help="Disable checkpointing entirely.")
     args = p.parse_args(argv)
 
     if args.check_gpu_only:

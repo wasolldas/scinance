@@ -65,6 +65,7 @@ import math
 import os
 import re
 import sys
+import time
 from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import date, datetime, timedelta, timezone
@@ -73,7 +74,12 @@ from typing import Any
 
 import numpy as np
 
-from .markov_baseline import CE_WARMUP, best_baseline_ce, fit_all_baselines
+from .markov_baseline import (
+    CE_WARMUP,
+    best_baseline_ce,
+    fit_all_baselines,
+    surrogate_cross_entropy,
+)
 from .stats import (
     BLOCK_LEN_EVENTS,
     EMBARGO_DAYS,
@@ -88,7 +94,7 @@ from .stats import (
     SURROGATE_PERCENTILE,
     SYMBOLS_PASS_MIN,
     benjamini_hochberg,
-    hour_block_shuffle,
+    hour_block_shuffle_perm,
     relative_ce_gap,
     surrogate_gap_p,
     walk_forward_folds,
@@ -103,8 +109,11 @@ from .transformer import (
     ComputeUnavailableError,
     GrammarTransformerConfig,
     evaluate_ce,
+    evaluate_ce_multi,
+    load_seed_models,
     num_parameters,
     release_device_memory,
+    save_seed_models,
     torch_cuda_status,
     train_transformer,
 )
@@ -405,18 +414,37 @@ def prepare_fold(
 
 
 # ----------------------------------------------------------------------------
-# Per-symbol checkpointing (atomic write, resume by skip)
+# Checkpointing (atomic writes, resume by skip) — SCHEMA v2, three levels
 #
 # A full T3 run trains 5 symbols x 4 folds x 3 seeds sequentially and can
-# take HOURS on the 12h runner timeout budget (see run_h15.sh/.ps1). Without
-# checkpointing, a timeout/crash after N of 5 symbols loses ALL of them —
-# including the already-finished ones (see audit_h15.md Bug #3). Each
-# completed symbol's AGGREGATED result (the same dict that lands in
-# ``per_symbol`` below) is atomically written to
-# ``<ckpt_dir>/<symbol>.json``; a re-run with the SAME ``ckpt_dir`` loads it
-# back and skips re-training that symbol entirely. A ``fingerprint`` of the
-# registered run parameters is stored alongside the result and re-checked on
-# load — a checkpoint from a run with different folds/seeds/surrogates/
+# take far longer than one 12h runner window (see run_h15.sh/.ps1). The
+# original per-SYMBOL-only granularity proved insufficient in practice: the
+# first GPU run spent ~12h inside BTCUSDT (fold 0 surrogates unfinished) and
+# lost EVERYTHING because no symbol ever completed. Schema v2 therefore
+# checkpoints at three granularities (the per-symbol v1 format had never
+# successfully written a file in the field, so it was replaced without a
+# migration path — ``ckpt_schema`` in the fingerprint invalidates any
+# hypothetical v1 leftovers):
+#
+#   1. ``<ckpt_dir>/<symbol>.json`` — the AGGREGATED symbol result (as
+#      before), written when a symbol's last fold finishes.
+#   2. ``<ckpt_dir>/<symbol>.fold<k>.json`` — one COMPLETED (symbol, fold)
+#      cell: the fold's public row + its full surrogate-gap vector. On
+#      resume the fold is skipped entirely (bit-identical: the gap floats
+#      round-trip exactly through JSON repr; NaN <-> null via _ckpt_clean).
+#   3. ``<ckpt_dir>/<symbol>.fold<k>.surr.json`` — surrogate-null PARTIAL
+#      state inside a fold, rewritten atomically every ``surr_ckpt_every``
+#      surrogates: gaps/CEs so far + the EXACT numpy PCG64 bit-generator
+#      state, so a resumed loop continues the very same surrogate sequence
+#      (RNG consumption order unchanged — registered deterministic seeds).
+#      Paired with ``<symbol>.fold<k>.models.pt`` (trained seed models,
+#      exact weights) because GPU re-training is not bit-reproducible and
+#      a fold's null must never mix two trainings. A timeout now loses at
+#      most ``surr_ckpt_every`` surrogates (~minutes), not 12 hours.
+#
+# Every level stores a ``fingerprint`` of the registered run parameters
+# (fold-level files additionally carry ``fold_index``) that is re-checked
+# on load — a checkpoint from a run with different folds/seeds/surrogates/
 # architecture/data-grid/mode/device/GPU-provenance/event-cap is treated as
 # stale (recomputed, never silently reused) so resume can never mix results
 # from two different configurations. In particular ``mode``/``device``/
@@ -428,6 +456,10 @@ def prepare_fold(
 # fingerprint: without them an uncapped run could adopt a per-day-capped
 # run's checkpoints while itself reporting ``events_capped=False``.
 # ----------------------------------------------------------------------------
+
+#: Checkpoint schema version (part of every fingerprint — bumping it
+#: invalidates all older checkpoints instead of misreading them).
+CKPT_SCHEMA_VERSION = 2
 
 def _run_fingerprint(
     *,
@@ -446,6 +478,7 @@ def _run_fingerprint(
     max_events_per_day: int,
 ) -> dict[str, Any]:
     return {
+        "ckpt_schema": CKPT_SCHEMA_VERSION,
         "mode": mode,
         "device": device,
         "ran_on_gpu": bool(ran_on_gpu),
@@ -486,6 +519,24 @@ def _ckpt_clean(v: Any) -> Any:
     return v
 
 
+def _restore_nans(v: Any) -> Any:
+    """Inverse of ``_ckpt_clean``: JSON-null -> NaN, recursively.
+
+    Checkpointed result dicts contain ``None`` ONLY where ``_ckpt_clean``
+    mapped a non-finite float (no field is legitimately null), so restoring
+    NaN on load makes a resumed payload STRUCTURALLY IDENTICAL to a
+    straight-run payload — finite floats already round-trip bit-exactly
+    through JSON's shortest-repr serialisation.
+    """
+    if v is None:
+        return float("nan")
+    if isinstance(v, dict):
+        return {k: _restore_nans(x) for k, x in v.items()}
+    if isinstance(v, list):
+        return [_restore_nans(x) for x in v]
+    return v
+
+
 def _symbol_ckpt_path(ckpt_dir: Path | str, symbol: str) -> Path:
     return Path(ckpt_dir) / f"{symbol}.json"
 
@@ -521,7 +572,161 @@ def _load_symbol_checkpoint(
         return None
     if payload.get("fingerprint") != fingerprint:
         return None
-    return payload["result"]
+    return _restore_nans(payload["result"])
+
+
+# --- per-(symbol, fold) checkpoint level (schema v2) -------------------------
+
+def _fold_fingerprint(fingerprint: dict[str, Any], fold_index: int) -> dict[str, Any]:
+    """Run fingerprint + the fold index (fold-level checkpoint discipline)."""
+    return {**fingerprint, "fold_index": int(fold_index)}
+
+
+def _fold_ckpt_path(ckpt_dir: Path | str, symbol: str, fold_index: int) -> Path:
+    return Path(ckpt_dir) / f"{symbol}.fold{int(fold_index)}.json"
+
+
+def _fold_models_path(ckpt_dir: Path | str, symbol: str, fold_index: int) -> Path:
+    return Path(ckpt_dir) / f"{symbol}.fold{int(fold_index)}.models.pt"
+
+
+def _fold_surr_path(ckpt_dir: Path | str, symbol: str, fold_index: int) -> Path:
+    return Path(ckpt_dir) / f"{symbol}.fold{int(fold_index)}.surr.json"
+
+
+def _atomic_write_json(path: Path, payload: dict[str, Any]) -> None:
+    """Atomic tmp+rename JSON write (same pattern as the symbol level)."""
+    path.parent.mkdir(parents=True, exist_ok=True)
+    tmp = path.with_suffix(path.suffix + ".tmp")
+    tmp.write_text(json.dumps(_ckpt_clean(payload), indent=2), encoding="utf-8")
+    os.replace(tmp, path)
+
+
+def _nan_float_list(values: Any) -> np.ndarray | None:
+    """JSON list -> float64 array, null -> NaN (inverse of ``_ckpt_clean``)."""
+    if not isinstance(values, list):
+        return None
+    try:
+        return np.array(
+            [float("nan") if v is None else float(v) for v in values],
+            dtype=np.float64,
+        )
+    except (TypeError, ValueError):
+        return None
+
+
+def _write_fold_checkpoint(
+    path: Path, row: dict[str, Any], fingerprint: dict[str, Any],
+) -> None:
+    """Persist one COMPLETED (symbol, fold) cell: public row + gap vector.
+
+    The gap floats round-trip bit-exactly through JSON (shortest-repr
+    float64 serialisation); non-finite values map to null and back to NaN
+    on load — resume is therefore numerically identical to a straight run.
+    """
+    _atomic_write_json(path, {
+        "fingerprint": fingerprint,
+        "public": row["public"],
+        "surrogate_gaps": [float(g) for g in np.asarray(row["surrogate_gaps"])],
+    })
+
+
+def _load_fold_checkpoint(
+    path: Path, fingerprint: dict[str, Any],
+) -> dict[str, Any] | None:
+    """Load one completed fold cell iff present AND fingerprint matches.
+
+    Missing/corrupt file, fingerprint mismatch (incl. ``fold_index``) or a
+    gap vector whose length contradicts the fingerprint's ``n_surrogates``
+    all return ``None`` — the fold is then recomputed, never mixed.
+    """
+    if not path.exists():
+        return None
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return None
+    if not isinstance(payload, dict) or payload.get("fingerprint") != fingerprint:
+        return None
+    public = payload.get("public")
+    gaps = _nan_float_list(payload.get("surrogate_gaps"))
+    if not isinstance(public, dict) or gaps is None:
+        return None
+    if gaps.size != int(fingerprint.get("n_surrogates", -1)):
+        return None
+    return {"public": _restore_nans(public), "surrogate_gaps": gaps}
+
+
+def _write_fold_surr_partial(
+    path: Path,
+    fingerprint: dict[str, Any],
+    *,
+    n_done: int,
+    gaps: np.ndarray,
+    markov_ces: np.ndarray,
+    transformer_ces: np.ndarray,
+    rng_state: dict[str, Any],
+) -> None:
+    """Persist the surrogate-null partial state of one in-flight fold.
+
+    ``rng_state`` is the numpy bit-generator state AFTER the first
+    ``n_done`` surrogates — restoring it continues the registered
+    deterministic surrogate sequence with unchanged RNG consumption order.
+    The per-surrogate CE lists are kept (a) for resume, (b) as a
+    diagnosable audit trail of the null (previously the loop was a 10h+
+    black box without a single log line or on-disk trace).
+    """
+    _atomic_write_json(path, {
+        "fingerprint": fingerprint,
+        "n_done": int(n_done),
+        "surrogate_gaps": [float(g) for g in gaps[:n_done]],
+        "surrogate_markov_ces": [float(c) for c in markov_ces[:n_done]],
+        "surrogate_transformer_ces": [float(c) for c in transformer_ces[:n_done]],
+        "rng_state": rng_state,
+    })
+
+
+def _load_fold_surr_partial(
+    path: Path, fingerprint: dict[str, Any], n_surrogates: int,
+) -> dict[str, Any] | None:
+    """Load a fold's surrogate partial state iff valid for THIS run.
+
+    Validity: fingerprint matches (incl. fold index), 0 < n_done <=
+    n_surrogates, all three CE lists have exactly n_done entries, and the
+    stored RNG state is a bit-generator state dict. Anything else returns
+    ``None`` (surrogates restart from 0 within the fold — never mixed).
+    """
+    if not path.exists():
+        return None
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return None
+    if not isinstance(payload, dict) or payload.get("fingerprint") != fingerprint:
+        return None
+    try:
+        n_done = int(payload.get("n_done"))
+    except (TypeError, ValueError):
+        return None
+    if not 0 < n_done <= n_surrogates:
+        return None
+    gaps = _nan_float_list(payload.get("surrogate_gaps"))
+    m_ces = _nan_float_list(payload.get("surrogate_markov_ces"))
+    t_ces = _nan_float_list(payload.get("surrogate_transformer_ces"))
+    rng_state = payload.get("rng_state")
+    if gaps is None or m_ces is None or t_ces is None:
+        return None
+    if not (gaps.size == m_ces.size == t_ces.size == n_done):
+        return None
+    if not (isinstance(rng_state, dict) and "bit_generator" in rng_state):
+        return None
+    return {
+        "n_done": n_done,
+        "gaps": gaps,
+        "markov_ces": m_ces,
+        "transformer_ces": t_ces,
+        "rng_state": rng_state,
+    }
 
 
 # ----------------------------------------------------------------------------
@@ -545,6 +750,8 @@ def run(
     max_events_per_day: int = 0,
     source: str = "",
     ckpt_dir: Path | str | None = None,
+    surr_ckpt_every: int = 10,
+    surr_log_every: int = 10,
 ) -> dict[str, Any]:
     """Run the H-15 grammar gate; return the gate-neutral payload.
 
@@ -565,17 +772,28 @@ def run(
     (``gate_valid: false``, ``ran_on_gpu: false`` ALWAYS); transformer arm
     runs on CPU if torch is present, else is skipped (CEs NaN).
 
-    ``ckpt_dir``: if given, EVERY completed symbol is atomically checkpointed
-    to ``<ckpt_dir>/<symbol>.json`` (fingerprinted against the run's
-    registered parameters — including ``mode``/``device``/``ran_on_gpu``/
-    ``events_capped``/``max_events_per_day``); re-calling ``run()`` with the
-    SAME ``ckpt_dir`` resumes by skipping already-checkpointed symbols
-    instead of re-training them — a timeout/crash loses at most the symbol
-    that was in flight, not the whole multi-hour run (see audit_h15.md
-    Bug #3). A checkpoint written under a different mode/device/GPU-
-    provenance/event-cap is treated as stale and recomputed, never silently
-    reused (a CPU ``mechanics`` checkpoint must never be adopted by a later
-    ``full`` GPU run).
+    ``ckpt_dir``: if given, checkpoints are written at THREE granularities
+    (schema v2, see the checkpoint section above): per completed symbol
+    (``<symbol>.json``), per completed (symbol, fold) cell
+    (``<symbol>.fold<k>.json``) and — inside a fold's surrogate null —
+    every ``surr_ckpt_every`` surrogates (``<symbol>.fold<k>.surr.json`` +
+    ``<symbol>.fold<k>.models.pt`` with the exact trained seed weights).
+    Everything is fingerprinted against the run's registered parameters —
+    including ``mode``/``device``/``ran_on_gpu``/``events_capped``/
+    ``max_events_per_day``, fold-level files additionally the fold index.
+    Re-calling ``run()`` with the SAME ``ckpt_dir`` resumes by skipping
+    checkpointed symbols/folds and by continuing a partially-evaluated
+    surrogate null from its saved RNG state with the saved seed models —
+    bit-identical to an uninterrupted run; a timeout/crash loses at most
+    ``surr_ckpt_every`` surrogate evaluations (~minutes), not hours. A
+    checkpoint written under a different mode/device/GPU-provenance/
+    event-cap is treated as stale and recomputed, never silently reused (a
+    CPU ``mechanics`` checkpoint must never be adopted by a later ``full``
+    GPU run).
+
+    ``surr_ckpt_every``/``surr_log_every``: surrogate-loop partial-
+    checkpoint and progress-log cadence (0 disables the respective one);
+    pure observability/resume knobs — zero effect on any statistic.
     """
     if mode not in ("full", "mechanics"):
         raise ValueError(f"unknown mode {mode!r}")
@@ -671,23 +889,71 @@ def run(
                 continue
 
         entry = symbol_events[symbol]
-        # lazy loader: load THIS symbol's events only now (post-resume-check,
-        # so checkpoint-resumed symbols are never loaded at all)
-        events = entry() if callable(entry) else entry
-        print(f"[c15_grammar] === {symbol}: {events.n_events} events, "
-              f"{len(folds)} folds ===", file=sys.stderr, flush=True)
+        # per-(symbol, fold) resume: collect completed fold cells BEFORE
+        # loading events — if every fold is checkpointed the multi-minute
+        # event load is skipped entirely.
+        folds_cached: dict[int, dict[str, Any]] = {}
+        if ckpt_dir is not None:
+            for fold in folds:
+                cached_fold = _load_fold_checkpoint(
+                    _fold_ckpt_path(ckpt_dir, symbol, fold.index),
+                    _fold_fingerprint(ckpt_fingerprint, fold.index))
+                if cached_fold is not None:
+                    folds_cached[fold.index] = cached_fold
+        events: EventStream | None = None
+        if any(fold.index not in folds_cached for fold in folds):
+            # lazy loader: load THIS symbol's events only now (post-resume-
+            # check, so checkpoint-resumed symbols are never loaded at all)
+            events = entry() if callable(entry) else entry
+            print(f"[c15_grammar] === {symbol}: {events.n_events} events, "
+                  f"{len(folds)} folds ({len(folds_cached)} resumed) ===",
+                  file=sys.stderr, flush=True)
+        else:
+            print(f"[c15_grammar] === {symbol}: all {len(folds)} folds "
+                  f"RESUMED from fold checkpoints — event load skipped ===",
+                  file=sys.stderr, flush=True)
         fold_rows: list[dict[str, Any]] = []
         fold_gap_matrix: list[np.ndarray] = []  # per fold: (n_surrogates,)
         for fold in folds:
+            if fold.index in folds_cached:
+                cached_fold = folds_cached[fold.index]
+                print(f"[c15_grammar] {symbol} fold {fold.index}: RESUMED "
+                      f"from fold checkpoint "
+                      f"({_fold_ckpt_path(ckpt_dir, symbol, fold.index)})",
+                      file=sys.stderr, flush=True)
+                fold_rows.append(cached_fold["public"])
+                fold_gap_matrix.append(cached_fold["surrogate_gaps"])
+                continue
+            fold_fp = _fold_fingerprint(ckpt_fingerprint, fold.index)
+            ckpt_paths = None
+            if ckpt_dir is not None:
+                ckpt_paths = {
+                    "models": _fold_models_path(ckpt_dir, symbol, fold.index),
+                    "surr": _fold_surr_path(ckpt_dir, symbol, fold.index),
+                }
             row = _run_fold(
                 events, fold, cfg,
                 seeds=seeds, n_surrogates=n_surrogates, block_len=block_len,
                 use_tick_direction=use_tick_direction, device=device,
                 transformer_arm=transformer_arm,
                 surrogate_seed=surrogate_seed + 7919 * fold.index,
+                ckpt_paths=ckpt_paths, ckpt_fingerprint=fold_fp,
+                surr_ckpt_every=surr_ckpt_every, surr_log_every=surr_log_every,
             )
             fold_rows.append(row["public"])
             fold_gap_matrix.append(row["surrogate_gaps"])
+            if ckpt_dir is not None:
+                fold_path = _fold_ckpt_path(ckpt_dir, symbol, fold.index)
+                _write_fold_checkpoint(fold_path, row, fold_fp)
+                print(f"[c15_grammar] {symbol} fold {fold.index}: "
+                      f"checkpointed to {fold_path}",
+                      file=sys.stderr, flush=True)
+                # The heavyweight seed-model file is only needed for a
+                # MID-fold resume; the fold checkpoint supersedes it. The
+                # surr.json partial stays as a cheap audit trail of the
+                # per-surrogate CEs.
+                _fold_models_path(ckpt_dir, symbol, fold.index).unlink(
+                    missing_ok=True)
 
         symbol_result = _aggregate_symbol(symbol, fold_rows, fold_gap_matrix,
                                            n_surrogates)
@@ -819,6 +1085,10 @@ def _run_fold(
     device: str,
     transformer_arm: bool,
     surrogate_seed: int,
+    ckpt_paths: dict[str, Path] | None = None,
+    ckpt_fingerprint: dict[str, Any] | None = None,
+    surr_ckpt_every: int = 10,
+    surr_log_every: int = 10,
 ) -> dict[str, Any]:
     """One (symbol, fold) cell: tokenize, both arms, surrogate gap null.
 
@@ -827,7 +1097,33 @@ def _run_fold(
     ``train_tokens`` is dropped after the last seed finishes training, each
     surrogate stream is dropped as soon as its gap scalar is recorded, and
     the seed models (GPU) are released after the surrogate loop. Only
-    scalars/small dicts survive the fold.
+    scalars/small dicts (plus the per-surrogate CE vectors) survive the
+    fold.
+
+    Surrogate-null cost discipline (the first GPU run spent >10.5h inside
+    ONE fold's null without a single log line):
+      * SURROGATE GENERATION is unchanged: the same sequential
+        ``rng.permutation`` draws in the same order (registered
+        deterministic seeds) — only expressed as a source-index
+        permutation ``src`` so scoring can exploit it.
+      * MARKOV arm: per-position log-probs of the ORIGINAL test stream are
+        computed ONCE; each surrogate reuses them for every position whose
+        whole k<=4 context maps contiguously (~252 of every 256 positions)
+        and recomputes only the block/hour seams — bit-identical CE (see
+        ``markov_baseline.surrogate_cross_entropy``), ~order-of-magnitude
+        cheaper than the previous full 30M-token lookup pass per surrogate.
+      * TRANSFORMER arm: all seed models score each surrogate in ONE
+        chunking/transfer pass (``evaluate_ce_multi`` — bit-identical to
+        the sequential per-model evaluation, see there). The per-surrogate
+        forward FLOPs themselves are irreducible under the registered D2
+        methodology (every surrogate must be scored by all 3 seed models
+        over the full test stream).
+      * ``ckpt_paths``/``ckpt_fingerprint``: mid-fold resume support —
+        trained seed models are persisted once (exact weights; GPU
+        re-training is not bit-reproducible) and the null's partial state
+        (CE vectors + RNG bit-generator state) every ``surr_ckpt_every``
+        surrogates; a resumed loop continues the identical surrogate
+        sequence bit-for-bit.
     """
     spec, train_tokens, test_tokens, test_hours = prepare_fold(
         events, fold, use_tick_direction=use_tick_direction,
@@ -835,6 +1131,8 @@ def _run_fold(
     n_train_tokens = int(train_tokens.size)
     n_test_tokens = int(test_tokens.size)
     n_scored = max(0, n_test_tokens - CE_WARMUP)
+    fp_json = json.dumps(_ckpt_clean(ckpt_fingerprint), sort_keys=True) \
+        if ckpt_fingerprint is not None else ""
 
     # Baseline arm (CPU) — fixed BEFORE surrogates: best on the observed OOS.
     baselines = fit_all_baselines(train_tokens, spec.vocab_size)
@@ -845,17 +1143,41 @@ def _run_fold(
     del baselines
 
     # Transformer arm — 3 seeds, OOS CE = mean over seeds (registry).
+    # Mid-fold resume: adopt the fold's OWN previously trained seed models
+    # (exact saved weights + their observed CEs) instead of re-training —
+    # GPU training is not bit-reproducible, and a fold's null must be
+    # scored by ONE training throughout.
     seed_models: list[Any] = []
     seed_ces: list[float] = []
+    models_resumed = False
     if transformer_arm:
-        for seed in seeds:
-            model = train_transformer(train_tokens, cfg, seed=seed, device=device)
-            ce = evaluate_ce(model, test_tokens, cfg, device=device)
-            seed_models.append(model)
-            seed_ces.append(float(ce))
-            print(f"[c15_grammar] {events.symbol} fold {fold.index} seed {seed}: "
-                  f"transformer_ce={ce:.4f} (params={num_parameters(model)})",
-                  file=sys.stderr, flush=True)
+        if ckpt_paths is not None:
+            loaded = load_seed_models(
+                ckpt_paths["models"], cfg, device=device,
+                fingerprint_json=fp_json)
+            if loaded is not None and len(loaded[0]) == len(seeds):
+                seed_models, seed_ces = loaded
+                models_resumed = True
+                print(f"[c15_grammar] {events.symbol} fold {fold.index}: "
+                      f"RESUMED {len(seed_models)} seed models from "
+                      f"{ckpt_paths['models']} (seed_ces="
+                      f"{[round(c, 4) for c in seed_ces]})",
+                      file=sys.stderr, flush=True)
+        if not models_resumed:
+            for seed in seeds:
+                model = train_transformer(train_tokens, cfg, seed=seed, device=device)
+                ce = evaluate_ce(model, test_tokens, cfg, device=device)
+                seed_models.append(model)
+                seed_ces.append(float(ce))
+                print(f"[c15_grammar] {events.symbol} fold {fold.index} seed {seed}: "
+                      f"transformer_ce={ce:.4f} (params={num_parameters(model)})",
+                      file=sys.stderr, flush=True)
+            if ckpt_paths is not None and seed_models:
+                save_seed_models(ckpt_paths["models"], seed_models, seed_ces,
+                                 fp_json)
+                print(f"[c15_grammar] {events.symbol} fold {fold.index}: "
+                      f"seed models checkpointed to {ckpt_paths['models']}",
+                      file=sys.stderr, flush=True)
     trans_ce = float(np.mean(seed_ces)) if seed_ces else float("nan")
     # Training is over — the train stream is not needed for the null.
     del train_tokens
@@ -863,17 +1185,71 @@ def _run_fold(
     # Surrogate null: re-EVALUATE both trained arms on each surrogate (D2).
     rng = np.random.default_rng(surrogate_seed)
     surr_gaps = np.full(n_surrogates, np.nan, dtype=np.float64)
-    for r in range(n_surrogates):
-        surr = hour_block_shuffle(test_tokens, test_hours,
-                                  block_len=block_len, rng=rng)
-        m_ce = best_model.cross_entropy(surr) if best_model is not None else float("nan")
+    surr_markov = np.full(n_surrogates, np.nan, dtype=np.float64)
+    surr_trans = np.full(n_surrogates, np.nan, dtype=np.float64)
+    start_r = 0
+    if ckpt_paths is not None:
+        partial = _load_fold_surr_partial(ckpt_paths["surr"],
+                                          ckpt_fingerprint, n_surrogates)
+        if partial is not None and transformer_arm and not models_resumed:
+            # The partial null was scored by a PREVIOUS training whose
+            # models are gone/stale — continuing would mix two trainings
+            # inside one fold's null. Discard, restart the null.
+            print(f"[c15_grammar] {events.symbol} fold {fold.index}: "
+                  f"surrogate partial found but seed-model checkpoint "
+                  f"missing/stale — restarting the null (never mixing two "
+                  f"trainings)", file=sys.stderr, flush=True)
+            partial = None
+        if partial is not None:
+            start_r = partial["n_done"]
+            surr_gaps[:start_r] = partial["gaps"]
+            surr_markov[:start_r] = partial["markov_ces"]
+            surr_trans[:start_r] = partial["transformer_ces"]
+            rng.bit_generator.state = partial["rng_state"]
+            print(f"[c15_grammar] {events.symbol} fold {fold.index}: "
+                  f"RESUMED surrogate null at {start_r}/{n_surrogates} "
+                  f"({ckpt_paths['surr']})", file=sys.stderr, flush=True)
+    # Surrogate-invariant precompute (Markov reuse base): per-position
+    # log-probs of the ORIGINAL test stream under the fixed best baseline.
+    lp_base = best_model.log_probs(test_tokens) if best_model is not None else None
+    t_loop0 = time.monotonic()
+    for r in range(start_r, n_surrogates):
+        # generation: sequential draws, identical RNG consumption order as
+        # the historical token-moving shuffle (see hour_block_shuffle_perm)
+        src = hour_block_shuffle_perm(test_hours, block_len=block_len, rng=rng)
+        surr = test_tokens[src]
+        if best_model is not None:
+            m_ce = surrogate_cross_entropy(best_model, surr, src, lp_base)
+        else:
+            m_ce = float("nan")
         if seed_models:
-            t_ces = [evaluate_ce(m, surr, cfg, device=device) for m in seed_models]
+            t_ces = evaluate_ce_multi(seed_models, surr, cfg, device=device)
             t_ce = float(np.mean(t_ces))
         else:
             t_ce = float("nan")
+        surr_markov[r] = m_ce
+        surr_trans[r] = t_ce
         surr_gaps[r] = m_ce - t_ce
-        del surr  # only the gap SCALAR is kept per surrogate
+        del surr, src  # only the CE scalars are kept per surrogate
+        done = r + 1
+        if surr_log_every > 0 and (done % surr_log_every == 0
+                                   or done == n_surrogates):
+            pace = (time.monotonic() - t_loop0) / max(1, done - start_r)
+            eta_min = pace * (n_surrogates - done) / 60.0
+            now_iso = datetime.now(timezone.utc).isoformat(timespec="seconds")
+            print(f"[c15_grammar] {events.symbol} fold {fold.index}: "
+                  f"surrogate {done}/{n_surrogates} markov_ce={m_ce:.4f} "
+                  f"transformer_ce={t_ce:.4f} gap={surr_gaps[r]:.5f} "
+                  f"({pace:.1f}s/surrogate, ETA {eta_min:.0f} min) "
+                  f"[{now_iso}]", file=sys.stderr, flush=True)
+        if ckpt_paths is not None and surr_ckpt_every > 0 and (
+                done % surr_ckpt_every == 0 or done == n_surrogates):
+            _write_fold_surr_partial(
+                ckpt_paths["surr"], ckpt_fingerprint,
+                n_done=done, gaps=surr_gaps, markov_ces=surr_markov,
+                transformer_ces=surr_trans,
+                rng_state=rng.bit_generator.state)
+    del lp_base
     # Seed models are finished after the null — drop them and release
     # torch's cached CUDA blocks before the next fold trains.
     if seed_models:

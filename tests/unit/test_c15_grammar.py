@@ -837,6 +837,296 @@ class TestSymbolCheckpointResume:
 
 
 # ----------------------------------------------------------------------------
+# (h2) schema-v2 fold-level checkpoints + surrogate partial resume — a
+# timeout inside ONE fold's ~200-surrogate null must lose at most
+# ~surr_ckpt_every surrogates and resume BIT-IDENTICALLY (the 12h T3 run
+# died inside BTCUSDT fold 0 with zero recoverable state).
+# ----------------------------------------------------------------------------
+
+def _assert_tree_equal(a, b, path: str = "$") -> None:
+    """Exact structural equality with NaN == NaN (bit-identity check)."""
+    if isinstance(a, float) or isinstance(b, float):
+        fa, fb = float(a), float(b)
+        if np.isnan(fa) or np.isnan(fb):
+            assert np.isnan(fa) and np.isnan(fb), f"{path}: {a!r} != {b!r}"
+        else:
+            assert fa == fb, f"{path}: {a!r} != {b!r}"
+    elif isinstance(a, dict):
+        assert isinstance(b, dict) and set(a) == set(b), f"{path}: keys differ"
+        for k in a:
+            _assert_tree_equal(a[k], b[k], f"{path}.{k}")
+    elif isinstance(a, (list, tuple)):
+        assert isinstance(b, (list, tuple)) and len(a) == len(b), \
+            f"{path}: length differs"
+        for i, (x, y) in enumerate(zip(a, b)):
+            _assert_tree_equal(x, y, f"{path}[{i}]")
+    else:
+        assert a == b, f"{path}: {a!r} != {b!r}"
+
+
+class TestFoldCheckpointResume:
+    """Fold-granular checkpoints (schema v2) + surrogate partial state."""
+
+    BLOCK_LEN = 4  # small so the tiny synthetic hour groups really shuffle
+
+    def _setup(self) -> tuple[list[str], dict]:
+        days = _day_grid("2026-01-01", 20)
+        events = {"BTCUSDT": _make_stream("BTCUSDT", days, 120, seed=3)}
+        return days, events
+
+    def _run_kwargs(self, **overrides) -> dict:
+        kw = dict(mode="mechanics", n_folds=2, embargo_days=1, seeds=(42,),
+                  n_surrogates=6, block_len=self.BLOCK_LEN,
+                  surr_ckpt_every=2, surr_log_every=0)
+        kw.update(overrides)
+        return kw
+
+    def test_fold_checkpoints_written_and_resume_bitidentical(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        days, events = self._setup()
+        ckpt_dir = tmp_path / "ckpt"
+        reference = c15_driver.run(events, days, **self._run_kwargs())
+        first = c15_driver.run(events, days,
+                               **self._run_kwargs(ckpt_dir=ckpt_dir))
+        # checkpointing itself must not perturb a single statistic
+        _assert_tree_equal(reference["per_symbol"], first["per_symbol"])
+        assert (ckpt_dir / "BTCUSDT.fold0.json").exists()
+        assert (ckpt_dir / "BTCUSDT.fold1.json").exists()
+
+        # kill the symbol-level checkpoint -> resume must come from the
+        # FOLD level, without a single _run_fold call, bit-identically.
+        (ckpt_dir / "BTCUSDT.json").unlink()
+        calls: list[str] = []
+        real_run_fold = c15_driver._run_fold
+
+        def counting_run_fold(ev, fold, cfg, **kw):
+            calls.append(f"{ev.symbol}.fold{fold.index}")
+            return real_run_fold(ev, fold, cfg, **kw)
+
+        monkeypatch.setattr(c15_driver, "_run_fold", counting_run_fold)
+        second = c15_driver.run(events, days,
+                                **self._run_kwargs(ckpt_dir=ckpt_dir))
+        assert calls == [], f"fold-level resume must not recompute: {calls}"
+        _assert_tree_equal(first["per_symbol"], second["per_symbol"])
+
+    def test_surrogate_partial_checkpoint_and_resume_bitidentical(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """Crash mid-null -> partial file holds the exact per-surrogate CEs
+        + RNG state; the resumed run continues the SAME surrogate sequence
+        (verified against an independent direct recomputation) and the
+        final payload equals an uninterrupted run bit for bit."""
+        days, events = self._setup()
+        ckpt_dir = tmp_path / "ckpt"
+        reference = c15_driver.run(events, days, **self._run_kwargs())
+
+        # crash on the 5th surrogate DRAW (fold 0): partials exist for 2, 4
+        real_perm = c15_driver.hour_block_shuffle_perm
+        n_calls = {"n": 0}
+
+        def crashing_perm(*a, **kw):
+            n_calls["n"] += 1
+            if n_calls["n"] == 5:
+                raise RuntimeError("simulated timeout")
+            return real_perm(*a, **kw)
+
+        monkeypatch.setattr(c15_driver, "hour_block_shuffle_perm", crashing_perm)
+        with pytest.raises(RuntimeError, match="simulated timeout"):
+            c15_driver.run(events, days,
+                           **self._run_kwargs(ckpt_dir=ckpt_dir))
+        monkeypatch.setattr(c15_driver, "hour_block_shuffle_perm", real_perm)
+
+        surr_path = ckpt_dir / "BTCUSDT.fold0.surr.json"
+        assert surr_path.exists(), "surrogate partial checkpoint missing"
+        partial = json.loads(surr_path.read_text(encoding="utf-8"))
+        assert partial["n_done"] == 4
+        assert len(partial["surrogate_gaps"]) == 4
+        assert len(partial["surrogate_markov_ces"]) == 4
+
+        # independent direct recomputation of the first 4 surrogate Markov
+        # CEs (registered seed discipline: default_rng(20260709 + 7919*0))
+        folds = c15_stats.walk_forward_folds(days, n_folds=2, embargo_days=1)
+        spec, train_tokens, test_tokens, test_hours = c15_driver.prepare_fold(
+            events["BTCUSDT"], folds[0])
+        baselines = c15_markov.fit_all_baselines(train_tokens, spec.vocab_size)
+        best_name, _, _ = c15_markov.best_baseline_ce(baselines, test_tokens)
+        best = baselines[best_name]
+        rng = np.random.default_rng(20260709)
+        expected = [
+            best.cross_entropy(c15_stats.hour_block_shuffle(
+                test_tokens, test_hours, block_len=self.BLOCK_LEN, rng=rng))
+            for _ in range(6)
+        ]
+        assert partial["surrogate_markov_ces"] == expected[:4], (
+            "partial checkpoint CEs differ from the direct surrogate "
+            "sequence — resume would not be bit-identical")
+
+        # resume: fold 0 must draw only the MISSING 2 surrogates, fold 1
+        # all 6 — and the final payload must equal the uninterrupted run.
+        n_resumed = {"n": 0}
+
+        def counting_perm(*a, **kw):
+            n_resumed["n"] += 1
+            return real_perm(*a, **kw)
+
+        monkeypatch.setattr(c15_driver, "hour_block_shuffle_perm", counting_perm)
+        resumed = c15_driver.run(events, days,
+                                 **self._run_kwargs(ckpt_dir=ckpt_dir))
+        assert n_resumed["n"] == (6 - 4) + 6, (
+            f"resume drew {n_resumed['n']} surrogates, expected 8 "
+            f"(2 remaining in fold 0 + 6 in fold 1)")
+        _assert_tree_equal(reference["per_symbol"], resumed["per_symbol"])
+
+        # the completed partial file proves surrogates 5..6 continued the
+        # SAME RNG sequence (bit-generator state restore, not a restart)
+        final_partial = json.loads(surr_path.read_text(encoding="utf-8"))
+        assert final_partial["n_done"] == 6
+        assert final_partial["surrogate_markov_ces"] == expected
+
+    def test_fold_fingerprint_mismatch_forces_fold_recompute(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """A fold checkpoint whose fingerprint (registered params + fold
+        index) does not match must be recomputed, never adopted — while
+        intact sibling folds still resume."""
+        days, events = self._setup()
+        ckpt_dir = tmp_path / "ckpt"
+        clean = c15_driver.run(events, days,
+                               **self._run_kwargs(ckpt_dir=ckpt_dir))
+        (ckpt_dir / "BTCUSDT.json").unlink()  # force fold-level path
+
+        # tamper fold 0: sentinel result under a WRONG fingerprint
+        fold0_path = ckpt_dir / "BTCUSDT.fold0.json"
+        payload = json.loads(fold0_path.read_text(encoding="utf-8"))
+        payload["public"]["best_markov_ce"] = 999.0
+        payload["fingerprint"]["block_len"] = 9999
+        fold0_path.write_text(json.dumps(payload), encoding="utf-8")
+
+        calls: list[str] = []
+        real_run_fold = c15_driver._run_fold
+
+        def counting_run_fold(ev, fold, cfg, **kw):
+            calls.append(f"fold{fold.index}")
+            return real_run_fold(ev, fold, cfg, **kw)
+
+        monkeypatch.setattr(c15_driver, "_run_fold", counting_run_fold)
+        second = c15_driver.run(events, days,
+                                **self._run_kwargs(ckpt_dir=ckpt_dir))
+        assert calls == ["fold0"], (
+            f"expected exactly the tampered fold to recompute, got {calls}")
+        fold0_row = second["per_symbol"][0]["folds"][0]
+        assert fold0_row["best_markov_ce"] != 999.0, (
+            "stale fold checkpoint was silently adopted")
+        _assert_tree_equal(clean["per_symbol"], second["per_symbol"])
+
+    def test_surrogate_progress_lines_logged(
+        self, tmp_path: Path, capfd: pytest.CaptureFixture[str],
+    ) -> None:
+        """The surrogate loop must emit progress lines (the 12h run gave
+        ~10.5h of silence) — cadence surr_log_every, with pace + ETA."""
+        days, events = self._setup()
+        c15_driver.run(events, days, **self._run_kwargs(surr_log_every=2))
+        err = capfd.readouterr().err
+        assert "surrogate 2/6" in err
+        assert "surrogate 6/6" in err
+        assert "s/surrogate, ETA" in err
+
+
+# ----------------------------------------------------------------------------
+# (h3) surrogate-scoring fast paths — MUST equal the direct evaluation
+# bit for bit (registered methodology untouched; only the schedule moved).
+# ----------------------------------------------------------------------------
+
+class TestSurrogateScoringEquivalence:
+    def test_hour_block_shuffle_perm_matches_shuffle(self) -> None:
+        """tokens[perm] must reproduce the historical shuffle EXACTLY —
+        same surrogate stream, same dtype, same RNG consumption."""
+        rng = np.random.default_rng(11)
+        n = 4000
+        hours = np.sort(rng.integers(0, 24, size=n)).astype(np.int8)
+        tokens = rng.integers(0, 128, size=n).astype(np.int16)
+        for block_len in (1, 4, 16, 4096):
+            r1 = np.random.default_rng(99)
+            r2 = np.random.default_rng(99)
+            out = c15_stats.hour_block_shuffle(
+                tokens, hours, block_len=block_len, rng=r1)
+            src = c15_stats.hour_block_shuffle_perm(
+                hours, block_len=block_len, rng=r2)
+            assert np.array_equal(out, tokens[src])
+            assert out.dtype == tokens.dtype
+            assert r1.bit_generator.state == r2.bit_generator.state, (
+                "RNG consumption diverged — deterministic surrogate seeds "
+                "would no longer reproduce the registered null")
+            # a permutation of positions, always
+            assert np.array_equal(np.sort(src), np.arange(n))
+
+    def test_markov_surrogate_fastpath_equals_direct(self) -> None:
+        """surrogate_cross_entropy (log-prob reuse + seam recompute) must
+        equal model.cross_entropy(surr) EXACTLY (==, not approx) for every
+        registered baseline form."""
+        rng = np.random.default_rng(5)
+        V = 12
+        train = rng.integers(0, V, size=30_000).astype(np.int16)
+        test = rng.integers(0, V, size=6_000).astype(np.int16)
+        hours = np.sort(rng.integers(0, 24, size=6_000)).astype(np.int8)
+        models = [c15_markov.MarkovKT(order=k, vocab_size=V).fit(train)
+                  for k in (0, 1, 4)]
+        models.append(
+            c15_markov.InterpolatedMarkov(max_order=4, vocab_size=V).fit(train))
+        for model in models:
+            lp_base = model.log_probs(test)
+            srng = np.random.default_rng(123)
+            for _ in range(5):
+                src = c15_stats.hour_block_shuffle_perm(
+                    hours, block_len=16, rng=srng)
+                surr = test[src]
+                fast = c15_markov.surrogate_cross_entropy(
+                    model, surr, src, lp_base)
+                direct = model.cross_entropy(surr)
+                assert fast == direct, (
+                    f"{type(model).__name__}: fast path {fast!r} != "
+                    f"direct {direct!r}")
+
+    def test_markov_surrogate_fastpath_identity_permutation(self) -> None:
+        """Degenerate case: block_len >= group size -> identity surrogate;
+        the fast path must reproduce the ORIGINAL CE exactly."""
+        rng = np.random.default_rng(6)
+        V = 8
+        train = rng.integers(0, V, size=10_000).astype(np.int16)
+        test = rng.integers(0, V, size=2_000).astype(np.int16)
+        hours = np.sort(rng.integers(0, 24, size=2_000)).astype(np.int8)
+        model = c15_markov.InterpolatedMarkov(max_order=4, vocab_size=V).fit(train)
+        lp_base = model.log_probs(test)
+        srng = np.random.default_rng(7)
+        src = c15_stats.hour_block_shuffle_perm(hours, block_len=10_000, rng=srng)
+        assert np.array_equal(src, np.arange(2_000))  # identity
+        fast = c15_markov.surrogate_cross_entropy(model, test[src], src, lp_base)
+        assert fast == model.cross_entropy(test)
+
+    @pytest.mark.skipif(not c15_transformer._TORCH_AVAILABLE,
+                        reason="torch not installed in this sandbox")
+    def test_evaluate_ce_multi_matches_single(self) -> None:
+        """Batched multi-model CE must equal per-model evaluate_ce bit for
+        bit on the CPU path (same chunks, same reductions in the same
+        order; only the accumulator moved device-side)."""
+        cfg = c15_transformer.GrammarTransformerConfig(
+            vocab_size=16, context_len=32, d_model=16, n_heads=2,
+            n_layers=1, epochs=1, batch_size=4)
+        rng = np.random.default_rng(3)
+        train = rng.integers(0, 16, size=2_000).astype(np.int16)
+        test = rng.integers(0, 16, size=1_000).astype(np.int16)
+        models = [
+            c15_transformer.train_transformer(train, cfg, seed=s, device="cpu")
+            for s in (42, 43)
+        ]
+        multi = c15_transformer.evaluate_ce_multi(models, test, cfg, device="cpu")
+        single = [c15_transformer.evaluate_ce(m, test, cfg, device="cpu")
+                  for m in models]
+        assert multi == single
+
+
+# ----------------------------------------------------------------------------
 # (i) benjamini_hochberg — dedicated unit test (Bug #4), own BH-FDR copy.
 # ----------------------------------------------------------------------------
 

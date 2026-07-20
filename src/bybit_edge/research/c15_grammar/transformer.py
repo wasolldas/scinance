@@ -39,7 +39,9 @@ from __future__ import annotations
 
 import logging
 import math
+import os
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Any
 
 import numpy as np
@@ -318,11 +320,179 @@ def evaluate_ce(
     return total_nll / total_cnt
 
 
+def evaluate_ce_multi(
+    models: list[Any],
+    tokens: np.ndarray,
+    cfg: GrammarTransformerConfig,
+    *,
+    device: str,
+    eval_batch_size: int = 64,
+) -> list[float]:
+    """CE of SEVERAL models on ONE stream — one chunking/transfer pass.
+
+    Returns ``[evaluate_ce(m, tokens, ...) for m in models]`` bit-for-bit,
+    but 200x-per-fold cheaper on the surrogate null: the stream is chunked
+    ONCE (not once per model), every batch is moved host->device ONCE and
+    all models score the SAME device-resident batch, and the two
+    per-batch ``.item()`` host syncs of the single-model path are replaced
+    by device-side accumulators read back once at the end.
+
+    Bit-identity argument (why the result equals per-model ``evaluate_ce``):
+      * chunks, batch grouping (``eval_batch_size``), ``inp``/``tgt``/
+        ``keep`` and each model's forward see IDENTICAL input tensors on
+        the identical device — same kernels, same logits, same per-batch
+        float32 ``nll[keep].sum()`` values;
+      * the single-model path accumulates those batch sums in a HOST
+        float64 (``total += float(batch_sum.item())``, batch order); here
+        each batch sum is widened float32->float64 (exact) and added into
+        a DEVICE float64 scalar in the SAME batch order — IEEE-754 double
+        addition is identical on host and device, so the running sums (and
+        the final ``sum/count`` divide) match bit for bit;
+      * the kept-position count is model-independent and integer-exact.
+    Per-surrogate CE numerics are therefore unchanged (registered CE-gap
+    methodology untouched); guarded by the torch-gated regression test
+    ``test_evaluate_ce_multi_matches_single``.
+    """
+    _require_torch()
+    if not models:
+        return []
+    tokens = np.asarray(tokens)
+    if tokens.dtype.kind != "i":
+        tokens = tokens.astype(np.int64)
+    n = tokens.size
+    if n <= CE_WARMUP:
+        return [float("nan")] * len(models)
+    chunks = _chunk_stream(tokens, cfg.context_len + 1)
+    if chunks.shape[0] == 0:
+        return [float("nan")] * len(models)
+    stride = cfg.context_len  # chunk s starts at global position s*stride
+
+    for model in models:
+        model.eval()
+    totals = [torch.zeros((), dtype=torch.float64, device=device)
+              for _ in models]
+    cnt = torch.zeros((), dtype=torch.int64, device=device)
+    with torch.no_grad():
+        for b0 in range(0, chunks.shape[0], eval_batch_size):
+            batch_np = chunks[b0: b0 + eval_batch_size]
+            # explicit long cast: chunks may be stored int16 (values exact)
+            batch = torch.from_numpy(batch_np).to(device=device, dtype=torch.long)
+            inp = batch[:, :-1].clamp_min(0)
+            tgt = batch[:, 1:]
+            valid = tgt >= 0
+            # global position of target column j in chunk i: i*stride + j + 1
+            rows = torch.arange(b0, b0 + batch.shape[0], device=device)
+            gpos = rows.unsqueeze(1) * stride + torch.arange(
+                1, batch.shape[1], device=device
+            ).unsqueeze(0)
+            keep = valid & (gpos >= CE_WARMUP)
+            safe_tgt = tgt.clamp_min(0).unsqueeze(-1)
+            cnt += keep.sum()
+            for m_i, model in enumerate(models):
+                logits = model(inp)
+                logp = torch.log_softmax(logits, dim=-1)
+                nll = -logp.gather(-1, safe_tgt).squeeze(-1)  # (B, L)
+                # same float32 batch reduction as evaluate_ce, widened to
+                # float64 BEFORE the cross-batch add (exact widening; adds
+                # run in the same batch order as the host accumulation).
+                totals[m_i] += nll[keep].sum().to(torch.float64)
+    total_cnt = int(cnt.item())
+    if total_cnt == 0:
+        return [float("nan")] * len(models)
+    return [float(t.item()) / total_cnt for t in totals]
+
+
+# ----------------------------------------------------------------------------
+# Per-(symbol, fold) seed-model checkpointing (driver resume support)
+# ----------------------------------------------------------------------------
+
+def save_seed_models(
+    path: Path | str,
+    models: list[Any],
+    seed_ces: list[float],
+    fingerprint_json: str,
+) -> None:
+    """Atomically persist a fold's trained seed models + observed seed CEs.
+
+    Written ONCE per (symbol, fold) right after the 3 seed trainings so a
+    timeout inside the ~200-surrogate null can resume with the EXACT same
+    weights (bit-identical state_dict round-trip) instead of re-training —
+    GPU re-training is not guaranteed bit-reproducible, and mixing gaps
+    from two trainings inside one fold's null would be methodologically
+    unsound. No-op without torch (mechanics mode without the transformer
+    arm has no models to persist).
+    """
+    if not _TORCH_AVAILABLE:
+        return
+    p = Path(path)
+    p.parent.mkdir(parents=True, exist_ok=True)
+    tmp = p.with_suffix(p.suffix + ".tmp")
+    torch.save(
+        {
+            "schema": 2,
+            "fingerprint_json": str(fingerprint_json),
+            "state_dicts": [m.state_dict() for m in models],
+            "seed_ces": [float(c) for c in seed_ces],
+        },
+        tmp,
+    )
+    os.replace(tmp, p)
+
+
+def load_seed_models(
+    path: Path | str,
+    cfg: GrammarTransformerConfig,
+    *,
+    device: str,
+    fingerprint_json: str,
+) -> tuple[list[Any], list[float]] | None:
+    """Load a fold's seed models iff present AND the fingerprint matches.
+
+    Returns ``(models, seed_ces)`` with the models reconstructed on
+    ``device`` from their exact saved weights, or ``None`` on any of:
+    torch unavailable, missing/corrupt file, fingerprint mismatch (stale
+    checkpoint from a different registered configuration — recomputed,
+    never silently reused; same discipline as the JSON checkpoints).
+    """
+    if not _TORCH_AVAILABLE:
+        return None
+    p = Path(path)
+    if not p.exists():
+        return None
+    try:
+        payload = torch.load(p, map_location=device, weights_only=True)
+    except Exception:
+        return None
+    if not isinstance(payload, dict):
+        return None
+    if payload.get("fingerprint_json") != fingerprint_json:
+        return None
+    state_dicts = payload.get("state_dicts")
+    seed_ces = payload.get("seed_ces")
+    if not isinstance(state_dicts, list) or not isinstance(seed_ces, list):
+        return None
+    if len(state_dicts) != len(seed_ces):
+        return None
+    try:
+        models: list[Any] = []
+        for sd in state_dicts:
+            model = GrammarTransformer(cfg).to(device)
+            model.load_state_dict(sd)
+            model.eval()
+            models.append(model)
+    except Exception:
+        return None
+    return models, [float(c) for c in seed_ces]
+
+
 __all__ = [
     "ComputeUnavailableError",
     "GrammarTransformerConfig",
     "evaluate_ce",
+    "evaluate_ce_multi",
+    "load_seed_models",
     "num_parameters",
+    "save_seed_models",
     "release_device_memory",
     "torch_cuda_status",
     "train_transformer",

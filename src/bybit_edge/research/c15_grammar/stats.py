@@ -196,16 +196,49 @@ def hour_block_shuffle(
     never changes values, so int16 in -> int16 out is bit-identical in
     content while avoiding a full int64 copy of a ~30M-token test stream
     per surrogate — 200+ such copies per fold otherwise).
+
+    Implementation note (performance refactor, zero methodology change):
+    the shuffle is expressed as ``tokens[hour_block_shuffle_perm(...)]`` —
+    the SOURCE-INDEX permutation is built by exactly the loop that used to
+    move the tokens themselves, with the identical single
+    ``rng.permutation(n_blocks)`` draw per >1-block hour group in hour
+    order, so RNG CONSUMPTION and the resulting surrogate stream are
+    bit-identical to the pre-refactor version. Exposing the permutation
+    lets the driver's surrogate scoring reuse per-position log-probs of
+    the ORIGINAL stream for every position whose whole Markov context maps
+    contiguously (see ``markov_baseline.surrogate_cross_entropy``).
     """
     tokens = np.asarray(tokens)
     hours = np.asarray(hours)
     if tokens.shape != hours.shape:
         raise FoldError("tokens and hours must share shape")
+    src = hour_block_shuffle_perm(hours, block_len=block_len, rng=rng)
+    return tokens[src]
+
+
+def hour_block_shuffle_perm(
+    hours: np.ndarray,
+    *,
+    block_len: int = BLOCK_LEN_EVENTS,
+    rng: np.random.Generator,
+) -> np.ndarray:
+    """Source-index permutation of one within-hour-of-day block shuffle.
+
+    Returns ``src`` (int64, len(hours)) such that ``tokens[src]`` is the
+    registered surrogate stream: ``surrogate[t] = original[src[t]]``. RNG
+    consumption is EXACTLY one ``rng.permutation(n_blocks)`` per hour-of-day
+    group with more than one block, iterated in hour order 0..23 — identical
+    to the historical token-moving implementation (the registered
+    deterministic seed discipline therefore reproduces the same 200
+    surrogates bit-for-bit). Groups with ``<= block_len`` events are the
+    identity (single block), exactly as before.
+    """
+    hours = np.asarray(hours)
     if block_len < 1:
         raise FoldError("block_len must be >= 1")
     if hours.size and (hours.min() < 0 or hours.max() > 23):
         raise FoldError("hours must be 0..23")
-    out = tokens.copy()
+    src = np.arange(hours.size, dtype=np.int64)
     for h in range(24):
         idx = np.nonzero(hours == h)[0]
         m = idx.size
@@ -214,10 +247,11 @@ def hour_block_shuffle(
         n_blocks = int(np.ceil(m / block_len))
         starts = [b * block_len for b in range(n_blocks)]
         perm = rng.permutation(n_blocks)
-        group = tokens[idx]
-        pieces = [group[starts[b]: starts[b] + block_len] for b in perm]
-        out[idx] = np.concatenate(pieces)
-    return out
+        order = np.concatenate(
+            [np.arange(starts[b], min(starts[b] + block_len, m)) for b in perm]
+        )
+        src[idx] = idx[order]
+    return src
 
 
 # ----------------------------------------------------------------------------
@@ -261,6 +295,7 @@ __all__ = [
     "SYMBOLS_PASS_MIN",
     "benjamini_hochberg",
     "hour_block_shuffle",
+    "hour_block_shuffle_perm",
     "relative_ce_gap",
     "surrogate_gap_p",
     "walk_forward_folds",
