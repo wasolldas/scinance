@@ -675,3 +675,34 @@ Beide Fenster sind **byte-identisch** zu den archivierten GL-006-Fenstern (F0: 2
 
 ### Programm-Bilanz (nach GL-014)
 Welle 1: H-01/H-02/H-03 DROP. Welle 2: H-04 WEITER (kapitalfrei) · H-04b PARK · H-05 DROP · H-06 DROP. Welle 3: H-05b WEITER (kapitalfrei) · H-05c PARK · H-07 DROP (strukturell) · H-08 DROP (empirisch). Welle 5 (laufend): **H-18 Auflösungs-Audit abgeschlossen** (GL-006 präzisiert: 4 harte + 8 fragile Zellen; kein neues Verdikt) · H-14…H-17 ausstehend (H-16-Lauf 1 durch PC-Neustart abgebrochen). Weiterhin 2 kapitalfreie Mess-WEITER, beide Tradability-PARK; 0 handelbare Kanten. 14 GL-Einträge, 0 Torpfosten-Verschiebungen.
+
+---
+
+## GL-015 · 2026-07-24 · H-16 · C16 Time-Arrow-CNN: Zeit-Irreversibilität im 1s-Trade-Imbalance-Flow (Welle 5, KAPITALFREI, GPU) — **WEITER (kapitalfrei)**
+
+**Quelle:** `state/c16_arrow_results.{json,md}` (archiviert aus `handoff_local/results/h16_20260722_115606/h16/`), erzeugt 2026-07-23 22:06 UTC. Lauf: RTX 5060 Ti, torch 2.11.0+cu128, `verdict_bearing=true` (echtes CUDA, `cell_errors=[]`, `non_verdict_reasons=[]`, 0 Sentinel-Zellen, torch/numpy-Scalogramm-Paritätscheck max_abs_diff 2,4e-7 < atol 1e-6). Datenfenster 2026-03-27..2026-07-19 (gepinnt; die Envelope-only-Tage ab 2026-07-17 wurden von der Datenhygiene sauber als INVALID ausgeschlossen — effektiv bis 2026-07-16, z.B. BTC 112/115 valide Tage). Methodik registriert: 5 Seeds + 20 IAAFT-Surrogat-Retrainings + 3 Ablationen je Symbol = 140 Trainings, Seed 42, ~57h GPU über 4 Checkpoint-Sessions (das in dieser Welle eingeführte Checkpoint/Resume-System — Commit 341d1d9 — hat den Lauf über 2 Timeouts und 1 Fortsetzung bit-identisch zusammengesetzt).
+
+### Registriertes Gate (H-16, wörtlich) vs. Messung
+
+Gate: WEITER, wenn Held-out-Day-Forward-vs-Reversed-AUC >=0,60 MIT IAAFT-Surrogat-Null-95.-Perzentil unter 0,53, bei >=4/5 Symbolen nach BH-FDR alpha=0,10 über F-ARROW, UND die phasenrandomisierte Leak-Kontrolle bleibt <=0,52.
+
+| Symbol | AUC | >=0,60 | Surr-p95 | <0,53 | Leak | <=0,52 | p (BH-FDR) | FDR-sig | Zelle bestanden |
+|---|---:|:---:|---:|:---:|---:|:---:|---:|:---:|:---:|
+| BTCUSDT | **0,7331** | ja | 0,5045 | ja | 0,4979 | ja | ~0 | ja | **ja** |
+| ETHUSDT | **0,7353** | ja | 0,5077 | ja | 0,5001 | ja | ~0 | ja | **ja** |
+| SOLUSDT | **0,6648** | ja | 0,5082 | ja | 0,4993 | ja | ~0 | ja | **ja** |
+| BNBUSDT | 0,5929 | **nein** | 0,5044 | ja | 0,4989 | ja | 5,8e-146 | ja | **nein** (AUC-Floor) |
+| XRPUSDT | **0,6416** | ja | 0,5067 | ja | 0,5007 | ja | ~0 | ja | **ja** |
+
+- **Quorum: 4/5 Zellen bestanden — die registrierte >=4/5-Schwelle ist EXAKT erfüllt.** BH-FDR α=0,10 über F-ARROW: 5/5 signifikant (p_crit 5,8e-146 — die p-Werte sind so extrem, dass BH degeneriert; urteilstragend ist das Zell-Quorum inkl. AUC-Floor).
+- **Leak-Kontrolle bestanden in allen 5 Zellen** (max 0,5007 <= 0,52) — methodisch valide, kein Repräsentations-Leak.
+- **BNBUSDT ehrlich eingeordnet:** Der Effekt existiert auch dort unzweifelhaft (p=5,8e-146 gegen die exakte Bayes-Null 0,5, Surrogate sauber bei ~0,50), liegt aber mit AUC 0,593 knapp UNTER dem registrierten Stärke-Floor 0,60 — die Zelle zählt NICHT zum Quorum. Keine Schwellen-Diskussion: der Floor stand vorregistriert, BNB ist zugleich das dünnste Symbol des Panels (~9,0M Events vs. 196,6M bei BTC).
+- **Robustheit (deskriptiv, nicht urteilstragend):** Seed-Streuung winzig (z.B. BTC 0,7228–0,7394 über 5 Seeds); Surrogat-Nullen eng um 0,50 (0,4855–0,5087 über alle 100 Surrogat-Trainings); Effektstärken-Ordnung BTC≈ETH > SOL > XRP > BNB folgt grob der Liquiditätsordnung. Ablations-Diagnostik (3 je Symbol, z.B. BTC 0,695–0,701) zeigt, dass der Effekt nicht an einer Einzelkomponente der Repräsentation hängt.
+- **Differenzierungsklausel erfüllt:** Der registrierte Abgrenzungsabsatz zum gesperrten Informationstheorie-Cluster (kein Entropie-Schätzer; gemessen wird Zeit-IRREVERSIBILITÄT unter t→−t mit exakter Bayes-Null 0,5) ist im Payload enthalten (`differentiation_note`).
+- **KAPITALFREI bestätigt:** `capital_free=true`, keinerlei bps/Edge/PnL-Metrik im Payload. Eine Handelsfolge wäre eine NEUE H-16b und ist NICHT impliziert.
+
+### URTEIL: **WEITER (kapitalfrei).**
+Alle registrierten WEITER-Bedingungen sind erfüllt (4/5-Quorum mit AUC>=0,60 + Surr-p95<0,53 + FDR-sig; Leak-Kontrolle global bestanden). Die 1s-Trade-Imbalance-Dynamik der großen Perp-Märkte trägt eine massive, symbol-replizierte, seed-stabile Zeit-Irreversibilitäts-Signatur (AUC bis 0,735 gegen exakte 0,5-Null), die von IAAFT-Surrogaten (lineare Struktur + Marginal erhalten) NICHT reproduziert wird — der Zeitpfeil sitzt in der nichtlinearen/höheren Struktur des Flows. Verdikt-Status: Messungen-WEITER, Kapital-Status entfällt (kapitalfrei per Registrierung). Kein H-16b-Nachschieben impliziert.
+
+### Programm-Bilanz (nach GL-015)
+Welle 1–3 unverändert (2 kapitalfreie Mess-WEITER, beide Tradability-PARK, 0 handelbare Kanten). Welle 5: H-18 Audit abgeschlossen (GL-014) · **H-16 WEITER (kapitalfrei) — das erste vollständige GPU-Hypothesen-Verdikt des Programms** · H-15 läuft (Checkpoint-Tranchen) · H-14/H-17 data-gated (Entsperrung in Prüfung nach Harvester-Backfill). 15 GL-Einträge, 0 Torpfosten-Verschiebungen.
