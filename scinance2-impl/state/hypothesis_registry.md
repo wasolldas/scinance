@@ -443,6 +443,18 @@ Alle 5 Hypothesen sind **sofort testbar** (keine data-gated Eintraege wie H-11/H
 
 **Unberuehrt:** H-18 (abgeschlossen, GL-014), H-16 und H-15 — beide bybit-only, Datenlage vollstaendig; ihre Laeufe laufen weiter. Die Original-Texte oben (inkl. der falschen "Sofort testbar"-Zeile) bleiben nach Registry-Disziplin §8 unveraendert stehen; dieser Nachtrag ist die Korrektur. Details und Abwaegung: DEC-27 in `decisions.md`.
 
+
+### Nachtrag 2026-07-25 (append-only) — ENTSPERRUNG H-14 und H-17 (Entsperr-Pfad (a) aus dem Nachtrag 2026-07-20 erfuellt)
+
+Der data-harvest-Backfill (Binance via data.binance.vision, Deribit via REST; Task-Brief 2026-07-20, Vollzugsmeldung des Harvesters 2026-07-24) hat den Entsperr-Pfad (a) erfuellt — verifiziert am 2026-07-25 durch Verzeichnis-Inventur UND Schema-/Dialekt-Pruefung auf der Nutzer-Maschine:
+
+| Boerse | Abdeckung (verifiziert) | Container-Schema |
+|---|---|---|
+| binance | ALLE 5 Symbole 2026-03-27..2026-07-19 (BTC zusaetzlich ab 2025-01-01) | bybit-identisch (payload_json), Inhalt venue-nativ (id/price/qty/is_buyer_maker) |
+| deribit | BTC-PERPETUAL/ETH-PERPETUAL 2026-03-27..2026-07-24 (durchgehend, Alt-Stream-Luecke geschlossen) | bybit-identisch, Inhalt venue-nativ (direction/amount/price) |
+
+Beide registrierten Fensterpaare (W1 2026-03-27..2026-05-15, W2 2026-05-16..2026-07-04) sind damit fuer das volle 12-Node- (H-14) bzw. 10-Node-Panel (H-17) abgedeckt. Code-seitige Vorbedingungen (Commits 2026-07-25): Venue-Payload-Dialekt-Unterstuetzung + Loud-Fail-Guard in den c14/c17-Loadern (c14 war fuer den Preis-Pfad bereits kompatibel — per Fixture-Test bewiesen), Checkpoint/Resume fuer c17 (c16-Muster; H-17 ~35h+ ist damit mehrnaechte-faehig). **Status-Aenderung: H-14 und H-17 sind ENTSPERRT und laufen in der Nacht-Rotation** (H-14 zuerst, Checkpoints seit Baubeginn vorhanden). Die registrierten Gates/Schwellen/Fenster sind UNVERAENDERT — entsperrt wird ausschliesslich die Datenverfuegbarkeit. Details: DEC-28.
+
 ---
 
 ## Registry-Disziplin (verbindlich, PRD §8)
