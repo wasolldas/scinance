@@ -145,10 +145,22 @@ def load_seconds_last_price(
     and aggregates INSIDE DuckDB to the last trade price per ``[t, t+1s)``
     second (``max_by(price, ts_exchange_ms)``). Price extraction is
     exchange-agnostic via ``COALESCE($.price, $.p)`` — covers the Bybit
-    backfill (``price``), Binance aggTrades (``p``) and Deribit (``price``)
-    payload forms (same rationale/limits as ``c12_frag.panel``, incl. the
-    documented Bybit LIVE multi-trade-envelope non-coverage: such rows fail
-    the ``IS NOT NULL`` filter loudly instead of being silently wrong).
+    backfill (``price`` string), Bybit live short form / Binance aggTrades
+    (``p``), the Binance REST backfill (``price`` string) and the Deribit
+    backfill (``price`` as a NATIVE JSON number — ``json_extract_string``
+    returns its decimal string form, so the ``CAST`` sees e.g. ``'74192.0'``;
+    fixture-verified in tests/unit/test_payload_dialects.py). Same
+    rationale/limits as ``c12_frag.panel``, incl. the documented Bybit LIVE
+    multi-trade-envelope non-coverage: such rows fail the price extraction
+    and are counted, not silently wrong.
+
+    LOUD-FAIL GUARD: if parquet files exist AND the window contains raw rows
+    but NOT A SINGLE price can be parsed, a ``DataError`` naming one file and
+    a sample payload is raised instead of returning an all-NaN series (the
+    bug class that hid the 2026-07-17 envelope finding for 5 days). The raw
+    vs. parsed row counts ride along in the ONE existing aggregation query
+    (``COUNT(*)`` vs ``COUNT(price)`` per second) — no second scan; only the
+    error path issues one extra ``LIMIT 1`` probe for the sample payload.
 
     Returns a ``(len(dates) * 86400,)`` float64 array of last prices, NaN
     where the second has no trade. Read-only — never writes into the tree.
@@ -175,28 +187,59 @@ def load_seconds_last_price(
     second0 = start_ms // MS_PER_SECOND
     n_seconds = len(dates) * SECONDS_PER_DAY
     file_list = "[" + ", ".join("'" + g.replace("'", "''") + "'" for g in present) + "]"
+    # One scan: last parsed price per second PLUS raw-vs-parsed row counts
+    # (COUNT(*) vs COUNT(price)) for the loud-fail guard below. The FILTER
+    # keeps max_by over parsed prices only — numerically identical to the
+    # previous WHERE ... IS NOT NULL variant for every parsable row.
     sql = f"""
+        WITH src AS (
+            SELECT ts_exchange_ms,
+                   CAST(COALESCE(json_extract_string(payload_json,'$.price'),
+                                 json_extract_string(payload_json,'$.p')) AS DOUBLE)
+                       AS price
+            FROM read_parquet({file_list}, hive_partitioning=1, union_by_name=1)
+            WHERE ts_exchange_ms IS NOT NULL
+              AND ts_exchange_ms >= {start_ms} AND ts_exchange_ms < {end_ms}
+        )
         SELECT CAST(ts_exchange_ms // {MS_PER_SECOND} AS BIGINT) AS second_idx,
-               max_by(
-                 CAST(COALESCE(json_extract_string(payload_json,'$.price'),
-                               json_extract_string(payload_json,'$.p')) AS DOUBLE),
-                 ts_exchange_ms) AS last_price
-        FROM read_parquet({file_list}, hive_partitioning=1, union_by_name=1)
-        WHERE ts_exchange_ms IS NOT NULL
-          AND ts_exchange_ms >= {start_ms} AND ts_exchange_ms < {end_ms}
-          AND COALESCE(json_extract_string(payload_json,'$.price'),
-                       json_extract_string(payload_json,'$.p')) IS NOT NULL
+               max_by(price, ts_exchange_ms) FILTER (WHERE price IS NOT NULL)
+                   AS last_price,
+               COUNT(*) AS n_raw,
+               COUNT(price) AS n_parsed
+        FROM src
         GROUP BY 1
         ORDER BY 1
     """
     con = duckdb.connect()
     try:
         rows = con.execute(sql).fetchall()
+        n_raw_total = sum(int(r[2]) for r in rows)
+        n_parsed_total = sum(int(r[3]) for r in rows)
+        if n_raw_total > 0 and n_parsed_total == 0:
+            # Loud fail: rows exist in the window but the payload dialect is
+            # unknown to the extraction above. Error path only -> one cheap
+            # LIMIT 1 probe for a concrete file + sample payload.
+            probe = con.execute(f"""
+                SELECT filename, payload_json
+                FROM read_parquet({file_list}, hive_partitioning=1,
+                                  union_by_name=1, filename=1)
+                WHERE ts_exchange_ms IS NOT NULL
+                  AND ts_exchange_ms >= {start_ms} AND ts_exchange_ms < {end_ms}
+                LIMIT 1
+            """).fetchone()
+            fname = str(probe[0]) if probe else "<unknown file>"
+            sample = str(probe[1]) if probe and probe[1] is not None else "<NULL payload_json>"
+            raise DataError(
+                f"{exchange}/{storage_symbol} {dates[0]}..{dates[-1]}: "
+                f"{n_raw_total} raw rows in window but 0 parsable trade prices "
+                f"-- unknown payload_json format (file {fname}, sample payload: "
+                f"{sample[:200]!r})"
+            )
     finally:
         con.close()
     out = np.full(n_seconds, np.nan, dtype=np.float64)
     n_used = 0
-    for second_idx, price in rows:
+    for second_idx, price, _n_raw, _n_parsed in rows:
         off = int(second_idx) - second0
         if 0 <= off < n_seconds and price is not None and np.isfinite(price) and price > 0.0:
             out[off] = float(price)

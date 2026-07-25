@@ -30,8 +30,14 @@ per-venue valid-length distribution is still reported as a diagnostic.
 
 Loader: read-only DuckDB over the harvester Hive tree, exchange-agnostic
 payload extraction — Bybit backfill (``side``/``price``/``size``), Bybit
-live short form (``S``/``p``/``v``) and Binance aggTrades (``p``/``q``/``m``,
-``m`` = buyer-is-maker -> aggressor sell). No write access (Schutzgut).
+live short form (``S``/``p``/``v``), Binance aggTrades (``p``/``q``/``m``,
+``m`` = buyer-is-maker -> aggressor sell), Binance REST backfill
+(``price``/``qty``/``is_buyer_maker``, same maker semantics as ``m``) and
+Deribit backfill (``price``/``amount``/``direction``; ``amount`` is USD
+notional on Deribit perps — see the SQL comment in ``load_node_trades``).
+A window whose rows match NONE of these dialects fails loudly with a
+``DataError`` naming a file + sample payload instead of silently yielding
+0 trades. No write access (Schutzgut).
 
 MEMORY DISCIPLINE (OOM fix, GPU-box crash at 221.8M events/node): the
 pipeline is O(one node) resident and avoids full-length int64/f64
@@ -554,6 +560,32 @@ def _date_list(start_date: str, end_date: str) -> list[str]:
             for i in range((b - a).days + 1)]
 
 
+def _probe_payload_sample(glob_pattern: str, start_ms: int, end_ms: int) -> tuple[str, str]:
+    """One (filename, payload_json) example row for the loud-fail message.
+
+    Called ONLY on the error path (unknown payload dialect in the window),
+    so this extra LIMIT 1 query never costs a second full scan.
+    """
+    import duckdb
+
+    file_expr = "'" + glob_pattern.replace("'", "''") + "'"
+    con = duckdb.connect()
+    try:
+        row = con.execute(f"""
+            SELECT filename, payload_json
+            FROM read_parquet({file_expr}, hive_partitioning=1,
+                              union_by_name=1, filename=1)
+            WHERE ts_exchange_ms IS NOT NULL
+              AND ts_exchange_ms >= {start_ms} AND ts_exchange_ms < {end_ms}
+            LIMIT 1
+        """).fetchone()
+    finally:
+        con.close()
+    if row is None:
+        return "<unknown file>", "<no payload row>"
+    return str(row[0]), (str(row[1]) if row[1] is not None else "<NULL payload_json>")
+
+
 def load_node_trades(
     base_dir: Path | str,
     exchange: str,
@@ -567,10 +599,15 @@ def load_node_trades(
 
     Reads ``<base>/raw/<exchange>/<stream>/symbol=<SYM>/date=<d>/*.parquet``
     read-only. Aggressor sign is extracted exchange-agnostically:
-    ``side``/``S`` = 'buy'/'sell' (Bybit backfill/live short form) or the
-    Binance aggTrade maker flag ``m`` (buyer-is-maker true -> aggressor
-    SELL -> -1; false -> aggressor BUY -> +1). Rows without a resolvable
-    price/size/sign are dropped loudly (counted), never silently defaulted.
+    ``side``/``S`` = 'buy'/'sell' (Bybit backfill/live short form), the
+    Binance maker flags ``m`` (aggTrade) / ``is_buyer_maker`` (REST
+    backfill) — buyer-is-maker true -> aggressor SELL -> -1; false ->
+    aggressor BUY -> +1 — or the Deribit ``direction`` = 'buy'/'sell'.
+    Size covers ``size``/``v``/``q``/``qty``/``amount`` (Deribit ``amount``
+    unit caveat: see the SQL comment below). Rows without a resolvable
+    price/size/sign are dropped loudly (counted), never silently defaulted;
+    if the window has raw rows but ZERO parse at all, a ``DataError`` with
+    file + sample payload is raised (loud-fail guard, no silent 0/NaN).
 
     DAY-BATCHED (audit finding: resource-exhaustion) -- the ~100-day
     registered window is never fetched in ONE ``fetchall()`` call: one
@@ -613,9 +650,18 @@ def load_node_trades(
         SELECT ts_exchange_ms,
                CAST(COALESCE(json_extract_string(payload_json,'$.price'),
                              json_extract_string(payload_json,'$.p')) AS DOUBLE) AS price,
+               -- size dialects: Bybit backfill 'size', Bybit live 'v',
+               -- Binance aggTrade 'q', Binance REST backfill 'qty',
+               -- Deribit backfill 'amount' (native JSON number; NOTE:
+               -- Deribit-perp 'amount' is USD NOTIONAL, not coin size --
+               -- irrelevant for H-17, which uses no Deribit node and
+               -- rank-normalises WITHIN each node, so units never mix,
+               -- but documented honestly for any future reuse).
                CAST(COALESCE(json_extract_string(payload_json,'$.size'),
                              json_extract_string(payload_json,'$.v'),
-                             json_extract_string(payload_json,'$.q')) AS DOUBLE) AS size,
+                             json_extract_string(payload_json,'$.q'),
+                             json_extract_string(payload_json,'$.qty'),
+                             json_extract_string(payload_json,'$.amount')) AS DOUBLE) AS size,
                CASE
                  WHEN lower(COALESCE(json_extract_string(payload_json,'$.side'),
                                      json_extract_string(payload_json,'$.S'))) = 'buy'  THEN 1
@@ -623,6 +669,15 @@ def load_node_trades(
                                      json_extract_string(payload_json,'$.S'))) = 'sell' THEN -1
                  WHEN lower(json_extract_string(payload_json,'$.m')) = 'true'  THEN -1
                  WHEN lower(json_extract_string(payload_json,'$.m')) = 'false' THEN 1
+                 -- Binance REST backfill maker flag 'is_buyer_maker' (string
+                 -- or native bool -- json_extract_string yields 'true'/'false'
+                 -- either way): buyer-is-maker true -> aggressor SELL -> -1,
+                 -- exactly the aggTrade 'm' semantics above.
+                 WHEN lower(json_extract_string(payload_json,'$.is_buyer_maker')) = 'true'  THEN -1
+                 WHEN lower(json_extract_string(payload_json,'$.is_buyer_maker')) = 'false' THEN 1
+                 -- Deribit backfill 'direction' = 'buy'/'sell' (taker side).
+                 WHEN lower(json_extract_string(payload_json,'$.direction')) = 'buy'  THEN 1
+                 WHEN lower(json_extract_string(payload_json,'$.direction')) = 'sell' THEN -1
                  ELSE 0
                END AS sign
         FROM read_parquet({file}, hive_partitioning=1, union_by_name=1)
@@ -679,6 +734,23 @@ def load_node_trades(
     sign_parts.clear()
     good = (np.isfinite(price) & (price > 0.0)
             & np.isfinite(size) & (size > 0.0) & (sign != 0.0))
+    if not np.any(good):
+        # LOUD-FAIL GUARD: parquet files exist and the window HAS raw rows
+        # (ts.size > 0 here by construction), yet not a single trade parsed
+        # (price/size/side all unresolvable). Silently returning 0 trades /
+        # NaN features is exactly the bug class that hid the 2026-07-17
+        # envelope finding for 5 days -- fail with a concrete file + sample
+        # payload instead. Raw-row counting reuses the arrays already
+        # fetched (no second scan); only this error path issues one extra
+        # LIMIT 1 probe query for the sample.
+        fname, sample = _probe_payload_sample(
+            date_globs[present_dates[0]], start_ms, end_ms)
+        raise DataError(
+            f"{exchange}/{symbol} {dates[0]}..{dates[-1]}: {ts.size} raw rows "
+            f"in window but 0 parsable trades (price/size/side all NULL) "
+            f"-- unknown payload_json format (file {fname}, sample payload: "
+            f"{sample[:200]!r})"
+        )
     n_drop = int(np.sum(~good))
     if n_drop:
         print(f"[c17_venue] {exchange}:{symbol}: dropped {n_drop}/{ts.size} "
