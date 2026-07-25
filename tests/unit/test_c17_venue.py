@@ -48,6 +48,7 @@ from bybit_edge.research.c17_venue.driver import (
     N_FOLDS,
     N_PERMUTATIONS,
     TEST_DAYS,
+    CheckpointMismatchError,
     Panel,
     build_loso_folds,
     run,
@@ -994,3 +995,97 @@ def test_tick_direction_vectorized_matches_loop_reference() -> None:
     # degenerate sizes
     assert np.array_equal(tick_direction(np.array([5.0])), np.zeros(1))
     assert tick_direction(np.empty(0)).size == 0
+
+
+# ---------------------------------------------------------------------------
+# Checkpoint/Resume (c16-pattern; written after the two-agent build round)
+# ---------------------------------------------------------------------------
+
+def _payload_for_compare(p: dict) -> str:
+    """Serialise a payload minus volatile timestamp for equality checks."""
+    q = {k: v for k, v in p.items() if k != "generated_at"}
+    return json.dumps(q, sort_keys=True, default=str)
+
+
+def _counting_factory():
+    """Factory returning PLAIN NumpyFallbackEncoder (the fingerprint pins
+    ``encoder_class``, so a differently-named subclass would -- correctly --
+    hard-abort the resume). Counted are REAL ``fit()`` calls summed over all
+    constructed encoders -- run() legitimately constructs one throwaway
+    probe encoder up front to derive ``encoder_class`` for the fingerprint,
+    so construction count alone would over-count by one.
+    """
+    made: list[NumpyFallbackEncoder] = []
+
+    def factory(s: int) -> NumpyFallbackEncoder:
+        enc = NumpyFallbackEncoder(seed=s)
+        made.append(enc)
+        return enc
+
+    def n_fits() -> int:
+        return sum(e.n_fit_calls for e in made)
+
+    return factory, n_fits
+
+
+def test_ckpt_written_per_training_and_resume_retrains_nothing(tmp_path: Path) -> None:
+    nodes = _small_synthetic_nodes(SYMBOLS5, VENUES2, n_days=28, seed=110)
+    ck = tmp_path / "ck"
+    p1 = run(nodes, n_perm=2, seed=1, cuda_used=False, torch_available=False,
+             ckpt_dir=ck)
+    files = sorted(ck.rglob("*.json"))
+    # 5 LOSO folds x (1 main + 2 null retrainings) = 15 single-training files
+    assert len(files) == 15, [str(f) for f in files]
+    kinds = sorted(f.name.split("_")[0] for f in files)
+    assert kinds.count("main") == 5 and kinds.count("null") == 10
+
+    factory, n_fits = _counting_factory()
+    p2 = run(nodes, encoder_factory=factory,
+             n_perm=2, seed=1, cuda_used=False, torch_available=False,
+             ckpt_dir=ck)
+    assert n_fits() == 0, (
+        "resume must not retrain anything when every checkpoint exists")
+    assert _payload_for_compare(p1) == _payload_for_compare(p2), (
+        "resumed payload must equal the uninterrupted run bit-for-bit "
+        "(minus the volatile generated_at timestamp)")
+
+
+def test_ckpt_partial_resume_retrains_only_missing(tmp_path: Path) -> None:
+    nodes = _small_synthetic_nodes(SYMBOLS5, VENUES2, n_days=28, seed=111)
+    ck = tmp_path / "ck"
+    p1 = run(nodes, n_perm=2, seed=1, cuda_used=False, torch_available=False,
+             ckpt_dir=ck)
+    files = sorted(ck.rglob("*.json"))
+    # simulate an interrupt: drop one main and two null checkpoints
+    dropped = [files[0], files[4], files[9]]
+    for f in dropped:
+        f.unlink()
+    factory, n_fits = _counting_factory()
+    p2 = run(nodes, encoder_factory=factory,
+             n_perm=2, seed=1, cuda_used=False, torch_available=False,
+             ckpt_dir=ck)
+    assert n_fits() == len(dropped), (
+        "exactly the missing trainings must be redone, nothing else")
+    assert _payload_for_compare(p1) == _payload_for_compare(p2)
+    assert len(sorted(ck.rglob("*.json"))) == 15  # rewritten
+
+
+def test_ckpt_fingerprint_mismatch_hard_aborts(tmp_path: Path) -> None:
+    nodes = _small_synthetic_nodes(SYMBOLS5, VENUES2, n_days=28, seed=112)
+    ck = tmp_path / "ck"
+    run(nodes, n_perm=2, seed=1, cuda_used=False, torch_available=False,
+        ckpt_dir=ck)
+    # a different base seed changes every derived training seed -> the
+    # stored checkpoints contradict the new run and must NEVER be mixed in
+    with pytest.raises(CheckpointMismatchError):
+        run(nodes, n_perm=2, seed=2, cuda_used=False, torch_available=False,
+            ckpt_dir=ck)
+
+
+def test_no_ckpt_dir_writes_nothing(tmp_path: Path) -> None:
+    nodes = _small_synthetic_nodes(SYMBOLS5, VENUES2, n_days=28, seed=113)
+    cwd_before = sorted(tmp_path.rglob("*"))
+    run(nodes, n_perm=2, seed=1, cuda_used=False, torch_available=False,
+        ckpt_dir=None)
+    assert sorted(tmp_path.rglob("*")) == cwd_before, (
+        "ckpt_dir=None must not create any checkpoint files")

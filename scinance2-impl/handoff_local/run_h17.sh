@@ -27,19 +27,38 @@
 # Smoke-Lauf trotz fehlender GPU: HANDOFF_H17_FORCE_NO_GPU=1 (nur fuer
 # Pipeline-Diagnose, NIE fuer ein Gate-Urteil verwenden).
 #
-# Laufzeit (registry-Schaetzung): GPU ~1-2 Tage (~105 volle Trainings: 5
-# Folds x (1 echtes + 20 Permutations-Retrainings) + Overhead). Dieser
-# Runner ist deshalb fuer MEHRTAGES-Betrieb ausgelegt (Timeout-Default
-# 172800s = 48h, per HANDOFF_H17_TIMEOUT_S override- und resumebar durch
-# erneuten Aufruf, falls ein Lauf abbricht -- der Encoder/Fold-Fortschritt
-# selbst wird NICHT zwischen Prozessen persistiert, ein Abbruch bedeutet
-# Neustart des GESAMTEN Laufs).
+# **EXTREME LAUFZEIT (registry-Schaetzung: GPU ~1-2 Tage, ~105 volle
+# Trainings: 5 Folds x (1 echtes InfoNCE-Training + 20 Permutations-
+# Retrainings) + Probe-Fits) - DIESER RUNNER IST RESUME-FAEHIG / EINFACH
+# ERNEUT STARTEN (run_h14/run_h16-Muster).** Jedes abgeschlossene
+# Einzeltraining (Fold-Symbol x {main, null} x Index) schreibt SOFORT
+# einen eigenen Checkpoint (atomic write) nach einem STABILEN, NICHT
+# zeitgestempelten Verzeichnis (results/h17_checkpoints/<Symbol>/). Ein
+# Neustart, ein TIMEOUT dieses Runners oder ein Abbruch verliert
+# HOECHSTENS das gerade laufende einzelne Training - nicht den restlichen
+# Fortschritt. EINFACH ERNEUT STARTEN: bereits abgeschlossene Trainings
+# werden uebersprungen (Start-Log: 'X/Y Trainings bereits als Checkpoint
+# vorhanden, Z noch offen'). Timeout-Default 172800s = 48h PRO AUFRUF
+# (Override HANDOFF_H17_TIMEOUT_S); braucht der Gesamtlauf mehrere
+# Aufrufe, ist das der VORGESEHENE Betriebsmodus, kein Fehler. Die
+# Checkpoints sind gegen die Lauf-Parameter gefingerprintet: ein
+# Parameterwechsel (anderes Datenfenster/Seed/Batch/Steps/Device/...)
+# unter demselben Checkpoint-Pfad bricht HART ab (CheckpointMismatchError,
+# rc=1) statt stillschweigend stale Ergebnisse zu mischen.
 #
 # EIN Block: H17_VENUE (plus vorgelagerter GPU_CHECK). Env: HARVEST_DIR,
 # C12_RESULTS_JSON (Pfad zu einem vorhandenen c12_frag_results.json fuer
 # das Redundanz-Gate; ohne diesen Pfad bleibt das Gate NICHT auswertbar,
-# aber der Lauf schlaegt NICHT fehl), HANDOFF_DRY_RUN (+HANDOFF_DRY_RC).
-# Exit: 0=OK 1=FAIL 2=SKIP.
+# aber der Lauf schlaegt NICHT fehl), HANDOFF_DRY_RUN (+HANDOFF_DRY_RC),
+# H17_END_DATE (Cutoff, Default 2026-07-04; wird beim ERSTEN Aufruf neben
+# den Checkpoints in results/h17_checkpoints/H17_END_DATE.pin
+# festgeschrieben und bei jedem weiteren Aufruf wiederverwendet - ein
+# Resume ueber mehrere Naechte behaelt so dasselbe registrierte
+# Datenfenster, sonst braeche der Checkpoint-Fingerprint absichtlich hart
+# ab), H17_CKPT_DIR (Default results/h17_checkpoints, NICHT aendern
+# zwischen Aufrufen desselben Laufs - sonst kein Resume!).
+# Exit: 0=OK 1=FAIL (inkl. TIMEOUT bei unvollstaendigem Plan - KEIN
+# Datenverlust, einfach erneut starten) 2=SKIP.
 # ========================================================================
 set -u
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -50,11 +69,28 @@ C12_RESULTS_JSON="${C12_RESULTS_JSON:-}"
 SYMBOLS="BTCUSDT,ETHUSDT,SOLUSDT,BNBUSDT,XRPUSDT"
 EXCHANGES="bybit,binance"
 START_DATE="2026-03-27"
-END_DATE="2026-07-04"
 N_PERM=20; STEPS=10000; BATCH_SIZE=2048; SEED=42
 TMO_GPU_CHECK=60
-TMO_MAIN="${HANDOFF_H17_TIMEOUT_S:-172800}"   # 48h default (multi-day GPU workload)
+TMO_MAIN="${HANDOFF_H17_TIMEOUT_S:-172800}"   # 48h Budget PRO AUFRUF (Resume, s. Kopf)
 FORCE_NO_GPU="${HANDOFF_H17_FORCE_NO_GPU:-0}"
+CKPT_DIR="${H17_CKPT_DIR:-$SCRIPT_DIR/results/h17_checkpoints}"
+mkdir -p "$CKPT_DIR"
+# Cutoff (End-Datum) PINNEN (run_h16-Muster): ein Resume-Lauf ueber mehrere
+# Naechte MUSS dasselbe registrierte Datenfenster behalten - sonst bricht
+# der Checkpoint-Fingerprint (absichtlich) hart ab. Der beim ERSTEN Aufruf
+# benutzte Cutoff wird neben den Checkpoints gepinnt und wiederverwendet;
+# auch eine spaetere Aenderung des Skript-Defaults kann so einen laufenden
+# Resume nicht mehr brechen. (H17_END_DATE-Env uebersteuert; dann bei
+# geaenderten Werten Checkpoints loeschen oder H17_CKPT_DIR wechseln.)
+END_DATE_PIN="$CKPT_DIR/H17_END_DATE.pin"
+if [ -n "${H17_END_DATE:-}" ]; then
+    END_DATE="$H17_END_DATE"
+elif [ -f "$END_DATE_PIN" ]; then
+    END_DATE="$(head -n 1 "$END_DATE_PIN" | tr -d '[:space:]')"
+else
+    END_DATE="2026-07-04"
+fi
+printf '%s\n' "$END_DATE" > "$END_DATE_PIN"
 
 PY="${PYTHON:-python3}"
 export PYTHONPATH="$REPO_ROOT/src${PYTHONPATH:+:$PYTHONPATH}"

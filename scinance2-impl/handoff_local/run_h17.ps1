@@ -26,20 +26,45 @@
 # fuer einen erzwungenen Smoke-Lauf trotz fehlender GPU (NUR Pipeline-
 # Diagnose, NIE fuer ein Gate-Urteil): $env:HANDOFF_H17_FORCE_NO_GPU=1.
 #
-# Laufzeit (registry-Schaetzung): GPU ~1-2 Tage (~105 volle Trainings: 5
-# Folds x (1 echtes + 20 Permutations-Retrainings) + Overhead). Timeout-
-# Default 172800s = 48h (Override $env:HANDOFF_H17_TIMEOUT_S). Ein
-# abgebrochener Lauf persistiert KEINEN Zwischenstand - erneuter Aufruf
-# startet den GESAMTEN Lauf neu.
+# **EXTREME LAUFZEIT (registry-Schaetzung: GPU ~1-2 Tage, ~105 volle
+# Trainings: 5 Folds x (1 echtes InfoNCE-Training + 20 Permutations-
+# Retrainings) + Probe-Fits) - DIESER RUNNER IST RESUME-FAEHIG / EINFACH
+# ERNEUT STARTEN (run_h14/run_h16-Muster).** Jedes abgeschlossene
+# Einzeltraining (Fold-Symbol x {main, null} x Index) schreibt SOFORT einen
+# eigenen Checkpoint (atomic write) nach einem STABILEN, NICHT
+# zeitgestempelten Verzeichnis (results\h17_checkpoints\<Symbol>\). Ein
+# Windows-Neustart, ein TIMEOUT dieses Runners oder ein geschlossenes
+# Fenster verliert HOECHSTENS das gerade laufende einzelne Training - nicht
+# den restlichen Fortschritt. EINFACH DIESES SKRIPT ERNEUT STARTEN: es
+# laedt automatisch alle bereits abgeschlossenen Trainings aus
+# results\h17_checkpoints\ (Start-Log: 'X/Y Trainings bereits als
+# Checkpoint vorhanden, Z noch offen') und trainiert nur die fehlenden
+# weiter. Timeout-Default 172800s = 48h PRO AUFRUF (Override
+# $env:HANDOFF_H17_TIMEOUT_S); braucht der Gesamtlauf mehrere Aufrufe, ist
+# das der VORGESEHENE Betriebsmodus, kein Fehler. Die Checkpoints sind
+# gegen die Lauf-Parameter gefingerprintet: ein Parameterwechsel (anderes
+# Datenfenster/Seed/Batch/Steps/Device/...) unter demselben Checkpoint-
+# Pfad bricht HART ab (CheckpointMismatchError, rc=1) statt
+# stillschweigend stale Ergebnisse zu mischen.
 #
 # EIN Block: H17_VENUE (plus vorgelagerter GPU_CHECK). Exit: 0=OK 1=FAIL
-# 2=SKIP. Ergebnisse: scinance2-impl\handoff_local\results\h17_<ts>\
-#             + SUMMARY_<datum>.md (gate-auditor urteilt gegen H-17).
+# (inkl. TIMEOUT dieses Aufrufs bei unvollstaendigem Plan - KEIN
+# Datenverlust, einfach erneut starten) 2=SKIP. Ergebnisse:
+# scinance2-impl\handoff_local\results\h17_<ts>\ + SUMMARY_<datum>.md
+# (gate-auditor urteilt gegen H-17). Checkpoints (STABIL, ueberlebt
+# Neustarts): scinance2-impl\handoff_local\results\h17_checkpoints\.
 #
 # Optionale Env-Overrides: HARVEST_DIR, C12_RESULTS_JSON (Pfad zu einem
 # vorhandenen c12_frag_results.json fuer das Redundanz-Gate),
 # HANDOFF_DRY_RUN=1 (+HANDOFF_DRY_RC), HANDOFF_H17_TIMEOUT_S,
-# HANDOFF_H17_FORCE_NO_GPU.
+# HANDOFF_H17_FORCE_NO_GPU, H17_END_DATE (Cutoff, Default 2026-07-04; wird
+# beim ERSTEN Aufruf neben den Checkpoints in
+# results\h17_checkpoints\H17_END_DATE.pin festgeschrieben und bei jedem
+# weiteren Aufruf wiederverwendet - ein Resume ueber mehrere Naechte
+# behaelt so dasselbe registrierte Datenfenster, sonst braeche der
+# Checkpoint-Fingerprint absichtlich hart ab), H17_CKPT_DIR (Default
+# results\h17_checkpoints, NICHT aendern zwischen Aufrufen desselben
+# Laufs - sonst kein Resume!).
 # PS 5.1-kompatibel (handle-cache + BelowNormal + ASCII-Body).
 # ========================================================================
 $ErrorActionPreference = 'Continue'
@@ -52,14 +77,33 @@ $C12ResultsJson = if ($env:C12_RESULTS_JSON) { $env:C12_RESULTS_JSON } else { ''
 $Symbols   = 'BTCUSDT,ETHUSDT,SOLUSDT,BNBUSDT,XRPUSDT'
 $Exchanges = 'bybit,binance'
 $StartDate = '2026-03-27'
-$EndDate   = '2026-07-04'
 $NPerm     = 20
 $Steps     = 10000
 $BatchSize = 2048
 $Seed      = 42
 $TmoGpuCheck = 60
-$TmoMain = if ($env:HANDOFF_H17_TIMEOUT_S) { [int]$env:HANDOFF_H17_TIMEOUT_S } else { 172800 }  # 48h
+$TmoMain = if ($env:HANDOFF_H17_TIMEOUT_S) { [int]$env:HANDOFF_H17_TIMEOUT_S } else { 172800 }  # 48h Budget PRO AUFRUF (Resume, s. Kopf)
 $ForceNoGpu = ($env:HANDOFF_H17_FORCE_NO_GPU -and ($env:HANDOFF_H17_FORCE_NO_GPU -ne '0'))
+$CkptDir = if ($env:H17_CKPT_DIR) { $env:H17_CKPT_DIR } else { Join-Path $ScriptDir 'results\h17_checkpoints' }
+New-Item -ItemType Directory -Force -Path $CkptDir | Out-Null
+
+# Cutoff (End-Datum) PINNEN (run_h16-Muster): ein Resume-Lauf ueber mehrere
+# Naechte MUSS dasselbe registrierte Datenfenster behalten - sonst bricht
+# der Checkpoint-Fingerprint (absichtlich) hart ab. Der beim ERSTEN Aufruf
+# benutzte Cutoff wird deshalb neben den Checkpoints festgeschrieben und
+# bei jedem weiteren Aufruf wiederverwendet; auch eine spaetere Aenderung
+# des Skript-Defaults kann so einen laufenden Resume nicht mehr brechen.
+# (H17_END_DATE-Env uebersteuert; dann bei geaenderten Werten Checkpoints
+# loeschen oder H17_CKPT_DIR wechseln.)
+$EndDatePin = Join-Path $CkptDir 'H17_END_DATE.pin'
+if ($env:H17_END_DATE) {
+    $EndDate = $env:H17_END_DATE
+} elseif (Test-Path $EndDatePin) {
+    $EndDate = (Get-Content -Path $EndDatePin -TotalCount 1).Trim()
+} else {
+    $EndDate = '2026-07-04'
+}
+Set-Content -Path $EndDatePin -Value $EndDate
 
 $PythonExe = if ($env:PYTHON) { $env:PYTHON } else { 'python' }
 $SrcPath = Join-Path $RepoRoot 'src'
@@ -111,7 +155,7 @@ function Invoke-Step {
             if (-not $p.WaitForExit($TimeoutSec * 1000)) {
                 try { $p.Kill() } catch { }
                 $rc = 124
-                $detail = "TIMEOUT nach $TimeoutSec s"
+                $detail = "TIMEOUT nach $TimeoutSec s (Plan unvollstaendig - Checkpoints erhalten, verloren ging hoechstens das laufende Training; naechster Aufruf resumed)"
             } else {
                 $rc = $p.ExitCode
                 if ($null -eq $rc) { $rc = -2; $detail = 'ExitCode war null (Handle-Quirk) - Log pruefen' }
@@ -176,7 +220,9 @@ function Invoke-GpuCheck {
 
 Write-Host ("RUN_H17 (T3) - Repo: " + $RepoRoot + " - Ergebnisse: " + $RunDir)
 Write-Host ("Harvest: " + $HarvestDir + " | Panel: " + $Symbols + " x {" + $Exchanges + "}")
-Write-Host ("Fenster: " + $StartDate + ".." + $EndDate + " | n_perm=" + $NPerm + " steps=" + $Steps + " batch_size=" + $BatchSize + " seed=" + $Seed)
+Write-Host ("Fenster: " + $StartDate + ".." + $EndDate + " (Cutoff gepinnt in " + $EndDatePin + ") | n_perm=" + $NPerm + " steps=" + $Steps + " batch_size=" + $BatchSize + " seed=" + $Seed)
+Write-Host ("Checkpoints (STABIL ueber Neustarts): " + $CkptDir)
+Write-Host ("RESUME-FAEHIG: bereits abgeschlossene Einzeltrainings werden uebersprungen - ein Timeout/Abbruch verliert hoechstens das gerade laufende Training; einfach erneut starten (s. Kopf-Kommentar).")
 Write-Host ("C12-Ergebnisse fuer Redundanz-Gate: " + $(if ($C12ResultsJson) { $C12ResultsJson } else { "<keiner - Gate bleibt nicht auswertbar>" }))
 if ($DryRun) { Write-Host "ACHTUNG: HANDOFF_DRY_RUN aktiv - keine echten Laeufe." }
 
@@ -211,6 +257,7 @@ if (-not $HarvestOk) {
             '--start-date', $StartDate, '--end-date', $EndDate,
             '--n-perm', "$NPerm", '--steps', "$Steps", '--batch-size', "$BatchSize",
             '--seed', "$Seed", '--device', 'auto',
+            '--ckpt-dir', $CkptDir,
             '--out-dir', (Join-Path $RunDir 'h17')
         )
         if ($C12ResultsJson) { $cmdArgs += @('--c12-results', $C12ResultsJson) }
@@ -232,10 +279,12 @@ $sb = New-Object System.Text.StringBuilder
 [void]$sb.AppendLine("- **Erzeugt:** " + (Get-Date).ToUniversalTime().ToString('yyyy-MM-dd HH:mm:ss') + " UTC")
 [void]$sb.AppendLine("- **Run-Dir:** ``" + $RunDir + "``")
 [void]$sb.AppendLine("- **Harvest:** ``" + $HarvestDir + "`` (read-only) | Panel: " + $Symbols + " x {" + $Exchanges + "}")
-[void]$sb.AppendLine("- **Fenster:** " + $StartDate + ".." + $EndDate)
+[void]$sb.AppendLine("- **Fenster:** " + $StartDate + ".." + $EndDate + " (Cutoff gepinnt in ``" + $EndDatePin + "``)")
+[void]$sb.AppendLine("- **Checkpoints (STABIL, ueberlebt Neustarts):** ``" + $CkptDir + "``")
 [void]$sb.AppendLine("- **n_perm=" + $NPerm + " steps=" + $Steps + " batch_size=" + $BatchSize + " seed=" + $Seed + " | F-VENUE BH-FDR a=0.10**")
 [void]$sb.AppendLine("- **C12-Redundanz-Gate-Quelle:** " + $(if ($C12ResultsJson) { $C12ResultsJson } else { "<keine - Gate nicht auswertbar>" }))
 [void]$sb.AppendLine("- **KAPITALFREI** - reine Struktur-/Existenzfrage, KEINE bps/PnL/Sharpe/Friction.")
+[void]$sb.AppendLine("- **RESUME-FAEHIG:** ~105 volle Trainings (~35h+ GPU) - jeder Aufruf setzt aus den Checkpoints in ``" + $CkptDir + "`` fort (je Einzeltraining atomar geschrieben). Ein TIMEOUT/FAIL bei unvollstaendigem Plan ist NORMAL, kein Datenverlust - ein Abbruch kostet hoechstens das gerade laufende Einzeltraining. EINFACH ERNEUT STARTEN. Steht im err.log eine CheckpointMismatchError: Lauf-Parameter wurden zwischen Aufrufen geaendert - Checkpoints loeschen ODER H17_CKPT_DIR wechseln ODER die alten Parameter wiederherstellen; NIEMALS mischen.")
 [void]$sb.AppendLine("")
 [void]$sb.AppendLine("## Schritte")
 [void]$sb.AppendLine("")

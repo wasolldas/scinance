@@ -19,6 +19,20 @@ adjudicates. KAPITALFREI.
                                  [--n-perm 20] [--steps 10000] [--batch-size 2048]
                                  [--c12-results PATH] [--device auto] [--seed 42]
                                  [--check-gpu-only] [--allow-cpu-fallback]
+                                 [--ckpt-dir DIR] [--no-ckpt]
+
+Checkpoint/resume (default ON — c16_arrow pattern; the full plan is ~105
+GPU trainings / ~35h+ and realistically NEVER survives one uninterrupted
+invocation): every completed single training — per fold 1 main (InfoNCE +
+frozen probe) + 20 permutation retrainings — is immediately persisted to
+``--ckpt-dir`` (default ``<out-dir>/c17_venue_ckpt``; the runner passes a
+STABLE, non-timestamped directory) and re-running with the SAME --ckpt-dir
+resumes — an interrupt loses at most the training in flight. At startup
+the driver logs 'X/Y Trainings bereits als Checkpoint vorhanden, Z noch
+offen'. Checkpoints are fingerprinted over all result-relevant parameters
+(incl. data window/Cutoff, seeds, batch/steps, encoder class); a mismatch
+aborts hard (rc 1) instead of silently mixing stale results. ``--no-ckpt``
+opts out (then ANY interrupt loses everything — smoke runs only).
 
 COMPUTE GATING (verbindlich, SAME rc=2 "SKIP: no compute" convention as the
 sibling Welle-5 CLIs c14_panellag.py/c15_grammar.py/c16_arrow.py):
@@ -133,6 +147,15 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--device", default="auto", choices=["auto", "cpu", "cuda"])
     p.add_argument("--seed", type=int, default=42)
     p.add_argument("--out-dir", default=".", help="Output directory for results.")
+    p.add_argument("--ckpt-dir", default=None,
+                   help="Checkpoint directory for resume (default: "
+                        "<out-dir>/c17_venue_ckpt). Keep STABLE across "
+                        "restarts — same path = resume; a different "
+                        "configuration under the same path aborts hard "
+                        "(fingerprint check).")
+    p.add_argument("--no-ckpt", action="store_true",
+                   help="Disable checkpoint/resume (any interrupt then loses "
+                        "ALL progress of the ~35h+ plan — smoke runs only).")
     p.add_argument("--check-gpu-only", action="store_true",
                    help="Report torch/CUDA availability and exit (no run). "
                         "Compute-gating requirement (registry H-17).")
@@ -188,10 +211,16 @@ def main(argv: list[str] | None = None) -> int:
     symbols = tuple(s.strip() for s in args.symbols.split(",") if s.strip())
     exchanges = tuple(e.strip() for e in args.exchanges.split(",") if e.strip())
     base = Path(args.base_dir)
+    out_dir = Path(args.out_dir)
+    if args.no_ckpt:
+        ckpt_dir = None
+    else:
+        ckpt_dir = Path(args.ckpt_dir) if args.ckpt_dir else out_dir / "c17_venue_ckpt"
     print(f"[c17_venue] base-dir={base.resolve()} symbols={list(symbols)} "
           f"exchanges={list(exchanges)} window={args.start_date}..{args.end_date} "
           f"n_perm={args.n_perm} batch_size={args.batch_size} "
-          f"gpu_ready={gpu_ready} allow_cpu_fallback={args.allow_cpu_fallback}",
+          f"gpu_ready={gpu_ready} allow_cpu_fallback={args.allow_cpu_fallback} "
+          f"ckpt_dir={ckpt_dir if ckpt_dir is not None else 'DISABLED (--no-ckpt)'}",
           file=sys.stderr, flush=True)
 
     c12_payload = None
@@ -242,12 +271,15 @@ def main(argv: list[str] | None = None) -> int:
             n_perm=args.n_perm, seed=args.seed, c12_payload=c12_payload,
             cuda_used=cuda_used, torch_available=TORCH_AVAILABLE,
             batch_size=args.batch_size, source=source,
+            start_date=args.start_date, end_date=args.end_date,
+            ckpt_dir=ckpt_dir,
         )
     except ValueError as exc:
+        # Incl. CheckpointMismatchError (stale --ckpt-dir): a HARD rc=1 —
+        # never silently mixed, never degraded; the message carries the fix.
         print(f"[c17_venue] FATAL: {exc}", file=sys.stderr, flush=True)
         return RC_ERROR
 
-    out_dir = Path(args.out_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
     json_path = out_dir / "c17_venue_results.json"
     md_path = out_dir / "c17_venue_results.md"
