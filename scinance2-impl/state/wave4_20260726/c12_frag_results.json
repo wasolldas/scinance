@@ -1,0 +1,1880 @@
+{
+  "schema_version": 1,
+  "hypothesis": "H-12",
+  "hypothesis_registry": "scinance2-impl/state/hypothesis_registry.md",
+  "capital_free": true,
+  "generated_at": "2026-07-26T09:09:19+00:00",
+  "source": "E:\\Claude\\Projects\\scinance\\data\\harvest/raw/{bybit,binance,deribit}/publicTrade (windows 2026-03-27..2026-05-15 + 2026-05-16..2026-07-04)",
+  "window_labels": [
+    "W1",
+    "W2"
+  ],
+  "n_windows": 2,
+  "n_mc": 1000,
+  "seed": 42,
+  "method": {
+    "panel": "6 Serien = 2 Symbole x 3 Boersen, Minuten-Last-Price, Forward-Fill <= 1 min, Tag gueltig >= 1380/1440 min je Serie",
+    "spectrum": "Log-Returns je Serie je Tag z-standardisiert, Korrelationsmatrix C (6x6), Eigenzerlegung, IPR(v) = Summe(v_i^4)",
+    "null_stage_a": "MC-Gaussian-Wishart-Referenz (NICHT urteilstragend)",
+    "null_stage_b": "Ein-Faktor-Gauss-Null je Tag aus (lambda1, v1), Tages-p = P(lambda2_sim >= lambda2_obs), Add-one-Konvention"
+  },
+  "fdr_alpha": 0.1,
+  "fdr_family": "F-FRAG",
+  "fdr_family_size": 78,
+  "fdr_p_crit": 0.04095904095904096,
+  "n_fdr_significant": 62,
+  "gate_thresholds": {
+    "a_sig_day_share_min": 0.2,
+    "b_ipr_v2_median_min": 0.4,
+    "c_dominant_exchange_share_min": 0.7,
+    "min_windows": 2
+  },
+  "validity_precondition": {
+    "ipr_v1_max": 0.25,
+    "ipr_v1_share_min": 0.9,
+    "min_valid_days_per_window": 35,
+    "note": "Validitaets-Vorbedingung (VOR dem Gate, KEIN Gate-Bestandteil): IPR(v1) <= 0,25 an >= 90% der gueltigen Tage UND >= 35 gueltige Tage je Fenster. Verfehlt -> Lauf UNGUELTIG: eigener Status, KEIN Verdikt, explizit NICHT DROP (Registry H-12)."
+  },
+  "validity_status": "ungueltig",
+  "all_windows_valid": false,
+  "all_criteria_met_all_windows": false,
+  "weiter_indication": false,
+  "windows": [
+    {
+      "window_index": 0,
+      "window_label": "W1",
+      "start_date": "2026-03-27",
+      "end_date": "2026-05-15",
+      "series_labels": [
+        "bybit:BTCUSDT",
+        "bybit:ETHUSDT",
+        "binance:BTCUSDT",
+        "binance:ETHUSDT",
+        "deribit:BTC-PERPETUAL",
+        "deribit:ETH-PERPETUAL"
+      ],
+      "series_exchanges": [
+        "bybit",
+        "bybit",
+        "binance",
+        "binance",
+        "deribit",
+        "deribit"
+      ],
+      "n_days_total": 50,
+      "n_days_panel_valid": 47,
+      "n_days_degenerate": 0,
+      "n_days_valid": 47,
+      "days": [
+        {
+          "date": "2026-03-27",
+          "panel_valid": true,
+          "analyzed": true,
+          "degenerate": false,
+          "t_eff": 1439,
+          "lambda1": 5.530289264812422,
+          "lambda2": 0.3457837797695617,
+          "ipr_v1": 0.1667054974263122,
+          "ipr_v2": 0.16701937160800245,
+          "exchange_loads_v2": {
+            "bybit": 0.32708634478588655,
+            "binance": 0.34183152138688455,
+            "deribit": 0.3310821338272292
+          },
+          "dominant_exchange_v2": "binance",
+          "p_lambda2_one_factor": 0.000999000999000999,
+          "p_ipr_v2_one_factor": 1.0,
+          "fdr_significant": true
+        },
+        {
+          "date": "2026-03-28",
+          "panel_valid": true,
+          "analyzed": true,
+          "degenerate": false,
+          "t_eff": 1419,
+          "lambda1": 5.311501638080821,
+          "lambda2": 0.4924681642881804,
+          "ipr_v1": 0.16684003994806418,
+          "ipr_v2": 0.1721462124498459,
+          "exchange_loads_v2": {
+            "bybit": 0.313744067559667,
+            "binance": 0.309912460233291,
+            "deribit": 0.3763434722070418
+          },
+          "dominant_exchange_v2": "deribit",
+          "p_lambda2_one_factor": 0.000999000999000999,
+          "p_ipr_v2_one_factor": 1.0,
+          "fdr_significant": true
+        },
+        {
+          "date": "2026-03-29",
+          "panel_valid": true,
+          "analyzed": true,
+          "degenerate": false,
+          "t_eff": 1422,
+          "lambda1": 5.568772949174283,
+          "lambda2": 0.28199920753714774,
+          "ipr_v1": 0.16677318338310362,
+          "ipr_v2": 0.17276198575198415,
+          "exchange_loads_v2": {
+            "bybit": 0.2988931795592272,
+            "binance": 0.2948412072448356,
+            "deribit": 0.40626561319593724
+          },
+          "dominant_exchange_v2": "deribit",
+          "p_lambda2_one_factor": 0.2677322677322677,
+          "p_ipr_v2_one_factor": 1.0,
+          "fdr_significant": false
+        },
+        {
+          "date": "2026-03-30",
+          "panel_valid": true,
+          "analyzed": true,
+          "degenerate": false,
+          "t_eff": 1436,
+          "lambda1": 5.497110501415332,
+          "lambda2": 0.33397930091960787,
+          "ipr_v1": 0.16683563789141523,
+          "ipr_v2": 0.1752400600877861,
+          "exchange_loads_v2": {
+            "bybit": 0.2929071085717561,
+            "binance": 0.2974475898541814,
+            "deribit": 0.40964530157406265
+          },
+          "dominant_exchange_v2": "deribit",
+          "p_lambda2_one_factor": 0.005994005994005994,
+          "p_ipr_v2_one_factor": 1.0,
+          "fdr_significant": true
+        },
+        {
+          "date": "2026-03-31",
+          "panel_valid": true,
+          "analyzed": true,
+          "degenerate": false,
+          "t_eff": 1407,
+          "lambda1": 5.565387680484257,
+          "lambda2": 0.32180258333253564,
+          "ipr_v1": 0.16670884519949902,
+          "ipr_v2": 0.16748710452897225,
+          "exchange_loads_v2": {
+            "bybit": 0.3231703888942813,
+            "binance": 0.3279412591428567,
+            "deribit": 0.34888835196286194
+          },
+          "dominant_exchange_v2": "deribit",
+          "p_lambda2_one_factor": 0.000999000999000999,
+          "p_ipr_v2_one_factor": 1.0,
+          "fdr_significant": true
+        },
+        {
+          "date": "2026-04-01",
+          "panel_valid": true,
+          "analyzed": true,
+          "degenerate": false,
+          "t_eff": 1439,
+          "lambda1": 5.511269380947588,
+          "lambda2": 0.34018313310689974,
+          "ipr_v1": 0.16676301963360338,
+          "ipr_v2": 0.1693568328404892,
+          "exchange_loads_v2": {
+            "bybit": 0.3086949773523509,
+            "binance": 0.3058808391605164,
+            "deribit": 0.3854241834871326
+          },
+          "dominant_exchange_v2": "deribit",
+          "p_lambda2_one_factor": 0.000999000999000999,
+          "p_ipr_v2_one_factor": 1.0,
+          "fdr_significant": true
+        },
+        {
+          "date": "2026-04-02",
+          "panel_valid": true,
+          "analyzed": true,
+          "degenerate": false,
+          "t_eff": 1438,
+          "lambda1": 5.519458486916495,
+          "lambda2": 0.37054958359118373,
+          "ipr_v1": 0.16671691153389917,
+          "ipr_v2": 0.16836951138638132,
+          "exchange_loads_v2": {
+            "bybit": 0.3191215383376804,
+            "binance": 0.32941501759558356,
+            "deribit": 0.3514634440667359
+          },
+          "dominant_exchange_v2": "deribit",
+          "p_lambda2_one_factor": 0.000999000999000999,
+          "p_ipr_v2_one_factor": 1.0,
+          "fdr_significant": true
+        },
+        {
+          "date": "2026-04-03",
+          "panel_valid": true,
+          "analyzed": true,
+          "degenerate": false,
+          "t_eff": 1435,
+          "lambda1": 5.305035445969775,
+          "lambda2": 0.3930313312922939,
+          "ipr_v1": 0.16716345638828153,
+          "ipr_v2": 0.18784391646211016,
+          "exchange_loads_v2": {
+            "bybit": 0.2871495759039685,
+            "binance": 0.2843255475288717,
+            "deribit": 0.42852487656715993
+          },
+          "dominant_exchange_v2": "deribit",
+          "p_lambda2_one_factor": 0.008991008991008992,
+          "p_ipr_v2_one_factor": 1.0,
+          "fdr_significant": true
+        },
+        {
+          "date": "2026-04-04",
+          "panel_valid": false,
+          "analyzed": false,
+          "degenerate": false
+        },
+        {
+          "date": "2026-04-05",
+          "panel_valid": true,
+          "analyzed": true,
+          "degenerate": false,
+          "t_eff": 1398,
+          "lambda1": 5.385401470896197,
+          "lambda2": 0.4431933637433538,
+          "ipr_v1": 0.166775465468963,
+          "ipr_v2": 0.16729223331088489,
+          "exchange_loads_v2": {
+            "bybit": 0.3224608545894463,
+            "binance": 0.3161029983082395,
+            "deribit": 0.3614361471023145
+          },
+          "dominant_exchange_v2": "deribit",
+          "p_lambda2_one_factor": 0.000999000999000999,
+          "p_ipr_v2_one_factor": 1.0,
+          "fdr_significant": true
+        },
+        {
+          "date": "2026-04-06",
+          "panel_valid": true,
+          "analyzed": true,
+          "degenerate": false,
+          "t_eff": 1437,
+          "lambda1": 5.4660540360874945,
+          "lambda2": 0.4081980054030799,
+          "ipr_v1": 0.16673055766331368,
+          "ipr_v2": 0.1672053159574553,
+          "exchange_loads_v2": {
+            "bybit": 0.31585287188937705,
+            "binance": 0.32606525680087084,
+            "deribit": 0.358081871309752
+          },
+          "dominant_exchange_v2": "deribit",
+          "p_lambda2_one_factor": 0.000999000999000999,
+          "p_ipr_v2_one_factor": 1.0,
+          "fdr_significant": true
+        },
+        {
+          "date": "2026-04-07",
+          "panel_valid": true,
+          "analyzed": true,
+          "degenerate": false,
+          "t_eff": 1438,
+          "lambda1": 5.5490675475292255,
+          "lambda2": 0.35990563395076447,
+          "ipr_v1": 0.1667078410398915,
+          "ipr_v2": 0.16763181947815203,
+          "exchange_loads_v2": {
+            "bybit": 0.3260151138260375,
+            "binance": 0.32269066638283245,
+            "deribit": 0.3512942197911301
+          },
+          "dominant_exchange_v2": "deribit",
+          "p_lambda2_one_factor": 0.000999000999000999,
+          "p_ipr_v2_one_factor": 1.0,
+          "fdr_significant": true
+        },
+        {
+          "date": "2026-04-08",
+          "panel_valid": true,
+          "analyzed": true,
+          "degenerate": false,
+          "t_eff": 1437,
+          "lambda1": 5.44783323954363,
+          "lambda2": 0.4047417384623072,
+          "ipr_v1": 0.16678945858804103,
+          "ipr_v2": 0.170444333350824,
+          "exchange_loads_v2": {
+            "bybit": 0.3174619730093479,
+            "binance": 0.3176242208422996,
+            "deribit": 0.36491380614835256
+          },
+          "dominant_exchange_v2": "deribit",
+          "p_lambda2_one_factor": 0.000999000999000999,
+          "p_ipr_v2_one_factor": 1.0,
+          "fdr_significant": true
+        },
+        {
+          "date": "2026-04-09",
+          "panel_valid": true,
+          "analyzed": true,
+          "degenerate": false,
+          "t_eff": 1434,
+          "lambda1": 5.598074000102801,
+          "lambda2": 0.2784842581645933,
+          "ipr_v1": 0.1667642779989378,
+          "ipr_v2": 0.18022503680038332,
+          "exchange_loads_v2": {
+            "bybit": 0.29827830581034465,
+            "binance": 0.2972479579419931,
+            "deribit": 0.40447373624766253
+          },
+          "dominant_exchange_v2": "deribit",
+          "p_lambda2_one_factor": 0.24975024975024976,
+          "p_ipr_v2_one_factor": 1.0,
+          "fdr_significant": false
+        },
+        {
+          "date": "2026-04-10",
+          "panel_valid": true,
+          "analyzed": true,
+          "degenerate": false,
+          "t_eff": 1436,
+          "lambda1": 5.479039438207357,
+          "lambda2": 0.3412175297663055,
+          "ipr_v1": 0.16682064376636627,
+          "ipr_v2": 0.1712796025175164,
+          "exchange_loads_v2": {
+            "bybit": 0.31043891170124605,
+            "binance": 0.3047924113163139,
+            "deribit": 0.38476867698244
+          },
+          "dominant_exchange_v2": "deribit",
+          "p_lambda2_one_factor": 0.001998001998001998,
+          "p_ipr_v2_one_factor": 1.0,
+          "fdr_significant": true
+        },
+        {
+          "date": "2026-04-11",
+          "panel_valid": true,
+          "analyzed": true,
+          "degenerate": false,
+          "t_eff": 1423,
+          "lambda1": 5.32527259003818,
+          "lambda2": 0.4906836669071992,
+          "ipr_v1": 0.1667477809512212,
+          "ipr_v2": 0.16694660132916128,
+          "exchange_loads_v2": {
+            "bybit": 0.3267438707283524,
+            "binance": 0.33334957810164534,
+            "deribit": 0.3399065511700024
+          },
+          "dominant_exchange_v2": "deribit",
+          "p_lambda2_one_factor": 0.000999000999000999,
+          "p_ipr_v2_one_factor": 1.0,
+          "fdr_significant": true
+        },
+        {
+          "date": "2026-04-12",
+          "panel_valid": true,
+          "analyzed": true,
+          "degenerate": false,
+          "t_eff": 1429,
+          "lambda1": 5.5525415401254605,
+          "lambda2": 0.3109953060165157,
+          "ipr_v1": 0.16672826594930085,
+          "ipr_v2": 0.16768795846692341,
+          "exchange_loads_v2": {
+            "bybit": 0.31662018405069514,
+            "binance": 0.32764191300730605,
+            "deribit": 0.355737902941999
+          },
+          "dominant_exchange_v2": "deribit",
+          "p_lambda2_one_factor": 0.000999000999000999,
+          "p_ipr_v2_one_factor": 1.0,
+          "fdr_significant": true
+        },
+        {
+          "date": "2026-04-13",
+          "panel_valid": true,
+          "analyzed": true,
+          "degenerate": false,
+          "t_eff": 1438,
+          "lambda1": 5.49702138352933,
+          "lambda2": 0.41659424409153567,
+          "ipr_v1": 0.166683038263282,
+          "ipr_v2": 0.16680873596469123,
+          "exchange_loads_v2": {
+            "bybit": 0.32958301186045014,
+            "binance": 0.33583657067279926,
+            "deribit": 0.3345804174667508
+          },
+          "dominant_exchange_v2": "binance",
+          "p_lambda2_one_factor": 0.000999000999000999,
+          "p_ipr_v2_one_factor": 1.0,
+          "fdr_significant": true
+        },
+        {
+          "date": "2026-04-14",
+          "panel_valid": true,
+          "analyzed": true,
+          "degenerate": false,
+          "t_eff": 1439,
+          "lambda1": 5.445450827467951,
+          "lambda2": 0.43014634704561866,
+          "ipr_v1": 0.16672198705904137,
+          "ipr_v2": 0.16695702252831784,
+          "exchange_loads_v2": {
+            "bybit": 0.3191265802826695,
+            "binance": 0.3321982785257308,
+            "deribit": 0.34867514119159965
+          },
+          "dominant_exchange_v2": "deribit",
+          "p_lambda2_one_factor": 0.000999000999000999,
+          "p_ipr_v2_one_factor": 1.0,
+          "fdr_significant": true
+        },
+        {
+          "date": "2026-04-15",
+          "panel_valid": true,
+          "analyzed": true,
+          "degenerate": false,
+          "t_eff": 1438,
+          "lambda1": 5.543162394124129,
+          "lambda2": 0.284860361820413,
+          "ipr_v1": 0.1668062228845083,
+          "ipr_v2": 0.1738161668966584,
+          "exchange_loads_v2": {
+            "bybit": 0.2865866880583029,
+            "binance": 0.2841598297944968,
+            "deribit": 0.4292534821472005
+          },
+          "dominant_exchange_v2": "deribit",
+          "p_lambda2_one_factor": 0.3336663336663337,
+          "p_ipr_v2_one_factor": 1.0,
+          "fdr_significant": false
+        },
+        {
+          "date": "2026-04-16",
+          "panel_valid": true,
+          "analyzed": true,
+          "degenerate": false,
+          "t_eff": 1438,
+          "lambda1": 5.614629343916915,
+          "lambda2": 0.2610259743055151,
+          "ipr_v1": 0.16671640102892132,
+          "ipr_v2": 0.16809279869383284,
+          "exchange_loads_v2": {
+            "bybit": 0.31048355255509263,
+            "binance": 0.3183762693807075,
+            "deribit": 0.3711401780642001
+          },
+          "dominant_exchange_v2": "deribit",
+          "p_lambda2_one_factor": 0.3946053946053946,
+          "p_ipr_v2_one_factor": 1.0,
+          "fdr_significant": false
+        },
+        {
+          "date": "2026-04-17",
+          "panel_valid": true,
+          "analyzed": true,
+          "degenerate": false,
+          "t_eff": 1437,
+          "lambda1": 5.501269145606702,
+          "lambda2": 0.39562568884938837,
+          "ipr_v1": 0.16671842244235788,
+          "ipr_v2": 0.16785178370567516,
+          "exchange_loads_v2": {
+            "bybit": 0.317486245688812,
+            "binance": 0.3231406991928894,
+            "deribit": 0.3593730551182984
+          },
+          "dominant_exchange_v2": "deribit",
+          "p_lambda2_one_factor": 0.000999000999000999,
+          "p_ipr_v2_one_factor": 1.0,
+          "fdr_significant": true
+        },
+        {
+          "date": "2026-04-18",
+          "panel_valid": true,
+          "analyzed": true,
+          "degenerate": false,
+          "t_eff": 1437,
+          "lambda1": 5.299448256673914,
+          "lambda2": 0.49981688382843925,
+          "ipr_v1": 0.1668414991194109,
+          "ipr_v2": 0.16839288528159782,
+          "exchange_loads_v2": {
+            "bybit": 0.3028168896978879,
+            "binance": 0.31710978635828646,
+            "deribit": 0.3800733239438256
+          },
+          "dominant_exchange_v2": "deribit",
+          "p_lambda2_one_factor": 0.000999000999000999,
+          "p_ipr_v2_one_factor": 1.0,
+          "fdr_significant": true
+        },
+        {
+          "date": "2026-04-19",
+          "panel_valid": true,
+          "analyzed": true,
+          "degenerate": false,
+          "t_eff": 1437,
+          "lambda1": 5.546728814501498,
+          "lambda2": 0.29885823864167693,
+          "ipr_v1": 0.16676872767088385,
+          "ipr_v2": 0.17014342881805755,
+          "exchange_loads_v2": {
+            "bybit": 0.28823903353996705,
+            "binance": 0.3119730233195065,
+            "deribit": 0.39978794314052657
+          },
+          "dominant_exchange_v2": "deribit",
+          "p_lambda2_one_factor": 0.026973026973026972,
+          "p_ipr_v2_one_factor": 1.0,
+          "fdr_significant": true
+        },
+        {
+          "date": "2026-04-20",
+          "panel_valid": true,
+          "analyzed": true,
+          "degenerate": false,
+          "t_eff": 1439,
+          "lambda1": 5.56818876704826,
+          "lambda2": 0.31409649488377245,
+          "ipr_v1": 0.16672599410129765,
+          "ipr_v2": 0.16856576044578075,
+          "exchange_loads_v2": {
+            "bybit": 0.30400117578973057,
+            "binance": 0.3142003844200461,
+            "deribit": 0.38179843979022343
+          },
+          "dominant_exchange_v2": "deribit",
+          "p_lambda2_one_factor": 0.001998001998001998,
+          "p_ipr_v2_one_factor": 1.0,
+          "fdr_significant": true
+        },
+        {
+          "date": "2026-04-21",
+          "panel_valid": true,
+          "analyzed": true,
+          "degenerate": false,
+          "t_eff": 1439,
+          "lambda1": 5.573532065695962,
+          "lambda2": 0.2965557714444819,
+          "ipr_v1": 0.1667396220892756,
+          "ipr_v2": 0.16833980865899803,
+          "exchange_loads_v2": {
+            "bybit": 0.31071516449704195,
+            "binance": 0.3120249506387573,
+            "deribit": 0.3772598848642009
+          },
+          "dominant_exchange_v2": "deribit",
+          "p_lambda2_one_factor": 0.014985014985014986,
+          "p_ipr_v2_one_factor": 1.0,
+          "fdr_significant": true
+        },
+        {
+          "date": "2026-04-22",
+          "panel_valid": true,
+          "analyzed": true,
+          "degenerate": false,
+          "t_eff": 1438,
+          "lambda1": 5.3139184385037055,
+          "lambda2": 0.5501486930870337,
+          "ipr_v1": 0.16674155564174498,
+          "ipr_v2": 0.16710002306002117,
+          "exchange_loads_v2": {
+            "bybit": 0.3147689979834886,
+            "binance": 0.3297703816033185,
+            "deribit": 0.3554606204131928
+          },
+          "dominant_exchange_v2": "deribit",
+          "p_lambda2_one_factor": 0.000999000999000999,
+          "p_ipr_v2_one_factor": 1.0,
+          "fdr_significant": true
+        },
+        {
+          "date": "2026-04-23",
+          "panel_valid": true,
+          "analyzed": true,
+          "degenerate": false,
+          "t_eff": 1437,
+          "lambda1": 5.477669244441791,
+          "lambda2": 0.37380551182372923,
+          "ipr_v1": 0.16679796459155838,
+          "ipr_v2": 0.17081120774516012,
+          "exchange_loads_v2": {
+            "bybit": 0.30134532793136826,
+            "binance": 0.310330293668433,
+            "deribit": 0.38832437840019896
+          },
+          "dominant_exchange_v2": "deribit",
+          "p_lambda2_one_factor": 0.000999000999000999,
+          "p_ipr_v2_one_factor": 1.0,
+          "fdr_significant": true
+        },
+        {
+          "date": "2026-04-24",
+          "panel_valid": true,
+          "analyzed": true,
+          "degenerate": false,
+          "t_eff": 1432,
+          "lambda1": 5.391840004582223,
+          "lambda2": 0.3967717745116606,
+          "ipr_v1": 0.16689354168943568,
+          "ipr_v2": 0.1726369633552549,
+          "exchange_loads_v2": {
+            "bybit": 0.3003596910706755,
+            "binance": 0.31456577157883037,
+            "deribit": 0.38507453735049413
+          },
+          "dominant_exchange_v2": "deribit",
+          "p_lambda2_one_factor": 0.000999000999000999,
+          "p_ipr_v2_one_factor": 1.0,
+          "fdr_significant": true
+        },
+        {
+          "date": "2026-04-25",
+          "panel_valid": false,
+          "analyzed": false,
+          "degenerate": false
+        },
+        {
+          "date": "2026-04-26",
+          "panel_valid": true,
+          "analyzed": true,
+          "degenerate": false,
+          "t_eff": 1398,
+          "lambda1": 5.1060069453414325,
+          "lambda2": 0.7074888404756033,
+          "ipr_v1": 0.16685756407450347,
+          "ipr_v2": 0.1674340637681209,
+          "exchange_loads_v2": {
+            "bybit": 0.31217859891094596,
+            "binance": 0.326624644728968,
+            "deribit": 0.361196756360086
+          },
+          "dominant_exchange_v2": "deribit",
+          "p_lambda2_one_factor": 0.000999000999000999,
+          "p_ipr_v2_one_factor": 1.0,
+          "fdr_significant": true
+        },
+        {
+          "date": "2026-04-27",
+          "panel_valid": true,
+          "analyzed": true,
+          "degenerate": false,
+          "t_eff": 1431,
+          "lambda1": 5.4795891080012655,
+          "lambda2": 0.35622743226814546,
+          "ipr_v1": 0.16678476075849613,
+          "ipr_v2": 0.16959610713923434,
+          "exchange_loads_v2": {
+            "bybit": 0.31568295738278507,
+            "binance": 0.318932788617849,
+            "deribit": 0.3653842539993662
+          },
+          "dominant_exchange_v2": "deribit",
+          "p_lambda2_one_factor": 0.000999000999000999,
+          "p_ipr_v2_one_factor": 1.0,
+          "fdr_significant": true
+        },
+        {
+          "date": "2026-04-28",
+          "panel_valid": true,
+          "analyzed": true,
+          "degenerate": false,
+          "t_eff": 1424,
+          "lambda1": 5.308851705249987,
+          "lambda2": 0.3936153934796808,
+          "ipr_v1": 0.16715389771965117,
+          "ipr_v2": 0.1851128646387306,
+          "exchange_loads_v2": {
+            "bybit": 0.2772121209903118,
+            "binance": 0.28946824509623637,
+            "deribit": 0.43331963391345174
+          },
+          "dominant_exchange_v2": "deribit",
+          "p_lambda2_one_factor": 0.002997002997002997,
+          "p_ipr_v2_one_factor": 1.0,
+          "fdr_significant": true
+        },
+        {
+          "date": "2026-04-29",
+          "panel_valid": true,
+          "analyzed": true,
+          "degenerate": false,
+          "t_eff": 1433,
+          "lambda1": 5.411470448541367,
+          "lambda2": 0.42119913709298323,
+          "ipr_v1": 0.16680242613347565,
+          "ipr_v2": 0.16840132923209833,
+          "exchange_loads_v2": {
+            "bybit": 0.3083980407287824,
+            "binance": 0.31930039433092,
+            "deribit": 0.3723015649402979
+          },
+          "dominant_exchange_v2": "deribit",
+          "p_lambda2_one_factor": 0.000999000999000999,
+          "p_ipr_v2_one_factor": 1.0,
+          "fdr_significant": true
+        },
+        {
+          "date": "2026-04-30",
+          "panel_valid": true,
+          "analyzed": true,
+          "degenerate": false,
+          "t_eff": 1428,
+          "lambda1": 5.470381884968991,
+          "lambda2": 0.2996019348410854,
+          "ipr_v1": 0.16700453788214853,
+          "ipr_v2": 0.20895544912603134,
+          "exchange_loads_v2": {
+            "bybit": 0.25478524718435624,
+            "binance": 0.26632349376979936,
+            "deribit": 0.4788912590458446
+          },
+          "dominant_exchange_v2": "deribit",
+          "p_lambda2_one_factor": 0.8851148851148851,
+          "p_ipr_v2_one_factor": 1.0,
+          "fdr_significant": false
+        },
+        {
+          "date": "2026-05-01",
+          "panel_valid": true,
+          "analyzed": true,
+          "degenerate": false,
+          "t_eff": 1428,
+          "lambda1": 5.409829182181348,
+          "lambda2": 0.37954601336044674,
+          "ipr_v1": 0.16699938902054767,
+          "ipr_v2": 0.18507022784427035,
+          "exchange_loads_v2": {
+            "bybit": 0.28500465812069437,
+            "binance": 0.2894198195976462,
+            "deribit": 0.4255755222816595
+          },
+          "dominant_exchange_v2": "deribit",
+          "p_lambda2_one_factor": 0.000999000999000999,
+          "p_ipr_v2_one_factor": 1.0,
+          "fdr_significant": true
+        },
+        {
+          "date": "2026-05-02",
+          "panel_valid": false,
+          "analyzed": false,
+          "degenerate": false
+        },
+        {
+          "date": "2026-05-03",
+          "panel_valid": true,
+          "analyzed": true,
+          "degenerate": false,
+          "t_eff": 1387,
+          "lambda1": 5.3066597582474655,
+          "lambda2": 0.4087642702758571,
+          "ipr_v1": 0.16700298306937955,
+          "ipr_v2": 0.17068614613870242,
+          "exchange_loads_v2": {
+            "bybit": 0.30837567791413667,
+            "binance": 0.29964662989618507,
+            "deribit": 0.3919776921896782
+          },
+          "dominant_exchange_v2": "deribit",
+          "p_lambda2_one_factor": 0.000999000999000999,
+          "p_ipr_v2_one_factor": 1.0,
+          "fdr_significant": true
+        },
+        {
+          "date": "2026-05-04",
+          "panel_valid": true,
+          "analyzed": true,
+          "degenerate": false,
+          "t_eff": 1435,
+          "lambda1": 5.597315572362258,
+          "lambda2": 0.29522995427959914,
+          "ipr_v1": 0.1667311270919784,
+          "ipr_v2": 0.16964196130513465,
+          "exchange_loads_v2": {
+            "bybit": 0.3088193019903488,
+            "binance": 0.3124508415655156,
+            "deribit": 0.3787298564441356
+          },
+          "dominant_exchange_v2": "deribit",
+          "p_lambda2_one_factor": 0.00999000999000999,
+          "p_ipr_v2_one_factor": 1.0,
+          "fdr_significant": true
+        },
+        {
+          "date": "2026-05-05",
+          "panel_valid": true,
+          "analyzed": true,
+          "degenerate": false,
+          "t_eff": 1438,
+          "lambda1": 5.434705973238309,
+          "lambda2": 0.37035859036531416,
+          "ipr_v1": 0.16686722475419952,
+          "ipr_v2": 0.17601345973443855,
+          "exchange_loads_v2": {
+            "bybit": 0.298895825136799,
+            "binance": 0.3030640803421726,
+            "deribit": 0.3980400945210285
+          },
+          "dominant_exchange_v2": "deribit",
+          "p_lambda2_one_factor": 0.000999000999000999,
+          "p_ipr_v2_one_factor": 1.0,
+          "fdr_significant": true
+        },
+        {
+          "date": "2026-05-06",
+          "panel_valid": true,
+          "analyzed": true,
+          "degenerate": false,
+          "t_eff": 1413,
+          "lambda1": 5.244742121663568,
+          "lambda2": 0.4641229450774813,
+          "ipr_v1": 0.1671796707569237,
+          "ipr_v2": 0.1763501377996948,
+          "exchange_loads_v2": {
+            "bybit": 0.2755199100228507,
+            "binance": 0.2834875789462953,
+            "deribit": 0.44099251103085413
+          },
+          "dominant_exchange_v2": "deribit",
+          "p_lambda2_one_factor": 0.000999000999000999,
+          "p_ipr_v2_one_factor": 1.0,
+          "fdr_significant": true
+        },
+        {
+          "date": "2026-05-07",
+          "panel_valid": true,
+          "analyzed": true,
+          "degenerate": false,
+          "t_eff": 1437,
+          "lambda1": 5.401010582945458,
+          "lambda2": 0.36961596070332425,
+          "ipr_v1": 0.16696342089414526,
+          "ipr_v2": 0.17496932053910702,
+          "exchange_loads_v2": {
+            "bybit": 0.28627981764869304,
+            "binance": 0.28958694973707444,
+            "deribit": 0.4241332326142326
+          },
+          "dominant_exchange_v2": "deribit",
+          "p_lambda2_one_factor": 0.001998001998001998,
+          "p_ipr_v2_one_factor": 1.0,
+          "fdr_significant": true
+        },
+        {
+          "date": "2026-05-08",
+          "panel_valid": true,
+          "analyzed": true,
+          "degenerate": false,
+          "t_eff": 1430,
+          "lambda1": 5.377474655273906,
+          "lambda2": 0.3774420382950029,
+          "ipr_v1": 0.16697772838906683,
+          "ipr_v2": 0.17481782543043237,
+          "exchange_loads_v2": {
+            "bybit": 0.27914710901755524,
+            "binance": 0.2836075925108954,
+            "deribit": 0.43724529847154936
+          },
+          "dominant_exchange_v2": "deribit",
+          "p_lambda2_one_factor": 0.000999000999000999,
+          "p_ipr_v2_one_factor": 1.0,
+          "fdr_significant": true
+        },
+        {
+          "date": "2026-05-09",
+          "panel_valid": true,
+          "analyzed": true,
+          "degenerate": false,
+          "t_eff": 1346,
+          "lambda1": 4.968553476839479,
+          "lambda2": 0.5654895293297839,
+          "ipr_v1": 0.16737866823010616,
+          "ipr_v2": 0.16872494216743616,
+          "exchange_loads_v2": {
+            "bybit": 0.3207472500758352,
+            "binance": 0.3236181195602635,
+            "deribit": 0.35563463036390164
+          },
+          "dominant_exchange_v2": "deribit",
+          "p_lambda2_one_factor": 0.000999000999000999,
+          "p_ipr_v2_one_factor": 1.0,
+          "fdr_significant": true
+        },
+        {
+          "date": "2026-05-10",
+          "panel_valid": true,
+          "analyzed": true,
+          "degenerate": false,
+          "t_eff": 1379,
+          "lambda1": 5.284621248598402,
+          "lambda2": 0.5065638840996022,
+          "ipr_v1": 0.16679782303132373,
+          "ipr_v2": 0.16717406647200367,
+          "exchange_loads_v2": {
+            "bybit": 0.32409949141869543,
+            "binance": 0.32711662375843553,
+            "deribit": 0.34878388482286937
+          },
+          "dominant_exchange_v2": "deribit",
+          "p_lambda2_one_factor": 0.000999000999000999,
+          "p_ipr_v2_one_factor": 1.0,
+          "fdr_significant": true
+        },
+        {
+          "date": "2026-05-11",
+          "panel_valid": true,
+          "analyzed": true,
+          "degenerate": false,
+          "t_eff": 1432,
+          "lambda1": 5.445330776329518,
+          "lambda2": 0.35924624032868707,
+          "ipr_v1": 0.1668579866705457,
+          "ipr_v2": 0.17753227165961133,
+          "exchange_loads_v2": {
+            "bybit": 0.2918581839561672,
+            "binance": 0.3083191048454809,
+            "deribit": 0.39982271119835194
+          },
+          "dominant_exchange_v2": "deribit",
+          "p_lambda2_one_factor": 0.000999000999000999,
+          "p_ipr_v2_one_factor": 1.0,
+          "fdr_significant": true
+        },
+        {
+          "date": "2026-05-12",
+          "panel_valid": true,
+          "analyzed": true,
+          "degenerate": false,
+          "t_eff": 1431,
+          "lambda1": 5.343577615136662,
+          "lambda2": 0.3991847796039897,
+          "ipr_v1": 0.16691166265205443,
+          "ipr_v2": 0.16810959506256573,
+          "exchange_loads_v2": {
+            "bybit": 0.3057970410733232,
+            "binance": 0.3226219610616317,
+            "deribit": 0.3715809978650453
+          },
+          "dominant_exchange_v2": "deribit",
+          "p_lambda2_one_factor": 0.000999000999000999,
+          "p_ipr_v2_one_factor": 1.0,
+          "fdr_significant": true
+        },
+        {
+          "date": "2026-05-13",
+          "panel_valid": true,
+          "analyzed": true,
+          "degenerate": false,
+          "t_eff": 1422,
+          "lambda1": 5.348319304636799,
+          "lambda2": 0.39897249688498654,
+          "ipr_v1": 0.16690691647557468,
+          "ipr_v2": 0.17509055681620883,
+          "exchange_loads_v2": {
+            "bybit": 0.313343050122025,
+            "binance": 0.31533626581199536,
+            "deribit": 0.3713206840659797
+          },
+          "dominant_exchange_v2": "deribit",
+          "p_lambda2_one_factor": 0.000999000999000999,
+          "p_ipr_v2_one_factor": 1.0,
+          "fdr_significant": true
+        },
+        {
+          "date": "2026-05-14",
+          "panel_valid": true,
+          "analyzed": true,
+          "degenerate": false,
+          "t_eff": 1434,
+          "lambda1": 5.43179966625784,
+          "lambda2": 0.3689349014453678,
+          "ipr_v1": 0.16686746828852642,
+          "ipr_v2": 0.1705857889947219,
+          "exchange_loads_v2": {
+            "bybit": 0.2946637449651487,
+            "binance": 0.3119182992174712,
+            "deribit": 0.3934179558173801
+          },
+          "dominant_exchange_v2": "deribit",
+          "p_lambda2_one_factor": 0.000999000999000999,
+          "p_ipr_v2_one_factor": 1.0,
+          "fdr_significant": true
+        },
+        {
+          "date": "2026-05-15",
+          "panel_valid": true,
+          "analyzed": true,
+          "degenerate": false,
+          "t_eff": 1426,
+          "lambda1": 5.396518181530533,
+          "lambda2": 0.3868157636300956,
+          "ipr_v1": 0.16690035161823902,
+          "ipr_v2": 0.17126676122295148,
+          "exchange_loads_v2": {
+            "bybit": 0.3008718844167174,
+            "binance": 0.3038836556931725,
+            "deribit": 0.3952444598901101
+          },
+          "dominant_exchange_v2": "deribit",
+          "p_lambda2_one_factor": 0.000999000999000999,
+          "p_ipr_v2_one_factor": 1.0,
+          "fdr_significant": true
+        }
+      ],
+      "n_days_fdr_significant": 42,
+      "validity": {
+        "ipr_v1_max": 0.25,
+        "ipr_v1_ok_share": 1.0,
+        "ipr_v1_share_min": 0.9,
+        "ipr_v1_share_ok": true,
+        "n_days_valid": 47,
+        "min_valid_days": 35,
+        "min_days_ok": true,
+        "window_valid": true
+      },
+      "criteria": {
+        "a_sig_day_share": 0.8936170212765957,
+        "a_threshold": 0.2,
+        "a_met": true,
+        "b_median_ipr_v2_sig": 0.16947646998986177,
+        "b_threshold": 0.4,
+        "b_met": false,
+        "c_dominant_exchange": "deribit",
+        "c_dominant_exchange_share": 0.9523809523809523,
+        "c_threshold": 0.7,
+        "c_met": true
+      },
+      "all_criteria_met": false,
+      "wishart_reference": {
+        "verdict_bearing": false,
+        "n_draws": 1000,
+        "t_obs": 1440,
+        "n_series": 6,
+        "q_aspect": 240.0,
+        "mp_lambda_minus": 0.8750672217930862,
+        "mp_lambda_plus": 1.1332661115402474,
+        "lambda1_null_quantiles": {
+          "q50": 1.084979353440515,
+          "q95": 1.1230041465165055,
+          "q99": 1.1381742279547018
+        },
+        "lambda2_null_quantiles": {
+          "q50": 1.0451349858357686,
+          "q95": 1.0699004402004528,
+          "q99": 1.0823100456930408
+        },
+        "t_eff_median_observed": 1434
+      }
+    },
+    {
+      "window_index": 1,
+      "window_label": "W2",
+      "start_date": "2026-05-16",
+      "end_date": "2026-07-04",
+      "series_labels": [
+        "bybit:BTCUSDT",
+        "bybit:ETHUSDT",
+        "binance:BTCUSDT",
+        "binance:ETHUSDT",
+        "deribit:BTC-PERPETUAL",
+        "deribit:ETH-PERPETUAL"
+      ],
+      "series_exchanges": [
+        "bybit",
+        "bybit",
+        "binance",
+        "binance",
+        "deribit",
+        "deribit"
+      ],
+      "n_days_total": 50,
+      "n_days_panel_valid": 31,
+      "n_days_degenerate": 0,
+      "n_days_valid": 31,
+      "days": [
+        {
+          "date": "2026-05-16",
+          "panel_valid": true,
+          "analyzed": true,
+          "degenerate": false,
+          "t_eff": 1370,
+          "lambda1": 5.1691176056299115,
+          "lambda2": 0.4903712527541156,
+          "ipr_v1": 0.16718422073452038,
+          "ipr_v2": 0.17593668993078876,
+          "exchange_loads_v2": {
+            "bybit": 0.2980489775913472,
+            "binance": 0.30089286981670804,
+            "deribit": 0.4010581525919449
+          },
+          "dominant_exchange_v2": "deribit",
+          "p_lambda2_one_factor": 0.000999000999000999,
+          "p_ipr_v2_one_factor": 1.0,
+          "fdr_significant": true
+        },
+        {
+          "date": "2026-05-17",
+          "panel_valid": true,
+          "analyzed": true,
+          "degenerate": false,
+          "t_eff": 1394,
+          "lambda1": 5.390763661339611,
+          "lambda2": 0.45980040447419274,
+          "ipr_v1": 0.16675384732120066,
+          "ipr_v2": 0.17088104357500322,
+          "exchange_loads_v2": {
+            "bybit": 0.35449392469030566,
+            "binance": 0.30766703527659733,
+            "deribit": 0.33783904003309706
+          },
+          "dominant_exchange_v2": "bybit",
+          "p_lambda2_one_factor": 0.000999000999000999,
+          "p_ipr_v2_one_factor": 1.0,
+          "fdr_significant": true
+        },
+        {
+          "date": "2026-05-18",
+          "panel_valid": true,
+          "analyzed": true,
+          "degenerate": false,
+          "t_eff": 1435,
+          "lambda1": 5.5770426331772995,
+          "lambda2": 0.2899017127435706,
+          "ipr_v1": 0.1667343872496354,
+          "ipr_v2": 0.16933767582755585,
+          "exchange_loads_v2": {
+            "bybit": 0.30904343664174766,
+            "binance": 0.3195101376778978,
+            "deribit": 0.3714464256803546
+          },
+          "dominant_exchange_v2": "deribit",
+          "p_lambda2_one_factor": 0.04095904095904096,
+          "p_ipr_v2_one_factor": 1.0,
+          "fdr_significant": true
+        },
+        {
+          "date": "2026-05-19",
+          "panel_valid": true,
+          "analyzed": true,
+          "degenerate": false,
+          "t_eff": 1386,
+          "lambda1": 5.449337980958645,
+          "lambda2": 0.3119596316030932,
+          "ipr_v1": 0.1669257727490582,
+          "ipr_v2": 0.17481100201726418,
+          "exchange_loads_v2": {
+            "bybit": 0.27786044974410484,
+            "binance": 0.29149091665889826,
+            "deribit": 0.430648633596997
+          },
+          "dominant_exchange_v2": "deribit",
+          "p_lambda2_one_factor": 0.3946053946053946,
+          "p_ipr_v2_one_factor": 1.0,
+          "fdr_significant": false
+        },
+        {
+          "date": "2026-05-20",
+          "panel_valid": true,
+          "analyzed": true,
+          "degenerate": false,
+          "t_eff": 1433,
+          "lambda1": 5.541357178275281,
+          "lambda2": 0.25488467998280795,
+          "ipr_v1": 0.1669129990907098,
+          "ipr_v2": 0.23622094041050312,
+          "exchange_loads_v2": {
+            "bybit": 0.2676566295972057,
+            "binance": 0.26245274177615563,
+            "deribit": 0.4698906286266386
+          },
+          "dominant_exchange_v2": "deribit",
+          "p_lambda2_one_factor": 1.0,
+          "p_ipr_v2_one_factor": 1.0,
+          "fdr_significant": false
+        },
+        {
+          "date": "2026-05-21",
+          "panel_valid": true,
+          "analyzed": true,
+          "degenerate": false,
+          "t_eff": 1432,
+          "lambda1": 5.556398199184578,
+          "lambda2": 0.25966977124414037,
+          "ipr_v1": 0.16685465997717838,
+          "ipr_v2": 0.18630184416167972,
+          "exchange_loads_v2": {
+            "bybit": 0.27687716549670494,
+            "binance": 0.2777773732954327,
+            "deribit": 0.44534546120786267
+          },
+          "dominant_exchange_v2": "deribit",
+          "p_lambda2_one_factor": 0.989010989010989,
+          "p_ipr_v2_one_factor": 1.0,
+          "fdr_significant": false
+        },
+        {
+          "date": "2026-05-22",
+          "panel_valid": true,
+          "analyzed": true,
+          "degenerate": false,
+          "t_eff": 1433,
+          "lambda1": 5.643135287326968,
+          "lambda2": 0.20274399346581465,
+          "ipr_v1": 0.16674883643345353,
+          "ipr_v2": 0.1788562003740478,
+          "exchange_loads_v2": {
+            "bybit": 0.29175375662176195,
+            "binance": 0.30481543999501554,
+            "deribit": 0.40343080338322246
+          },
+          "dominant_exchange_v2": "deribit",
+          "p_lambda2_one_factor": 1.0,
+          "p_ipr_v2_one_factor": 1.0,
+          "fdr_significant": false
+        },
+        {
+          "date": "2026-05-23",
+          "panel_valid": true,
+          "analyzed": true,
+          "degenerate": false,
+          "t_eff": 1421,
+          "lambda1": 5.465350819781611,
+          "lambda2": 0.4006455395931501,
+          "ipr_v1": 0.16672204445025224,
+          "ipr_v2": 0.16709542035969405,
+          "exchange_loads_v2": {
+            "bybit": 0.3245632811880772,
+            "binance": 0.3261962868250058,
+            "deribit": 0.3492404319869172
+          },
+          "dominant_exchange_v2": "deribit",
+          "p_lambda2_one_factor": 0.000999000999000999,
+          "p_ipr_v2_one_factor": 1.0,
+          "fdr_significant": true
+        },
+        {
+          "date": "2026-05-24",
+          "panel_valid": true,
+          "analyzed": true,
+          "degenerate": false,
+          "t_eff": 1423,
+          "lambda1": 5.465326519998682,
+          "lambda2": 0.32247081600104643,
+          "ipr_v1": 0.16690233931066403,
+          "ipr_v2": 0.17649271950868406,
+          "exchange_loads_v2": {
+            "bybit": 0.28574802476536293,
+            "binance": 0.29147743903016454,
+            "deribit": 0.4227745362044727
+          },
+          "dominant_exchange_v2": "deribit",
+          "p_lambda2_one_factor": 0.11788211788211789,
+          "p_ipr_v2_one_factor": 1.0,
+          "fdr_significant": false
+        },
+        {
+          "date": "2026-05-25",
+          "panel_valid": true,
+          "analyzed": true,
+          "degenerate": false,
+          "t_eff": 1423,
+          "lambda1": 5.295347145134365,
+          "lambda2": 0.37088360151735894,
+          "ipr_v1": 0.16730092426371906,
+          "ipr_v2": 0.25076063205610666,
+          "exchange_loads_v2": {
+            "bybit": 0.25704162132000163,
+            "binance": 0.25456291588298696,
+            "deribit": 0.4883954627970116
+          },
+          "dominant_exchange_v2": "deribit",
+          "p_lambda2_one_factor": 0.3046953046953047,
+          "p_ipr_v2_one_factor": 1.0,
+          "fdr_significant": false
+        },
+        {
+          "date": "2026-05-26",
+          "panel_valid": true,
+          "analyzed": true,
+          "degenerate": false,
+          "t_eff": 1436,
+          "lambda1": 5.45812576622251,
+          "lambda2": 0.3716116259066288,
+          "ipr_v1": 0.16684435719878737,
+          "ipr_v2": 0.1764079668608468,
+          "exchange_loads_v2": {
+            "bybit": 0.2987242578976387,
+            "binance": 0.29894053058668346,
+            "deribit": 0.402335211515678
+          },
+          "dominant_exchange_v2": "deribit",
+          "p_lambda2_one_factor": 0.000999000999000999,
+          "p_ipr_v2_one_factor": 1.0,
+          "fdr_significant": true
+        },
+        {
+          "date": "2026-05-27",
+          "panel_valid": true,
+          "analyzed": true,
+          "degenerate": false,
+          "t_eff": 1437,
+          "lambda1": 5.490548755654158,
+          "lambda2": 0.3301593666417715,
+          "ipr_v1": 0.1668428185629897,
+          "ipr_v2": 0.18127115392774223,
+          "exchange_loads_v2": {
+            "bybit": 0.29170880494215845,
+            "binance": 0.3018440276053409,
+            "deribit": 0.4064471674525008
+          },
+          "dominant_exchange_v2": "deribit",
+          "p_lambda2_one_factor": 0.008991008991008992,
+          "p_ipr_v2_one_factor": 1.0,
+          "fdr_significant": true
+        },
+        {
+          "date": "2026-05-28",
+          "panel_valid": true,
+          "analyzed": true,
+          "degenerate": false,
+          "t_eff": 1438,
+          "lambda1": 5.507188880006248,
+          "lambda2": 0.35590972989957054,
+          "ipr_v1": 0.1667473621460202,
+          "ipr_v2": 0.1681723913608527,
+          "exchange_loads_v2": {
+            "bybit": 0.31097802624980186,
+            "binance": 0.31139201629517166,
+            "deribit": 0.3776299574550267
+          },
+          "dominant_exchange_v2": "deribit",
+          "p_lambda2_one_factor": 0.000999000999000999,
+          "p_ipr_v2_one_factor": 1.0,
+          "fdr_significant": true
+        },
+        {
+          "date": "2026-05-29",
+          "panel_valid": true,
+          "analyzed": true,
+          "degenerate": false,
+          "t_eff": 1432,
+          "lambda1": 5.497750927513144,
+          "lambda2": 0.3464856284117143,
+          "ipr_v1": 0.1667642231322433,
+          "ipr_v2": 0.17016527559284758,
+          "exchange_loads_v2": {
+            "bybit": 0.3100937167917402,
+            "binance": 0.317130648295332,
+            "deribit": 0.37277563491292776
+          },
+          "dominant_exchange_v2": "deribit",
+          "p_lambda2_one_factor": 0.000999000999000999,
+          "p_ipr_v2_one_factor": 1.0,
+          "fdr_significant": true
+        },
+        {
+          "date": "2026-05-30",
+          "panel_valid": true,
+          "analyzed": true,
+          "degenerate": false,
+          "t_eff": 1372,
+          "lambda1": 5.0911299865453685,
+          "lambda2": 0.484826348697156,
+          "ipr_v1": 0.16776029717555382,
+          "ipr_v2": 0.24774469678210498,
+          "exchange_loads_v2": {
+            "bybit": 0.2534704977972891,
+            "binance": 0.2599965504944433,
+            "deribit": 0.4865329517082678
+          },
+          "dominant_exchange_v2": "deribit",
+          "p_lambda2_one_factor": 0.000999000999000999,
+          "p_ipr_v2_one_factor": 1.0,
+          "fdr_significant": true
+        },
+        {
+          "date": "2026-05-31",
+          "panel_valid": true,
+          "analyzed": true,
+          "degenerate": false,
+          "t_eff": 1410,
+          "lambda1": 5.261169093633905,
+          "lambda2": 0.42876213299651766,
+          "ipr_v1": 0.16708858149312023,
+          "ipr_v2": 0.17974379746616517,
+          "exchange_loads_v2": {
+            "bybit": 0.29839156110675724,
+            "binance": 0.2954189454624688,
+            "deribit": 0.4061894934307741
+          },
+          "dominant_exchange_v2": "deribit",
+          "p_lambda2_one_factor": 0.000999000999000999,
+          "p_ipr_v2_one_factor": 1.0,
+          "fdr_significant": true
+        },
+        {
+          "date": "2026-06-01",
+          "panel_valid": true,
+          "analyzed": true,
+          "degenerate": false,
+          "t_eff": 1439,
+          "lambda1": 5.508856569088268,
+          "lambda2": 0.3372603328824104,
+          "ipr_v1": 0.16677922740250026,
+          "ipr_v2": 0.17196623575384426,
+          "exchange_loads_v2": {
+            "bybit": 0.31368878690097557,
+            "binance": 0.31059592714634293,
+            "deribit": 0.37571528595268155
+          },
+          "dominant_exchange_v2": "deribit",
+          "p_lambda2_one_factor": 0.000999000999000999,
+          "p_ipr_v2_one_factor": 1.0,
+          "fdr_significant": true
+        },
+        {
+          "date": "2026-06-02",
+          "panel_valid": true,
+          "analyzed": true,
+          "degenerate": false,
+          "t_eff": 1439,
+          "lambda1": 5.511864921631928,
+          "lambda2": 0.40266244489576497,
+          "ipr_v1": 0.1667176459119511,
+          "ipr_v2": 0.1693195729294235,
+          "exchange_loads_v2": {
+            "bybit": 0.31055633123544657,
+            "binance": 0.31842810133222044,
+            "deribit": 0.3710155674323329
+          },
+          "dominant_exchange_v2": "deribit",
+          "p_lambda2_one_factor": 0.000999000999000999,
+          "p_ipr_v2_one_factor": 1.0,
+          "fdr_significant": true
+        },
+        {
+          "date": "2026-06-03",
+          "panel_valid": true,
+          "analyzed": true,
+          "degenerate": false,
+          "t_eff": 1439,
+          "lambda1": 5.4833726471530255,
+          "lambda2": 0.42743902885988155,
+          "ipr_v1": 0.16671830780123406,
+          "ipr_v2": 0.16781720386077625,
+          "exchange_loads_v2": {
+            "bybit": 0.3153794624773617,
+            "binance": 0.32082059057578916,
+            "deribit": 0.3637999469468489
+          },
+          "dominant_exchange_v2": "deribit",
+          "p_lambda2_one_factor": 0.000999000999000999,
+          "p_ipr_v2_one_factor": 1.0,
+          "fdr_significant": true
+        },
+        {
+          "date": "2026-06-04",
+          "panel_valid": true,
+          "analyzed": true,
+          "degenerate": false,
+          "t_eff": 1439,
+          "lambda1": 5.693529311528913,
+          "lambda2": 0.24620178872422036,
+          "ipr_v1": 0.16669211483371268,
+          "ipr_v2": 0.1684593022778449,
+          "exchange_loads_v2": {
+            "bybit": 0.3134672574885555,
+            "binance": 0.31913181774688326,
+            "deribit": 0.36740092476456143
+          },
+          "dominant_exchange_v2": "deribit",
+          "p_lambda2_one_factor": 0.32867132867132864,
+          "p_ipr_v2_one_factor": 1.0,
+          "fdr_significant": false
+        },
+        {
+          "date": "2026-06-05",
+          "panel_valid": true,
+          "analyzed": true,
+          "degenerate": false,
+          "t_eff": 1439,
+          "lambda1": 5.658369716074179,
+          "lambda2": 0.2976618497106667,
+          "ipr_v1": 0.16667606228006349,
+          "ipr_v2": 0.16696986395333682,
+          "exchange_loads_v2": {
+            "bybit": 0.32144692159710914,
+            "binance": 0.325669571210166,
+            "deribit": 0.352883507192725
+          },
+          "dominant_exchange_v2": "deribit",
+          "p_lambda2_one_factor": 0.000999000999000999,
+          "p_ipr_v2_one_factor": 1.0,
+          "fdr_significant": true
+        },
+        {
+          "date": "2026-06-06",
+          "panel_valid": true,
+          "analyzed": true,
+          "degenerate": false,
+          "t_eff": 1439,
+          "lambda1": 5.664010929442622,
+          "lambda2": 0.24961789867631046,
+          "ipr_v1": 0.16669864534668444,
+          "ipr_v2": 0.1678017558671411,
+          "exchange_loads_v2": {
+            "bybit": 0.3148396250001041,
+            "binance": 0.3164333783087212,
+            "deribit": 0.3687269966911748
+          },
+          "dominant_exchange_v2": "deribit",
+          "p_lambda2_one_factor": 0.45354645354645357,
+          "p_ipr_v2_one_factor": 1.0,
+          "fdr_significant": false
+        },
+        {
+          "date": "2026-06-07",
+          "panel_valid": true,
+          "analyzed": true,
+          "degenerate": false,
+          "t_eff": 1439,
+          "lambda1": 5.6366497621210385,
+          "lambda2": 0.28607066057871783,
+          "ipr_v1": 0.1666983871150588,
+          "ipr_v2": 0.16817890574477257,
+          "exchange_loads_v2": {
+            "bybit": 0.3163609822949703,
+            "binance": 0.3196012124557732,
+            "deribit": 0.3640378052492564
+          },
+          "dominant_exchange_v2": "deribit",
+          "p_lambda2_one_factor": 0.004995004995004995,
+          "p_ipr_v2_one_factor": 1.0,
+          "fdr_significant": true
+        },
+        {
+          "date": "2026-06-08",
+          "panel_valid": true,
+          "analyzed": true,
+          "degenerate": false,
+          "t_eff": 1439,
+          "lambda1": 5.603219138502187,
+          "lambda2": 0.28932053849937034,
+          "ipr_v1": 0.16672541324526394,
+          "ipr_v2": 0.1682361838942108,
+          "exchange_loads_v2": {
+            "bybit": 0.31528028000170255,
+            "binance": 0.31405823940801625,
+            "deribit": 0.37066148059028126
+          },
+          "dominant_exchange_v2": "deribit",
+          "p_lambda2_one_factor": 0.013986013986013986,
+          "p_ipr_v2_one_factor": 1.0,
+          "fdr_significant": true
+        },
+        {
+          "date": "2026-06-09",
+          "panel_valid": true,
+          "analyzed": true,
+          "degenerate": false,
+          "t_eff": 1438,
+          "lambda1": 5.618166055443007,
+          "lambda2": 0.27507116242427476,
+          "ipr_v1": 0.16673089246125236,
+          "ipr_v2": 0.1708361319564728,
+          "exchange_loads_v2": {
+            "bybit": 0.30688174258719353,
+            "binance": 0.3111671054237287,
+            "deribit": 0.3819511519890778
+          },
+          "dominant_exchange_v2": "deribit",
+          "p_lambda2_one_factor": 0.12987012987012986,
+          "p_ipr_v2_one_factor": 1.0,
+          "fdr_significant": false
+        },
+        {
+          "date": "2026-06-10",
+          "panel_valid": true,
+          "analyzed": true,
+          "degenerate": false,
+          "t_eff": 1439,
+          "lambda1": 5.678419904183266,
+          "lambda2": 0.20745210104660747,
+          "ipr_v1": 0.16674414922166547,
+          "ipr_v2": 0.17763560722793525,
+          "exchange_loads_v2": {
+            "bybit": 0.2977797768182734,
+            "binance": 0.3048288189108214,
+            "deribit": 0.3973914042709051
+          },
+          "dominant_exchange_v2": "deribit",
+          "p_lambda2_one_factor": 1.0,
+          "p_ipr_v2_one_factor": 1.0,
+          "fdr_significant": false
+        },
+        {
+          "date": "2026-06-11",
+          "panel_valid": true,
+          "analyzed": true,
+          "degenerate": false,
+          "t_eff": 1438,
+          "lambda1": 5.518926381698236,
+          "lambda2": 0.3778397234452416,
+          "ipr_v1": 0.16674103050802558,
+          "ipr_v2": 0.1721852228681428,
+          "exchange_loads_v2": {
+            "bybit": 0.3082044227975703,
+            "binance": 0.31420940602136815,
+            "deribit": 0.3775861711810615
+          },
+          "dominant_exchange_v2": "deribit",
+          "p_lambda2_one_factor": 0.000999000999000999,
+          "p_ipr_v2_one_factor": 1.0,
+          "fdr_significant": true
+        },
+        {
+          "date": "2026-06-12",
+          "panel_valid": true,
+          "analyzed": true,
+          "degenerate": false,
+          "t_eff": 1407,
+          "lambda1": 5.554272852191969,
+          "lambda2": 0.2593848476928363,
+          "ipr_v1": 0.16686828475109874,
+          "ipr_v2": 0.18586944958359558,
+          "exchange_loads_v2": {
+            "bybit": 0.27422429021915695,
+            "binance": 0.2781380588779838,
+            "deribit": 0.4476376509028591
+          },
+          "dominant_exchange_v2": "deribit",
+          "p_lambda2_one_factor": 0.9920079920079921,
+          "p_ipr_v2_one_factor": 1.0,
+          "fdr_significant": false
+        },
+        {
+          "date": "2026-06-13",
+          "panel_valid": true,
+          "analyzed": true,
+          "degenerate": false,
+          "t_eff": 1404,
+          "lambda1": 5.1093364690934315,
+          "lambda2": 0.5029929425205365,
+          "ipr_v1": 0.16796461481049516,
+          "ipr_v2": 0.2434963341619091,
+          "exchange_loads_v2": {
+            "bybit": 0.2385110978799747,
+            "binance": 0.24646467955241694,
+            "deribit": 0.5150242225676086
+          },
+          "dominant_exchange_v2": "deribit",
+          "p_lambda2_one_factor": 0.000999000999000999,
+          "p_ipr_v2_one_factor": 1.0,
+          "fdr_significant": true
+        },
+        {
+          "date": "2026-06-14",
+          "panel_valid": false,
+          "analyzed": false,
+          "degenerate": false
+        },
+        {
+          "date": "2026-06-15",
+          "panel_valid": true,
+          "analyzed": true,
+          "degenerate": false,
+          "t_eff": 1439,
+          "lambda1": 5.287172354350412,
+          "lambda2": 0.5492788269855108,
+          "ipr_v1": 0.16678737167601648,
+          "ipr_v2": 0.16741927616461694,
+          "exchange_loads_v2": {
+            "bybit": 0.3147748574997976,
+            "binance": 0.32130164408457074,
+            "deribit": 0.36392349841563165
+          },
+          "dominant_exchange_v2": "deribit",
+          "p_lambda2_one_factor": 0.000999000999000999,
+          "p_ipr_v2_one_factor": 1.0,
+          "fdr_significant": true
+        },
+        {
+          "date": "2026-06-16",
+          "panel_valid": false,
+          "analyzed": false,
+          "degenerate": false
+        },
+        {
+          "date": "2026-06-17",
+          "panel_valid": false,
+          "analyzed": false,
+          "degenerate": false
+        },
+        {
+          "date": "2026-06-18",
+          "panel_valid": false,
+          "analyzed": false,
+          "degenerate": false
+        },
+        {
+          "date": "2026-06-19",
+          "panel_valid": false,
+          "analyzed": false,
+          "degenerate": false
+        },
+        {
+          "date": "2026-06-20",
+          "panel_valid": false,
+          "analyzed": false,
+          "degenerate": false
+        },
+        {
+          "date": "2026-06-21",
+          "panel_valid": false,
+          "analyzed": false,
+          "degenerate": false
+        },
+        {
+          "date": "2026-06-22",
+          "panel_valid": false,
+          "analyzed": false,
+          "degenerate": false
+        },
+        {
+          "date": "2026-06-23",
+          "panel_valid": false,
+          "analyzed": false,
+          "degenerate": false
+        },
+        {
+          "date": "2026-06-24",
+          "panel_valid": false,
+          "analyzed": false,
+          "degenerate": false
+        },
+        {
+          "date": "2026-06-25",
+          "panel_valid": false,
+          "analyzed": false,
+          "degenerate": false
+        },
+        {
+          "date": "2026-06-26",
+          "panel_valid": true,
+          "analyzed": true,
+          "degenerate": false,
+          "t_eff": 1439,
+          "lambda1": 5.644145832021771,
+          "lambda2": 0.2821045325456981,
+          "ipr_v1": 0.1666906179164272,
+          "ipr_v2": 0.168201929370655,
+          "exchange_loads_v2": {
+            "bybit": 0.318303089431214,
+            "binance": 0.3186706770106141,
+            "deribit": 0.3630262335581719
+          },
+          "dominant_exchange_v2": "deribit",
+          "p_lambda2_one_factor": 0.001998001998001998,
+          "p_ipr_v2_one_factor": 1.0,
+          "fdr_significant": true
+        },
+        {
+          "date": "2026-06-27",
+          "panel_valid": false,
+          "analyzed": false,
+          "degenerate": false
+        },
+        {
+          "date": "2026-06-28",
+          "panel_valid": false,
+          "analyzed": false,
+          "degenerate": false
+        },
+        {
+          "date": "2026-06-29",
+          "panel_valid": false,
+          "analyzed": false,
+          "degenerate": false
+        },
+        {
+          "date": "2026-06-30",
+          "panel_valid": false,
+          "analyzed": false,
+          "degenerate": false
+        },
+        {
+          "date": "2026-07-01",
+          "panel_valid": false,
+          "analyzed": false,
+          "degenerate": false
+        },
+        {
+          "date": "2026-07-02",
+          "panel_valid": false,
+          "analyzed": false,
+          "degenerate": false
+        },
+        {
+          "date": "2026-07-03",
+          "panel_valid": false,
+          "analyzed": false,
+          "degenerate": false
+        },
+        {
+          "date": "2026-07-04",
+          "panel_valid": false,
+          "analyzed": false,
+          "degenerate": false
+        }
+      ],
+      "n_days_fdr_significant": 20,
+      "validity": {
+        "ipr_v1_max": 0.25,
+        "ipr_v1_ok_share": 1.0,
+        "ipr_v1_share_min": 0.9,
+        "ipr_v1_share_ok": true,
+        "n_days_valid": 31,
+        "min_valid_days": 35,
+        "min_days_ok": false,
+        "window_valid": false
+      },
+      "criteria": {
+        "a_sig_day_share": 0.6451612903225806,
+        "a_threshold": 0.2,
+        "a_met": true,
+        "b_median_ipr_v2_sig": 0.16975147571020172,
+        "b_threshold": 0.4,
+        "b_met": false,
+        "c_dominant_exchange": "deribit",
+        "c_dominant_exchange_share": 0.95,
+        "c_threshold": 0.7,
+        "c_met": true
+      },
+      "all_criteria_met": false,
+      "wishart_reference": {
+        "verdict_bearing": false,
+        "n_draws": 1000,
+        "t_obs": 1440,
+        "n_series": 6,
+        "q_aspect": 240.0,
+        "mp_lambda_minus": 0.8750672217930862,
+        "mp_lambda_plus": 1.1332661115402474,
+        "lambda1_null_quantiles": {
+          "q50": 1.0857302697331108,
+          "q95": 1.1210321075911578,
+          "q99": 1.1358209194855853
+        },
+        "lambda2_null_quantiles": {
+          "q50": 1.045052573874107,
+          "q95": 1.0678936562215715,
+          "q99": 1.0797932853292003
+        },
+        "t_eff_median_observed": 1436
+      }
+    }
+  ]
+}

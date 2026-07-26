@@ -706,3 +706,72 @@ Alle registrierten WEITER-Bedingungen sind erfüllt (4/5-Quorum mit AUC>=0,60 + 
 
 ### Programm-Bilanz (nach GL-015)
 Welle 1–3 unverändert (2 kapitalfreie Mess-WEITER, beide Tradability-PARK, 0 handelbare Kanten). Welle 5: H-18 Audit abgeschlossen (GL-014) · **H-16 WEITER (kapitalfrei) — das erste vollständige GPU-Hypothesen-Verdikt des Programms** · H-15 läuft (Checkpoint-Tranchen) · H-14/H-17 data-gated (Entsperrung in Prüfung nach Harvester-Backfill). 15 GL-Einträge, 0 Torpfosten-Verschiebungen.
+
+---
+
+## GL-016 · 2026-07-26 · H-09 · C-09 Risk-Limit-Tier-Bunching (Welle 4, KAPITALFREI) — **DROP (empirisch)**
+
+**Quelle:** `state/wave4_20260726/c09_bunch_results.{json,md}` (Lauf `wave4_20260726_084312`, erster Welle-4-Datenlauf überhaupt; 568 s CPU). Kohorten-Lauf mit H-10/H-12 unter der vorregistrierten Über-Familie **F-XDOM1** (Beide-Stufen-Regel, DEC-22). Fenster W1 2026-03-27..05-15 / W2 2026-05-16..07-04, 5 Symbole, 500 Bootstrap-Reps, BH-FDR α=0,10 über **F-BUNCH** (10 Zellen).
+
+### Registriertes Gate vs. Messung
+WEITER verlangt für ≥1 Symbol in BEIDEN Fenstern: Bootstrap-p≤0,05 nach BH-FDR UND b̂⁻≥1,0 UND b̂⁻−b̂⁺≥0,5 UND b̂⁻ > max(Placebos); N-Floors ≥2.000 Orders im Band + CF-Erwartung ≥50.
+
+- **0 von 10 Zellen bestehen; 0 FDR-signifikant** (bestes p: SOL-W1 0,0559 — überlebt BH nicht; p_crit degeneriert auf 0). 7/10 Zellen valide (BNB reißt in beiden Fenstern den N-Floor — dünnstes Symbol, dokumentiert, kein Fenster komplett invalide).
+- Die b̂⁻-Schätzer streuen vorzeichen-wild (−3,49 … +10,20) bei riesiger Bootstrap-Varianz — das Muster von RAUSCHEN, nicht von systematischem Bunching unter der Tier-Kante. Mehrere Zellen mit b̂⁻ ≤ 0.
+- F-XDOM1 Stage 2: keine Stage-1-Survivor aus F-BUNCH → nichts zu aggregieren.
+
+### URTEIL: **DROP.**
+Hartes Ein-Fenster-Kriterium in beiden Fenstern verfehlt (0 Survivor). Das vorregistrierte A-priori („Positionsgrößen werden auf Account-, nicht Order-Ebene gesteuert; sichtbares Clustering ist Rundzahl-Präferenz") ist bestätigt. KAPITALFREI gewahrt. Kein H-09b nahegelegt.
+
+---
+
+## GL-017 · 2026-07-26 · H-10 · C-10 Cross-Stream-Pointer-Days + Pre-Event-Drift (Welle 4, KAPITALFREI) — **DROP (empirisch; das registrierte Power-Risiko hat sich als N=0 realisiert)**
+
+**Quelle:** `state/wave4_20260726/c10_pointer_results.{json,md}` (Lauf `wave4_20260726_084312`, 648 s CPU). 30 Detektions-Serien (5 Symbole × {rv, funding, dlog_oi} × {bybit, binance}), Hold-out-Ziel deribit dvol (nie in der Detektion), 79 nutzbare Tage nach 21-Tage-Burn-in, 1.000 Surrogate + 1.000 Permutationen, BH-FDR α=0,10 über **F-POINTER** (4 Zellen).
+
+### Registriertes Gate vs. Messung
+WEITER verlangt ALLE 4 Zellen: Stufe-1-Surrogat-p≤0,05 in W1 UND W2, **N_pointer ≥3 je Fenster (Floor NICHT absenkbar)**, Stufe-2-Permutations-p≤0,05 in W1 UND W2. Pointer-Tag-Definition: ≥60% der verfügbaren Serien mit |C_t|≥1,5 gleichgerichtet.
+
+| Stufe | Fenster | N_pointer | p | N-Floor ≥3 | Zelle besteht |
+|---:|---|---:|---:|:---:|:---:|
+| 1 | W1 | **0** | 1,0000 | NEIN | nein |
+| 1 | W2 | **0** | 1,0000 | NEIN | nein |
+| 2 | W1 | 0 | n/a | NEIN | nein |
+| 2 | W2 | 0 | n/a | NEIN | nein |
+
+- **Es existiert im gesamten 79-Tage-Zeitraum KEIN einziger Pointer-Tag** nach der registrierten Cropper-Regel — und die nicht-urteilstragende Neuwirth-13-Tage-Gegenprobe findet ebenfalls 0 (Anti-Method-Shopping-Diagnostikum: die Nullmenge ist nicht artefakt der Fensterwahl).
+- Das in der Registry benannte Power-Risiko („nur ~2–6 erwartete Pointer-Tage je Fenster") hat sich als **N=0** realisiert: Die 30 Streams dieses Frühjahr/Sommer-Regimes richten sich an keinem Tag zu ≥60% gleichzeitig aus.
+
+### URTEIL: **DROP.**
+Hartes Ein-Fenster-Kriterium (N-Floor, nicht absenkbar) in beiden Fenstern verfehlt. Ehrliche Einordnung: Das ist primär ein Existenz-DROP für die registrierte Pointer-Tag-Definition in DIESEM 100-Tage-Panel — kein Beleg gegen Ausnahme-Tage in Crash-Regimes (der Zeitraum enthielt keinen). Eine Neuauflage bräuchte einen neuen Registry-Eintrag mit längerem/regime-reicherem Fenster und ist NICHT nahegelegt. **Damit entfällt auch die H-10b-Arithmetik (13–55× über der Wand) — ohne Pointer-Tage gibt es nichts zu handeln.** KAPITALFREI gewahrt.
+
+---
+
+## GL-018 · 2026-07-26 · H-12 · C-12 Cross-Exchange-Fragmentierungsmatrix (RMT/MP, Welle 4, KAPITALFREI) — **DROP (empirisch; W1 valide und Kriterium (b) klar verfehlt — W2 formal invalide)**
+
+**Quelle:** `state/wave4_20260726/c12_frag_results.{json,md}` (Lauf `wave4_20260726_084312`, 346 s CPU). 6-Serien-Panel (BTC/ETH × Bybit/Binance/Deribit-PERPETUAL, Minuten-Last-Price), Ein-Faktor-Gauß-Null je Tag, 1.000 MC-Draws, BH-FDR α=0,10 über **F-FRAG** (78 Tages-Zellen). Erst durch den Binance/Deribit-Backfill vom 2026-07-24 lauffähig geworden (DEC-27/28).
+
+### Validitäts-Vorbedingung (KEIN Gate-Bestandteil)
+- **W1: VALIDE** — 47/50 gültige Tage (≥35 ✓), IPR(v1)≤0,25 an 100% der Tage (≥90% ✓).
+- **W2: INVALIDE** — nur **31/50 gültige Tage < 35-Floor** (Panel-Lücken v.a. um die Deribit-Stream-Umbenennung Mitte Juni; IPR(v1)-Kriterium wäre erfüllt gewesen). Per Registrierung: für W2 KEIN Verdikt-Beitrag.
+
+### Registriertes Gate vs. Messung (tragend: das VALIDE Fenster W1)
+
+| Kriterium | Schwelle | W1 (valide) | W2 (invalide, informativ) | Bestanden |
+|---|---|---|---|:---:|
+| (a) Anteil FDR-sig. Tage (λ2 > Ein-Faktor-Null) | ≥20% | **89,4%** (42/47) | 64,5% | ja |
+| (b) Median-IPR(v2) über FDR-sig. Tage | ≥0,40 | **0,169** | 0,170 | **NEIN** |
+| (c) Max-Last derselben Börse an FDR-sig. Tagen | ≥70% | 95,2% (deribit) | 95,0% (deribit) | ja |
+
+F-XDOM1 Stage 2: alle 62 Stage-1-Survivor (Tages-λ2-p-Werte) überleben auch Stage 2 (p_crit 0,0410) — ändert nichts, da das Gate an (b) scheitert, nicht an der Signifikanz.
+
+### URTEIL: **DROP.**
+Das harte Ein-Fenster-Kriterium ist im VALIDEN Fenster W1 ausgelöst: Kriterium (b) wird nicht knapp, sondern strukturell verfehlt — der Median-IPR(v2) von 0,169 liegt praktisch exakt am theoretischen Minimum 1/6≈0,167 eines VOLLSTÄNDIG DELOKALISIERTEN Vektors. Die registrierte Fragmentierungs-These (ein auf EINER Börse lokalisierter zweiter Faktor) ist damit klar widerlegt.
+
+**Ehrlicher Messbefund am Rande (KEIN Verdikt, KEINE Nachregistrierung):** Kriterium (a) zeigt mit 89% signifikanten Tagen, dass ein robuster ZWEITER Faktor jenseits des Marktmodus existiert; (c) zeigt, dass seine größte Einzellast an 95% der Tage auf Deribit liegt. Zusammen mit (b) gelesen: Es gibt systematische Struktur jenseits des Ein-Faktor-Modells, aber sie ist PANEL-BREIT (venue-klassen-artig, z.B. Deribit-vs-Rest-Kontrast), nicht börsen-lokalisiert. Eine darauf zugeschnittene Hypothese wäre ein NEUER Registry-Eintrag und wird durch diesen DROP nicht nahegelegt.
+
+KAPITALFREI gewahrt (H-12b explizit nicht impliziert; friction_audit-A-priori 80–500× unter der Wand).
+
+### Welle-4-Bilanz + Programm-Bilanz (nach GL-018)
+**Welle 4 ist mit diesem Lauf vollständig adjudiziert, soweit entsperrt:** H-09 DROP · H-10 DROP · H-12 DROP (alle drei A-prioris „DROP erwartet" bestätigt; 0 Torpfosten-Verschiebungen). H-11/H-13 bleiben GESPERRT — die Entsperr-Checks liefen erstmals und ehrlich: H-11 Manifest-Coverage 8/730 Tagen im geforderten Fenster (die Verzeichnis-Inventur vom 07-20 zählte Lebenszeit-Ordner, nicht Fenster-done_days — die Scout-Lehre aus DEC-27 bestätigt sich erneut); H-13 ohne zwei vol-regime-disjunkte Snapshot-Tage im noch jungen markprice.options-Fenster (wächst kalendarisch).
+Gesamtbild: Welle 1–3: 2 kapitalfreie Mess-WEITER (H-04, H-05b), beide Tradability-PARK. Welle 4: H-09/H-10/H-12 DROP, H-11/H-13 gesperrt. Welle 5: H-18 Audit (GL-014) · H-16 WEITER kapitalfrei (GL-015) · H-15/H-14/H-17 laufen. **18 GL-Einträge, 0 Torpfosten-Verschiebungen, 0 handelbare Kanten.**

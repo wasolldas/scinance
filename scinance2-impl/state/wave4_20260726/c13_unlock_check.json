@@ -1,0 +1,23 @@
+{
+  "unlocked": false,
+  "unlock_condition": "2 vol-regime-disjoint live IV snapshot days D1<D2: |log(RV_5d(D1)/RV_5d(D2))| >= log(1.5), >= 10 calendar days apart, >= 12 strikes with 0.01 <= |delta| <= 0.5 in the 20-45 DTE tenor per day/symbol",
+  "selection": {
+    "BTC": {
+      "found": false,
+      "d1": null,
+      "d2": null,
+      "reason": "no markprice.options snapshot dates for BTC",
+      "days_scanned": []
+    },
+    "ETH": {
+      "found": false,
+      "d1": null,
+      "d2": null,
+      "reason": "no markprice.options snapshot dates for ETH",
+      "days_scanned": []
+    }
+  },
+  "hypothesis": "H-13",
+  "capital_free": true,
+  "data_gated": true
+}
