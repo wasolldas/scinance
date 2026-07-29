@@ -775,3 +775,51 @@ KAPITALFREI gewahrt (H-12b explizit nicht impliziert; friction_audit-A-priori 80
 ### Welle-4-Bilanz + Programm-Bilanz (nach GL-018)
 **Welle 4 ist mit diesem Lauf vollständig adjudiziert, soweit entsperrt:** H-09 DROP · H-10 DROP · H-12 DROP (alle drei A-prioris „DROP erwartet" bestätigt; 0 Torpfosten-Verschiebungen). H-11/H-13 bleiben GESPERRT — die Entsperr-Checks liefen erstmals und ehrlich: H-11 Manifest-Coverage 8/730 Tagen im geforderten Fenster (die Verzeichnis-Inventur vom 07-20 zählte Lebenszeit-Ordner, nicht Fenster-done_days — die Scout-Lehre aus DEC-27 bestätigt sich erneut); H-13 ohne zwei vol-regime-disjunkte Snapshot-Tage im noch jungen markprice.options-Fenster (wächst kalendarisch).
 Gesamtbild: Welle 1–3: 2 kapitalfreie Mess-WEITER (H-04, H-05b), beide Tradability-PARK. Welle 4: H-09/H-10/H-12 DROP, H-11/H-13 gesperrt. Welle 5: H-18 Audit (GL-014) · H-16 WEITER kapitalfrei (GL-015) · H-15/H-14/H-17 laufen. **18 GL-Einträge, 0 Torpfosten-Verschiebungen, 0 handelbare Kanten.**
+
+---
+
+## GL-019 · 2026-07-29 · H-17 · C17 Venue-Fingerprint (Welle 5, KAPITALFREI, GPU) — **VERDIKT AUSSTEHEND (Mess-Befund herausragend; Non-Redundanz-Gate strukturell nicht auswertbar)**
+
+**Quelle:** `state/c17_venue_results.{json,md}` (Lauf über 3 Checkpoint-Sessions, abgeschlossen 2026-07-28 20:44 UTC nach ~59h GPU brutto inkl. eines Maschinen-RAM-Kaskaden-Abbruchs bei Training 93/105 — das c17-Checkpoint-System, Commit 09fd8b3, hat alle Sessions bit-konsistent zusammengesetzt). `verdict_bearing=true`: echtes CUDA, VenueEncoder verdikt-fähig, Batch 2048 = registriertes Minimum erreicht, 10.000 Steps erreicht, `blocked_reasons=[]`. Redundanz-Gate-Quelle: `wave4_20260726/c12_frag_results.json` (erst durch den Welle-4-Lauf vom 26.07. verfügbar).
+
+### Mess-Gate (registriert) vs. Messung — ALLE Kriterien bestanden
+
+| Fold (Symbol out) | Balanced Acc | >=0,60 | p (add-one, 20 Null-Retrainings) | FDR-sig (α=0,10) | bestanden |
+|---|---:|:---:|---:|:---:|:---:|
+| BTCUSDT | **0,9424** | ja | 0,0476 | ja | ja |
+| ETHUSDT | **0,9950** | ja | 0,0476 | ja | ja |
+| SOLUSDT | **0,9679** | ja | 0,0476 | ja | ja |
+| BNBUSDT | 0,7130 | ja | 0,0952 | ja | ja |
+| XRPUSDT | **0,8535** | ja | 0,0476 | ja | ja |
+
+**5/5 Folds bestanden** (registriert: >=4/5), Pooled-Balanced-Accuracy **0,8944** (>=0,55 ✓), BH-FDR p_crit 0,0952. Der Venue-Fingerprint ist SYMBOL-INVARIANT massiv lernbar: Auf nie gesehenen Symbolen erkennt der Contrastive-Encoder die Börse am shape-normalisierten Order-Flow mit bis zu 99,5%. Ehrliche Randnotiz: Die Permutations-Null-Verteilungen sind schwer-schwänzig (Einzel-Nulls bis 0,94 bei ETH, 0,86 bei BNB — volle Retrainings auf permutierten Labels können vereinzelt echte Venue-Struktur wiederfinden); die add-one-p-Konvention verarbeitet das korrekt und BNB bleibt mit p=0,0952 knapp unter p_crit.
+
+### Non-Redundanz-Gate (registriert, bindend) — NICHT AUSWERTBAR
+
+Registriert: |Spearman ρ| < 0,6 der täglichen Embedding-Distance-Serie gegen die c12_frag-Tages-λ2/IPR-Serie an überlappenden Tagen; |ρ|>=0,6 = REDUNDANT zu H-12 = DROP. Gemessen: **n_overlap_days = 2** (technisches Minimum 10) → `evaluable=false`, ρ nicht berechenbar. **Strukturelle Ursache, kein Zufall:** Die c17-Distanz-Serie existiert konstruktionsbedingt nur auf den Fold-TEST-Tagen (letzte 3 Wochen, ~2026-06-14..07-04); die c12-W2-Serie hat in genau diesem Zeitraum nur **2 valide Tage** (2026-06-15, 2026-06-26 — die übrigen 19 Tage scheitern an der 6-Serien-Panel-Vollständigkeit rund um die Deribit-Stream-Umstellung Mitte Juni). Ein Spearman-ρ auf n=2 wäre ohnehin bedeutungslos (immer ±1).
+
+### URTEIL: **KEIN VERDIKT — AUSSTEHEND** (Präzedenz: GL-002/GL-003 PENDING).
+Die registrierten WEITER-Bedingungen verlangen das BESTEHEN des Non-Redundanz-Gates — es kann nicht bestehen, was nicht auswertbar ist. Die registrierten DROP-Bedingungen (Pooled<0,55 / <4/5 Folds / ρ>=0,6) sind sämtlich NICHT ausgelöst. Ein WEITER allein auf dem Mess-Befund wäre eine Torpfosten-Verschiebung (das Redundanz-Gate wurde exakt gegen die Möglichkeit registriert, dass H-17 heimlich H-12-Fragmentierung nachmisst — pikanterweise ist H-12 inzwischen selbst DROP/GL-018, was die Redundanz-Sorge inhaltlich entschärft, aber die Registry kennt diese Bedingung nicht als erfüllbar durch H-12-Wegfall). **Auflösungspfade (jeweils NEUE Registrierung, keine automatisch nahegelegt):** (a) H-17-Wiederholung mit über ALLE Tage definierter Distanz-Serie; (b) Redundanz-Prüfung gegen ein neues c12-Fenster mit vollem Panel nach Stabilisierung der Deribit-Daten. KAPITALFREI gewahrt; H-17b nicht impliziert.
+
+---
+
+## GL-020 · 2026-07-29 · H-14 · C14 Conditional Cross-Venue-Lead-Lag-Graph (Welle 5, KAPITALFREI, GPU) — **METHODISCH INVALIDE (Positivkontrolle in beiden Fenstern gescheitert — kein Verdikt, NICHT DROP)**
+
+**Quelle:** `state/c14_panellag_results.{json,md}` (Lauf über mehrere Checkpoint-Sessions, abgeschlossen 2026-07-29 11:15 UTC). Compute-Gating erfüllt: echtes CUDA-Training (RTX 5060 Ti), `ran_on_gpu=true`, kein CPU-/Synthetik-Fallback, `gate_valid=true` — der Lauf ist verdikt-TRAGFÄHIG; das Verdikt scheitert an der METHODEN-Validität, nicht am Compute.
+
+### Vorregistrierte Positivkontrolle (Registry H-14, bindend) — GESCHEITERT
+
+Registriert: Mindestens eine BTC→ETH-Kante (der durch H-04/GL-006 etablierte Effekt, vom Pass-Kriterium ausgeschlossen) muss je Fenster das 95. Perzentil ihrer Retrain-Ablations-Null überschreiten. „Scheitert sie, ist der Lauf METHODISCH INVALIDE (kein Verdikt, NICHT DROP)."
+
+| Fenster | BTC→ETH-Kanten | davon über Null-q95 | Kontrolle |
+|---|---:|---:|:---:|
+| W1 (2026-03-27..05-15) | 9 | **0** | GESCHEITERT |
+| W2 (2026-05-16..07-04) | 9 | **0** | GESCHEITERT |
+
+`validity_status="ungueltig"`, `weiter_indication=null` (payload-seitig korrekt erzwungen).
+
+### URTEIL: **KEIN VERDIKT — METHODISCH INVALIDE.**
+Die Ablations-Messmaschinerie (PatchTST-Encoder + Cross-Node-Attention, Retrain-Ablations-ΔLogLoss auf 10s-Vorzeichen-Targets) konnte nicht einmal den BEKANNTEN BTC→ETH-Lead detektieren — damit ist ihr Null-Befund auf allen anderen Kanten uninformativ. Genau dafür war die Positivkontrolle vorregistriert; sie hat funktioniert. Ehrliche Interpretations-Notiz: Der H-04-Lead lebt auf 1–3s-Lags; das H-14-Target (10s-Forward-Vorzeichen) liegt möglicherweise jenseits der Kohärenzzeit des Effekts — eine Horizont-/Architektur-Neufassung wäre eine NEUE Hypothese und wird NICHT automatisch nahegelegt. Deskriptiv am Rande (urteils-irrelevant, da invalide): In W1 überlebte genau 1 von 198 Kanten die BH-FDR (bybit:BNB→binance:SOL, ΔLogLoss 6,1e-4, p=1,0e-4); W2: 0.
+
+### Programm-Bilanz (nach GL-020)
+Welle 1–3 unverändert (H-04/H-05b Mess-WEITER, Tradability-PARK). Welle 4: H-09/H-10/H-12 DROP; H-11/H-13 gesperrt. Welle 5: H-18 Audit (GL-014) · **H-16 WEITER kapitalfrei (GL-015)** · H-17 VERDIKT AUSSTEHEND (GL-019, Redundanz-Gate strukturell nicht auswertbar) · H-14 METHODISCH INVALIDE (GL-020, Positivkontrolle) · H-15 läuft (Checkpoint-Tranchen). **20 GL-Einträge, 0 Torpfosten-Verschiebungen, 0 handelbare Kanten.**
