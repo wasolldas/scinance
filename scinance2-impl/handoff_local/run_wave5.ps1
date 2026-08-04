@@ -78,6 +78,17 @@ if (-not $WaveMutex.WaitOne(0)) {
 $ScriptDir = $PSScriptRoot
 Set-Location $ScriptDir
 
+# Junction-Guard: data\harvest ist nach Reboots/Harvest-Kompaktierungen
+# schon zweimal verschwunden (2026-07-17, 2026-08-03) und hat Sessions zu
+# SKIP gezwungen. Der Guard repariert eine tote/fehlende Junction
+# selbstheilend (loescht NIE echte Verzeichnisse - Sicherheits-Stopp im
+# Skript). Ein Guard-FEHLER bricht hier nicht ab: die Kind-Runner skippen
+# dann selbst laut mit klarer Meldung.
+$JunctionGuard = Join-Path $ScriptDir 'ensure_harvest_junction.ps1'
+if (Test-Path $JunctionGuard) {
+    & powershell -ExecutionPolicy Bypass -File $JunctionGuard | Out-Host
+}
+
 $Ts = (Get-Date).ToUniversalTime().ToString('yyyyMMdd_HHmmss')
 $SummaryDate = (Get-Date).ToUniversalTime().ToString('yyyy-MM-dd')
 $RunDir = Join-Path (Join-Path $ScriptDir 'results') ("wave5_" + $Ts)
