@@ -57,7 +57,10 @@ $Seeds       = '42,43,44'
 $NSurrogates = 200
 $BlockLen    = 256
 $Mode        = if ($env:MODE) { $env:MODE } else { 'full' }
-$TmoStep     = 43200   # 12h Budget fuer den einen Gesamtblock
+# 12h Default-Budget PRO AUFRUF; via H15_TIMEOUT_SEC ueberschreibbar
+# (gleiches Muster wie H14_TIMEOUT_SEC/H16_TIMEOUT_SEC - Checkpoints machen
+# lange Sessions risikofrei, ein Abbruch kostet <=10 Surrogate).
+$TmoStep     = if ($env:H15_TIMEOUT_SEC) { [int]$env:H15_TIMEOUT_SEC } else { 43200 }
 
 $PythonExe = if ($env:PYTHON) { $env:PYTHON } else { 'python' }
 $SrcPath = Join-Path $RepoRoot 'src'
