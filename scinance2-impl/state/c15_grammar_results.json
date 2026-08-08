@@ -1,0 +1,1123 @@
+{
+  "schema_version": 1,
+  "hypothesis": "H-15",
+  "hypothesis_registry": "scinance2-impl/state/hypothesis_registry.md",
+  "capital_free": true,
+  "generated_at": "2026-08-08T17:08:10+00:00",
+  "source": "E:\\Claude\\Projects\\scinance\\data\\harvest/raw/bybit/publicTrade (H-15, read-only harvester tree)",
+  "mode": "full",
+  "ran_on_gpu": true,
+  "gate_valid": true,
+  "gate_valid_reasons": [],
+  "compute": {
+    "torch_available": true,
+    "torch_version": "2.11.0+cu128",
+    "cuda_available": true,
+    "cuda_device_count": 1,
+    "cuda_device_name": "NVIDIA GeForce RTX 5060 Ti"
+  },
+  "device": "cuda",
+  "data_start": "2026-03-27",
+  "data_end": "2026-07-04",
+  "n_days": 100,
+  "symbols": [
+    "BTCUSDT",
+    "ETHUSDT",
+    "SOLUSDT",
+    "BNBUSDT",
+    "XRPUSDT"
+  ],
+  "n_folds": 4,
+  "embargo_days": 1,
+  "folds": [
+    {
+      "index": 0,
+      "train_start": "2026-03-27",
+      "train_end": "2026-04-15",
+      "n_train_days": 20,
+      "embargo": [
+        "2026-04-16"
+      ],
+      "test_start": "2026-04-17",
+      "test_end": "2026-05-05",
+      "n_test_days": 19
+    },
+    {
+      "index": 1,
+      "train_start": "2026-03-27",
+      "train_end": "2026-05-05",
+      "n_train_days": 40,
+      "embargo": [
+        "2026-05-06"
+      ],
+      "test_start": "2026-05-07",
+      "test_end": "2026-05-25",
+      "n_test_days": 19
+    },
+    {
+      "index": 2,
+      "train_start": "2026-03-27",
+      "train_end": "2026-05-25",
+      "n_train_days": 60,
+      "embargo": [
+        "2026-05-26"
+      ],
+      "test_start": "2026-05-27",
+      "test_end": "2026-06-14",
+      "n_test_days": 19
+    },
+    {
+      "index": 3,
+      "train_start": "2026-03-27",
+      "train_end": "2026-06-14",
+      "n_train_days": 80,
+      "embargo": [
+        "2026-06-15"
+      ],
+      "test_start": "2026-06-16",
+      "test_end": "2026-07-04",
+      "n_test_days": 19
+    }
+  ],
+  "seeds": [
+    42,
+    43,
+    44
+  ],
+  "n_surrogates": 200,
+  "surrogate_block_len_events": 256,
+  "surrogate_kind": "within-hour-of-day block shuffle (registry H-15)",
+  "use_tick_direction": false,
+  "vocab_size": 128,
+  "events_capped": false,
+  "model_config": {
+    "context_len": 1024,
+    "d_model": 256,
+    "n_heads": 4,
+    "n_layers": 4,
+    "dropout": 0.1,
+    "lr": 0.0003,
+    "batch_size": 32,
+    "epochs": 3
+  },
+  "ce_unit": "nats (natural log); gate threshold is RELATIVE (unit-invariant)",
+  "ce_warmup_positions": 4,
+  "gate_thresholds": {
+    "rel_ce_gap_min": 0.02,
+    "surrogate_percentile": 95.0,
+    "symbols_pass_min": 4,
+    "family_size": 5,
+    "fdr_alpha": 0.1,
+    "hard_one_window_drop": true
+  },
+  "fdr_alpha": 0.1,
+  "fdr_family": "F-GRAMMAR",
+  "fdr_p_crit": 0.004975124378109453,
+  "n_fdr_significant": 5,
+  "n_symbols_pass": 4,
+  "family_complete": true,
+  "family_pass_geq_4of5": true,
+  "differentiation_note": "Differenzierung zu den gesperrten Informationstheorie-Clustern (PE/TE, H-06/H-04) ist konzeptionell sauber: (1) EVENT-STREAM statt Renditen \u2014 tokenisiert wird der publicTrade-Fluss (Side x Signed-Size-Quantil x Log-Inter-Arrival), keine Preis-/Rendite-Serie; (2) CROSS-ENTROPY als SCORING-RULE zweier expliziter Modelle (Causal-Transformer vs. Variable-Order-Markov) statt eines Entropie-SCHAETZERS (keine Permutations-Entropie, keine Transfer-Entropie); (3) KEIN rho-/Trading-Gate \u2014 reine kapitalfreie Existence-of-Structure-Messung. Eine Handelsfolge waere NEUE H-15b, NICHT impliziert.",
+  "per_symbol": [
+    {
+      "symbol": "BTCUSDT",
+      "n_folds": 4,
+      "fold_weights_scored_tokens": [
+        0.20069143451559607,
+        0.1774391820267081,
+        0.3261711728502928,
+        0.29569821060740303
+      ],
+      "best_markov_ce": 1.2155407803108413,
+      "transformer_ce": 1.1778359546373545,
+      "observed_gap": 0.037704825673486875,
+      "relative_ce_gap": 0.03101897220087087,
+      "rel_gap_threshold_met": true,
+      "surrogate_gap_p95": 0.025668847876828906,
+      "gap_above_surrogate_p95": true,
+      "surrogate_p": 0.004975124378109453,
+      "n_surrogates_finite": 200,
+      "folds": [
+        {
+          "fold": 0,
+          "n_train_events": 36077234,
+          "n_test_events": 30623396,
+          "n_scored_test_tokens": 30623392,
+          "tokenizer_size_edges": [
+            -0.012,
+            -0.002,
+            -0.001,
+            0.001,
+            0.001,
+            0.002,
+            0.012
+          ],
+          "tokenizer_iat_edges": [
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            2.4849066497880004
+          ],
+          "tokenizer_fit_on": "train fold ONLY (leak discipline, registry H-15)",
+          "best_markov_name": "interp_k4",
+          "best_markov_ce": 1.4450805237004398,
+          "markov_ces": {
+            "kt_k0": 2.211297989635998,
+            "kt_k1": 1.5310898579242866,
+            "kt_k2": 1.4800959638112274,
+            "kt_k3": 1.460198397949942,
+            "kt_k4": 1.4821644587762681,
+            "interp_k4": 1.4450805237004398
+          },
+          "transformer_ces_per_seed": [
+            1.40912956503408,
+            1.4095215037892848,
+            1.409527573368179
+          ],
+          "transformer_ce_mean_seeds": 1.4093928807305147,
+          "observed_gap": 0.035687642969925104,
+          "n_surrogates": 200,
+          "surrogate_gap_p95": 0.02209468098585111
+        },
+        {
+          "fold": 1,
+          "n_train_events": 68724086,
+          "n_test_events": 27075348,
+          "n_scored_test_tokens": 27075344,
+          "tokenizer_size_edges": [
+            -0.012,
+            -0.001,
+            -0.001,
+            0.001,
+            0.001,
+            0.002,
+            0.012
+          ],
+          "tokenizer_iat_edges": [
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            2.5649493574615367
+          ],
+          "tokenizer_fit_on": "train fold ONLY (leak discipline, registry H-15)",
+          "best_markov_name": "interp_k4",
+          "best_markov_ce": 1.296208691545102,
+          "markov_ces": {
+            "kt_k0": 2.080138671442689,
+            "kt_k1": 1.3683176930439835,
+            "kt_k2": 1.324642244033776,
+            "kt_k3": 1.3064538529601584,
+            "kt_k4": 1.3076082637656403,
+            "interp_k4": 1.296208691545102
+          },
+          "transformer_ces_per_seed": [
+            1.2630975525633557,
+            1.2613239422853686,
+            1.2626434659677708
+          ],
+          "transformer_ce_mean_seeds": 1.2623549869388315,
+          "observed_gap": 0.033853704606270574,
+          "n_surrogates": 200,
+          "surrogate_gap_p95": 0.022499264231089798
+        },
+        {
+          "fold": 2,
+          "n_train_events": 97720422,
+          "n_test_events": 49770278,
+          "n_scored_test_tokens": 49770274,
+          "tokenizer_size_edges": [
+            -0.012,
+            -0.001,
+            -0.001,
+            0.001,
+            0.001,
+            0.002,
+            0.012
+          ],
+          "tokenizer_iat_edges": [
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            2.5649493574615367
+          ],
+          "tokenizer_fit_on": "train fold ONLY (leak discipline, registry H-15)",
+          "best_markov_name": "interp_k4",
+          "best_markov_ce": 1.2206495705517393,
+          "markov_ces": {
+            "kt_k0": 2.0061660136372548,
+            "kt_k1": 1.2910485265485576,
+            "kt_k2": 1.2491079339172153,
+            "kt_k3": 1.2308872122521002,
+            "kt_k4": 1.2274968391615402,
+            "interp_k4": 1.2206495705517393
+          },
+          "transformer_ces_per_seed": [
+            1.1786337426313194,
+            1.177251303330051,
+            1.178393350253105
+          ],
+          "transformer_ce_mean_seeds": 1.1780927987381584,
+          "observed_gap": 0.04255677181358086,
+          "n_surrogates": 200,
+          "surrogate_gap_p95": 0.03094807833434655
+        },
+        {
+          "fold": 3,
+          "n_train_events": 149528466,
+          "n_test_events": 45120426,
+          "n_scored_test_tokens": 45120422,
+          "tokenizer_size_edges": [
+            -0.012,
+            -0.001,
+            -0.001,
+            0.001,
+            0.001,
+            0.001,
+            0.012
+          ],
+          "tokenizer_iat_edges": [
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            2.302585092994046
+          ],
+          "tokenizer_fit_on": "train fold ONLY (leak discipline, registry H-15)",
+          "best_markov_name": "interp_k4",
+          "best_markov_ce": 1.0057097889711288,
+          "markov_ces": {
+            "kt_k0": 1.7716742410573965,
+            "kt_k1": 1.059076833484659,
+            "kt_k2": 1.0276944896513223,
+            "kt_k3": 1.0129985384147162,
+            "kt_k4": 1.0082352306914304,
+            "interp_k4": 1.0057097889711288
+          },
+          "transformer_ces_per_seed": [
+            0.969677837421725,
+            0.9695652458831446,
+            0.9697876695477411
+          ],
+          "transformer_ce_mean_seeds": 0.9696769176175368,
+          "observed_gap": 0.03603287135359201,
+          "n_surrogates": 200,
+          "surrogate_gap_p95": 0.024237593537634022
+        }
+      ],
+      "p_for_fdr": 0.004975124378109453,
+      "fdr_significant": true,
+      "symbol_pass": true
+    },
+    {
+      "symbol": "ETHUSDT",
+      "n_folds": 4,
+      "fold_weights_scored_tokens": [
+        0.193300696801543,
+        0.1832584077624151,
+        0.3203884955877297,
+        0.3030523998483122
+      ],
+      "best_markov_ce": 1.1084989585789395,
+      "transformer_ce": 1.0648394195511388,
+      "observed_gap": 0.04365953902780073,
+      "relative_ce_gap": 0.03938617956283051,
+      "rel_gap_threshold_met": true,
+      "surrogate_gap_p95": 0.031377290842956485,
+      "gap_above_surrogate_p95": true,
+      "surrogate_p": 0.004975124378109453,
+      "n_surrogates_finite": 200,
+      "folds": [
+        {
+          "fold": 0,
+          "n_train_events": 39830484,
+          "n_test_events": 33314118,
+          "n_scored_test_tokens": 33314114,
+          "tokenizer_size_edges": [
+            -0.13,
+            -0.02,
+            -0.01,
+            0.01,
+            0.01,
+            0.02,
+            0.14
+          ],
+          "tokenizer_iat_edges": [
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            1.6094379124341003
+          ],
+          "tokenizer_fit_on": "train fold ONLY (leak discipline, registry H-15)",
+          "best_markov_name": "interp_k4",
+          "best_markov_ce": 1.4290973599904322,
+          "markov_ces": {
+            "kt_k0": 2.1797963087256518,
+            "kt_k1": 1.486163046019199,
+            "kt_k2": 1.4508634701065513,
+            "kt_k3": 1.4378554859651091,
+            "kt_k4": 1.454756109666918,
+            "interp_k4": 1.4290973599904322
+          },
+          "transformer_ces_per_seed": [
+            1.3851210160246383,
+            1.3844299307227375,
+            1.3851340816439506
+          ],
+          "transformer_ce_mean_seeds": 1.3848950094637755,
+          "observed_gap": 0.044202350526656664,
+          "n_surrogates": 200,
+          "surrogate_gap_p95": 0.03225200486703742
+        },
+        {
+          "fold": 1,
+          "n_train_events": 75415664,
+          "n_test_events": 31583395,
+          "n_scored_test_tokens": 31583391,
+          "tokenizer_size_edges": [
+            -0.13,
+            -0.01,
+            -0.01,
+            0.01,
+            0.01,
+            0.01,
+            0.13
+          ],
+          "tokenizer_iat_edges": [
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            1.6094379124341003
+          ],
+          "tokenizer_fit_on": "train fold ONLY (leak discipline, registry H-15)",
+          "best_markov_name": "interp_k4",
+          "best_markov_ce": 1.0885586411944386,
+          "markov_ces": {
+            "kt_k0": 1.8435597281388492,
+            "kt_k1": 1.1398967917254497,
+            "kt_k2": 1.109673557901688,
+            "kt_k3": 1.0964539239274929,
+            "kt_k4": 1.0937067587386498,
+            "interp_k4": 1.0885586411944386
+          },
+          "transformer_ces_per_seed": [
+            1.0502261332695007,
+            1.0508886858196687,
+            1.051083870365994
+          ],
+          "transformer_ce_mean_seeds": 1.0507328964850544,
+          "observed_gap": 0.03782574470938416,
+          "n_surrogates": 200,
+          "surrogate_gap_p95": 0.02601232486302336
+        },
+        {
+          "fold": 2,
+          "n_train_events": 109294235,
+          "n_test_events": 55216871,
+          "n_scored_test_tokens": 55216867,
+          "tokenizer_size_edges": [
+            -0.12,
+            -0.01,
+            -0.01,
+            0.01,
+            0.01,
+            0.01,
+            0.12
+          ],
+          "tokenizer_iat_edges": [
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            1.6094379124341003
+          ],
+          "tokenizer_fit_on": "train fold ONLY (leak discipline, registry H-15)",
+          "best_markov_name": "interp_k4",
+          "best_markov_ce": 1.0364816028514492,
+          "markov_ces": {
+            "kt_k0": 1.8037885875661692,
+            "kt_k1": 1.08600112604933,
+            "kt_k2": 1.0575564962121737,
+            "kt_k3": 1.0445392537604918,
+            "kt_k4": 1.039475463384352,
+            "interp_k4": 1.0364816028514492
+          },
+          "transformer_ces_per_seed": [
+            0.9950727042874191,
+            0.9954426141144064,
+            0.9952701281815753
+          ],
+          "transformer_ce_mean_seeds": 0.9952618155278002,
+          "observed_gap": 0.04121978732364895,
+          "n_surrogates": 200,
+          "surrogate_gap_p95": 0.028794818272518164
+        },
+        {
+          "fold": 3,
+          "n_train_events": 166763892,
+          "n_test_events": 52229108,
+          "n_scored_test_tokens": 52229104,
+          "tokenizer_size_edges": [
+            -0.11,
+            -0.01,
+            -0.01,
+            -0.01,
+            0.01,
+            0.01,
+            0.11
+          ],
+          "tokenizer_iat_edges": [
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            1.3862943611198906
+          ],
+          "tokenizer_fit_on": "train fold ONLY (leak discipline, registry H-15)",
+          "best_markov_name": "interp_k4",
+          "best_markov_ce": 0.9922018055715872,
+          "markov_ces": {
+            "kt_k0": 1.7729552336902081,
+            "kt_k1": 1.0371706677819466,
+            "kt_k2": 1.0130072342320304,
+            "kt_k3": 1.0003706950796065,
+            "kt_k4": 0.9941836836606868,
+            "interp_k4": 0.9922018055715872
+          },
+          "transformer_ces_per_seed": [
+            0.9427988138716921,
+            0.942704225804472,
+            0.942841259674515
+          ],
+          "transformer_ce_mean_seeds": 0.942781433116893,
+          "observed_gap": 0.04942037245469422,
+          "n_surrogates": 200,
+          "surrogate_gap_p95": 0.036870429901228845
+        }
+      ],
+      "p_for_fdr": 0.004975124378109453,
+      "fdr_significant": true,
+      "symbol_pass": true
+    },
+    {
+      "symbol": "SOLUSDT",
+      "n_folds": 4,
+      "fold_weights_scored_tokens": [
+        0.1899615726944451,
+        0.23210075246106734,
+        0.2885114336719435,
+        0.28942624117254406
+      ],
+      "best_markov_ce": 1.6446223829803042,
+      "transformer_ce": 1.6003308313698517,
+      "observed_gap": 0.044291551610452506,
+      "relative_ce_gap": 0.02693113754793336,
+      "rel_gap_threshold_met": true,
+      "surrogate_gap_p95": 0.02698078239668503,
+      "gap_above_surrogate_p95": true,
+      "surrogate_p": 0.004975124378109453,
+      "n_surrogates_finite": 200,
+      "folds": [
+        {
+          "fold": 0,
+          "n_train_events": 10726380,
+          "n_test_events": 7682296,
+          "n_scored_test_tokens": 7682292,
+          "tokenizer_size_edges": [
+            -8.5,
+            -0.8,
+            -0.1,
+            0.1,
+            0.2,
+            0.9,
+            8.7
+          ],
+          "tokenizer_iat_edges": [
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            5.117993812416755
+          ],
+          "tokenizer_fit_on": "train fold ONLY (leak discipline, registry H-15)",
+          "best_markov_name": "interp_k4",
+          "best_markov_ce": 1.875490547010088,
+          "markov_ces": {
+            "kt_k0": 2.473293037772308,
+            "kt_k1": 1.910158104115607,
+            "kt_k2": 1.8850972002386106,
+            "kt_k3": 1.898391021977524,
+            "kt_k4": 2.049315769136373,
+            "interp_k4": 1.875490547010088
+          },
+          "transformer_ces_per_seed": [
+            1.8243744301627365,
+            1.8281779662688882,
+            1.8260041302615158
+          ],
+          "transformer_ce_mean_seeds": 1.8261855088977132,
+          "observed_gap": 0.049305038112374744,
+          "n_surrogates": 200,
+          "surrogate_gap_p95": 0.029854744198105198
+        },
+        {
+          "fold": 1,
+          "n_train_events": 19171998,
+          "n_test_events": 9386459,
+          "n_scored_test_tokens": 9386455,
+          "tokenizer_size_edges": [
+            -8.1,
+            -0.8,
+            -0.1,
+            0.1,
+            0.1,
+            0.9,
+            8.3
+          ],
+          "tokenizer_iat_edges": [
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            5.19295685089021
+          ],
+          "tokenizer_fit_on": "train fold ONLY (leak discipline, registry H-15)",
+          "best_markov_name": "interp_k4",
+          "best_markov_ce": 1.5943407761004413,
+          "markov_ces": {
+            "kt_k0": 2.2466595127122164,
+            "kt_k1": 1.6534030280394265,
+            "kt_k2": 1.6159705381698863,
+            "kt_k3": 1.6077361353214592,
+            "kt_k4": 1.657487740365004,
+            "interp_k4": 1.5943407761004413
+          },
+          "transformer_ces_per_seed": [
+            1.5589237515737437,
+            1.5593735700805043,
+            1.5602036439658928
+          ],
+          "transformer_ce_mean_seeds": 1.5595003218733803,
+          "observed_gap": 0.03484045422706106,
+          "n_surrogates": 200,
+          "surrogate_gap_p95": 0.01874851158218599
+        },
+        {
+          "fold": 2,
+          "n_train_events": 29148865,
+          "n_test_events": 11667780,
+          "n_scored_test_tokens": 11667776,
+          "tokenizer_size_edges": [
+            -7.8,
+            -0.7,
+            -0.1,
+            0.1,
+            0.1,
+            0.8,
+            8.1
+          ],
+          "tokenizer_iat_edges": [
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            5.123963979403259
+          ],
+          "tokenizer_fit_on": "train fold ONLY (leak discipline, registry H-15)",
+          "best_markov_name": "interp_k4",
+          "best_markov_ce": 1.5838056316443885,
+          "markov_ces": {
+            "kt_k0": 2.22853468367165,
+            "kt_k1": 1.6333656674916737,
+            "kt_k2": 1.6039407029689787,
+            "kt_k3": 1.594828670571826,
+            "kt_k4": 1.6218992259388665,
+            "interp_k4": 1.5838056316443885
+          },
+          "transformer_ces_per_seed": [
+            1.5384044635185297,
+            1.5386291959931526,
+            1.5385303189412647
+          ],
+          "transformer_ce_mean_seeds": 1.5385213261509822,
+          "observed_gap": 0.04528430549340623,
+          "n_surrogates": 200,
+          "surrogate_gap_p95": 0.03010087277629573
+        },
+        {
+          "fold": 3,
+          "n_train_events": 41275198,
+          "n_test_events": 11704776,
+          "n_scored_test_tokens": 11704772,
+          "tokenizer_size_edges": [
+            -7.8,
+            -0.7,
+            -0.1,
+            -0.1,
+            0.1,
+            0.7,
+            7.8
+          ],
+          "tokenizer_iat_edges": [
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            5.0106352940962555
+          ],
+          "tokenizer_fit_on": "train fold ONLY (leak discipline, registry H-15)",
+          "best_markov_name": "interp_k4",
+          "best_markov_ce": 1.5940417840895258,
+          "markov_ces": {
+            "kt_k0": 2.240979870255234,
+            "kt_k1": 1.6505265784105716,
+            "kt_k2": 1.6169990752237724,
+            "kt_k3": 1.6054692579130487,
+            "kt_k4": 1.6282412925185952,
+            "interp_k4": 1.5940417840895258
+          },
+          "transformer_ces_per_seed": [
+            1.546446145133156,
+            1.5464498071678585,
+            1.5464577553149903
+          ],
+          "transformer_ce_mean_seeds": 1.5464512358720015,
+          "observed_gap": 0.04759054821752429,
+          "n_surrogates": 200,
+          "surrogate_gap_p95": 0.028780890676372427
+        }
+      ],
+      "p_for_fdr": 0.004975124378109453,
+      "fdr_significant": true,
+      "symbol_pass": true
+    },
+    {
+      "symbol": "BNBUSDT",
+      "n_folds": 4,
+      "fold_weights_scored_tokens": [
+        0.15075313408843083,
+        0.20820293224305803,
+        0.419399563219849,
+        0.22164437044866214
+      ],
+      "best_markov_ce": 1.9201024562924773,
+      "transformer_ce": 1.9215593020475579,
+      "observed_gap": -0.001456845755080538,
+      "relative_ce_gap": -0.0007587333427475319,
+      "rel_gap_threshold_met": false,
+      "surrogate_gap_p95": -0.020771456274799677,
+      "gap_above_surrogate_p95": true,
+      "surrogate_p": 0.004975124378109453,
+      "n_surrogates_finite": 200,
+      "folds": [
+        {
+          "fold": 0,
+          "n_train_events": 1350123,
+          "n_test_events": 1097984,
+          "n_scored_test_tokens": 1097980,
+          "tokenizer_size_edges": [
+            -0.38,
+            -0.07,
+            -0.02,
+            0.01,
+            0.02,
+            0.1,
+            0.46
+          ],
+          "tokenizer_iat_edges": [
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            3.6888794541139363,
+            7.5485559791698735
+          ],
+          "tokenizer_fit_on": "train fold ONLY (leak discipline, registry H-15)",
+          "best_markov_name": "interp_k4",
+          "best_markov_ce": 2.1902010058255046,
+          "markov_ces": {
+            "kt_k0": 2.801038471485103,
+            "kt_k1": 2.221056357644227,
+            "kt_k2": 2.207306475695073,
+            "kt_k3": 2.4153135211696495,
+            "kt_k4": 2.8808746534592884,
+            "interp_k4": 2.1902010058255046
+          },
+          "transformer_ces_per_seed": [
+            2.217280483251061,
+            2.2117250897671177,
+            2.2088621263593144
+          ],
+          "transformer_ce_mean_seeds": 2.212622566459164,
+          "observed_gap": -0.02242156063365952,
+          "n_surrogates": 200,
+          "surrogate_gap_p95": -0.03114688018968619
+        },
+        {
+          "fold": 1,
+          "n_train_events": 2527296,
+          "n_test_events": 1516408,
+          "n_scored_test_tokens": 1516404,
+          "tokenizer_size_edges": [
+            -0.39,
+            -0.07,
+            -0.01,
+            0.01,
+            0.02,
+            0.1,
+            0.46
+          ],
+          "tokenizer_iat_edges": [
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            3.6888794541139363,
+            7.641564441260972
+          ],
+          "tokenizer_fit_on": "train fold ONLY (leak discipline, registry H-15)",
+          "best_markov_name": "interp_k4",
+          "best_markov_ce": 2.0512364893726587,
+          "markov_ces": {
+            "kt_k0": 2.7468874527979534,
+            "kt_k1": 2.117955548064314,
+            "kt_k2": 2.0791325438419506,
+            "kt_k3": 2.1682064560859455,
+            "kt_k4": 2.5188201388305034,
+            "interp_k4": 2.0512364893726587
+          },
+          "transformer_ces_per_seed": [
+            2.041713607746105,
+            2.0425395376166247,
+            2.039372711691607
+          ],
+          "transformer_ce_mean_seeds": 2.0412086190181125,
+          "observed_gap": 0.01002787035454622,
+          "n_surrogates": 200,
+          "surrogate_gap_p95": -0.005807310289302659
+        },
+        {
+          "fold": 2,
+          "n_train_events": 4152329,
+          "n_test_events": 3054616,
+          "n_scored_test_tokens": 3054612,
+          "tokenizer_size_edges": [
+            -0.37,
+            -0.06,
+            -0.01,
+            0.01,
+            0.01,
+            0.08,
+            0.41
+          ],
+          "tokenizer_iat_edges": [
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            2.772588722239781,
+            7.496652438168283
+          ],
+          "tokenizer_fit_on": "train fold ONLY (leak discipline, registry H-15)",
+          "best_markov_name": "interp_k4",
+          "best_markov_ce": 1.7887344005828383,
+          "markov_ces": {
+            "kt_k0": 2.490429249671936,
+            "kt_k1": 1.864458511868568,
+            "kt_k2": 1.8217397825235748,
+            "kt_k3": 1.8428042207529522,
+            "kt_k4": 2.022381061288388,
+            "interp_k4": 1.7887344005828383
+          },
+          "transformer_ces_per_seed": [
+            1.7807200431675119,
+            1.7805281356110039,
+            1.7779603841666307
+          ],
+          "transformer_ce_mean_seeds": 1.779736187648382,
+          "observed_gap": 0.008998212934456351,
+          "n_surrogates": 200,
+          "surrogate_gap_p95": -0.013995348177717205
+        },
+        {
+          "fold": 3,
+          "n_train_events": 7285264,
+          "n_test_events": 1614306,
+          "n_scored_test_tokens": 1614302,
+          "tokenizer_size_edges": [
+            -0.37,
+            -0.04,
+            -0.01,
+            0.01,
+            0.01,
+            0.05,
+            0.39
+          ],
+          "tokenizer_iat_edges": [
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            1.6094379124341003,
+            6.98933526597456
+          ],
+          "tokenizer_fit_on": "train fold ONLY (leak discipline, registry H-15)",
+          "best_markov_name": "interp_k4",
+          "best_markov_ce": 1.861788374833209,
+          "markov_ces": {
+            "kt_k0": 2.580337619309098,
+            "kt_k1": 1.9508495166439377,
+            "kt_k2": 1.8980053796598126,
+            "kt_k3": 1.9038547544030016,
+            "kt_k4": 2.0560832386868366,
+            "interp_k4": 1.861788374833209
+          },
+          "transformer_ces_per_seed": [
+            1.8797518844444843,
+            1.8800036331491876,
+            1.878916674397046
+          ],
+          "transformer_ce_mean_seeds": 1.8795573973302393,
+          "observed_gap": -0.017769022497030384,
+          "n_surrogates": 200,
+          "surrogate_gap_p95": -0.03945801071487153
+        }
+      ],
+      "p_for_fdr": 0.004975124378109453,
+      "fdr_significant": true,
+      "symbol_pass": false
+    },
+    {
+      "symbol": "XRPUSDT",
+      "n_folds": 4,
+      "fold_weights_scored_tokens": [
+        0.19148420694064536,
+        0.22162452176002426,
+        0.34062953086826003,
+        0.24626174043107035
+      ],
+      "best_markov_ce": 2.0897785335876033,
+      "transformer_ce": 1.9803297060755296,
+      "observed_gap": 0.10944882751207374,
+      "relative_ce_gap": 0.052373409791026386,
+      "rel_gap_threshold_met": true,
+      "surrogate_gap_p95": 0.06012779248072226,
+      "gap_above_surrogate_p95": true,
+      "surrogate_p": 0.004975124378109453,
+      "n_surrogates_finite": 200,
+      "folds": [
+        {
+          "fold": 0,
+          "n_train_events": 7504733,
+          "n_test_events": 6815303,
+          "n_scored_test_tokens": 6815299,
+          "tokenizer_size_edges": [
+            -136.5,
+            -7.5,
+            -3.9,
+            -0.1,
+            4.0,
+            7.5,
+            147.6
+          ],
+          "tokenizer_iat_edges": [
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            1.9459101490553132,
+            5.872117789475416
+          ],
+          "tokenizer_fit_on": "train fold ONLY (leak discipline, registry H-15)",
+          "best_markov_name": "interp_k4",
+          "best_markov_ce": 2.188287940943472,
+          "markov_ces": {
+            "kt_k0": 2.859076276035356,
+            "kt_k1": 2.2231804050856225,
+            "kt_k2": 2.1995417446386853,
+            "kt_k3": 2.265818796564472,
+            "kt_k4": 2.5918633686331316,
+            "interp_k4": 2.188287940943472
+          },
+          "transformer_ces_per_seed": [
+            2.070830299870189,
+            2.0752873883449574,
+            2.070014241809127
+          ],
+          "transformer_ce_mean_seeds": 2.072043976674758,
+          "observed_gap": 0.11624396426871408,
+          "n_surrogates": 200,
+          "surrogate_gap_p95": 0.07427374366020845
+        },
+        {
+          "fold": 1,
+          "n_train_events": 15068653,
+          "n_test_events": 7888056,
+          "n_scored_test_tokens": 7888052,
+          "tokenizer_size_edges": [
+            -121.7,
+            -7.3,
+            -3.6,
+            -0.1,
+            3.7,
+            7.4,
+            136.4
+          ],
+          "tokenizer_iat_edges": [
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            1.3862943611198906,
+            5.817111159963204
+          ],
+          "tokenizer_fit_on": "train fold ONLY (leak discipline, registry H-15)",
+          "best_markov_name": "interp_k4",
+          "best_markov_ce": 2.0483490129264217,
+          "markov_ces": {
+            "kt_k0": 2.847747948004618,
+            "kt_k1": 2.1437922414315107,
+            "kt_k2": 2.0868510278159724,
+            "kt_k3": 2.0964195185236383,
+            "kt_k4": 2.2933568200090044,
+            "interp_k4": 2.0483490129264217
+          },
+          "transformer_ces_per_seed": [
+            1.9448083192585128,
+            1.9437624470290638,
+            1.939051411334668
+          ],
+          "transformer_ce_mean_seeds": 1.9425407258740817,
+          "observed_gap": 0.10580828705234002,
+          "n_surrogates": 200,
+          "surrogate_gap_p95": 0.030734685088850577
+        },
+        {
+          "fold": 2,
+          "n_train_events": 23441389,
+          "n_test_events": 12123678,
+          "n_scored_test_tokens": 12123674,
+          "tokenizer_size_edges": [
+            -119.0,
+            -5.8,
+            -3.6,
+            -0.1,
+            3.6,
+            5.8,
+            127.1
+          ],
+          "tokenizer_iat_edges": [
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            1.0986122886681098,
+            5.786897381366708
+          ],
+          "tokenizer_fit_on": "train fold ONLY (leak discipline, registry H-15)",
+          "best_markov_name": "interp_k4",
+          "best_markov_ce": 2.0677142805544717,
+          "markov_ces": {
+            "kt_k0": 2.8866899093197462,
+            "kt_k1": 2.1701752794777684,
+            "kt_k2": 2.103200396944679,
+            "kt_k3": 2.109009804821749,
+            "kt_k4": 2.289267958919208,
+            "interp_k4": 2.0677142805544717
+          },
+          "transformer_ces_per_seed": [
+            1.96038822923542,
+            1.9596803380311942,
+            1.9590085416248408
+          ],
+          "transformer_ce_mean_seeds": 1.9596923696304849,
+          "observed_gap": 0.10802191092398683,
+          "n_surrogates": 200,
+          "surrogate_gap_p95": 0.06875368829856729
+        },
+        {
+          "fold": 3,
+          "n_train_events": 35888623,
+          "n_test_events": 8764943,
+          "n_scored_test_tokens": 8764939,
+          "tokenizer_size_edges": [
+            -95.3,
+            -5.3,
+            -3.7,
+            -0.1,
+            3.7,
+            5.3,
+            98.4
+          ],
+          "tokenizer_iat_edges": [
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            1.0986122886681098,
+            5.634789603169249
+          ],
+          "tokenizer_fit_on": "train fold ONLY (leak discipline, registry H-15)",
+          "best_markov_name": "interp_k4",
+          "best_markov_ce": 2.0809851989956147,
+          "markov_ces": {
+            "kt_k0": 2.9083037921207016,
+            "kt_k1": 2.192326373832111,
+            "kt_k2": 2.1201065914418584,
+            "kt_k3": 2.11154982804724,
+            "kt_k4": 2.2618184000957493,
+            "interp_k4": 2.0809851989956147
+          },
+          "transformer_ces_per_seed": [
+            1.97336426574817,
+            1.9710657409452592,
+            1.9702799566331837
+          ],
+          "transformer_ce_mean_seeds": 1.9715699877755377,
+          "observed_gap": 0.10941521122007702,
+          "n_surrogates": 200,
+          "surrogate_gap_p95": 0.06420983859957971
+        }
+      ],
+      "p_for_fdr": 0.004975124378109453,
+      "fdr_significant": true,
+      "symbol_pass": true
+    }
+  ]
+}

@@ -823,3 +823,41 @@ Die Ablations-Messmaschinerie (PatchTST-Encoder + Cross-Node-Attention, Retrain-
 
 ### Programm-Bilanz (nach GL-020)
 Welle 1–3 unverändert (H-04/H-05b Mess-WEITER, Tradability-PARK). Welle 4: H-09/H-10/H-12 DROP; H-11/H-13 gesperrt. Welle 5: H-18 Audit (GL-014) · **H-16 WEITER kapitalfrei (GL-015)** · H-17 VERDIKT AUSSTEHEND (GL-019, Redundanz-Gate strukturell nicht auswertbar) · H-14 METHODISCH INVALIDE (GL-020, Positivkontrolle) · H-15 läuft (Checkpoint-Tranchen). **20 GL-Einträge, 0 Torpfosten-Verschiebungen, 0 handelbare Kanten.**
+
+---
+
+## GL-021 · 2026-08-07 · H-15 · C-15 Trade-Tape-Event-Grammatik (Welle 5, KAPITALFREI, GPU) — **WEITER (kapitalfrei)**
+
+**Quelle:** `state/c15_grammar_results.{json,md}` (Lauf abgeschlossen 2026-08-07, rc=0). Der Lauf lief über **9 Checkpoint-Sessions** (2026-07-24 bis 2026-08-07, ~180 h GPU brutto) auf RTX 5060 Ti / torch 2.11.0+cu128; das dreistufige Checkpoint-System (Symbol → Fold → Surrogat-Zwischenstand mit PCG64-State + Seed-Modell-Gewichten, Commit 00a531d) hat den Lauf über mehrere Timeouts, einen Windows-Shutdown und einen Junction-Ausfall bit-konsistent zusammengesetzt. **`gate_valid=true`, `ran_on_gpu=true`, `gate_valid_reasons=[]`, `events_capped=false`, `family_complete=true`** — verdikt-tragend.
+
+Methodik wie registriert, ohne jede Abweichung: 5 Symbole × 4 purged Walk-Forward-Folds (1-Tag-Embargo) × 3 Seeds (42/43/44), Causal-Transformer (context 1024, d_model 256, 4 Heads, 4 Layer, 3,49 M Parameter) gegen die beste Variable-Order-Markov-Baseline k≤4 (in ALLEN Zellen `interp_k4`), Datenfenster 2026-03-27..2026-07-04 (100 Tage), Vocab 128 (ohne tick_direction), 200 Within-Hour-of-Day-Block-Shuffle-Surrogate (Blocklänge 256 Events), BH-FDR α=0,10 über **F-GRAMMAR** (5 Zellen).
+
+### Registriertes Gate vs. Messung
+
+Gate: WEITER, wenn OOS-Token-CE des Transformers **≥2% relativ** unter der besten Markov-k≤4-Baseline bei **≥4/5 Symbolen** UND die CE-Lücke **über dem 95. Perzentil der Surrogat-Lücken-Verteilung** liegt, nach BH-FDR α=0,10 über F-GRAMMAR.
+
+| Symbol | Transformer-CE | Markov-CE (interp_k4) | abs. Lücke | **rel. Lücke** | ≥2% | Surr-p95 | > p95 | p | FDR-sig | Zelle |
+|---|---:|---:|---:|---:|:---:|---:|:---:|---:|:---:|:---:|
+| BTCUSDT | 1,1778 | 1,2155 | 0,0377 | **3,10%** | ja | 0,0257 | ja | 0,00498 | ja | **bestanden** |
+| ETHUSDT | 1,0648 | 1,1085 | 0,0437 | **3,94%** | ja | 0,0314 | ja | 0,00498 | ja | **bestanden** |
+| SOLUSDT | 1,6003 | 1,6446 | 0,0443 | **2,69%** | ja | 0,0270 | ja | 0,00498 | ja | **bestanden** |
+| XRPUSDT | 1,9803 | 2,0898 | 0,1095 | **5,24%** | ja | 0,0601 | ja | 0,00498 | ja | **bestanden** |
+| BNBUSDT | 1,9216 | 1,9201 | −0,0015 | **−0,08%** | **nein** | −0,0208 | ja | 0,00498 | ja | **nicht bestanden** (Stärke-Floor) |
+
+**4/5 Symbole bestanden — die registrierte ≥4/5-Schwelle ist erfüllt** (`n_symbols_pass=4`, `family_pass_geq_4of5=true`). BH-FDR: 5/5 Zellen signifikant bei p_crit 0,004975 (alle Surrogat-p am 1/201-Floor — die beobachtete Lücke wurde von KEINEM der 200 Surrogate je Symbol erreicht).
+
+### Einordnung (ehrlich)
+- **Der Effekt repliziert über Symbole und Marktphasen.** Alle Einzel-Folds der bestandenen Symbole lagen über der Schwelle, mit steigender Tendenz in den späteren Fenstern (z.B. ETH Fold 0→3: 3,48% → 3,98% → 4,98%). Die Surrogat-Verteilungen sind extrem eng (Streuung im Promillebereich über 200 Reps) — die Trennung Signal/Null ist nicht knapp, sondern deutlich.
+- **BNBUSDT fällt sauber und erklärbar durch:** Als einziges Symbol ist die Transformer-CE praktisch identisch zur Markov-Baseline (−0,08%, faktisch Gleichstand); die Fold-Lücken alternieren im Vorzeichen (−0,022 / +0,010 / +0,009 / −0,018). BNB ist mit ~9,0 M Events das mit Abstand dünnste Symbol des Panels (BTC 196,6 M, ETH 221,8 M) — dasselbe Symbol, das schon bei H-16/GL-015 als einziges den Stärke-Floor verfehlte. Bemerkenswert und im Payload sichtbar: BNBs Surrogat-p95 ist **negativ** (−0,0208), d.h. selbst die Surrogat-Läufe erreichten dort im Mittel keine positive Lücke — die formal erfüllte „> p95"-Bedingung ist bei BNB daher inhaltlich leer, und die Zelle scheitert korrekt am 2%-Floor. Keine Schwellen-Diskussion: der Floor stand vorregistriert.
+- **Konfundierungs-Kontrolle bestanden:** Das registrierte A-priori lautete „DROP erwartet — Konfundierung durch Saisonalität/Regime-Drift ist der wahrscheinlichere Ausgang". Genau dagegen war die Within-Hour-of-Day-Block-Shuffle-Null konstruiert (erhält Tageszeit-Saisonalität und lokale Blockstruktur, zerstört nur die längerreichweitige Sequenz-Grammatik). Die Lücke überlebt diese Null in 4/5 Symbolen deutlich — die Saisonalitäts-Erklärung ist damit vorregistriert ausgeschlossen.
+- **Differenzierung zum gesperrten Informationstheorie-Cluster** (Registry-Pflicht) im Payload enthalten (`differentiation_note`): Event-Stream statt Renditen, CE als Scoring-Rule statt Entropie-Schätzer, kein rho-/Trading-Gate.
+- **KAPITALFREI bestätigt:** keine bps/Edge/PnL/Friction-Metrik im Payload. Eine Handelsfolge wäre eine NEUE H-15b und ist **NICHT** impliziert.
+
+### URTEIL: **WEITER (kapitalfrei).**
+Alle registrierten WEITER-Bedingungen sind erfüllt (4/5-Quorum mit rel. CE-Lücke ≥2% UND Lücke über Surrogat-p95 UND BH-FDR-Signifikanz). Der Trade-Tape-Event-Stream der großen Perp-Märkte trägt **längerreichweitige sequentielle Struktur, die ein Variable-Order-Markov-Modell 4. Ordnung nicht erfasst** und die von saisonalitätserhaltenden Block-Shuffles nicht reproduziert wird. Verdikt-Status: Messungen-WEITER, Kapital-Status entfällt (kapitalfrei per Registrierung).
+
+**Konditionale Folge-Kandidaten (vom GPU-Scan 2026-07-09 vorgemerkt, durch dieses WEITER erst adressierbar, NICHT automatisch registriert):** DSM-02 (Memory-Horizon-Ablation: bis zu welcher Kontextlänge reicht die Grammatik?) und DSM-04 (Cross-Symbol-Zero-Shot-Universalität) — beide wären neue Registry-Einträge nach §2.
+
+### Welle-5-Bilanz + Programm-Bilanz (nach GL-021)
+**Welle 5 ist abgeschlossen:** H-18 Auflösungs-Audit (GL-014) · **H-16 WEITER kapitalfrei** (GL-015) · H-17 VERDIKT AUSSTEHEND (GL-019, Non-Redundanz-Gate strukturell nicht auswertbar) · H-14 METHODISCH INVALIDE (GL-020, Positivkontrolle gescheitert) · **H-15 WEITER kapitalfrei** (GL-021). Zwei von fünf GPU-Hypothesen mit vollem WEITER — beide messen unabhängig voneinander dieselbe Grundaussage: der Orderflow trägt nichtlineare, zeitgerichtete, längerreichweitige Struktur, die lineare bzw. Kurzgedächtnis-Modelle nicht sehen.
+Gesamt: Welle 1–3: 2 kapitalfreie Mess-WEITER (H-04, H-05b), beide Tradability-PARK. Welle 4: H-09/H-10/H-12 DROP, H-11/H-13 gesperrt. Welle 5: s.o. **21 GL-Einträge, 0 Torpfosten-Verschiebungen, 0 handelbare Kanten** (alle vier Mess-WEITER sind kapitalfrei; keine Tradability-Hypothese wurde durch sie impliziert).
