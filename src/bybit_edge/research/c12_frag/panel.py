@@ -40,6 +40,8 @@ from pathlib import Path
 
 import numpy as np
 
+from bybit_edge.research.payload_sql import trade_rows_sql
+
 #: Program-standard internal symbol notation (Bybit) for the H-12 panel.
 DEFAULT_SYMBOLS: tuple[str, ...] = ("BTCUSDT", "ETHUSDT")
 
@@ -122,16 +124,27 @@ def load_minute_last_price(
     and aggregates INSIDE DuckDB to the last trade price per ``[t, t+60s)``
     minute (``max_by(price, ts_exchange_ms)``), so full tick windows never
     enter Python memory. Price is extracted exchange-agnostically via
-    ``COALESCE($.price, $.p)`` — covers the Bybit backfill (``price``) and
-    Binance aggTrades (``p``, top-level) and Deribit (``price``) payload
-    forms. It does NOT cover the Bybit LIVE ``publicTrade`` multi-trade
-    envelope (``{"topic":..., "data":[{...,"p":...}, ...]}``, DATASET.md §6)
-    since ``p`` is nested inside ``data[]`` there, not top-level; such rows
-    fail the ``IS NOT NULL`` filter and the affected minute/day becomes
-    invalid (loud, visible via the day counters) rather than silently wrong.
-    The registered H-12 windows are backfill-bound (flat ``price`` form), so
-    this is immaterial for the pre-registered run; a ``$.data[]`` explosion
-    would be needed only to cover live-form edge days.
+    ``COALESCE($.price, $.p)`` — covers the Bybit backfill (``price``),
+    Binance aggTrades/REST backfill (``p``/``price``) and Deribit
+    (``price``, a native JSON number) payload forms.
+
+    BOTH harvester payload forms are read (``payload_sql.trade_rows_sql``):
+    the FLAT backfill form (one trade per parquet row, top-level keys) and
+    the multi-trade LIVE ENVELOPE (``{"topic":..,"data":[{..,"p":..},..]}``
+    and the JSON-RPC ``$.params.data[*]`` variant), which is expanded to one
+    row per trade using the PER-TRADE timestamp (``$.T``/``$.timestamp``).
+    Before that expansion existed, envelope rows produced NULL prices and
+    fell out silently — bybit from 2026-07-17 and deribit from ~2026-06-16
+    delivered 0 parsable trades, which is what flipped 19/50 W2 days of the
+    H-12 run to ``panel_valid=False``.
+
+    NO de-duplication is applied here, and none is needed: a mixed
+    backfill+live day (DATASET.md §9 caveat 4) can contain the same trade in
+    both forms, but this loader only takes the LAST price per minute — the
+    duplicate carries the SAME price at the SAME timestamp, so
+    ``max_by(price, ts_exchange_ms)`` returns the identical value whether the
+    trade appears once or twice. Counts/sums, which duplicates WOULD
+    corrupt, are never formed here.
 
     Returns a ``(len(dates) * 1440,)`` float array of last prices, NaN where
     the minute has no trade. Read-only: never writes into the harvester tree.
@@ -158,13 +171,18 @@ def load_minute_last_price(
     minute0 = start_ms // MS_PER_MINUTE
     n_minutes = len(dates) * MINUTES_PER_DAY
     file_list = "[" + ", ".join("'" + g.replace("'", "''") + "'" for g in present) + "]"
+    # One trade per row for BOTH payload forms (flat backfill row passed
+    # through unchanged, live envelope exploded on the per-trade timestamp).
+    trade_rows = trade_rows_sql(
+        f"read_parquet({file_list}, hive_partitioning=1, union_by_name=1)"
+    )
     sql = f"""
         SELECT CAST(ts_exchange_ms // {MS_PER_MINUTE} AS BIGINT) AS minute_idx,
                max_by(
                  CAST(COALESCE(json_extract_string(payload_json,'$.price'),
                                json_extract_string(payload_json,'$.p')) AS DOUBLE),
                  ts_exchange_ms) AS last_price
-        FROM read_parquet({file_list}, hive_partitioning=1, union_by_name=1)
+        FROM {trade_rows}
         WHERE ts_exchange_ms IS NOT NULL
           AND ts_exchange_ms >= {start_ms} AND ts_exchange_ms < {end_ms}
           AND COALESCE(json_extract_string(payload_json,'$.price'),

@@ -69,6 +69,8 @@ from typing import Any, Callable
 
 import numpy as np
 
+from bybit_edge.research.payload_sql import cross_form_dedup_qualify, trade_rows_sql
+
 from .cnn import (
     BATCH_SIZE_DEFAULT,
     ComputeError,
@@ -193,6 +195,7 @@ def load_day_imbalance(
     *,
     exchange: str = "bybit",
     stream: str = "publicTrade",
+    dedup_cross_form: bool = True,
 ) -> tuple[np.ndarray, int, int]:
     """1 s signed trade-imbalance series for one UTC day (read-only DuckDB).
 
@@ -202,6 +205,24 @@ def load_day_imbalance(
     the c01_ofi_sign loader: backfill form ``side``/``size`` with live-form
     fallback ``S``/``v``. Returns ``(series[86400], n_active_seconds,
     n_trades)``. Never writes into the harvester tree (Schutzgut).
+
+    BOTH harvester payload forms are read (``payload_sql.trade_rows_sql``):
+    the FLAT backfill row is passed through unchanged, the multi-trade LIVE
+    ENVELOPE (``$.data[*]`` / JSON-RPC ``$.params.data[*]``) is expanded to
+    one row per trade on the PER-TRADE timestamp (``$.T``/``$.timestamp``),
+    so the trades of one WS message land in their true seconds instead of
+    all in the packet's second.
+
+    DE-DUPLICATION IS REQUIRED HERE and is on by default: unlike the
+    last-price-per-bar loaders (c12/c14), this one SUMS signed sizes, so a
+    trade delivered in BOTH forms on a mixed backfill+live day (DATASET.md
+    §9 caveat 4) would be counted twice and inflate the imbalance.
+    ``dedup_cross_form`` drops an envelope trade whose exchange trade id
+    also appears in a flat row of the same day partition (see
+    ``payload_sql.cross_form_dedup_qualify``); it is a provable no-op on a
+    backfill-only or live-only day, so pre-existing flat-form results are
+    bit-identical. Set it to False only to reproduce a raw un-deduplicated
+    read.
     """
     import duckdb
 
@@ -216,6 +237,10 @@ def load_day_imbalance(
     y, m, d = (int(x) for x in day.split("-"))
     day_ms = int(datetime(y, m, d, tzinfo=timezone.utc).timestamp() * 1000)
     file_list = "[" + ", ".join("'" + str(f).replace("'", "''") + "'" for f in files) + "]"
+    trade_rows = trade_rows_sql(
+        f"read_parquet({file_list}, hive_partitioning=1, union_by_name=1)"
+    )
+    dedup = cross_form_dedup_qualify() if dedup_cross_form else ""
     sql = f"""
         WITH t AS (
             SELECT (ts_exchange_ms - {day_ms}) // 1000 AS sec,
@@ -223,10 +248,11 @@ def load_day_imbalance(
                                   json_extract_string(payload_json,'$.S'))) AS side,
                    CAST(COALESCE(json_extract_string(payload_json,'$.size'),
                                  json_extract_string(payload_json,'$.v')) AS DOUBLE) AS vol
-            FROM read_parquet({file_list}, hive_partitioning=1, union_by_name=1)
+            FROM {trade_rows}
             WHERE ts_exchange_ms IS NOT NULL
               AND ts_exchange_ms >= {day_ms}
               AND ts_exchange_ms < {day_ms + SECONDS_PER_DAY * 1000}
+            {dedup}
         )
         SELECT CAST(sec AS BIGINT) AS sec,
                SUM(CASE WHEN side = 'buy' THEN vol ELSE -vol END) AS imb,

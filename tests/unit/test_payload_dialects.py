@@ -21,6 +21,13 @@ Plus the LOUD-FAIL guard: files present, raw rows in the window, but an
 unknown payload dialect (nothing parses) must raise DataError naming a file
 and a sample payload -- never silently return 0 trades / all-NaN series
 (the bug class that hid the 2026-07-17 envelope finding for 5 days).
+
+The second half of this file (from "ENVELOPE (live) payload form") pins the
+OTHER structural shape -- the multi-trade live envelope -- for all five
+trade loaders (c12/c14 price bars, c15/c16/c17 event and flow series):
+per-trade timestamps, side/size out of the nested element, the Deribit
+JSON-RPC variant, the cross-form de-duplication, and the bit-identity of
+the flat pass-through.
 """
 from __future__ import annotations
 
@@ -242,3 +249,488 @@ def test_c14_missing_files_error_unchanged(tmp_path: Path) -> None:
     # loud-fail guard is specifically about EXISTING rows that do not parse.
     with pytest.raises(C14DataError, match="no parquet"):
         load_seconds_last_price(tmp_path / "empty", "bybit", "BTCUSDT", [DAY])
+
+
+# ===========================================================================
+# ENVELOPE (live) payload form -- ``$.data[*]`` / ``$.params.data[*]``
+#
+# The harvester stores TWO shapes for publicTrade (DATASET.md §6): the flat
+# backfill row (one trade per parquet row, tested above) and the LIVE
+# ENVELOPE, which nests MANY trades in ONE row. All loaders below used to
+# read top-level keys only, so envelope rows produced NULL and vanished --
+# bybit from 2026-07-17, deribit from ~2026-06-16 delivered 0 trades, which
+# flipped 19/50 W2 days of the H-12 run to panel_valid=False.
+#
+# The decisive property pinned here is the PER-TRADE timestamp: an envelope
+# carries one packet ``ts`` plus a per-trade ``T`` (bybit) / ``timestamp``
+# (deribit). Every envelope fixture below deliberately spreads its trades
+# over SEVERAL bars while the packet ``ts`` sits in the FIRST bar, so a
+# loader that (wrongly) used the packet timestamp would collapse them into
+# one bar and fail the assertions.
+# ===========================================================================
+
+from bybit_edge.research.c12_frag.panel import (  # noqa: E402
+    DataError as C12DataError,
+    load_minute_last_price,
+)
+from bybit_edge.research.c15_grammar.driver import load_trade_events  # noqa: E402
+from bybit_edge.research.c16_arrow.driver import load_day_imbalance  # noqa: E402
+
+MINUTE_MS = 60_000
+
+
+def _bybit_envelope(trades: list[tuple[int, str, float, float, str]], *,
+                    envelope_ts: int, symbol: str = "BTCUSDT") -> str:
+    """Bybit V5 live ``publicTrade`` envelope (verified shape).
+
+    ``trades`` = [(trade_ts_ms, side, size, price, trade_id), ...].
+    """
+    return json.dumps({
+        "topic": f"publicTrade.{symbol}", "type": "snapshot", "ts": envelope_ts,
+        "data": [
+            {"T": int(t_ms), "s": symbol, "S": side, "v": f"{size}", "p": f"{price}",
+             "L": "PlusTick", "i": tid, "BT": False}
+            for t_ms, side, size, price, tid in trades
+        ],
+    })
+
+
+def _deribit_envelope(trades: list[tuple[int, str, float, float, str]], *,
+                      envelope_ts: int, jsonrpc: bool = False,
+                      instrument: str = "BTC-PERPETUAL") -> str:
+    """Deribit live envelope -- plain ``$.data[]`` or JSON-RPC ``$.params.data[]``.
+
+    The Deribit live shape is NOT verified against a stored file, so the
+    reader supports both plausible forms; both are pinned here.
+    ``trades`` = [(trade_ts_ms, direction, amount, price, trade_id), ...].
+    """
+    data = [
+        {"trade_seq": i, "trade_id": tid, "timestamp": int(t_ms), "tick_direction": 1,
+         "price": float(price), "mark_price": float(price),
+         "instrument_name": instrument, "direction": direction, "amount": float(amount)}
+        for i, (t_ms, direction, amount, price, tid) in enumerate(trades)
+    ]
+    channel = f"trades.{instrument}.raw"
+    if jsonrpc:
+        return json.dumps({"jsonrpc": "2.0", "method": "subscription",
+                           "params": {"channel": channel, "data": data}})
+    return json.dumps({"channel": channel, "ts": envelope_ts, "data": data})
+
+
+def _bybit_flat_with_id(price: float, size: float, side: str, trade_id: str) -> str:
+    """Flat bybit backfill row INCLUDING its exchange trade id."""
+    return json.dumps({"timestamp": "1750000000.0", "symbol": "BTCUSDT", "side": side,
+                       "size": f"{size}", "price": f"{price}", "tickDirection": "PlusTick",
+                       "trdMatchID": trade_id})
+
+
+# ---------------------------------------------------------------------------
+# (a) c12_frag load_minute_last_price -- flat / envelope / mixed
+# ---------------------------------------------------------------------------
+
+def test_c12_minute_last_price_flat_only(tmp_path: Path) -> None:
+    base = tmp_path / "harvest"
+    _write_partition(base, "bybit", "BTCUSDT", DAY, [
+        (DAY_MS + 1_000, _bybit_payload(100.0, 0.1, "Buy")),
+        (DAY_MS + 59_000, _bybit_payload(101.0, 0.2, "Sell")),   # last in minute 0
+        (DAY_MS + 5 * MINUTE_MS + 10, _bybit_payload(99.0, 0.3, "Buy")),
+    ])
+    out = load_minute_last_price(base, "bybit", "BTCUSDT", [DAY])
+    assert out.shape == (1440,)
+    assert out[0] == 101.0
+    assert out[5] == 99.0
+    assert np.isnan(out[1]) and np.isnan(out[4])
+    assert int(np.sum(np.isfinite(out))) == 2
+
+
+def test_c12_minute_last_price_envelope_only_spreads_over_minutes(tmp_path: Path) -> None:
+    # ONE parquet row, three trades, packet ts in minute 0 -- the trades must
+    # land in minutes 0 and 2 by their per-trade $.T, not all in minute 0.
+    base = tmp_path / "harvest"
+    _write_partition(base, "bybit", "BTCUSDT", DAY, [
+        (DAY_MS + 500, _bybit_envelope([
+            (DAY_MS + 1_000, "Buy", 0.010, 100.0, "e1"),
+            (DAY_MS + 59_000, "Sell", 0.020, 101.0, "e2"),          # last in minute 0
+            (DAY_MS + 2 * MINUTE_MS + 5_000, "Buy", 0.030, 102.0, "e3"),
+        ], envelope_ts=DAY_MS + 500)),
+    ])
+    out = load_minute_last_price(base, "bybit", "BTCUSDT", [DAY])
+    assert out[0] == 101.0
+    assert out[2] == 102.0
+    assert np.isnan(out[1])
+    assert int(np.sum(np.isfinite(out))) == 2
+
+
+def test_c12_minute_last_price_mixed_forms(tmp_path: Path) -> None:
+    base = tmp_path / "harvest"
+    _write_partition(base, "bybit", "BTCUSDT", DAY, [
+        (DAY_MS + 1_000, _bybit_payload(100.0, 0.1, "Buy")),        # flat, minute 0
+        (DAY_MS + 500, _bybit_envelope([
+            (DAY_MS + 30_000, "Sell", 0.02, 101.0, "e1"),           # envelope, minute 0
+            (DAY_MS + 3 * MINUTE_MS, "Buy", 0.03, 103.0, "e2"),     # envelope, minute 3
+        ], envelope_ts=DAY_MS + 500)),
+        (DAY_MS + 7 * MINUTE_MS, _bybit_payload(107.0, 0.4, "Buy")),  # flat, minute 7
+    ])
+    out = load_minute_last_price(base, "bybit", "BTCUSDT", [DAY])
+    assert out[0] == 101.0   # envelope trade at +30s is the LAST of minute 0
+    assert out[3] == 103.0
+    assert out[7] == 107.0
+    assert int(np.sum(np.isfinite(out))) == 3
+
+
+def test_c12_minute_last_price_deribit_envelope_plain(tmp_path: Path) -> None:
+    base = tmp_path / "harvest"
+    _write_partition(base, "deribit", "BTC-PERPETUAL", DAY, [
+        (DAY_MS + 100, _deribit_envelope([
+            (DAY_MS + 1_000, "buy", 10.0, 74192.0, "d1"),
+            (DAY_MS + 4 * MINUTE_MS, "sell", 20.0, 74180.5, "d2"),
+        ], envelope_ts=DAY_MS + 100)),
+    ])
+    out = load_minute_last_price(base, "deribit", "BTC-PERPETUAL", [DAY])
+    assert out[0] == 74192.0
+    assert out[4] == 74180.5
+    assert int(np.sum(np.isfinite(out))) == 2
+
+
+def test_c12_minute_last_price_deribit_envelope_jsonrpc(tmp_path: Path) -> None:
+    # (e) JSON-RPC subscription-notification variant: $.params.data[*]
+    base = tmp_path / "harvest"
+    _write_partition(base, "deribit", "ETH-PERPETUAL", DAY, [
+        (DAY_MS + 100, _deribit_envelope([
+            (DAY_MS + 2_000, "buy", 10.0, 2321.0, "d1"),
+            (DAY_MS + 6 * MINUTE_MS, "sell", 20.0, 2319.75, "d2"),
+        ], envelope_ts=DAY_MS + 100, jsonrpc=True, instrument="ETH-PERPETUAL")),
+    ])
+    out = load_minute_last_price(base, "deribit", "ETH-PERPETUAL", [DAY])
+    assert out[0] == 2321.0
+    assert out[6] == 2319.75
+    assert int(np.sum(np.isfinite(out))) == 2
+
+
+def test_c12_loud_fail_on_unknown_payload_format(tmp_path: Path) -> None:
+    base = tmp_path / "harvest"
+    _write_unknown_dialect(base, "bybit", "BTCUSDT")
+    with pytest.raises(C12DataError, match="0 usable minute bars"):
+        load_minute_last_price(base, "bybit", "BTCUSDT", [DAY])
+
+
+# ---------------------------------------------------------------------------
+# (a') c14 1s series: envelope + JSON-RPC variant (same technique)
+# ---------------------------------------------------------------------------
+
+def test_c14_price_series_envelope_spreads_over_seconds(tmp_path: Path) -> None:
+    base = tmp_path / "harvest"
+    _write_partition(base, "bybit", "BTCUSDT", DAY, [
+        (DAY_MS + 10, _bybit_envelope([
+            (DAY_MS + 100, "Buy", 0.01, 100.0, "e1"),
+            (DAY_MS + 900, "Sell", 0.02, 101.25, "e2"),   # last of second 0
+            (DAY_MS + 5_000, "Buy", 0.03, 99.75, "e3"),
+        ], envelope_ts=DAY_MS + 10)),
+    ])
+    out = load_seconds_last_price(base, "bybit", "BTCUSDT", [DAY])
+    assert out[0] == 101.25
+    assert out[5] == 99.75
+    assert np.isnan(out[1]) and np.isnan(out[6])
+
+
+def test_c14_price_series_deribit_jsonrpc_envelope(tmp_path: Path) -> None:
+    base = tmp_path / "harvest"
+    _write_partition(base, "deribit", "BTC-PERPETUAL", DAY, [
+        (DAY_MS + 10, _deribit_envelope([
+            (DAY_MS + 200, "buy", 10.0, 74192.0, "d1"),
+            (DAY_MS + 9_400, "sell", 20.0, 74180.25, "d2"),
+        ], envelope_ts=DAY_MS + 10, jsonrpc=True)),
+    ])
+    out = load_seconds_last_price(base, "deribit", "BTC-PERPETUAL", [DAY])
+    assert out[0] == 74192.0
+    assert out[9] == 74180.25
+
+
+# ---------------------------------------------------------------------------
+# (b) c16 load_day_imbalance -- signed size out of the envelope + dedup
+# ---------------------------------------------------------------------------
+
+def test_c16_day_imbalance_flat_only(tmp_path: Path) -> None:
+    base = tmp_path / "harvest"
+    _write_partition(base, "bybit", "BTCUSDT", DAY, [
+        (DAY_MS + 1_000, _bybit_payload(100.0, 1.00, "Buy")),
+        (DAY_MS + 1_500, _bybit_payload(100.1, 0.25, "Sell")),
+        (DAY_MS + 60_000, _bybit_payload(100.2, 2.00, "Buy")),
+    ])
+    series, n_active, n_trades = load_day_imbalance(base, "BTCUSDT", DAY)
+    assert series.shape == (86_400,)
+    assert series[1] == pytest.approx(0.75)
+    assert series[60] == pytest.approx(2.00)
+    assert (n_active, n_trades) == (2, 3)
+
+
+def test_c16_day_imbalance_envelope_only_sides_and_seconds(tmp_path: Path) -> None:
+    # S='Sell' must enter NEGATIVE; the two trades must land in the seconds
+    # of their per-trade $.T (1 and 61), not both in the packet's second.
+    base = tmp_path / "harvest"
+    _write_partition(base, "bybit", "BTCUSDT", DAY, [
+        (DAY_MS + 50, _bybit_envelope([
+            (DAY_MS + 1_000, "Sell", 0.010, 100.0, "e1"),
+            (DAY_MS + 1_200, "Buy", 0.030, 100.1, "e2"),
+            (DAY_MS + 61_000, "Buy", 0.020, 100.2, "e3"),
+        ], envelope_ts=DAY_MS + 50)),
+    ])
+    series, n_active, n_trades = load_day_imbalance(base, "BTCUSDT", DAY)
+    assert series[1] == pytest.approx(0.020)   # 0.030 buy - 0.010 sell
+    assert series[61] == pytest.approx(0.020)
+    assert series[0] == 0.0                     # packet second stays empty
+    assert (n_active, n_trades) == (2, 3)
+
+
+def test_c16_day_imbalance_cross_form_dedup(tmp_path: Path) -> None:
+    # Mixed backfill+live day (DATASET.md §9 caveat 4): trade 'X1' is stored
+    # BOTH flat and inside the envelope. Summing signed size double-counts
+    # it unless the cross-form dedup drops the envelope copy.
+    base = tmp_path / "harvest"
+    _write_partition(base, "bybit", "BTCUSDT", DAY, [
+        (DAY_MS + 1_000, _bybit_flat_with_id(100.0, 1.0, "Buy", "X1")),
+        (DAY_MS + 900, _bybit_envelope([
+            (DAY_MS + 1_000, "Buy", 1.0, 100.0, "X1"),    # SAME trade
+            (DAY_MS + 1_100, "Sell", 0.5, 100.1, "X2"),   # live-only trade
+        ], envelope_ts=DAY_MS + 900)),
+    ])
+    series, n_active, n_trades = load_day_imbalance(base, "BTCUSDT", DAY)
+    assert series[1] == pytest.approx(0.5)      # 1.0 buy - 0.5 sell, ONCE
+    assert (n_active, n_trades) == (1, 2)
+    raw, _, raw_trades = load_day_imbalance(base, "BTCUSDT", DAY,
+                                            dedup_cross_form=False)
+    assert raw[1] == pytest.approx(1.5)          # duplicate counted twice
+    assert raw_trades == 3
+
+
+def test_c16_day_imbalance_dedup_is_noop_on_flat_only(tmp_path: Path) -> None:
+    # Bit-identity: on a backfill-only partition the dedup clause cannot
+    # remove anything (there are no envelope rows to drop).
+    base = tmp_path / "harvest"
+    _write_partition(base, "bybit", "BTCUSDT", DAY, [
+        (DAY_MS + 1_000, _bybit_flat_with_id(100.0, 1.0, "Buy", "A1")),
+        (DAY_MS + 1_500, _bybit_flat_with_id(100.1, 0.25, "Sell", "A2")),
+        (DAY_MS + 2_000, _bybit_flat_with_id(100.2, 2.0, "Buy", "A3")),
+    ])
+    on = load_day_imbalance(base, "BTCUSDT", DAY)
+    off = load_day_imbalance(base, "BTCUSDT", DAY, dedup_cross_form=False)
+    assert np.array_equal(on[0], off[0])
+    assert on[1:] == off[1:] == (2, 3)
+
+
+# ---------------------------------------------------------------------------
+# (b') c17 load_node_trades -- ts/price/size/sign out of the envelope + dedup
+# ---------------------------------------------------------------------------
+
+def test_c17_load_node_trades_bybit_envelope(tmp_path: Path) -> None:
+    base = tmp_path / "harvest"
+    _write_partition(base, "bybit", "BTCUSDT", DAY, [
+        (DAY_MS + 50, _bybit_envelope([
+            (DAY_MS + 1_000, "Buy", 0.10, 100.5, "e1"),
+            (DAY_MS + 2_000, "Sell", 0.25, 100.6, "e2"),
+            (DAY_MS + 3_000, "Buy", 1.50, 100.4, "e3"),
+        ], envelope_ts=DAY_MS + 50)),
+    ])
+    ts, price, size, sign = load_node_trades(base, "bybit", "BTCUSDT", DAY, DAY)
+    assert ts.tolist() == [DAY_MS + 1_000, DAY_MS + 2_000, DAY_MS + 3_000]
+    assert price.tolist() == [100.5, 100.6, 100.4]
+    assert size.tolist() == [0.10, 0.25, 1.50]
+    assert sign.tolist() == [1.0, -1.0, 1.0]
+
+
+def test_c17_load_node_trades_deribit_jsonrpc_envelope(tmp_path: Path) -> None:
+    base = tmp_path / "harvest"
+    _write_partition(base, "deribit", "BTC-PERPETUAL", DAY, [
+        (DAY_MS + 10, _deribit_envelope([
+            (DAY_MS + 1_000, "buy", 10.0, 74192.0, "d1"),
+            (DAY_MS + 2_000, "sell", 250.0, 74191.5, "d2"),
+        ], envelope_ts=DAY_MS + 10, jsonrpc=True)),
+    ])
+    ts, price, size, sign = load_node_trades(base, "deribit", "BTC-PERPETUAL", DAY, DAY)
+    assert ts.tolist() == [DAY_MS + 1_000, DAY_MS + 2_000]
+    assert price.tolist() == [74192.0, 74191.5]
+    assert size.tolist() == [10.0, 250.0]
+    assert sign.tolist() == [1.0, -1.0]
+
+
+def test_c17_load_node_trades_mixed_forms_dedup(tmp_path: Path) -> None:
+    base = tmp_path / "harvest"
+    _write_partition(base, "bybit", "BTCUSDT", DAY, [
+        (DAY_MS + 1_000, _bybit_flat_with_id(100.0, 1.0, "Buy", "X1")),
+        (DAY_MS + 900, _bybit_envelope([
+            (DAY_MS + 1_000, "Buy", 1.0, 100.0, "X1"),     # SAME trade
+            (DAY_MS + 2_000, "Sell", 0.5, 100.1, "X2"),
+        ], envelope_ts=DAY_MS + 900)),
+    ])
+    ts, price, size, sign = load_node_trades(base, "bybit", "BTCUSDT", DAY, DAY)
+    assert ts.tolist() == [DAY_MS + 1_000, DAY_MS + 2_000]
+    assert sign.tolist() == [1.0, -1.0]
+    assert size.tolist() == [1.0, 0.5]
+    ts_raw, _, _, _ = load_node_trades(base, "bybit", "BTCUSDT", DAY, DAY,
+                                       dedup_cross_form=False)
+    assert ts_raw.size == 3   # duplicate present without the dedup
+
+
+def test_c17_load_node_trades_dedup_is_noop_on_flat_only(tmp_path: Path) -> None:
+    base = tmp_path / "harvest"
+    _write_partition(base, "bybit", "BTCUSDT", DAY, [
+        (DAY_MS + 1_000, _bybit_flat_with_id(100.5, 0.10, "Buy", "A1")),
+        (DAY_MS + 2_000, _bybit_flat_with_id(100.6, 0.25, "Sell", "A2")),
+        (DAY_MS + 3_000, _bybit_flat_with_id(100.4, 1.50, "Buy", "A3")),
+    ])
+    on = load_node_trades(base, "bybit", "BTCUSDT", DAY, DAY)
+    off = load_node_trades(base, "bybit", "BTCUSDT", DAY, DAY, dedup_cross_form=False)
+    for a, b in zip(on, off):
+        assert np.array_equal(a, b)
+    assert on[0].tolist() == [DAY_MS + 1_000, DAY_MS + 2_000, DAY_MS + 3_000]
+
+
+# ---------------------------------------------------------------------------
+# (b'') c15 load_trade_events -- event stream out of the envelope + dedup
+# ---------------------------------------------------------------------------
+
+def test_c15_trade_events_flat_only(tmp_path: Path) -> None:
+    base = tmp_path / "harvest"
+    _write_partition(base, "bybit", "BTCUSDT", DAY, [
+        (DAY_MS + 1_000, _bybit_flat_with_id(100.5, 0.10, "Buy", "A1")),
+        (DAY_MS + 2_000, _bybit_flat_with_id(100.6, 0.25, "Sell", "A2")),
+    ])
+    ev = load_trade_events(base, "BTCUSDT", [DAY])
+    assert ev.ts_ms.tolist() == [DAY_MS + 1_000, DAY_MS + 2_000]
+    assert ev.price.tolist() == [100.5, 100.6]
+    assert ev.size.tolist() == [0.10, 0.25]
+    assert ev.side.tolist() == [1, 0]   # 1 = Buy, 0 = Sell
+
+
+def test_c15_trade_events_envelope_uses_per_trade_timestamps(tmp_path: Path) -> None:
+    # If the packet ts were used, every inter-arrival time would be 0 ms and
+    # the whole IAT token axis would be corrupt -- pinned by distinct ts.
+    base = tmp_path / "harvest"
+    _write_partition(base, "bybit", "BTCUSDT", DAY, [
+        (DAY_MS + 50, _bybit_envelope([
+            (DAY_MS + 1_000, "Buy", 0.10, 100.5, "e1"),
+            (DAY_MS + 2_500, "Sell", 0.25, 100.6, "e2"),
+            (DAY_MS + 9_000, "Buy", 1.50, 100.4, "e3"),
+        ], envelope_ts=DAY_MS + 50)),
+    ])
+    ev = load_trade_events(base, "BTCUSDT", [DAY])
+    assert ev.ts_ms.tolist() == [DAY_MS + 1_000, DAY_MS + 2_500, DAY_MS + 9_000]
+    assert ev.price.tolist() == [100.5, 100.6, 100.4]
+    assert ev.size.tolist() == [0.10, 0.25, 1.50]
+    assert ev.side.tolist() == [1, 0, 1]
+
+
+def test_c15_trade_events_cross_form_dedup(tmp_path: Path) -> None:
+    base = tmp_path / "harvest"
+    _write_partition(base, "bybit", "BTCUSDT", DAY, [
+        (DAY_MS + 1_000, _bybit_flat_with_id(100.0, 1.0, "Buy", "X1")),
+        (DAY_MS + 900, _bybit_envelope([
+            (DAY_MS + 1_000, "Buy", 1.0, 100.0, "X1"),     # SAME trade
+            (DAY_MS + 2_000, "Sell", 0.5, 100.1, "X2"),
+        ], envelope_ts=DAY_MS + 900)),
+    ])
+    ev = load_trade_events(base, "BTCUSDT", [DAY])
+    assert ev.ts_ms.tolist() == [DAY_MS + 1_000, DAY_MS + 2_000]
+    raw = load_trade_events(base, "BTCUSDT", [DAY], dedup_cross_form=False)
+    assert raw.ts_ms.size == 3
+
+
+def test_c15_trade_events_dedup_is_noop_on_flat_only(tmp_path: Path) -> None:
+    base = tmp_path / "harvest"
+    _write_partition(base, "bybit", "BTCUSDT", DAY, [
+        (DAY_MS + 1_000, _bybit_flat_with_id(100.5, 0.10, "Buy", "A1")),
+        (DAY_MS + 2_000, _bybit_flat_with_id(100.6, 0.25, "Sell", "A2")),
+        (DAY_MS + 3_000, _bybit_flat_with_id(100.4, 1.50, "Buy", "A3")),
+    ])
+    on = load_trade_events(base, "BTCUSDT", [DAY])
+    off = load_trade_events(base, "BTCUSDT", [DAY], dedup_cross_form=False)
+    assert np.array_equal(on.ts_ms, off.ts_ms)
+    assert np.array_equal(on.price, off.price)
+    assert np.array_equal(on.size, off.size)
+    assert np.array_equal(on.side, off.side)
+
+
+# ---------------------------------------------------------------------------
+# (c) flat-form regression: envelope support must not touch the flat path
+# ---------------------------------------------------------------------------
+
+def test_flat_rows_are_passed_through_unchanged(tmp_path: Path) -> None:
+    """The flat branch must hand the parquet row on byte-for-byte.
+
+    Pins the bit-identity guarantee the registered verdicts rest on: same
+    ``ts_exchange_ms``, same ``payload_json`` string, exactly one row out per
+    row in -- for every flat dialect, including one that carries a ``data``
+    key that is NOT a trade container (scalar -> stays flat).
+    """
+    import duckdb
+
+    from bybit_edge.research.payload_sql import trade_rows_sql
+
+    rows = [
+        (DAY_MS + 1, _bybit_payload(100.5, 0.1, "Buy")),
+        (DAY_MS + 2, _binance_backfill_payload(2321.16, 0.014, True)),
+        (DAY_MS + 3, _deribit_backfill_payload(74192.0, 10.0, "buy", DAY_MS + 3)),
+        (DAY_MS + 4, json.dumps({"foo": 1})),
+        (DAY_MS + 5, json.dumps({"price": "1.0", "data": 7})),   # scalar $.data
+        (DAY_MS + 6, None),
+    ]
+    _write_partition(tmp_path / "h", "bybit", "BTCUSDT", DAY, rows)
+    f = (tmp_path / "h" / "raw" / "bybit" / "publicTrade" / "symbol=BTCUSDT"
+         / f"date={DAY}" / "data.parquet").as_posix()
+    src = trade_rows_sql(f"read_parquet('{f}', union_by_name=1)")
+    con = duckdb.connect()
+    try:
+        got = con.execute(
+            f"SELECT ts_exchange_ms, payload_json, is_envelope FROM {src} "
+            f"ORDER BY ts_exchange_ms"
+        ).fetchall()
+    finally:
+        con.close()
+    assert [(t, p) for t, p, _ in got] == rows
+    assert all(not env for _, _, env in got)
+
+
+def test_envelope_expansion_never_touches_flat_rows_in_mixed_file(tmp_path: Path) -> None:
+    import duckdb
+
+    from bybit_edge.research.payload_sql import trade_rows_sql
+
+    flat = _bybit_payload(100.5, 0.1, "Buy")
+    _write_partition(tmp_path / "h", "bybit", "BTCUSDT", DAY, [
+        (DAY_MS + 1, flat),
+        (DAY_MS + 2, _bybit_envelope([(DAY_MS + 7, "Sell", 0.2, 101.0, "e1")],
+                                     envelope_ts=DAY_MS + 2)),
+    ])
+    f = (tmp_path / "h" / "raw" / "bybit" / "publicTrade" / "symbol=BTCUSDT"
+         / f"date={DAY}" / "data.parquet").as_posix()
+    src = trade_rows_sql(f"read_parquet('{f}', union_by_name=1)")
+    con = duckdb.connect()
+    try:
+        got = con.execute(
+            f"SELECT ts_exchange_ms, payload_json, is_envelope FROM {src} "
+            f"ORDER BY ts_exchange_ms"
+        ).fetchall()
+    finally:
+        con.close()
+    assert got[0] == (DAY_MS + 1, flat, False)
+    assert got[1][0] == DAY_MS + 7 and got[1][2] is True
+    assert json.loads(got[1][1])["p"] == "101.0"
+
+
+def test_empty_envelope_array_yields_no_trades(tmp_path: Path) -> None:
+    import duckdb
+
+    from bybit_edge.research.payload_sql import trade_rows_sql
+
+    _write_partition(tmp_path / "h", "bybit", "BTCUSDT", DAY, [
+        (DAY_MS + 1, json.dumps({"topic": "publicTrade.BTCUSDT", "ts": DAY_MS + 1,
+                                 "data": []})),
+    ])
+    f = (tmp_path / "h" / "raw" / "bybit" / "publicTrade" / "symbol=BTCUSDT"
+         / f"date={DAY}" / "data.parquet").as_posix()
+    src = trade_rows_sql(f"read_parquet('{f}', union_by_name=1)")
+    con = duckdb.connect()
+    try:
+        assert con.execute(f"SELECT count(*) FROM {src}").fetchone()[0] == 0
+    finally:
+        con.close()

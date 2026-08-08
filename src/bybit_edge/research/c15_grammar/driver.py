@@ -74,6 +74,8 @@ from typing import Any
 
 import numpy as np
 
+from bybit_edge.research.payload_sql import cross_form_dedup_qualify, trade_rows_sql
+
 from .markov_baseline import (
     CE_WARMUP,
     best_baseline_ce,
@@ -221,12 +223,30 @@ def _trade_events_sql_parts(
     exchange: str,
     stream: str,
     max_events_per_day: int,
+    dedup_cross_form: bool = True,
 ) -> tuple[str, str]:
     """Shared SQL fragments for ``load_trade_events``/``count_trade_events``.
 
     Returns ``(inner, per_day_limit)``. Raises ``DataError`` when no parquet
     is present — SAME fail-fast surface for both the counting pre-pass and
     the real load.
+
+    ``inner`` reads BOTH harvester payload forms via
+    ``payload_sql.trade_rows_sql``: the FLAT backfill row is passed through
+    unchanged, the multi-trade LIVE ENVELOPE (``$.data[*]`` / JSON-RPC
+    ``$.params.data[*]``) is expanded to one row per trade on the PER-TRADE
+    timestamp (``$.T``/``$.timestamp``) — the envelope element carries the
+    live keys ``S``/``p``/``v`` this SQL already handles. Using the envelope
+    packet ``ts`` instead would give every trade of one WS message an
+    inter-arrival time of 0 ms and corrupt the whole IAT token axis.
+
+    ``dedup_cross_form`` (default True) is REQUIRED for this event-level
+    loader: a mixed backfill+live day (DATASET.md §9 caveat 4) can carry the
+    same trade in both forms, which here would become two events (a phantom
+    0 ms inter-arrival plus double size mass), not an inert repeat as in the
+    last-price-per-bar loaders. It drops an envelope trade whose exchange
+    trade id also appears in a flat row and is a provable no-op on
+    backfill-only / live-only data, keeping flat-form results bit-identical.
     """
     if not _SYMBOL_RE.match(symbol):
         raise DataError(f"invalid symbol: {symbol!r}")
@@ -242,6 +262,10 @@ def _trade_events_sql_parts(
             f"{days[0]}..{days[-1]} under {base}"
         )
     file_list = "[" + ", ".join("'" + g.replace("'", "''") + "'" for g in present) + "]"
+    trade_rows = trade_rows_sql(
+        f"read_parquet({file_list}, hive_partitioning=1, union_by_name=1)"
+    )
+    dedup = cross_form_dedup_qualify() if dedup_cross_form else ""
     inner = f"""
         SELECT ts_exchange_ms AS ts,
                CASE WHEN lower(COALESCE(json_extract_string(payload_json,'$.side'),
@@ -251,10 +275,11 @@ def _trade_events_sql_parts(
                              json_extract_string(payload_json,'$.p')) AS DOUBLE) AS price,
                CAST(COALESCE(json_extract_string(payload_json,'$.size'),
                              json_extract_string(payload_json,'$.v')) AS DOUBLE) AS size
-        FROM read_parquet({file_list}, hive_partitioning=1, union_by_name=1)
+        FROM {trade_rows}
         WHERE ts_exchange_ms IS NOT NULL
           AND (json_extract_string(payload_json,'$.side') IS NOT NULL
                OR json_extract_string(payload_json,'$.S') IS NOT NULL)
+        {dedup}
     """
     per_day_limit = ""
     if max_events_per_day and max_events_per_day > 0:
@@ -274,13 +299,17 @@ def load_trade_events(
     exchange: str = "bybit",
     stream: str = "publicTrade",
     max_events_per_day: int = 0,
+    dedup_cross_form: bool = True,
 ) -> EventStream:
     """Load the full publicTrade stream for one symbol (read-only DuckDB).
 
     Same Hive-glob + payload-field convention as
     ``c01_ofi_sign.oos.load_harvest_window`` (backfill keys ``side``/``price``
     /``size``, live keys ``S``/``p``/``v``); side normalised to int in SQL
-    (1 = Buy, 0 = Sell). Results ordered by exchange timestamp.
+    (1 = Buy, 0 = Sell). Results ordered by exchange timestamp. BOTH payload
+    forms are read and the live envelope is exploded per trade, with
+    cross-form de-duplication on by default — see
+    :func:`_trade_events_sql_parts` for the exact contract.
     ``max_events_per_day`` > 0 caps events per day (FIRST events of the day)
     — a mechanics/testing convenience that is flagged by the caller and voids
     ``gate_valid`` (it changes the registered data binding).
@@ -290,6 +319,7 @@ def load_trade_events(
     inner, per_day_limit = _trade_events_sql_parts(
         base_dir, symbol, days,
         exchange=exchange, stream=stream, max_events_per_day=max_events_per_day,
+        dedup_cross_form=dedup_cross_form,
     )
     sql = f"SELECT ts, side, price, size FROM ({inner}) {per_day_limit} ORDER BY ts"
     con = duckdb.connect()
@@ -326,6 +356,7 @@ def count_trade_events(
     exchange: str = "bybit",
     stream: str = "publicTrade",
     max_events_per_day: int = 0,
+    dedup_cross_form: bool = True,
 ) -> int:
     """Count USABLE trade events for one symbol WITHOUT materialising arrays.
 
@@ -344,6 +375,7 @@ def count_trade_events(
     inner, per_day_limit = _trade_events_sql_parts(
         base_dir, symbol, days,
         exchange=exchange, stream=stream, max_events_per_day=max_events_per_day,
+        dedup_cross_form=dedup_cross_form,
     )
     sql = (
         f"SELECT count(*) FROM ("

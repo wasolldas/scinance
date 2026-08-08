@@ -39,6 +39,8 @@ from pathlib import Path
 
 import numpy as np
 
+from bybit_edge.research.payload_sql import trade_rows_sql
+
 #: Registered 12-node panel (registry H-14): (exchange, internal Bybit-notation
 #: symbol). Symbol-major order following the registry text.
 DEFAULT_NODES: tuple[tuple[str, str], ...] = (
@@ -149,10 +151,17 @@ def load_seconds_last_price(
     (``p``), the Binance REST backfill (``price`` string) and the Deribit
     backfill (``price`` as a NATIVE JSON number — ``json_extract_string``
     returns its decimal string form, so the ``CAST`` sees e.g. ``'74192.0'``;
-    fixture-verified in tests/unit/test_payload_dialects.py). Same
-    rationale/limits as ``c12_frag.panel``, incl. the documented Bybit LIVE
-    multi-trade-envelope non-coverage: such rows fail the price extraction
-    and are counted, not silently wrong.
+    fixture-verified in tests/unit/test_payload_dialects.py).
+
+    BOTH harvester payload forms are read (``payload_sql.trade_rows_sql``):
+    the FLAT backfill form is passed through unchanged, and the multi-trade
+    LIVE ENVELOPE (``$.data[*]`` and the JSON-RPC ``$.params.data[*]``
+    variant) is expanded to one row per trade on the PER-TRADE timestamp
+    (``$.T``/``$.timestamp``) — using the envelope packet ``ts`` instead
+    would collapse a whole WS message into one second. No de-duplication:
+    identical to ``c12_frag.panel``, only the LAST price per bar is taken,
+    so a trade appearing in both forms on a mixed backfill+live day
+    (DATASET.md §9 caveat 4) yields the identical bar value.
 
     LOUD-FAIL GUARD: if parquet files exist AND the window contains raw rows
     but NOT A SINGLE price can be parsed, a ``DataError`` naming one file and
@@ -191,13 +200,16 @@ def load_seconds_last_price(
     # (COUNT(*) vs COUNT(price)) for the loud-fail guard below. The FILTER
     # keeps max_by over parsed prices only — numerically identical to the
     # previous WHERE ... IS NOT NULL variant for every parsable row.
+    trade_rows = trade_rows_sql(
+        f"read_parquet({file_list}, hive_partitioning=1, union_by_name=1)"
+    )
     sql = f"""
         WITH src AS (
             SELECT ts_exchange_ms,
                    CAST(COALESCE(json_extract_string(payload_json,'$.price'),
                                  json_extract_string(payload_json,'$.p')) AS DOUBLE)
                        AS price
-            FROM read_parquet({file_list}, hive_partitioning=1, union_by_name=1)
+            FROM {trade_rows}
             WHERE ts_exchange_ms IS NOT NULL
               AND ts_exchange_ms >= {start_ms} AND ts_exchange_ms < {end_ms}
         )

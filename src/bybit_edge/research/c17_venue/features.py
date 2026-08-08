@@ -72,6 +72,8 @@ from typing import Any, Callable
 
 import numpy as np
 
+from bybit_edge.research.payload_sql import cross_form_dedup_qualify, trade_rows_sql
+
 #: Program-standard 5-symbol panel (registry H-17: 5 Symbole).
 DEFAULT_SYMBOLS: tuple[str, ...] = ("BTCUSDT", "ETHUSDT", "SOLUSDT", "BNBUSDT", "XRPUSDT")
 
@@ -594,6 +596,7 @@ def load_node_trades(
     end_date: str,
     *,
     stream: str = "publicTrade",
+    dedup_cross_form: bool = True,
 ) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
     """Load (ts_ms, price, size, sign) for one node from the harvester tree.
 
@@ -608,6 +611,28 @@ def load_node_trades(
     price/size/sign are dropped loudly (counted), never silently defaulted;
     if the window has raw rows but ZERO parse at all, a ``DataError`` with
     file + sample payload is raised (loud-fail guard, no silent 0/NaN).
+
+    BOTH harvester payload forms are read (``payload_sql.trade_rows_sql``):
+    the FLAT backfill row is passed through unchanged, and the multi-trade
+    LIVE ENVELOPE (``$.data[*]`` / JSON-RPC ``$.params.data[*]``) is
+    expanded to one row per trade on the PER-TRADE timestamp
+    (``$.T``/``$.timestamp``). The envelope element carries exactly the keys
+    the extraction above already knows (``p``/``v``/``S``/``i`` bybit live,
+    ``price``/``amount``/``direction``/``trade_id`` deribit), so nothing in
+    the dialect handling changes. Reading only top-level keys was what made
+    bybit deliver 0 trades from 2026-07-17 and deribit from ~2026-06-16.
+
+    DE-DUPLICATION IS REQUIRED HERE and is on by default: this is an EVENT
+    stream (per-trade rows feeding counts, inter-arrival times and per-day
+    rank normalisation), so a trade present in BOTH forms on a mixed
+    backfill+live day (DATASET.md §9 caveat 4) would appear twice — unlike
+    the last-price-per-bar loaders c12/c14, where a duplicate is inert.
+    ``dedup_cross_form`` drops an envelope trade whose exchange trade id
+    also occurs in a flat row (see ``payload_sql.cross_form_dedup_qualify``);
+    it is a provable no-op on a backfill-only or live-only partition, so
+    pre-existing flat-form results stay bit-identical. The de-duplication
+    runs PER DAY QUERY, which is exactly the scope of the overlap (both
+    forms of one trade live in the same UTC day partition).
 
     DAY-BATCHED (audit finding: resource-exhaustion) -- the ~100-day
     registered window is never fetched in ONE ``fetchall()`` call: one
@@ -680,9 +705,10 @@ def load_node_trades(
                  WHEN lower(json_extract_string(payload_json,'$.direction')) = 'sell' THEN -1
                  ELSE 0
                END AS sign
-        FROM read_parquet({file}, hive_partitioning=1, union_by_name=1)
+        FROM {source}
         WHERE ts_exchange_ms IS NOT NULL
           AND ts_exchange_ms >= {start_ms} AND ts_exchange_ms < {end_ms}
+        {dedup}
         ORDER BY ts_exchange_ms
     """
     def _col_f64(col: Any) -> np.ndarray:
@@ -700,11 +726,18 @@ def load_node_trades(
     size_parts: list[np.ndarray] = []
     sign_parts: list[np.ndarray] = []
     n_days_used = 0
+    dedup = cross_form_dedup_qualify() if dedup_cross_form else ""
     con = duckdb.connect()
     try:
         for d in present_dates:
             file_expr = "'" + date_globs[d].replace("'", "''") + "'"
-            sql = sql_tmpl.format(file=file_expr, start_ms=start_ms, end_ms=end_ms)
+            # One trade per row for BOTH payload forms; the flat branch is a
+            # literal pass-through of the parquet row.
+            trade_rows = trade_rows_sql(
+                f"read_parquet({file_expr}, hive_partitioning=1, union_by_name=1)"
+            )
+            sql = sql_tmpl.format(source=trade_rows, start_ms=start_ms,
+                                  end_ms=end_ms, dedup=dedup)
             cols = con.execute(sql).fetchnumpy()
             n = int(cols["ts_exchange_ms"].size)
             if n == 0:
