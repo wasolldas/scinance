@@ -861,3 +861,17 @@ Alle registrierten WEITER-Bedingungen sind erfüllt (4/5-Quorum mit rel. CE-Lüc
 ### Welle-5-Bilanz + Programm-Bilanz (nach GL-021)
 **Welle 5 ist abgeschlossen:** H-18 Auflösungs-Audit (GL-014) · **H-16 WEITER kapitalfrei** (GL-015) · H-17 VERDIKT AUSSTEHEND (GL-019, Non-Redundanz-Gate strukturell nicht auswertbar) · H-14 METHODISCH INVALIDE (GL-020, Positivkontrolle gescheitert) · **H-15 WEITER kapitalfrei** (GL-021). Zwei von fünf GPU-Hypothesen mit vollem WEITER — beide messen unabhängig voneinander dieselbe Grundaussage: der Orderflow trägt nichtlineare, zeitgerichtete, längerreichweitige Struktur, die lineare bzw. Kurzgedächtnis-Modelle nicht sehen.
 Gesamt: Welle 1–3: 2 kapitalfreie Mess-WEITER (H-04, H-05b), beide Tradability-PARK. Welle 4: H-09/H-10/H-12 DROP, H-11/H-13 gesperrt. Welle 5: s.o. **21 GL-Einträge, 0 Torpfosten-Verschiebungen, 0 handelbare Kanten** (alle vier Mess-WEITER sind kapitalfrei; keine Tradability-Hypothese wurde durch sie impliziert).
+
+> **Nachtrag 2026-08-10 zu GL-018 (append-only, Loader-Bug-Transparenz — Originaltext GL-018 oben UNVERÄNDERT, Verdikt UNVERÄNDERT und GESTÄRKT):** Der ursprüngliche H-12-Lauf (2026-07-26) las die **Envelope-Payload-Form nicht** (Live-Trades verschachtelt in `data[…]`, siehe DATASET.md §6). Für Deribit beginnt diese Form ~2026-06-16; die Deribit-Serie war ab dann leer, wodurch 19 von 50 W2-Tagen die Minuten-Abdeckung (1380/1440 je Serie) rissen und **W2 formal invalide** wurde (31 < 35 gültige Tage). Der Loader-Fix (Commit `4f28cda`, `payload_sql.trade_rows_sql`; reales Deribit-Live-Payload als Regressionstest gepinnt, Commit `5456ff1`) wurde am 2026-08-10 mit einem vollständigen c12-Re-Lauf gegengeprüft (`state/h12_20260810_envelope_rerun/`).
+>
+> **Materielle Bewertung — das Verdikt ändert sich nicht, es wird STÄRKER:**
+>
+> | | GL-018-Basis (2026-07-26) | Nach Envelope-Fix (2026-08-10) |
+> |---|---|---|
+> | W1 gültige Tage | 47/50 (valide) | 47/50 (valide) — **unverändert** |
+> | W2 gültige Tage | 31/50 (**invalide**) | **38/50 (valide)** |
+> | Kriterium (b) W1 | 0,1695 < 0,40 ✗ | **0,1695 < 0,40 ✗ (identisch)** |
+> | Kriterium (b) W2 | 0,1698 < 0,40 ✗ | 0,1687 < 0,40 ✗ |
+> | `all_criteria_met` | False / False | **False / False** |
+>
+> W1 ist reines Backfill-Fenster und vom Fix **arithmetisch unberührt** (alle drei Kriterienwerte identisch bis zur 4. Nachkommastelle) — das urteilstragende Fenster von GL-018 steht unverändert. Neu ist, dass **W2 jetzt formal valide ist und ebenfalls an Kriterium (b) scheitert**: Der Median-IPR(v2) liegt mit 0,169 in BEIDEN Fenstern praktisch am theoretischen Minimum 1/6 ≈ 0,167 eines vollständig delokalisierten Eigenvektors. Die registrierte Fragmentierungs-These (auf EINER Börse lokalisierter zweiter Faktor) ist damit nicht mehr nur in einem, sondern in **beiden** Fenstern widerlegt. **DROP bleibt, auf breiterer Basis.** Der begleitende Messbefund aus GL-018 (robuster zweiter Faktor, 89 %/66 % signifikante Tage, Deribit-Maxlast 95 %) bestätigt sich ebenfalls. Registry-Disziplin §8 (append-only) gewahrt: kein Verdikt rückwirkend geändert; siehe DEC-29.
