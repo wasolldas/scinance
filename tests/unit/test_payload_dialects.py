@@ -300,8 +300,14 @@ def _deribit_envelope(trades: list[tuple[int, str, float, float, str]], *,
                       instrument: str = "BTC-PERPETUAL") -> str:
     """Deribit live envelope -- plain ``$.data[]`` or JSON-RPC ``$.params.data[]``.
 
-    The Deribit live shape is NOT verified against a stored file, so the
-    reader supports both plausible forms; both are pinned here.
+    The PLAIN form is VERIFIED against a real stored file (harvester
+    partition deribit/BTC-PERPETUAL/date=2026-06-30, sampled 2026-08-08):
+    ``{"channel":"trades.BTC-PERPETUAL.100ms","data":[{"timestamp":...,
+    "price":...,"amount":...,"direction":"buy","trade_id":"..."}, ...]}``
+    -- see ``test_c12_real_deribit_live_payload_verbatim`` which pins that
+    exact byte shape. The JSON-RPC variant has NOT been observed in stored
+    data; it is kept as a defensive path (Deribit documents it for
+    subscription notifications) and pinned here so it cannot rot.
     ``trades`` = [(trade_ts_ms, direction, amount, price, trade_id), ...].
     """
     data = [
@@ -734,3 +740,40 @@ def test_empty_envelope_array_yields_no_trades(tmp_path: Path) -> None:
         assert con.execute(f"SELECT count(*) FROM {src}").fetchone()[0] == 0
     finally:
         con.close()
+
+
+def test_c12_real_deribit_live_payload_verbatim(tmp_path: Path) -> None:
+    """The EXACT stored Deribit live payload (harvester file, sampled
+    2026-08-08 from deribit/BTC-PERPETUAL/date=2026-06-30) must parse.
+
+    This is the shape that silently produced ZERO trades before the
+    envelope support and flipped 19/50 W2 days of the H-12 run to
+    panel_valid=False. Pinned verbatim (only the two trade timestamps are
+    moved into the test day, so the minute assignment is checkable) so a
+    future refactor cannot re-break the real-world format.
+    """
+    day = "2026-06-30"
+    midnight = int(datetime(2026, 6, 30, tzinfo=timezone.utc).timestamp() * 1000)
+    t_a, t_b = midnight + 30_000, midnight + 90_000  # minute 0 and minute 1
+    payload = (
+        '{"channel":"trades.BTC-PERPETUAL.100ms","data":['
+        '{"timestamp":' + str(t_a) + ',"price":60156.5,"amount":745630.0,'
+        '"direction":"buy","index_price":60141.59,'
+        '"instrument_name":"BTC-PERPETUAL","trade_seq":293343065,'
+        '"mark_price":60152.38,"tick_direction":0,"contracts":74563.0,'
+        '"trade_id":"436180169"},'
+        '{"timestamp":' + str(t_b) + ',"price":60164.5,"amount":21910.0,'
+        '"direction":"buy","index_price":60141.59,'
+        '"instrument_name":"BTC-PERPETUAL","trade_seq":293343099,'
+        '"mark_price":60152.38,"tick_direction":1,"contracts":2770.0,'
+        '"trade_id":"436180241"}]}'
+    )
+    _write_partition(tmp_path, "deribit", "BTC-PERPETUAL", day, [(t_a, payload)])
+
+    series = load_minute_last_price(tmp_path, "deribit", "BTC-PERPETUAL", [day])
+
+    assert np.isfinite(series).sum() == 2, "both nested trades must be read"
+    # per-trade timestamps -> two DIFFERENT minutes (the envelope packet
+    # timestamp would have collapsed both into minute 0)
+    assert series[0] == pytest.approx(60156.5)
+    assert series[1] == pytest.approx(60164.5)
