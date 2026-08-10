@@ -247,3 +247,11 @@ nicht nahegelegt), VQ-FLOW-LEX (konfundierte Null), TE/PE-Cluster-Neuauflagen
 - **`option_tickers`-Keepalive-Defekt** — offen seit Welle 1, blockiert den
   C-33-Vorlauf.
 - **Sunset-Review-Wecker** ~2026-09-11 (PROGRAM_FINAL_REPORT §8).
+
+---
+
+## KORREKTUR-NOTIZ 2026-08-10 (nachtraeglich angefuegt, Text oben unveraendert)
+
+Die in §1, §2.1 und §4 verwendete Formulierung **„nichtlineare, zeitgerichtete Struktur im Orderflow"** ist durch die eigenen Payload-Daten **nicht gedeckt** und hiermit korrigiert. Die vorregistrierte Volatility-Asymmetry-Ablation von H-16 zeigt: die unsigned-|Imbalance|-Variante, die keinerlei Flussrichtung sieht, reproduziert **85–106 %** des Zeitpfeil-Ueberschusses (BTC 85 %, ETH 89 %, SOL 86 %, XRP 93 %, BNB 106 %). Der Traeger der Zeit-Irreversibilitaet ist also ueberwiegend die **Asymmetrie des Aktivitaets-/Volatilitaets-Envelopes**, nicht die Richtung des Flows.
+
+Korrekt ist: „zeit-**asymmetrische** Struktur, ueberwiegend im Aktivitaets-Envelope". Das GL-015-Verdikt (WEITER, kapitalfrei) bleibt unberuehrt — das Gate lief auf der signed-AUC und war vollstaendig erfuellt; die Ablation war vorregistriert als nicht-urteilstragend. Ebenfalls unter Vorbehalt steht damit die in §2.1 behauptete **gemeinsame Aussage von H-15 und H-16**: ob beide dieselbe Struktur messen, ist eine offene, messbare Frage. Vollstaendige Darstellung: Nachtrag 2026-08-10 unter GL-015 in `gate_log.md` sowie DEC-30.

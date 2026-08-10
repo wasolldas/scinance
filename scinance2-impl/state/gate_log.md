@@ -875,3 +875,23 @@ Gesamt: Welle 1–3: 2 kapitalfreie Mess-WEITER (H-04, H-05b), beide Tradability
 > | `all_criteria_met` | False / False | **False / False** |
 >
 > W1 ist reines Backfill-Fenster und vom Fix **arithmetisch unberührt** (alle drei Kriterienwerte identisch bis zur 4. Nachkommastelle) — das urteilstragende Fenster von GL-018 steht unverändert. Neu ist, dass **W2 jetzt formal valide ist und ebenfalls an Kriterium (b) scheitert**: Der Median-IPR(v2) liegt mit 0,169 in BEIDEN Fenstern praktisch am theoretischen Minimum 1/6 ≈ 0,167 eines vollständig delokalisierten Eigenvektors. Die registrierte Fragmentierungs-These (auf EINER Börse lokalisierter zweiter Faktor) ist damit nicht mehr nur in einem, sondern in **beiden** Fenstern widerlegt. **DROP bleibt, auf breiterer Basis.** Der begleitende Messbefund aus GL-018 (robuster zweiter Faktor, 89 %/66 % signifikante Tage, Deribit-Maxlast 95 %) bestätigt sich ebenfalls. Registry-Disziplin §8 (append-only) gewahrt: kein Verdikt rückwirkend geändert; siehe DEC-29.
+
+> **Nachtrag 2026-08-10 zu GL-015 (append-only, KORREKTUR EINER FEHLLESUNG DES ORCHESTRATORS — Originaltext GL-015 oben UNVERÄNDERT, Verdikt UNVERÄNDERT):** Die Welle-6-Recherche (Lane B) hat eine Fehlinterpretation in der GL-015-Adjudikation aufgedeckt, die der Orchestrator hiermit korrigiert. Der Originaltext schreibt: *„Ablations-Diagnostik (3 je Symbol, z.B. BTC 0,695–0,701) zeigt, dass der Effekt nicht an einer Einzelkomponente der Repräsentation hängt."* **Diese Lesart ist falsch.** Die Registry definiert die Ablation nicht als Robustheitsprobe, sondern als vorregistrierten Diskriminator zwischen zwei konkurrierenden Erklärungen: *„(b) Volatility-Asymmetry-Ablation — Wiederholung auf |Imbalance| (unsigned) zur **Trennung von Leverage-Effekt- vs. Flow-Richtungs-Asymmetrie** (nicht-urteilstragend, aber Pflicht-Report)."*
+>
+> **Die Messwerte, im Überschuss über die exakte Bayes-Null 0,5 (vom Orchestrator aus `state/c16_arrow_results.json` nachgerechnet):**
+>
+> | Symbol | signed AUC−0,5 | unsigned AUC−0,5 | unsigned/signed |
+> |---|---:|---:|---:|
+> | BTCUSDT | 0,2331 | 0,1982 | **85 %** |
+> | ETHUSDT | 0,2353 | 0,2095 | **89 %** |
+> | SOLUSDT | 0,1648 | 0,1417 | **86 %** |
+> | XRPUSDT | 0,1416 | 0,1324 | **93 %** |
+> | BNBUSDT | 0,0929 | 0,0987 | **106 %** |
+>
+> `unsigned=True` wendet `abs()` auf die Roh-Tagesserie an, BEVOR das Skalogramm gebildet wird (`c16_arrow/driver.py`) — der Klassifikator sieht dann ausschließlich den Betrags-/Aktivitäts-Envelope und **keinerlei Flussrichtung**. Er erreicht damit 85–106 % des gemessenen Zeitpfeil-Überschusses.
+>
+> **Korrigierte Lesart:** Die Zeit-Irreversibilität ist real und bleibt nachgewiesen — aber ihr Träger ist **überwiegend die Asymmetrie des Aktivitäts-/Volatilitäts-Envelopes** (schneller Anstieg, langsamer Abfall — ein etablierter Stilisierter Fakt, verwandt mit dem Leverage-Effekt), **nicht die Richtung des Order-Flows**. Das Vorzeichen trägt höchstens ~15 % des Effekts, bei BNB gar nichts. Die vorregistrierte Kontrolle hat exakt das geleistet, wofür sie gebaut wurde; der Fehler lag allein in ihrer Auslegung durch den Orchestrator.
+>
+> **Was sich NICHT ändert:** Das Verdikt **WEITER (kapitalfrei)** steht unverändert. Das registrierte Gate lief ausschließlich auf der signed-AUC (4/5 Symbole ≥0,60, Surrogat-p95 <0,53, BH-FDR, Leak-Kontrolle ≤0,52) und war in allen Punkten erfüllt; die Ablation war vorregistriert als **nicht-urteilstragend**. Registry-Disziplin §8 (append-only) gewahrt: kein Verdikt rückwirkend geändert, kein Torpfosten verschoben.
+>
+> **Was sich ändert — Auflagen für Folgearbeit:** (1) Die Programm-Formulierung „der Orderflow trägt nichtlineare, **zeitgerichtete** Struktur" ist in dieser Schärfe von den eigenen Payloads **nicht gedeckt** und darf so nicht weiterverwendet werden; korrekt ist „zeit-**asymmetrische** Struktur, überwiegend im Aktivitäts-Envelope". Das betrifft auch `WELLE5_FINAL_REPORT.md` §2.1 und §4, die diese Formulierung tragen (dort per Korrektur-Notiz vermerkt). (2) Jede Hypothese, die auf H-16 aufbaut, MUSS diesen Vorbehalt zitieren — analog zur GL-014-Zitierpflicht für die „auflösungsbedingt fragilen" ETH→BTC-Zellen. (3) Eine Richtungs-/Tradability-Brücke, die implizit annimmt, H-16 belege gerichtete Information, ist damit a priori entwertet. Siehe DEC-30.
