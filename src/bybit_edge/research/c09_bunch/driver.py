@@ -43,6 +43,7 @@ from bybit_edge.research.c01_ofi_sign.oos import (  # noqa: F401
     DataError,
     load_harvest_window,
 )
+from bybit_edge.research.payload_sql import cross_form_dedup_qualify, trade_rows_sql
 
 from .estimator import aggregate_orders, estimate_cell
 from .kinks import (
@@ -175,6 +176,7 @@ def load_window_orders(
     kink: float,
     exchange: str = "bybit",
     stream: str = "publicTrade",
+    dedup_cross_form: bool = True,
 ) -> WindowOrders:
     """Load one full pre-registered window as DuckDB-aggregated taker orders.
 
@@ -191,6 +193,28 @@ def load_window_orders(
     (audit_h09.md Bug 9). Only notionals inside the retention band around
     ``kink`` are returned (everything the estimator touches, see
     ``_RETAIN_*``); full-window counts are carried as metadata.
+
+    BOTH harvester payload forms are read (``payload_sql.trade_rows_sql``):
+    the FLAT backfill row is passed through byte-for-byte, and the multi-trade
+    LIVE ENVELOPE (``$.data[*]`` / JSON-RPC ``$.params.data[*]``) is expanded
+    to one row per trade on the PER-TRADE timestamp (``$.T``/``$.timestamp``).
+    The envelope element carries exactly the live keys the extraction below
+    already knows (``S``/``p``/``v``), so no extraction expression changes.
+    The per-trade timestamp is decisive TWICE here: it is the ORDER grouping
+    key (``GROUP BY ts_exchange_ms, side``), so the packet ``ts`` would merge
+    every fill of one WS message into a single phantom order.
+
+    DE-DUPLICATION IS REQUIRED HERE and is on by default: the registered
+    observation unit is an ORDER notional ``SUM(price*size)`` over a
+    (ts, side) group plus a fill COUNT — a trade delivered in BOTH forms on a
+    mixed backfill+live day (DATASET.md §9 caveat 4) would double that
+    order's notional and shift it across the tier-kink bands, unlike the
+    last-price-per-bar loaders (c12/c14) where a duplicate is inert.
+    ``dedup_cross_form`` drops an envelope trade whose exchange trade id also
+    appears in a flat row of the same scan (see
+    ``payload_sql.cross_form_dedup_qualify``); it is a provable no-op on a
+    backfill-only or live-only window, so the flat-form results the
+    registered H-09 verdicts rest on stay bit-identical.
 
     Read-only: never writes into the harvester tree (Schutzgut-Prinzip).
     """
@@ -215,6 +239,12 @@ def load_window_orders(
     start_ms = _utc_midnight_ms(start_date)
     end_ms = _utc_midnight_ms(end_date) + 86_400_000  # end date inclusive
     file_list = "[" + ", ".join("'" + g.replace("'", "''") + "'" for g in present) + "]"
+    # One trade per row for BOTH payload forms; the flat branch is a literal
+    # pass-through of the parquet row (bit-identity of the registered runs).
+    trade_rows = trade_rows_sql(
+        f"read_parquet({file_list}, hive_partitioning=1, union_by_name=1)"
+    )
+    dedup = cross_form_dedup_qualify() if dedup_cross_form else ""
     # NOTE: the side predicate is parenthesised (the bestand loader's
     # ``A AND B OR C`` precedence bug is NOT inherited here) and BOTH window
     # bounds are in the WHERE clause.
@@ -230,11 +260,12 @@ def load_window_orders(
                                      json_extract_string(payload_json, '$.p')) AS DOUBLE) AS price,
                    TRY_CAST(COALESCE(json_extract_string(payload_json, '$.size'),
                                      json_extract_string(payload_json, '$.v')) AS DOUBLE) AS size
-            FROM read_parquet({file_list}, hive_partitioning=1, union_by_name=1)
+            FROM {trade_rows}
             WHERE ts_exchange_ms IS NOT NULL
               AND ts_exchange_ms >= {start_ms} AND ts_exchange_ms < {end_ms}
               AND (json_extract_string(payload_json, '$.side') IS NOT NULL
                    OR json_extract_string(payload_json, '$.S') IS NOT NULL)
+            {dedup}
         )
         WHERE price IS NOT NULL AND size IS NOT NULL
         GROUP BY ts_exchange_ms, side

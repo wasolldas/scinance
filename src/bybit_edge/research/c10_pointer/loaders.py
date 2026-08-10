@@ -50,6 +50,8 @@ from pathlib import Path
 
 import numpy as np
 
+from bybit_edge.research.payload_sql import trade_rows_sql
+
 _DATE_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 _SYMBOL_RE = re.compile(r"^[A-Za-z0-9_\-]+$")
 
@@ -111,16 +113,24 @@ def daily_grid(start_date: str, end_date: str) -> list[str]:
     return [(d0 + timedelta(days=i)).isoformat() for i in range(n)]
 
 
+def _present_globs_by_day(base: Path, exchange: str, stream: str, symbol: str,
+                          days: list[str]) -> list[tuple[str, str]]:
+    """``(day, glob)`` pairs for the EXISTING per-date parquet partitions."""
+    if not _SYMBOL_RE.match(symbol):
+        raise DataError(f"invalid symbol: {symbol!r}")
+    out: list[tuple[str, str]] = []
+    for d in days:
+        g = str(base / "raw" / exchange / stream / f"symbol={symbol}"
+                / f"date={d}" / "*.parquet")
+        if list(Path(g).parent.glob("*.parquet")):
+            out.append((d, g))
+    return out
+
+
 def _present_globs(base: Path, exchange: str, stream: str, symbol: str,
                    days: list[str]) -> list[str]:
     """Existing per-date parquet globs for one (exchange, stream, symbol)."""
-    if not _SYMBOL_RE.match(symbol):
-        raise DataError(f"invalid symbol: {symbol!r}")
-    globs = [
-        str(base / "raw" / exchange / stream / f"symbol={symbol}" / f"date={d}" / "*.parquet")
-        for d in days
-    ]
-    return [g for g in globs if list(Path(g).parent.glob("*.parquet"))]
+    return [g for _, g in _present_globs_by_day(base, exchange, stream, symbol, days)]
 
 
 def _file_list_sql(globs: list[str]) -> str:
@@ -197,56 +207,83 @@ def load_daily_rv(base_dir: Path | str, exchange: str, symbol: str,
     1-min bars (see ``RV_MIN_BARS_PER_DAY`` — documented, unregistered
     robustness floor) or the within-day return sum is zero/non-finite
     (log undefined).
+
+    BOTH harvester payload forms are read (``payload_sql.trade_rows_sql``):
+    the FLAT backfill row is passed through byte-for-byte, and the multi-trade
+    LIVE ENVELOPE (``$.data[*]`` / JSON-RPC ``$.params.data[*]``) is expanded
+    to one row per trade on the PER-TRADE timestamp (``$.T``/``$.timestamp``)
+    — the packet ``ts`` would collapse a whole WS message into one minute
+    bucket. Reading top-level keys only was what made bybit deliver 0 parsable
+    trades from 2026-07-17 and deribit from ~2026-06-16.
+
+    NO de-duplication is applied, and none is needed: the day series is built
+    from 1-MINUTE LAST-PRICE BARS (``max_by(px, ts)``), so a trade delivered
+    in BOTH forms on a mixed backfill+live day (DATASET.md §9 caveat 4)
+    carries the SAME price at the SAME timestamp and leaves the bar — and
+    hence every squared log-return — unchanged. Counts/sums over trades,
+    which a duplicate WOULD corrupt, are never formed here (same reasoning as
+    ``c12_frag.panel.load_minute_last_price`` / ``c14_panellag.panel``).
+
+    The day grouping is the HIVE PARTITION day, exactly as before: the query
+    runs PER DATE PARTITION (``trade_rows_sql`` exposes only the per-trade
+    ``ts_exchange_ms``/``payload_json``, not the hive ``date`` column), and a
+    per-partition query is by construction identical to the previous single
+    query's ``GROUP BY "date"`` — each row contributed to exactly the day of
+    the partition it was read from.
     """
     import duckdb
 
     base = Path(base_dir)
-    present = _present_globs(base, exchange, stream, symbol, days)
+    present = _present_globs_by_day(base, exchange, stream, symbol, days)
     if not present:
         raise DataError(
             f"no parquet for {exchange}/{stream}/{symbol} in {days[0]}..{days[-1]} under {base}"
         )
-    # 1-min last-price bars per (day, minute bucket), then within-day squared
-    # log-return sum. lag() is partitioned by day => strictly intraday returns.
-    sql = f"""
+    # 1-min last-price bars per minute bucket of ONE date partition, then the
+    # within-day squared log-return sum (returns never cross a partition, so
+    # this is exactly the previous PARTITION BY day semantics).
+    sql_tmpl = """
         WITH bars AS (
-            SELECT day, minute_idx, max_by(px, ts) AS px
+            SELECT minute_idx, max_by(px, ts) AS px
             FROM (
-                SELECT "date" AS day,
-                       ts_exchange_ms AS ts,
-                       CAST(ts_exchange_ms // {_MS_PER_MINUTE} AS BIGINT) AS minute_idx,
+                SELECT ts_exchange_ms AS ts,
+                       CAST(ts_exchange_ms // {ms_per_minute} AS BIGINT) AS minute_idx,
                        CAST(COALESCE(json_extract_string(payload_json,'$.price'),
                                      json_extract_string(payload_json,'$.p')) AS DOUBLE) AS px
-                FROM read_parquet({_file_list_sql(present)}, hive_partitioning=1, union_by_name=1)
+                FROM {source}
             )
             WHERE px IS NOT NULL AND isfinite(px) AND px > 0 AND ts IS NOT NULL
-            GROUP BY day, minute_idx
+            GROUP BY minute_idx
         ),
         rets AS (
-            SELECT day,
-                   ln(px) - lag(ln(px)) OVER (PARTITION BY day ORDER BY minute_idx) AS r
+            SELECT ln(px) - lag(ln(px)) OVER (ORDER BY minute_idx) AS r
             FROM bars
         )
-        SELECT day,
-               sum(r * r) AS ssq,
+        SELECT sum(r * r) AS ssq,
                count(r) AS n_rets
         FROM rets
         WHERE r IS NOT NULL AND isfinite(r)
-        GROUP BY day
     """
-    con = duckdb.connect()
-    try:
-        rows = con.execute(sql).fetchall()
-    finally:
-        con.close()
     by_day: dict[str, float] = {}
     min_rets = max(1, int(min_bars_per_day) - 1)  # n bars -> n-1 intraday returns
-    for day, ssq, n_rets in rows:
-        if ssq is None or n_rets is None or int(n_rets) < min_rets:
-            continue
-        ssq = float(ssq)
-        if ssq > 0.0 and math.isfinite(ssq):
-            by_day[str(day)] = math.log(ssq)
+    con = duckdb.connect()
+    try:
+        for day, glob in present:
+            trade_rows = trade_rows_sql(
+                f"read_parquet({_file_list_sql([glob])}, hive_partitioning=1, union_by_name=1)"
+            )
+            sql = sql_tmpl.format(source=trade_rows, ms_per_minute=_MS_PER_MINUTE)
+            row = con.execute(sql).fetchone()
+            if row is None:
+                continue
+            ssq, n_rets = row
+            if ssq is None or n_rets is None or int(n_rets) < min_rets:
+                continue
+            ssq = float(ssq)
+            if ssq > 0.0 and math.isfinite(ssq):
+                by_day[str(day)] = math.log(ssq)
+    finally:
+        con.close()
     return _align(by_day, days)
 
 

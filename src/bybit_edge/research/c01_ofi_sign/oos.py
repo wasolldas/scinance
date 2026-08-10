@@ -33,6 +33,8 @@ from typing import Any
 
 import numpy as np
 
+from bybit_edge.research.payload_sql import cross_form_dedup_qualify, trade_rows_sql
+
 from .driver import TradeArrays, WindowSymbolResult, _build_variants
 from .ofi import DEFAULT_GRID_MS, DEFAULT_LAGS_S
 from .sign_test import (
@@ -101,6 +103,7 @@ def load_harvest_window(
     spill_days: int = 1,
     exchange: str = "bybit",
     stream: str = "publicTrade",
+    dedup_cross_form: bool = True,
 ) -> TradeArrays:
     """Load the first ``max_ticks`` ticks at/after ``start_date`` 00:00 UTC.
 
@@ -110,6 +113,29 @@ def load_harvest_window(
     ``ts_exchange_ms`` is taken from the dedicated column. Side is normalised to
     exactly ``"Buy"``/``"Sell"`` (the OFI estimator treats anything != ``"Buy"``
     as a sell, so buy-variants MUST map to ``"Buy"``).
+
+    BOTH harvester payload forms are read (``payload_sql.trade_rows_sql``):
+    the FLAT backfill row is passed through byte-for-byte, and the multi-trade
+    LIVE ENVELOPE (``$.data[*]`` / JSON-RPC ``$.params.data[*]``) is expanded
+    to one row per trade on the PER-TRADE timestamp (``$.T``/``$.timestamp``).
+    The envelope element carries exactly the live keys this SQL already knows
+    (``S``/``p``/``v``), so no extraction expression changes. Using the
+    envelope packet ``ts`` instead would give every trade of one WS message
+    the same millisecond and corrupt the OFI grid buckets. Reading top-level
+    keys only was what made bybit deliver 0 parsable ticks from 2026-07-17
+    onwards.
+
+    DE-DUPLICATION IS REQUIRED HERE and is on by default: the OFI estimator
+    SUMS signed sizes per grid bucket (and the ``max_ticks`` cap is a per-tick
+    budget), so a trade delivered in BOTH forms on a mixed backfill+live day
+    (DATASET.md §9 caveat 4) would be counted twice — unlike the
+    last-price-per-bar loaders (c12/c14), where a duplicate is inert.
+    ``dedup_cross_form`` drops an envelope trade whose exchange trade id also
+    appears in a flat row of the same scan (see
+    ``payload_sql.cross_form_dedup_qualify``); it is a provable no-op on a
+    backfill-only or live-only window, so the pre-existing flat-form results
+    the registered H-05b verdicts rest on stay bit-identical. Set it to False
+    only to reproduce a raw un-deduplicated read.
 
     Read-only: never writes into the harvester tree (Schutzgut-Prinzip).
     """
@@ -130,6 +156,12 @@ def load_harvest_window(
         )
     start_ms = _midnight_ms(start_date)
     file_list = "[" + ", ".join("'" + g.replace("'", "''") + "'" for g in present) + "]"
+    # One trade per row for BOTH payload forms; the flat branch is a literal
+    # pass-through of the parquet row (bit-identity of the registered runs).
+    trade_rows = trade_rows_sql(
+        f"read_parquet({file_list}, hive_partitioning=1, union_by_name=1)"
+    )
+    dedup = cross_form_dedup_qualify() if dedup_cross_form else ""
     sql = f"""
         SELECT ts_exchange_ms AS ts,
                CASE
@@ -144,10 +176,11 @@ def load_harvest_window(
                              json_extract_string(payload_json,'$.p')) AS DOUBLE) AS price,
                CAST(COALESCE(json_extract_string(payload_json,'$.size'),
                              json_extract_string(payload_json,'$.v')) AS DOUBLE) AS volume
-        FROM read_parquet({file_list}, hive_partitioning=1, union_by_name=1)
+        FROM {trade_rows}
         WHERE ts_exchange_ms IS NOT NULL AND ts_exchange_ms >= {start_ms}
           AND (json_extract_string(payload_json,'$.side') IS NOT NULL
                OR json_extract_string(payload_json,'$.S') IS NOT NULL)
+        {dedup}
         ORDER BY ts_exchange_ms
         LIMIT {int(max_ticks)}
     """

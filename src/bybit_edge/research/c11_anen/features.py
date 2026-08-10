@@ -35,6 +35,8 @@ from pathlib import Path
 
 import numpy as np
 
+from bybit_edge.research.payload_sql import trade_rows_sql
+
 #: Annualisation basis for daily realised vol (crypto trades 365 days/year).
 ANNUALISATION_DAYS = 365
 
@@ -115,6 +117,24 @@ def load_daily_rv(
     tick returns are deliberately NOT used: bid-ask bounce inflates tick RV,
     and the registered quantity is the 1-min-return RV. Days with < 2 minute
     bars are omitted (NaN downstream). Read-only.
+
+    BOTH harvester payload forms are read (``payload_sql.trade_rows_sql``):
+    the FLAT backfill row is passed through byte-for-byte, and the multi-trade
+    LIVE ENVELOPE (``$.data[*]`` / JSON-RPC ``$.params.data[*]``) is expanded
+    to one row per trade on the PER-TRADE timestamp (``$.T``/``$.timestamp``)
+    — the envelope packet ``ts`` would collapse a whole WS message into one
+    minute bucket. Reading top-level keys only was what made bybit deliver 0
+    parsable trades from 2026-07-17 onwards. The hive ``date`` partition
+    filter is applied to the parquet scan BEFORE the expansion (the expanded
+    source exposes only per-trade ``ts_exchange_ms``/``payload_json``), so the
+    date window is unchanged.
+
+    NO de-duplication is applied, and none is needed: the RV is built from
+    1-MINUTE LAST-PRICE BARS (``max_by(price, ts)``), so a trade delivered in
+    BOTH forms on a mixed backfill+live day (DATASET.md §9 caveat 4) carries
+    the SAME price at the SAME timestamp and leaves the bar — and therefore
+    every 1-min log-return — unchanged. No trade counts or size sums are
+    formed here (same reasoning as ``c12_frag.panel.load_minute_last_price``).
     """
     import duckdb
 
@@ -124,6 +144,10 @@ def load_daily_rv(
     glob = _glob_for(base, exchange, stream, symbol)
     if not list((base / "raw" / exchange / stream / f"symbol={symbol}").glob("date=*")):
         raise DataError(f"no partitions for {exchange}/{stream}/{symbol} under {base}")
+    trade_rows = trade_rows_sql(
+        f"""(SELECT * FROM read_parquet('{glob}', hive_partitioning=1, union_by_name=1)
+             WHERE date >= '{start_date}' AND date <= '{end_date}') AS src"""
+    )
     sql = f"""
         WITH bars AS (
             SELECT CAST(ts_exchange_ms // {MS_PER_MINUTE} AS BIGINT) AS minute_idx,
@@ -131,9 +155,8 @@ def load_daily_rv(
                      CAST(COALESCE(json_extract_string(payload_json,'$.price'),
                                    json_extract_string(payload_json,'$.p')) AS DOUBLE),
                      ts_exchange_ms) AS px
-            FROM read_parquet('{glob}', hive_partitioning=1, union_by_name=1)
+            FROM {trade_rows}
             WHERE ts_exchange_ms IS NOT NULL
-              AND date >= '{start_date}' AND date <= '{end_date}'
               AND COALESCE(json_extract_string(payload_json,'$.price'),
                            json_extract_string(payload_json,'$.p')) IS NOT NULL
             GROUP BY 1

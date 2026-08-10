@@ -30,6 +30,8 @@ from typing import Any
 import numpy as np
 from scipy.stats import genpareto
 
+from bybit_edge.research.payload_sql import trade_rows_sql
+
 #: Pre-registered POT threshold quantile (registry H-13, fixed).
 POT_QUANTILE = 0.995
 #: Block length for the block bootstrap: 60 one-minute returns = 60 min.
@@ -120,6 +122,25 @@ def load_returns_window(
     1-min last-price series and its log-returns. Missing dates are tolerated
     down to ``min_days`` present dates; below that a :class:`DataError` is
     raised. Returns ``(returns, meta)``.
+
+    BOTH harvester payload forms are read (``payload_sql.trade_rows_sql``):
+    the FLAT backfill row is passed through byte-for-byte, and the multi-trade
+    LIVE ENVELOPE (``$.data[*]`` / JSON-RPC ``$.params.data[*]``) is expanded
+    to one row per trade on the PER-TRADE timestamp (``$.T``/``$.timestamp``).
+    The per-trade timestamp is decisive: with the envelope packet ``ts`` every
+    trade of one WS message would fall into the same minute bin and the 1-min
+    bar series would be wrong. Reading top-level keys only was what made bybit
+    deliver 0 parsable trades from 2026-07-17 onwards.
+
+    NO de-duplication is applied, and none is needed: the tick series is
+    immediately reduced to the LAST price per UTC minute
+    (:func:`one_min_log_returns`), so a trade delivered in BOTH forms on a
+    mixed backfill+live day (DATASET.md §9 caveat 4) carries the SAME price at
+    the SAME timestamp and cannot change any minute bar, hence no 1-min
+    log-return and no tail statistic. This loader counts nothing and sums no
+    sizes — the two things a cross-form duplicate WOULD corrupt (which is why
+    c01/c09/c15/c16/c17 do de-duplicate, while c12/c14 and this loader do
+    not).
     """
     import duckdb
 
@@ -140,11 +161,16 @@ def load_returns_window(
             f"{n_days} dates present (< min_days={min_days}) under {base}"
         )
     file_list = "[" + ", ".join("'" + g.replace("'", "''") + "'" for g in globs) + "]"
+    # One trade per row for BOTH payload forms; the flat branch is a literal
+    # pass-through of the parquet row (bit-identity of the registered runs).
+    trade_rows = trade_rows_sql(
+        f"read_parquet({file_list}, hive_partitioning=1, union_by_name=1)"
+    )
     sql = f"""
         SELECT ts_exchange_ms AS ts,
                CAST(COALESCE(json_extract_string(payload_json,'$.price'),
                              json_extract_string(payload_json,'$.p')) AS DOUBLE) AS price
-        FROM read_parquet({file_list}, hive_partitioning=1, union_by_name=1)
+        FROM {trade_rows}
         WHERE ts_exchange_ms IS NOT NULL
         ORDER BY ts_exchange_ms
     """

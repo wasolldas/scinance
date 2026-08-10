@@ -777,3 +777,630 @@ def test_c12_real_deribit_live_payload_verbatim(tmp_path: Path) -> None:
     # timestamp would have collapsed both into minute 0)
     assert series[0] == pytest.approx(60156.5)
     assert series[1] == pytest.approx(60164.5)
+
+
+# ===========================================================================
+# ENVELOPE form for the REMAINING five trade loaders
+# (c01 OOS ticks, c09 order notionals, c10 daily RV, c11 daily RV,
+#  c13 trailing 1-min returns)
+#
+# Same structure as the sections above, per loader:
+#   (a) flat-only == the pre-envelope behaviour (legacy SQL / closed-form
+#       expectation) -- the bit-identity the registered verdicts rest on
+#       (GL-007/010/011 for c01, GL-016/017 for c09+c10),
+#   (b) an envelope-only partition is read at all,
+#   (c) a MIXED partition (flat + envelope rows in one file) is correct,
+#   (d) the de-duplication DECISION is pinned: c01/c09 sum sizes/notionals
+#       and therefore de-duplicate; c10/c11/c13 aggregate to price bars,
+#       where a cross-form duplicate is inert and must stay a no-op.
+# ===========================================================================
+
+import math  # noqa: E402
+
+from bybit_edge.research.c01_ofi_sign.oos import (  # noqa: E402
+    DataError as C01DataError,
+    load_harvest_window,
+)
+from bybit_edge.research.c09_bunch.driver import load_window_orders  # noqa: E402
+from bybit_edge.research.c10_pointer.loaders import (  # noqa: E402
+    DataError as C10DataError,
+    load_daily_rv as load_daily_rv_c10,
+)
+from bybit_edge.research.c11_anen.features import (  # noqa: E402
+    load_daily_rv as load_daily_rv_c11,
+)
+
+DAY2 = "2031-01-02"
+DAY2_MS = DAY_MS + 86_400_000
+
+
+def _parquet_path(base: Path, exchange: str, symbol: str, day: str) -> str:
+    return (base / "raw" / exchange / "publicTrade" / f"symbol={symbol}"
+            / f"date={day}" / "data.parquet").as_posix()
+
+
+# ---------------------------------------------------------------------------
+# (d) c01 load_harvest_window -- OOS tick window (GL-007/GL-010/GL-011)
+# ---------------------------------------------------------------------------
+
+def _c01_legacy_rows(base: Path, symbol: str, day: str,
+                     max_ticks: int = 300_000) -> list[tuple]:
+    """The PRE-ENVELOPE c01 SQL verbatim, straight on the parquet scan.
+
+    Reference for the bit-identity regression: on a flat-only partition the
+    new ``trade_rows_sql`` read path must return exactly these rows.
+    """
+    import duckdb
+
+    f = _parquet_path(base, "bybit", symbol, day)
+    start_ms = int(datetime.strptime(day, "%Y-%m-%d")
+                   .replace(tzinfo=timezone.utc).timestamp() * 1000)
+    sql = f"""
+        SELECT ts_exchange_ms AS ts,
+               CASE
+                 WHEN lower(COALESCE(json_extract_string(payload_json,'$.side'),
+                                     json_extract_string(payload_json,'$.S'))) = 'buy'  THEN 'Buy'
+                 WHEN lower(COALESCE(json_extract_string(payload_json,'$.side'),
+                                     json_extract_string(payload_json,'$.S'))) = 'sell' THEN 'Sell'
+                 ELSE COALESCE(json_extract_string(payload_json,'$.side'),
+                               json_extract_string(payload_json,'$.S'))
+               END AS side,
+               CAST(COALESCE(json_extract_string(payload_json,'$.price'),
+                             json_extract_string(payload_json,'$.p')) AS DOUBLE) AS price,
+               CAST(COALESCE(json_extract_string(payload_json,'$.size'),
+                             json_extract_string(payload_json,'$.v')) AS DOUBLE) AS volume
+        FROM read_parquet('{f}', hive_partitioning=1, union_by_name=1)
+        WHERE ts_exchange_ms IS NOT NULL AND ts_exchange_ms >= {start_ms}
+          AND (json_extract_string(payload_json,'$.side') IS NOT NULL
+               OR json_extract_string(payload_json,'$.S') IS NOT NULL)
+        ORDER BY ts_exchange_ms
+        LIMIT {int(max_ticks)}
+    """
+    con = duckdb.connect()
+    try:
+        return con.execute(sql).fetchall()
+    finally:
+        con.close()
+
+
+def test_c01_harvest_window_flat_matches_legacy_sql(tmp_path: Path) -> None:
+    # BIT-IDENTITY regression: flat-only partition, new read path vs the
+    # verbatim pre-envelope SQL (the H-05b verdicts GL-007/010/011 rest on
+    # exactly these numbers).
+    base = tmp_path / "harvest"
+    _write_partition(base, "bybit", "BTCUSDT", DAY, [
+        (DAY_MS + 1_000, _bybit_payload(100.5, 0.10, "Buy")),
+        (DAY_MS + 2_000, _bybit_payload(100.6, 0.25, "Sell")),
+        (DAY_MS + 3_000, _bybit_payload(100.4, 1.50, "Buy")),
+        (DAY_MS + 4_000, json.dumps({"foo": 1})),          # no side -> filtered
+    ])
+    w = load_harvest_window(base, "BTCUSDT", DAY)
+    legacy = _c01_legacy_rows(base, "BTCUSDT", DAY)
+    assert w.ts.tolist() == [float(r[0]) for r in legacy]
+    assert list(w.side) == [r[1] for r in legacy]
+    assert w.price.tolist() == [r[2] for r in legacy]
+    assert w.volume.tolist() == [r[3] for r in legacy]
+    assert w.ts.size == 3
+
+
+def test_c01_harvest_window_envelope_uses_per_trade_timestamps(tmp_path: Path) -> None:
+    # ONE parquet row, three trades; packet ts far before them. Per-trade $.T
+    # must reach the OFI grid -- the packet ts would give all three the same
+    # millisecond.
+    base = tmp_path / "harvest"
+    _write_partition(base, "bybit", "BTCUSDT", DAY, [
+        (DAY_MS + 50, _bybit_envelope([
+            (DAY_MS + 1_000, "Buy", 0.10, 100.5, "e1"),
+            (DAY_MS + 2_000, "Sell", 0.25, 100.6, "e2"),
+            (DAY_MS + 3_000, "Buy", 1.50, 100.4, "e3"),
+        ], envelope_ts=DAY_MS + 50)),
+    ])
+    w = load_harvest_window(base, "BTCUSDT", DAY)
+    assert w.ts.tolist() == [DAY_MS + 1_000, DAY_MS + 2_000, DAY_MS + 3_000]
+    assert list(w.side) == ["Buy", "Sell", "Buy"]
+    assert w.price.tolist() == [100.5, 100.6, 100.4]
+    assert w.volume.tolist() == [0.10, 0.25, 1.50]
+
+
+def test_c01_harvest_window_mixed_forms(tmp_path: Path) -> None:
+    base = tmp_path / "harvest"
+    _write_partition(base, "bybit", "BTCUSDT", DAY, [
+        (DAY_MS + 1_000, _bybit_payload(100.5, 0.10, "Buy")),        # flat
+        (DAY_MS + 50, _bybit_envelope([
+            (DAY_MS + 2_000, "Sell", 0.25, 100.6, "e1"),
+            (DAY_MS + 4_000, "Buy", 1.50, 100.4, "e2"),
+        ], envelope_ts=DAY_MS + 50)),
+        (DAY_MS + 3_000, _bybit_payload(100.7, 0.75, "Sell")),       # flat
+    ])
+    w = load_harvest_window(base, "BTCUSDT", DAY)
+    assert w.ts.tolist() == [DAY_MS + 1_000, DAY_MS + 2_000,
+                             DAY_MS + 3_000, DAY_MS + 4_000]
+    assert list(w.side) == ["Buy", "Sell", "Sell", "Buy"]
+    assert w.volume.tolist() == [0.10, 0.25, 0.75, 1.50]
+
+
+def test_c01_harvest_window_cross_form_dedup(tmp_path: Path) -> None:
+    # The OFI estimator SUMS signed sizes, so the flat/envelope copy of the
+    # SAME trade 'X1' must be collapsed (dedup ON by default).
+    base = tmp_path / "harvest"
+    _write_partition(base, "bybit", "BTCUSDT", DAY, [
+        (DAY_MS + 1_000, _bybit_flat_with_id(100.0, 1.0, "Buy", "X1")),
+        (DAY_MS + 900, _bybit_envelope([
+            (DAY_MS + 1_000, "Buy", 1.0, 100.0, "X1"),    # SAME trade
+            (DAY_MS + 2_000, "Sell", 0.5, 100.1, "X2"),   # live-only trade
+        ], envelope_ts=DAY_MS + 900)),
+    ])
+    w = load_harvest_window(base, "BTCUSDT", DAY)
+    assert w.ts.tolist() == [DAY_MS + 1_000, DAY_MS + 2_000]
+    assert w.volume.tolist() == [1.0, 0.5]
+    raw = load_harvest_window(base, "BTCUSDT", DAY, dedup_cross_form=False)
+    assert raw.ts.size == 3   # duplicate survives without the dedup
+
+
+def test_c01_harvest_window_dedup_is_noop_on_flat_only(tmp_path: Path) -> None:
+    base = tmp_path / "harvest"
+    _write_partition(base, "bybit", "BTCUSDT", DAY, [
+        (DAY_MS + 1_000, _bybit_flat_with_id(100.5, 0.10, "Buy", "A1")),
+        (DAY_MS + 2_000, _bybit_flat_with_id(100.6, 0.25, "Sell", "A2")),
+        (DAY_MS + 3_000, _bybit_flat_with_id(100.4, 1.50, "Buy", "A3")),
+    ])
+    on = load_harvest_window(base, "BTCUSDT", DAY)
+    off = load_harvest_window(base, "BTCUSDT", DAY, dedup_cross_form=False)
+    assert np.array_equal(on.ts, off.ts)
+    assert np.array_equal(on.price, off.price)
+    assert np.array_equal(on.volume, off.volume)
+    assert list(on.side) == list(off.side)
+
+
+def test_c01_missing_files_error_unchanged(tmp_path: Path) -> None:
+    with pytest.raises(C01DataError, match="no parquet"):
+        load_harvest_window(tmp_path / "empty", "BTCUSDT", DAY)
+
+
+# ---------------------------------------------------------------------------
+# (e) c09 load_window_orders -- ORDER notionals (GL-016/GL-017)
+# ---------------------------------------------------------------------------
+
+#: kink for the fixtures below: retention band is
+#: [(0.20-0.005)*kink, (1.30+0.005)*kink] = [195, 1305] USDT.
+C09_KINK = 1_000.0
+
+
+def _c09_order_payload(price: float, size: float, side: str) -> str:
+    return _bybit_payload(price, size, side)
+
+
+def _c09_legacy_orders(base: Path, symbol: str, day: str) -> list[tuple]:
+    """The PRE-ENVELOPE c09 order aggregation verbatim (bit-identity ref)."""
+    import duckdb
+
+    f = _parquet_path(base, "bybit", symbol, day)
+    start_ms = int(datetime.strptime(day, "%Y-%m-%d")
+                   .replace(tzinfo=timezone.utc).timestamp() * 1000)
+    end_ms = start_ms + 86_400_000
+    sql = f"""
+        SELECT ts_exchange_ms AS ts,
+               SUM(price * size) AS notional,
+               COUNT(*) AS n_fills
+        FROM (
+            SELECT ts_exchange_ms,
+                   lower(COALESCE(json_extract_string(payload_json, '$.side'),
+                                  json_extract_string(payload_json, '$.S'))) AS side,
+                   TRY_CAST(COALESCE(json_extract_string(payload_json, '$.price'),
+                                     json_extract_string(payload_json, '$.p')) AS DOUBLE) AS price,
+                   TRY_CAST(COALESCE(json_extract_string(payload_json, '$.size'),
+                                     json_extract_string(payload_json, '$.v')) AS DOUBLE) AS size
+            FROM read_parquet('{f}', hive_partitioning=1, union_by_name=1)
+            WHERE ts_exchange_ms IS NOT NULL
+              AND ts_exchange_ms >= {start_ms} AND ts_exchange_ms < {end_ms}
+              AND (json_extract_string(payload_json, '$.side') IS NOT NULL
+                   OR json_extract_string(payload_json, '$.S') IS NOT NULL)
+        )
+        WHERE price IS NOT NULL AND size IS NOT NULL
+        GROUP BY ts_exchange_ms, side
+    """
+    con = duckdb.connect()
+    try:
+        return sorted(con.execute(sql).fetchall())
+    finally:
+        con.close()
+
+
+def test_c09_window_orders_flat_matches_legacy_sql(tmp_path: Path) -> None:
+    # BIT-IDENTITY regression on a flat-only window (H-09 GL-016/GL-017).
+    base = tmp_path / "harvest"
+    _write_partition(base, "bybit", "BTCUSDT", DAY, [
+        (DAY_MS + 1_000, _c09_order_payload(100.0, 5.0, "Buy")),    # 500
+        (DAY_MS + 1_000, _c09_order_payload(100.0, 3.0, "Buy")),    # same order
+        (DAY_MS + 2_000, _c09_order_payload(100.0, 9.0, "Sell")),   # 900
+    ])
+    wo = load_window_orders(base, "BTCUSDT", DAY, DAY, kink=C09_KINK)
+    legacy = _c09_legacy_orders(base, "BTCUSDT", DAY)
+    assert wo.n_records_raw == sum(int(r[2]) for r in legacy) == 3
+    assert wo.n_orders_total == len(legacy) == 2
+    assert sorted(wo.notionals.tolist()) == sorted(
+        float(r[1]) for r in legacy if 195.0 <= float(r[1]) <= 1305.0
+    ) == [800.0, 900.0]
+
+
+def test_c09_window_orders_envelope_groups_by_per_trade_timestamp(tmp_path: Path) -> None:
+    # Three envelope trades at three DIFFERENT $.T -> three orders. With the
+    # packet ts they would collapse into ONE phantom order of 2400 USDT.
+    base = tmp_path / "harvest"
+    _write_partition(base, "bybit", "BTCUSDT", DAY, [
+        (DAY_MS + 50, _bybit_envelope([
+            (DAY_MS + 1_000, "Buy", 5.0, 100.0, "e1"),
+            (DAY_MS + 2_000, "Buy", 8.0, 100.0, "e2"),
+            (DAY_MS + 3_000, "Sell", 11.0, 100.0, "e3"),
+        ], envelope_ts=DAY_MS + 50)),
+    ])
+    wo = load_window_orders(base, "BTCUSDT", DAY, DAY, kink=C09_KINK)
+    assert wo.n_records_raw == 3
+    assert wo.n_orders_total == 3
+    assert sorted(wo.notionals.tolist()) == [500.0, 800.0, 1100.0]
+
+
+def test_c09_window_orders_mixed_forms(tmp_path: Path) -> None:
+    base = tmp_path / "harvest"
+    _write_partition(base, "bybit", "BTCUSDT", DAY, [
+        (DAY_MS + 1_000, _c09_order_payload(100.0, 5.0, "Buy")),
+        (DAY_MS + 50, _bybit_envelope([
+            (DAY_MS + 1_000, "Buy", 3.0, 100.0, "e1"),   # SAME (ts, side) order
+            (DAY_MS + 2_000, "Sell", 9.0, 100.0, "e2"),
+        ], envelope_ts=DAY_MS + 50)),
+    ])
+    wo = load_window_orders(base, "BTCUSDT", DAY, DAY, kink=C09_KINK)
+    assert wo.n_records_raw == 3
+    assert wo.n_orders_total == 2
+    assert sorted(wo.notionals.tolist()) == [800.0, 900.0]
+
+
+def test_c09_window_orders_cross_form_dedup(tmp_path: Path) -> None:
+    # An order notional is a SUM over fills, so a trade stored in BOTH forms
+    # would double that order's notional -- dedup ON by default.
+    base = tmp_path / "harvest"
+    _write_partition(base, "bybit", "BTCUSDT", DAY, [
+        (DAY_MS + 1_000, _bybit_flat_with_id(100.0, 5.0, "Buy", "X1")),
+        (DAY_MS + 900, _bybit_envelope([
+            (DAY_MS + 1_000, "Buy", 5.0, 100.0, "X1"),    # SAME trade
+            (DAY_MS + 2_000, "Sell", 9.0, 100.0, "X2"),
+        ], envelope_ts=DAY_MS + 900)),
+    ])
+    wo = load_window_orders(base, "BTCUSDT", DAY, DAY, kink=C09_KINK)
+    assert wo.n_records_raw == 2
+    assert sorted(wo.notionals.tolist()) == [500.0, 900.0]
+    raw = load_window_orders(base, "BTCUSDT", DAY, DAY, kink=C09_KINK,
+                             dedup_cross_form=False)
+    assert raw.n_records_raw == 3
+    assert sorted(raw.notionals.tolist()) == [900.0, 1000.0]  # X1 counted twice
+
+
+def test_c09_window_orders_dedup_is_noop_on_flat_only(tmp_path: Path) -> None:
+    base = tmp_path / "harvest"
+    _write_partition(base, "bybit", "BTCUSDT", DAY, [
+        (DAY_MS + 1_000, _bybit_flat_with_id(100.0, 5.0, "Buy", "A1")),
+        (DAY_MS + 2_000, _bybit_flat_with_id(100.0, 9.0, "Sell", "A2")),
+        (DAY_MS + 3_000, _bybit_flat_with_id(100.0, 7.0, "Buy", "A3")),
+    ])
+    on = load_window_orders(base, "BTCUSDT", DAY, DAY, kink=C09_KINK)
+    off = load_window_orders(base, "BTCUSDT", DAY, DAY, kink=C09_KINK,
+                             dedup_cross_form=False)
+    assert sorted(on.notionals.tolist()) == sorted(off.notionals.tolist())
+    assert (on.n_records_raw, on.n_orders_total) == (off.n_records_raw,
+                                                     off.n_orders_total)
+
+
+# ---------------------------------------------------------------------------
+# (f) c10 load_daily_rv -- daily RV over 1-min bars (GL-016/GL-017)
+# ---------------------------------------------------------------------------
+
+#: Three 1-min bars (100 -> 101 -> 102) shared by the c10/c11 fixtures.
+_RV_PRICES = (100.0, 101.0, 102.0)
+_RV_R1 = math.log(_RV_PRICES[1] / _RV_PRICES[0])
+_RV_R2 = math.log(_RV_PRICES[2] / _RV_PRICES[1])
+_RV_SSQ = _RV_R1 * _RV_R1 + _RV_R2 * _RV_R2
+
+
+def _rv_flat_rows(day_ms: int, prices=_RV_PRICES) -> list[tuple[int, str]]:
+    """One flat trade in each of the first ``len(prices)`` minutes of a day."""
+    return [(day_ms + i * MINUTE_MS + 1_000, _bybit_payload(p, 0.1, "Buy"))
+            for i, p in enumerate(prices)]
+
+
+def test_c10_daily_rv_flat_only(tmp_path: Path) -> None:
+    base = tmp_path / "harvest"
+    _write_partition(base, "bybit", "BTCUSDT", DAY, _rv_flat_rows(DAY_MS))
+    out = load_daily_rv_c10(base, "bybit", "BTCUSDT", [DAY], min_bars_per_day=3)
+    assert out.shape == (1,)
+    assert out[0] == pytest.approx(math.log(_RV_SSQ))
+
+
+def test_c10_daily_rv_flat_two_days_matches_legacy_group_by_date(tmp_path: Path) -> None:
+    """Per-partition query == the previous single query's ``GROUP BY "date"``.
+
+    The day grouping used to come from the hive ``date`` column; the expanded
+    trade source no longer carries it, so the query now runs per date
+    partition. This pins that both give the same per-day RV AND that no
+    return crosses midnight (day 2 alone would otherwise leak into day 1).
+    """
+    import duckdb
+
+    base = tmp_path / "harvest"
+    _write_partition(base, "bybit", "BTCUSDT", DAY, _rv_flat_rows(DAY_MS))
+    _write_partition(base, "bybit", "BTCUSDT", DAY2,
+                     _rv_flat_rows(DAY2_MS, (200.0, 202.0, 204.0)))
+    files = [_parquet_path(base, "bybit", "BTCUSDT", d) for d in (DAY, DAY2)]
+    file_list = "[" + ", ".join(f"'{f}'" for f in files) + "]"
+    legacy_sql = f"""
+        WITH bars AS (
+            SELECT day, minute_idx, max_by(px, ts) AS px
+            FROM (
+                SELECT "date" AS day,
+                       ts_exchange_ms AS ts,
+                       CAST(ts_exchange_ms // 60000 AS BIGINT) AS minute_idx,
+                       CAST(COALESCE(json_extract_string(payload_json,'$.price'),
+                                     json_extract_string(payload_json,'$.p')) AS DOUBLE) AS px
+                FROM read_parquet({file_list}, hive_partitioning=1, union_by_name=1)
+            )
+            WHERE px IS NOT NULL AND isfinite(px) AND px > 0 AND ts IS NOT NULL
+            GROUP BY day, minute_idx
+        ),
+        rets AS (
+            SELECT day,
+                   ln(px) - lag(ln(px)) OVER (PARTITION BY day ORDER BY minute_idx) AS r
+            FROM bars
+        )
+        SELECT day, sum(r * r) AS ssq, count(r) AS n_rets
+        FROM rets
+        WHERE r IS NOT NULL AND isfinite(r)
+        GROUP BY day
+    """
+    con = duckdb.connect()
+    try:
+        legacy = {str(d): math.log(float(s)) for d, s, _ in con.execute(legacy_sql).fetchall()}
+    finally:
+        con.close()
+    out = load_daily_rv_c10(base, "bybit", "BTCUSDT", [DAY, DAY2], min_bars_per_day=3)
+    assert out[0] == pytest.approx(legacy[DAY])
+    assert out[1] == pytest.approx(legacy[DAY2])
+
+
+def test_c10_daily_rv_envelope_only(tmp_path: Path) -> None:
+    # All three trades in ONE envelope row with the packet ts in minute 0:
+    # the per-trade $.T must spread them over three minute bars, otherwise
+    # there is exactly one bar, no return, and the day would be NaN.
+    base = tmp_path / "harvest"
+    _write_partition(base, "bybit", "BTCUSDT", DAY, [
+        (DAY_MS + 50, _bybit_envelope([
+            (DAY_MS + i * MINUTE_MS + 1_000, "Buy", 0.1, p, f"e{i}")
+            for i, p in enumerate(_RV_PRICES)
+        ], envelope_ts=DAY_MS + 50)),
+    ])
+    out = load_daily_rv_c10(base, "bybit", "BTCUSDT", [DAY], min_bars_per_day=3)
+    assert out[0] == pytest.approx(math.log(_RV_SSQ))
+
+
+def test_c10_daily_rv_mixed_forms(tmp_path: Path) -> None:
+    base = tmp_path / "harvest"
+    _write_partition(base, "bybit", "BTCUSDT", DAY, [
+        (DAY_MS + 1_000, _bybit_payload(_RV_PRICES[0], 0.1, "Buy")),   # flat
+        (DAY_MS + 50, _bybit_envelope([
+            (DAY_MS + MINUTE_MS + 1_000, "Buy", 0.1, _RV_PRICES[1], "e1"),
+            (DAY_MS + 2 * MINUTE_MS + 1_000, "Sell", 0.1, _RV_PRICES[2], "e2"),
+        ], envelope_ts=DAY_MS + 50)),
+    ])
+    out = load_daily_rv_c10(base, "bybit", "BTCUSDT", [DAY], min_bars_per_day=3)
+    assert out[0] == pytest.approx(math.log(_RV_SSQ))
+
+
+def test_c10_daily_rv_cross_form_duplicate_is_inert(tmp_path: Path) -> None:
+    """NO de-duplication here, and none needed: the duplicate is inert.
+
+    The RV is built from 1-min LAST-price bars, so the same trade appearing
+    in both forms carries the same price at the same timestamp and cannot
+    move a bar -- pinned by comparing against the duplicate-free partition.
+    """
+    base_dup = tmp_path / "dup"
+    _write_partition(base_dup, "bybit", "BTCUSDT", DAY, [
+        *[(DAY_MS + i * MINUTE_MS + 1_000,
+           _bybit_flat_with_id(p, 0.1, "Buy", f"X{i}"))
+          for i, p in enumerate(_RV_PRICES)],
+        (DAY_MS + 50, _bybit_envelope([
+            (DAY_MS + i * MINUTE_MS + 1_000, "Buy", 0.1, p, f"X{i}")
+            for i, p in enumerate(_RV_PRICES)          # every trade duplicated
+        ], envelope_ts=DAY_MS + 50)),
+    ])
+    base_clean = tmp_path / "clean"
+    _write_partition(base_clean, "bybit", "BTCUSDT", DAY, [
+        (DAY_MS + i * MINUTE_MS + 1_000, _bybit_flat_with_id(p, 0.1, "Buy", f"X{i}"))
+        for i, p in enumerate(_RV_PRICES)
+    ])
+    dup = load_daily_rv_c10(base_dup, "bybit", "BTCUSDT", [DAY], min_bars_per_day=3)
+    clean = load_daily_rv_c10(base_clean, "bybit", "BTCUSDT", [DAY], min_bars_per_day=3)
+    assert dup[0] == pytest.approx(clean[0])
+    assert dup[0] == pytest.approx(math.log(_RV_SSQ))
+
+
+def test_c10_daily_rv_missing_files_error_unchanged(tmp_path: Path) -> None:
+    with pytest.raises(C10DataError, match="no parquet"):
+        load_daily_rv_c10(tmp_path / "empty", "bybit", "BTCUSDT", [DAY])
+
+
+def test_c10_daily_rv_deribit_jsonrpc_envelope(tmp_path: Path) -> None:
+    base = tmp_path / "harvest"
+    _write_partition(base, "deribit", "BTC-PERPETUAL", DAY, [
+        (DAY_MS + 10, _deribit_envelope([
+            (DAY_MS + i * MINUTE_MS + 1_000, "buy", 10.0, p, f"d{i}")
+            for i, p in enumerate(_RV_PRICES)
+        ], envelope_ts=DAY_MS + 10, jsonrpc=True)),
+    ])
+    out = load_daily_rv_c10(base, "deribit", "BTC-PERPETUAL", [DAY],
+                            min_bars_per_day=3)
+    assert out[0] == pytest.approx(math.log(_RV_SSQ))
+
+
+# ---------------------------------------------------------------------------
+# (g) c11 load_daily_rv -- daily RV = sqrt(sum r_1min^2), date-window filtered
+# ---------------------------------------------------------------------------
+
+def test_c11_daily_rv_flat_only(tmp_path: Path) -> None:
+    base = tmp_path / "harvest"
+    _write_partition(base, "bybit", "BTCUSDT", DAY, _rv_flat_rows(DAY_MS))
+    out = load_daily_rv_c11(base, "BTCUSDT", DAY, DAY)
+    assert set(out) == {DAY}
+    assert out[DAY] == pytest.approx(math.sqrt(_RV_SSQ))
+
+
+def test_c11_daily_rv_envelope_only(tmp_path: Path) -> None:
+    base = tmp_path / "harvest"
+    _write_partition(base, "bybit", "BTCUSDT", DAY, [
+        (DAY_MS + 50, _bybit_envelope([
+            (DAY_MS + i * MINUTE_MS + 1_000, "Buy", 0.1, p, f"e{i}")
+            for i, p in enumerate(_RV_PRICES)
+        ], envelope_ts=DAY_MS + 50)),
+    ])
+    out = load_daily_rv_c11(base, "BTCUSDT", DAY, DAY)
+    assert out[DAY] == pytest.approx(math.sqrt(_RV_SSQ))
+
+
+def test_c11_daily_rv_mixed_forms(tmp_path: Path) -> None:
+    base = tmp_path / "harvest"
+    _write_partition(base, "bybit", "BTCUSDT", DAY, [
+        (DAY_MS + 1_000, _bybit_payload(_RV_PRICES[0], 0.1, "Buy")),
+        (DAY_MS + 50, _bybit_envelope([
+            (DAY_MS + MINUTE_MS + 1_000, "Buy", 0.1, _RV_PRICES[1], "e1"),
+            (DAY_MS + 2 * MINUTE_MS + 1_000, "Sell", 0.1, _RV_PRICES[2], "e2"),
+        ], envelope_ts=DAY_MS + 50)),
+    ])
+    out = load_daily_rv_c11(base, "BTCUSDT", DAY, DAY)
+    assert out[DAY] == pytest.approx(math.sqrt(_RV_SSQ))
+
+
+def test_c11_daily_rv_date_window_filter_still_applies(tmp_path: Path) -> None:
+    # The hive ``date`` filter moved INTO the scanned source (the expanded
+    # trade source has no ``date`` column) -- it must still exclude DAY2,
+    # for envelope rows exactly as for flat ones.
+    base = tmp_path / "harvest"
+    _write_partition(base, "bybit", "BTCUSDT", DAY, _rv_flat_rows(DAY_MS))
+    _write_partition(base, "bybit", "BTCUSDT", DAY2, [
+        (DAY2_MS + 50, _bybit_envelope([
+            (DAY2_MS + i * MINUTE_MS + 1_000, "Buy", 0.1, p, f"e{i}")
+            for i, p in enumerate((200.0, 202.0, 204.0))
+        ], envelope_ts=DAY2_MS + 50)),
+    ])
+    both = load_daily_rv_c11(base, "BTCUSDT", DAY, DAY2)
+    assert set(both) == {DAY, DAY2}
+    only_first = load_daily_rv_c11(base, "BTCUSDT", DAY, DAY)
+    assert set(only_first) == {DAY}
+    assert only_first[DAY] == pytest.approx(both[DAY])
+
+
+def test_c11_daily_rv_cross_form_duplicate_is_inert(tmp_path: Path) -> None:
+    # Same reasoning as c10: last-price bars, so no de-duplication is needed.
+    base_dup = tmp_path / "dup"
+    _write_partition(base_dup, "bybit", "BTCUSDT", DAY, [
+        *[(DAY_MS + i * MINUTE_MS + 1_000,
+           _bybit_flat_with_id(p, 0.1, "Buy", f"X{i}"))
+          for i, p in enumerate(_RV_PRICES)],
+        (DAY_MS + 50, _bybit_envelope([
+            (DAY_MS + i * MINUTE_MS + 1_000, "Buy", 0.1, p, f"X{i}")
+            for i, p in enumerate(_RV_PRICES)
+        ], envelope_ts=DAY_MS + 50)),
+    ])
+    dup = load_daily_rv_c11(base_dup, "BTCUSDT", DAY, DAY)
+    assert dup[DAY] == pytest.approx(math.sqrt(_RV_SSQ))
+
+
+# ---------------------------------------------------------------------------
+# (h) c13 load_returns_window -- trailing 1-min log-returns (data-gated cell)
+# ---------------------------------------------------------------------------
+
+#: c13 needs >= 2 * BLOCK_LEN_MIN = 120 one-minute returns, i.e. 121 bars.
+_C13_N_BARS = 121
+_C13_PRICES = tuple(100.0 + (i % 7) * 0.5 for i in range(_C13_N_BARS))
+_C13_SNAPSHOT = DAY2  # trailing window = the day BEFORE the snapshot
+
+
+def _c13_loader():
+    """Import the c13 loader lazily (its module imports scipy at import time)."""
+    pytest.importorskip("scipy")
+    from bybit_edge.research.c13_tailshape.returns_tail import load_returns_window
+
+    return load_returns_window
+
+
+def _c13_expected_returns() -> np.ndarray:
+    return np.diff(np.log(np.asarray(_C13_PRICES, dtype=np.float64)))
+
+
+def test_c13_returns_window_flat_only(tmp_path: Path) -> None:
+    load_returns_window = _c13_loader()
+    base = tmp_path / "harvest"
+    _write_partition(base, "bybit", "BTCUSDT", DAY, [
+        (DAY_MS + i * MINUTE_MS + 1_000, _bybit_payload(p, 0.1, "Buy"))
+        for i, p in enumerate(_C13_PRICES)
+    ])
+    r, meta = load_returns_window(base, "BTCUSDT", _C13_SNAPSHOT,
+                                  n_days=2, min_days=1)
+    assert r.size == _C13_N_BARS - 1
+    assert np.allclose(r, _c13_expected_returns())
+    assert meta["n_days_present"] == 1
+
+
+def test_c13_returns_window_envelope_only(tmp_path: Path) -> None:
+    # ALL 121 trades in ONE envelope row: with the packet timestamp there
+    # would be a single minute bar and ZERO returns (DataError), so this
+    # pins the per-trade $.T end to end.
+    load_returns_window = _c13_loader()
+    base = tmp_path / "harvest"
+    _write_partition(base, "bybit", "BTCUSDT", DAY, [
+        (DAY_MS + 10, _bybit_envelope([
+            (DAY_MS + i * MINUTE_MS + 1_000, "Buy", 0.1, p, f"e{i}")
+            for i, p in enumerate(_C13_PRICES)
+        ], envelope_ts=DAY_MS + 10)),
+    ])
+    r, _ = load_returns_window(base, "BTCUSDT", _C13_SNAPSHOT,
+                               n_days=2, min_days=1)
+    assert r.size == _C13_N_BARS - 1
+    assert np.allclose(r, _c13_expected_returns())
+
+
+def test_c13_returns_window_mixed_forms(tmp_path: Path) -> None:
+    load_returns_window = _c13_loader()
+    base = tmp_path / "harvest"
+    split = 61
+    rows: list[tuple[int, str]] = [
+        (DAY_MS + i * MINUTE_MS + 1_000, _bybit_payload(p, 0.1, "Buy"))
+        for i, p in enumerate(_C13_PRICES[:split])
+    ]
+    rows.append((DAY_MS + 10, _bybit_envelope([
+        (DAY_MS + i * MINUTE_MS + 1_000, "Sell", 0.1, _C13_PRICES[i], f"e{i}")
+        for i in range(split, _C13_N_BARS)
+    ], envelope_ts=DAY_MS + 10)))
+    _write_partition(base, "bybit", "BTCUSDT", DAY, rows)
+    r, _ = load_returns_window(base, "BTCUSDT", _C13_SNAPSHOT,
+                               n_days=2, min_days=1)
+    assert r.size == _C13_N_BARS - 1
+    assert np.allclose(r, _c13_expected_returns())
+
+
+def test_c13_returns_window_cross_form_duplicate_is_inert(tmp_path: Path) -> None:
+    """NO de-duplication here either: the tick series is reduced to the LAST
+    price per minute before any statistic, so a cross-form duplicate (same
+    price, same ms) cannot change a single 1-min return."""
+    load_returns_window = _c13_loader()
+    base = tmp_path / "harvest"
+    rows: list[tuple[int, str]] = [
+        (DAY_MS + i * MINUTE_MS + 1_000, _bybit_flat_with_id(p, 0.1, "Buy", f"X{i}"))
+        for i, p in enumerate(_C13_PRICES)
+    ]
+    # every second trade additionally delivered in the live envelope
+    rows.append((DAY_MS + 10, _bybit_envelope([
+        (DAY_MS + i * MINUTE_MS + 1_000, "Buy", 0.1, _C13_PRICES[i], f"X{i}")
+        for i in range(0, _C13_N_BARS, 2)
+    ], envelope_ts=DAY_MS + 10)))
+    _write_partition(base, "bybit", "BTCUSDT", DAY, rows)
+    r, _ = load_returns_window(base, "BTCUSDT", _C13_SNAPSHOT,
+                               n_days=2, min_days=1)
+    assert r.size == _C13_N_BARS - 1
+    assert np.allclose(r, _c13_expected_returns())
