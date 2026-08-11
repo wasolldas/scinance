@@ -165,7 +165,7 @@ if ($Locked) {
     Write-Host "(lueckenlose done_days bybit publicTrade + rest.fundingRate, BTC+ETH,"
     Write-Host (" " + $UnlockStart + ".." + $UnlockEnd + " noetig). Kein Datenlauf, kein Gate-Urteil.")
     Record-Step -Name 'H11_ANEN' -Status 'SKIP' -Rc 2 -Dur 0 -Detail 'H-11 gesperrt - Entsperr-Bedingung nicht erfuellt'
-} elseif (($Script:Results | Where-Object { $_.Name -eq 'H11_UNLOCK_CHECK' -and $_.Status -eq 'OK' }).Count -gt 0) {
+} elseif (@($Script:Results | Where-Object { $_.Name -eq 'H11_UNLOCK_CHECK' -and $_.Status -eq 'OK' }).Count -gt 0) {
     # Schritt 2: voller Gate-Lauf (nur nach bestandenem Entsperr-Check).
     [void](Invoke-Step -Name 'H11_ANEN' -TimeoutSec $TmoStep -OkRcs @(0) -SkipRcs @(2) -CmdArgs @(
         $CliScript,
