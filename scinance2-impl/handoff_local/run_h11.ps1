@@ -50,7 +50,11 @@ $BlockLen   = 5
 $Bootstrap  = 1000
 $Seed       = 42
 $TmoCheck   = 300    # 5 min Budget fuer den Entsperr-Check
-$TmoStep    = 3600   # 60 min Budget fuer den vollen Lauf (3125 Gewichts-Kombos)
+# Budget fuer den vollen Lauf. GEMESSEN 2026-08-11: BTCUSDT allein
+# (Panel-Bau + 3124 Gewichts-Kombos LOO-Tuning + W1/W2) braucht ~50 min;
+# der 60-min-Default riss deshalb mitten im ETHUSDT-Panel. Default daher
+# 4 h, ueberschreibbar via H11_TIMEOUT_SEC (Muster wie H14/H15/H16).
+$TmoStep    = if ($env:H11_TIMEOUT_SEC) { [int]$env:H11_TIMEOUT_SEC } else { 14400 }
 
 $PythonExe = if ($env:PYTHON) { $env:PYTHON } else { 'python' }
 $SrcPath = Join-Path $RepoRoot 'src'
