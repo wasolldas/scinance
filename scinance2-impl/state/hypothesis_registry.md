@@ -457,6 +457,28 @@ Beide registrierten Fensterpaare (W1 2026-03-27..2026-05-15, W2 2026-05-16..2026
 
 ---
 
+## 2026-08-12 · Nach-Registrierung Welle 4 (Folge aus GL-022)
+
+### H-11c · AnEn gegen dispersions-gematchte HAR-Baseline (Dressed-HAR) — die eigentliche Informations-Frage (KAPITALFREI)
+- **Registriert:** 2026-08-12 (Folge-Auflage aus GL-022, Herkunft: Etikett E1/E2)
+- **Markt:** F (BTC/ETH-Perp; Ziel = realisierte Vol, Horizont 3 Handelstage) — identisch H-11.
+- **Hypothese:** Der in GL-022 gemessene CRPS-Vorsprung des Analog-Ensembles ueberlebt, wenn die HAR-Baseline dieselbe Verteilungs-Geometrie erhaelt wie das AnEn: identische HAR-Punktprognose, umhuellt mit einer k=20-Wolke aus der EMPIRISCHEN Verteilung ihrer eigenen, zum Zeitpunkt t bereits verfuegbaren Residuen. Damit misst das Gate ausschliesslich Information, nicht mehr Dirac-vs-Verteilung.
+- **A-priori (ehrlich):** DROP erwartet. Begruendung: GL-022 Etikett E3 (84-119 % der CRPS-Luecke sitzen im Nicht-Lage-Term) und E2 (Rest-Skill gegen ein Gauss-Dressing bereits vorzeichen-instabil, 2 von 4 Zellen negativ).
+- **Datenbindung:** identisch H-11, Entsperr-Bedingung bereits erfuellt (730/730 done_days, gapless, `manifest_done_days`, GL-022).
+- **Fenster:** UNVERAENDERT gegenueber H-11: Tuning L = 2024-03-27..2025-09-30 (kein Re-Tuning, Gewichte bleiben eingefroren: BTC [2;2;0,5;0;0], ETH [2;0,5;0;0;0]), W1 = 2025-10-01..2026-03-26 (177 Tage), W2 = 2026-03-27..2026-06-30 (96 Tage), 30-Tage-Embargo.
+- **Methodik (vorab fixiert):** AnEn-Seite bit-identisch zum GL-022-Lauf (k=20, dieselben Features, dieselben Gewichte, derselbe Seed 42) — nachzuweisen durch Reproduktion von `sum_crps_anen` je Zelle. Baseline-Seite: HAR-RV (Corsi) OLS, expanding Fit <=t-30, monatlicher Refit — Punktprognose UNVERAENDERT. Dressing: die k=20 Mitglieder sind `f_HAR(t) + r_j`, wobei die r_j eine deterministische Quantil-Stichprobe (Plotting-Positionen (j-0,5)/k, j=1..20) aus der empirischen Verteilung der In-Fit-Residuen desselben Refits sind (also ausschliesslich Daten <= t-30; KEIN Look-ahead, KEINE Verteilungsannahme, KEINE Skalenschaetzung aus dem Bewertungsfenster). CRPS beider Seiten mit derselben registrierten Ensemble-Formel (1/k)Sum|x_i-y| - (1/(2k^2))SumSum|x_i-x_j| — d.h. die 1/(2k^2)-Form bleibt, auf BEIDEN Seiten.
+- **Nullhypothese:** H0: mittlere CRPS-Differenz (DressedHAR - AnEn) <= 0. Test: Block-Bootstrap (Blocklaenge 5 Tage, 1.000 Reps, Diebold-Mariano-artig) je Symbol x Fenster — identisch H-11.
+- **Gate (woertlich, bindend):** WEITER, wenn fuer mindestens ein Symbol in {BTC,ETH} in BEIDEN Fenstern: CRPSS_dressed = 1 - Summe(CRPS_AnEn)/Summe(CRPS_DressedHAR) >= 0,05 UND Block-Bootstrap-p <= 0,05 nach BH-FDR alpha=0,10 ueber F-ANEN-C.
+- **DROP (hartes Ein-Fenster-Kriterium):** verfehlt ein Symbol CRPSS_dressed >= 0,05 ODER p <= 0,05 (FDR-korrigiert) in einem Fenster, scheidet es aus; erfuellt kein Symbol beide Fenster -> DROP. Keine k-/Gewichts-/Feature-/Dressing-Nachsuche, keine Schwellensenkung. **Kein Graubereich.**
+- **FDR-Familie:** **F-ANEN-C** (neu) — 2 Symbole x 2 Fenster = 4 Zellen, BH-FDR alpha=0,10. Getrennt von F-ANEN (anderes Schaetzobjekt), KEINE Ueber-Familie (Einzelhypothese, Muster DEC-24).
+- **Pflicht-Diagnostik (vorab als NICHT-urteilstragend deklariert, damit sie ehrlich mitberichtet werden muss):** (a) MAE des Ensemble-**Medians** gegen HAR-MAE je Zelle mit Diebold-Mariano-Test — schliesst die in GL-022 offengelegte Funktional-Luecke; (b) Verhaeltnis Ensemble-Spread zu realisiertem Fehler-Spread (Dispersions-Kalibrierung); (c) PIT-Histogramme beider Seiten mit chi^2 gegen Gleichverteilung. Diese drei tragen KEIN Verdikt und duerfen das Gate nicht beeinflussen.
+- **Feasibility (GL-012-Check):** BESTANDEN — kein struktureller Deckel: das Dressing entfernt genau den Term, der in GL-022 den Boden bei ~0,21-0,26 gesetzt hat; unter H0 (kein Informationsvorsprung) ist CRPSS_dressed um 0 zentriert, die 0,05-Schwelle ist damit erstmals eine echte Huerde. Power: 96-177 gepaarte Differenzen je Fenster >> 30-Faustregel. Rechenaufwand CPU, wenige Minuten (AnEn-Seite aus dem Checkpoint wiederverwendbar).
+- **KAPITALFREIHEIT (verbindlich):** Mess-Gate. Tradability bleibt NEUE **H-11b** (Vol-Targeting/Straddle, eigene Options-Spread-Konfrontation), NICHT impliziert — und die 25-75x-Notiz aus H-11 bleibt nach GL-022 E5 ausdruecklich ENTKOPPELT, auch bei einem WEITER hier.
+- **Selbstkill-/Restrisiko:** (1) Die In-Fit-Residuen des expanding OLS sind gegenueber den echten Out-of-Sample-Fehlern zu schmal (Overfit-Schrumpfung) — das macht die Baseline zu schwach und wirkt zugunsten des AnEn; bewusst akzeptiert, weil die Alternative (Residuen aus dem Bewertungsfenster) Look-ahead waere. Die Richtung ist im Bericht zu nennen. (2) Serielle Abhaengigkeit der 3-Tage-ueberlappenden Ziele ist durch die Blocklaenge 5 adressiert (wie H-11). (3) Ein DROP hier annulliert GL-022 NICHT — es praezisiert es: der registrierte H-11-Befund bleibt als „schlaegt die Punktschaetzer-Baseline unter der registrierten Regel" stehen, verliert aber jede Informations-Lesart.
+- **Status:** registriert, Lauf NICHT gestartet.
+
+---
+
 ## Registry-Disziplin (verbindlich, PRD §8)
 
 1. **Pre-Registration (§8.3):** Jede Hypothese, jeder Schwellwert, jedes Fenster wird HIER festgeschrieben, BEVOR der Run startet.

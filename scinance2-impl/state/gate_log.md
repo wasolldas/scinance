@@ -895,3 +895,85 @@ Gesamt: Welle 1–3: 2 kapitalfreie Mess-WEITER (H-04, H-05b), beide Tradability
 > **Was sich NICHT ändert:** Das Verdikt **WEITER (kapitalfrei)** steht unverändert. Das registrierte Gate lief ausschließlich auf der signed-AUC (4/5 Symbole ≥0,60, Surrogat-p95 <0,53, BH-FDR, Leak-Kontrolle ≤0,52) und war in allen Punkten erfüllt; die Ablation war vorregistriert als **nicht-urteilstragend**. Registry-Disziplin §8 (append-only) gewahrt: kein Verdikt rückwirkend geändert, kein Torpfosten verschoben.
 >
 > **Was sich ändert — Auflagen für Folgearbeit:** (1) Die Programm-Formulierung „der Orderflow trägt nichtlineare, **zeitgerichtete** Struktur" ist in dieser Schärfe von den eigenen Payloads **nicht gedeckt** und darf so nicht weiterverwendet werden; korrekt ist „zeit-**asymmetrische** Struktur, überwiegend im Aktivitäts-Envelope". Das betrifft auch `WELLE5_FINAL_REPORT.md` §2.1 und §4, die diese Formulierung tragen (dort per Korrektur-Notiz vermerkt). (2) Jede Hypothese, die auf H-16 aufbaut, MUSS diesen Vorbehalt zitieren — analog zur GL-014-Zitierpflicht für die „auflösungsbedingt fragilen" ETH→BTC-Zellen. (3) Eine Richtungs-/Tradability-Brücke, die implizit annimmt, H-16 belege gerichtete Information, ist damit a priori entwertet. Siehe DEC-30.
+
+---
+
+## GL-022 · 2026-08-12 · H-11 · C-11 AnEn-Vol-Regime-Forecast vs. HAR-RV, 3-Tage-Horizont (Welle 4 nachgeholt, KAPITALFREI) — **WEITER (kapitalfrei) — mit bindenden Einschränkungs-Etiketten; Effektgrößen-Lesart ausdrücklich NICHT gedeckt**
+
+**Quelle:** `state/h11_20260811_135839/c11_anen_results.{json,md}` (Lauf 2026-08-11 13:58–15:02 UTC, 3.801 s, rc=0, CPU — für H-11 registriert und ausreichend). Entsperr-Bedingung erfüllt und im Payload belegt: bybit `publicTrade` + `rest.fundingRate`, BTC+ETH, 2024-03-27..2026-03-26, **730/730 done_days, gapless=true, missing_days_count=0** in allen vier Strömen (`unlock_check.unlocked=true`, Quelle `manifest_done_days`). Damit ist die seit 2026-07-07 bestehende Sperre regelkonform aufgehoben — die Schwelle (>=730 zusammenhängende Tage) wurde NICHT gesenkt.
+
+### Registriertes Gate (wörtlich) und Messergebnis
+
+Gate: „WEITER, wenn fuer mindestens ein Symbol in {BTC,ETH} in BEIDEN Fenstern: CRPSS = 1 - Summe(CRPS_AnEn)/Summe(CRPS_HAR) >=0,05 UND Block-Bootstrap-p<=0,05 nach BH-FDR alpha=0,10 ueber F-ANEN." · DROP: hartes Ein-Fenster-Kriterium, „Kein Graubereich."
+
+| Zelle | n | mean CRPS AnEn | mean CRPS HAR | **CRPSS** | Bootstrap-p | FDR-sig | Zelle besteht |
+|---|---:|---:|---:|---:|---:|:---:|:---:|
+| BTC W1 (2025-10-01..2026-03-26) | 177 | 0,15042 | 0,21238 | **0,2917** | 0,000999 | ja | **ja** |
+| BTC W2 (2026-03-27..06-30) | 96 | 0,12961 | 0,17056 | **0,2401** | 0,000999 | ja | **ja** |
+| ETH W1 | 177 | 0,16504 | 0,21934 | **0,2475** | 0,000999 | ja | **ja** |
+| ETH W2 | 96 | 0,15630 | 0,21164 | **0,2615** | 0,000999 | ja | **ja** |
+
+F-ANEN: 4 Zellen, BH-FDR alpha=0,10, p_crit=0,000999; `n_fdr_significant=4`; `any_symbol_both_windows_pass=true` (BEIDE Symbole, beide Fenster). Gewichte auf L eingefroren (BTC [2;2;0,5;0;0], ETH [2;0,5;0;0;0]), k=20, Embargo 30 Tage, Blocklänge 5, 1.000 Reps, Seed 42 — alles wie registriert. Die registrierte A-priori-Erwartung war **DROP**; sie ist widerlegt.
+
+### URTEIL: **WEITER (kapitalfrei).**
+Das vorregistrierte Gate ist in allen vier Zellen erfüllt, mit dem Vierfachen bis Sechsfachen der Schwelle. Eine unabhängige Implementierungs-Prüfung (6 Achsen: Look-ahead in der Analog-Auswahl, Ziel-Leckage zwischen Trailing- und Forward-Fenstern, Gewichts-Einfrierung, Corsi-Spezifikation mit symmetrischem `<= t-30`-Fit, volle n mit gepaarter NaN-Filterung, zirkulärer Block-Bootstrap) hat **keinen** Defekt gefunden; `stats.py` implementiert die Gneiting-Raftery-Form korrekt. Es gibt bei H-11 **keine vorregistrierte Positivkontrolle**, die gescheitert wäre — der GL-020-Weg („methodisch invalide, kein Verdikt") steht deshalb NICHT offen. Ein nachträgliches Kassieren eines PASS, den man ex ante als unwahrscheinlich notiert hatte, wäre eine Torpfosten-Verschiebung nach unten und damit genau der Regelbruch, den §8 verbietet — in beide Richtungen.
+
+### Bindende Einschränkungs-Etiketten (Zitierpflicht für jede Folgearbeit)
+
+**(E1) Das Gate hat gegen die naheliegendste Null keine Trennschärfe.** Die Registry schreibt für die Baseline wörtlich vor: „CRPS der Punktprognose = |Prognose-Beobachtung|". Die HAR wird damit als **Dirac-Verteilung** bewertet, das AnEn als echte 20-Mitglieder-Verteilung. CRPS belohnt jede Verteilung mit sachgerechter Breite gegenüber einem Punkt — strukturell, ohne jede Information. Kontrafaktual „Dressed HAR" (identische HAR-Punktprognose, lediglich mit einer k=20-Wolke passender Breite umhüllt, **null Zusatzinformation**), analytisch und per 400k-Simulation bestätigt:
+
+| Fehlerverteilung | CRPS_dressed/MAE | geschenkter CRPSS |
+|---|---:|---:|
+| Gauß, k=20 (analytisch (1+1/k)/√π ÷ √(2/π)) | 0,7425 | **0,2575** |
+| Gauß, k→∞ (1/√2) | 0,7071 | **0,2929** |
+| t₅ (varianz-normiert) | 0,7656 | **0,2344** |
+| Laplace (varianz-normiert) | 0,7877 | **0,2123** |
+
+**Der gemessene CRPSS von 0,240–0,292 liegt vollständig in dem Band, das ein informationsfreies Dressing erzeugt.** Die registrierte Schwelle 0,05 liegt um Faktor ~4–5 UNTER diesem strukturellen Boden; das Gate war ex ante ein Fast-Automatik-PASS. Das ist ein **Registrierungs-Defekt (Schwellenwahl), kein Ausführungsfehler** — der Lauf hat exakt geliefert, was bestellt war.
+
+**(E2) Rest-Skill gegenüber einer gedressten HAR ist vorzeichen-instabil.** 1 − ΣCRPS_AnEn/ΣCRPS_dressedHAR:
+
+| Zelle | vs. Gauß | vs. t₅ | vs. Laplace |
+|---|---:|---:|---:|
+| BTC W1 | +0,046 | +0,075 | +0,101 |
+| BTC W2 | **−0,023** | +0,007 | +0,035 |
+| ETH W1 | **−0,013** | +0,017 | +0,045 |
+| ETH W2 | +0,005 | +0,035 | +0,062 |
+
+Je nach Annahme über die Schwänze der HAR-Fehlerverteilung besteht das AnEn 2 bis 4 von 4 Zellen — und nur bei schweren Schwänzen deutlich. Welche Annahme zutrifft, ist aus dem Payload **nicht** entscheidbar (die HAR-Fehler-Tagesreihe wird nicht persistiert). Deshalb H-11c (s.u.).
+
+**(E3) Zerlegung: der Vorsprung sitzt fast vollständig im Nicht-Lage-Term.** Exakt und annahmefrei, H−A = (H−M) + (M−A) mit M = `mean_abs_err_ensemble_mean`:
+
+| Zelle | CRPS-Lücke gesamt | Lage-Term | Nicht-Lage-Term | Anteil Nicht-Lage |
+|---|---:|---:|---:|---:|
+| BTC W1 | 0,06196 | +0,00993 | 0,05203 | **84,0 %** |
+| BTC W2 | 0,04095 | −0,00765 | 0,04860 | **118,7 %** |
+| ETH W1 | 0,05430 | −0,00716 | 0,06145 | **113,2 %** |
+| ETH W2 | 0,05533 | −0,00597 | 0,06130 | **110,8 %** |
+
+**(E4) PIT: Breite plausibel, Zentrum verzerrt.** χ² gegen Gleichverteilung (21 Bins, df=20), mitberichtet und laut Registry ausdrücklich **nicht-urteilstragend**:
+
+| Zelle | n | χ² | p | mittlerer Rang (flach = 10,00) |
+|---|---:|---:|---:|---:|
+| BTC W1 | 177 | 23,86 | 0,248 | 11,08 (Unter-Prognose) |
+| BTC W2 | 96 | 35,69 | **0,017** | 8,78 (Über-Prognose) |
+| ETH W1 | 177 | 20,78 | 0,410 | 10,20 |
+| ETH W2 | 96 | 31,31 | 0,051 | 7,51 (starke Über-Prognose) |
+
+BH-FDR α=0,10 über die vier Tests: BTC W2 signifikant, ETH W2 knapp verfehlt. Die Bias-Richtung **kippt zwischen W1 und W2** — Fingerabdruck einer regime-veralteten Analog-Bibliothek, gegen die die HAR mit monatlichem Refit adaptiert. Die Ensemble-**Breite** ist dagegen sachgerecht (A/M = 0,718–0,743 liegt praktisch auf dem Minimum ~0,725, das bei kalibrierter Dispersion σ_ens/σ_err ≈ 1 erreichbar ist; Fehl-Dispersion in beide Richtungen triebe A/M auf 0,80–0,95). „Hedging-Blähung" liegt also NICHT vor — der Punkt ist, dass auch eine *korrekt* gewählte Breite gegen eine Dirac-Baseline ein struktureller Gratisgewinn ist.
+
+**(E5) Die ökonomische 25–75×-Notiz ist von diesem Befund NICHT gedeckt.** Die Registry-Zeile („~350–870 bps 3-Tage-Kumulation gegen die 11–15-bps-Wand ≈ 25–75× ÜBER der Wand") ist eine Aussage über die **Bewegungsgröße**, nie an den CRPSS konditioniert. Gemessen wurde eine Verteilung über log-annualisierte RV, keine Preis-Return-Übersetzung; für Vol-Targeting/Straddle wäre die **Lage** der RV-Prognose entscheidend, und dort ist die Evidenz nach (E3) ein Unentschieden mit in 3 von 4 Zellen negativem Vorzeichen. Zusätzlich zeigen beide W2-Zellen systematische Über-Prognose — genau der Bias, der eine Straddle-Long-Regel systematisch überzahlen ließe. Die Notiz darf in keinem Bericht neben dem CRPSS stehen, ohne dass diese Entkopplung explizit mitgeschrieben wird. `KAPITALFREIHEIT (verbindlich)` bleibt unberührt: Monetarisierung wäre eine NEUE **H-11b**, nicht impliziert.
+
+**(E6) Was H-11 belegt und was nicht.** Gedeckt: „Das AnEn schlägt die *registrierte* HAR-Punktschätzer-Baseline unter der *registrierten* Regel, in allen vier Zellen, FDR-fest." **Nicht gedeckt:** „Das AnEn hat einen Informationsvorsprung von ~25 % gegenüber HAR." Der zweite Satz darf im Programm nicht verwendet werden. Ebenfalls unverändert gilt die registrierte Abgrenzung: ein WEITER hier **rehabilitiert den an H-02/GL-001 gebundenen Vol-Stack (C-10/C-35/C-11/C-12) NICHT**.
+
+### Nebenbefund (dokumentiert, ohne Folge)
+Die registrierte CRPS-Form nutzt den Spread-Term 1/(2k²) statt des erwartungstreuen 1/(2k(k−1)). Das unterzählt den Spread um Faktor (k−1)/k = 0,95 und wirkt damit **zuungunsten** des Ensembles — ein Handicap, kein Bonus. Es wird nicht geändert (Torpfosten fixiert); die Kontrafaktual-Rechnung in (E1) verwendet dieselbe Form auf beiden Seiten und ist davon unberührt.
+
+### Korrektur einer Orchestrator-Zwischenthese (offengelegt)
+Der Orchestrator hatte die Deflation zunächst mit einer Tabelle „HAR-MAE vs. MAE des **Ensemble-Mittels**" belegt (AnEn schlage nur in 1 von 4 Zellen). Dieser Beleg ist defekt und wird zurückgezogen: (a) falsches Funktional — MAE wird vom **Median** minimiert, nicht vom Mittel (`driver.py:372` markiert `mean_abs_err_ensemble_mean` selbst als „secondary/display statistic only — NOT what CRPS scores"); ein Median-MAE existiert im Payload nicht und ist ohne Re-Run nicht rekonstruierbar; (b) statistisch leer — die Differenzen von 0,006–0,010 log-RV-Einheiten entsprechen bei ρ≈0,8 korrelierten Fehlerreihen |t| < 1,4 in allen vier Zellen, sind also Vorzeichen-Lesen an Rauschen. **Die Deflations-Schlussfolgerung überlebt dennoch** — sie trägt über (E1)/(E3), also über die annahmefreie Zerlegung und das Dressing-Kontrafaktual, nicht über den ursprünglichen Punktprognose-Vergleich.
+
+### Folge-Auflage (verbindlich vor jeder Weiterverwendung)
+**H-11c** wird vorregistriert (s. `hypothesis_registry.md`): identische Fenster, identische eingefrorene Gewichte, kein Re-Tuning — aber Baseline = **dispersions-gematchte HAR** (unveränderte Punktprognose, gedresst mit der *empirischen* Verteilung ihrer eigenen, zum Zeitpunkt t verfügbaren Residuen). Erst dieses Gate trennt Information von Verteilungs-Geometrie. Bis H-11c entschieden ist, darf H-11 in keiner Folgehypothese als Beleg für einen Prognose-Vorsprung zitiert werden — nur mit den Etiketten (E1)–(E6).
+
+### Programm-Bilanz (nach GL-022)
+Welle 1–3 unverändert. Welle 4: H-09/H-10/H-12 DROP · **H-11 WEITER kapitalfrei (GL-022, mit Etiketten)** · H-13 gesperrt. Welle 5: H-18 Audit (GL-014) · H-16 WEITER kapitalfrei (GL-015 + Nachtrag) · H-17 Verdikt ausstehend (GL-019) · H-14 methodisch invalide (GL-020) · H-15 WEITER kapitalfrei (GL-021). **22 GL-Einträge, 0 Torpfosten-Verschiebungen, 0 handelbare Kanten.**

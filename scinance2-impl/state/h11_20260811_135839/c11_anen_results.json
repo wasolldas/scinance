@@ -1,0 +1,361 @@
+{
+  "schema_version": 1,
+  "hypothesis": "H-11",
+  "hypothesis_registry": "scinance2-impl/state/hypothesis_registry.md",
+  "capital_free": true,
+  "data_gated": true,
+  "status": "RUN",
+  "generated_at": "2026-08-11T15:02:00+00:00",
+  "source": "E:\\Claude\\Projects\\scinance\\data\\harvest/raw/bybit/{publicTrade,rest.fundingRate}",
+  "symbols": [
+    "BTCUSDT",
+    "ETHUSDT"
+  ],
+  "unlock_check": {
+    "unlocked": true,
+    "unlock_source": "manifest_done_days",
+    "manifest_path": "E:\\Claude\\Projects\\scinance\\data\\harvest\\state\\harvest_manifest.sqlite",
+    "range": [
+      "2024-03-27",
+      "2026-03-26"
+    ],
+    "days_required": 730,
+    "min_days": 730,
+    "streams": [
+      "publicTrade",
+      "rest.fundingRate"
+    ],
+    "symbols": [
+      "BTCUSDT",
+      "ETHUSDT"
+    ],
+    "details": [
+      {
+        "exchange": "bybit",
+        "stream": "publicTrade",
+        "symbol": "BTCUSDT",
+        "days_present": 730,
+        "days_required": 730,
+        "gapless": true,
+        "missing_days_count": 0,
+        "missing_days_sample": []
+      },
+      {
+        "exchange": "bybit",
+        "stream": "publicTrade",
+        "symbol": "ETHUSDT",
+        "days_present": 730,
+        "days_required": 730,
+        "gapless": true,
+        "missing_days_count": 0,
+        "missing_days_sample": []
+      },
+      {
+        "exchange": "bybit",
+        "stream": "rest.fundingRate",
+        "symbol": "BTCUSDT",
+        "days_present": 730,
+        "days_required": 730,
+        "gapless": true,
+        "missing_days_count": 0,
+        "missing_days_sample": []
+      },
+      {
+        "exchange": "bybit",
+        "stream": "rest.fundingRate",
+        "symbol": "ETHUSDT",
+        "days_present": 730,
+        "days_required": 730,
+        "gapless": true,
+        "missing_days_count": 0,
+        "missing_days_sample": []
+      }
+    ]
+  },
+  "windows": {
+    "tune_L": [
+      "2024-03-27",
+      "2025-09-30"
+    ],
+    "W1": [
+      "2025-10-01",
+      "2026-03-26"
+    ],
+    "W2": [
+      "2026-03-27",
+      "2026-06-30"
+    ]
+  },
+  "method": {
+    "k_analogs": 20,
+    "embargo_days": 30,
+    "weight_grid": [
+      0.0,
+      0.5,
+      1.0,
+      1.5,
+      2.0
+    ],
+    "target_horizon_days": 3,
+    "crps": "AnEn: proper ensemble CRPS of the k-member empirical distribution of analog targets; HAR baseline: degenerate point CRPS |forecast - obs|",
+    "pit": "rank of obs within the k-member ensemble, k+1 bins, non-judgment-bearing (mitberichtet)",
+    "block_len_days": 5,
+    "n_bootstrap": 1000,
+    "seed": 42
+  },
+  "fdr_family": "F-ANEN",
+  "fdr_alpha": 0.1,
+  "fdr_p_crit": 0.000999000999000999,
+  "n_fdr_significant": 4,
+  "gate_thresholds": {
+    "crpss_min": 0.05,
+    "bootstrap_p_max": 0.05
+  },
+  "tuning": [
+    {
+      "symbol": "BTCUSDT",
+      "tune_range": [
+        "2024-03-27",
+        "2025-09-30"
+      ],
+      "weight_grid": [
+        0.0,
+        0.5,
+        1.0,
+        1.5,
+        2.0
+      ],
+      "weights_frozen": [
+        2.0,
+        2.0,
+        0.5,
+        0.0,
+        0.0
+      ],
+      "loo_mean_crps": 0.17153305837607438
+    },
+    {
+      "symbol": "ETHUSDT",
+      "tune_range": [
+        "2024-03-27",
+        "2025-09-30"
+      ],
+      "weight_grid": [
+        0.0,
+        0.5,
+        1.0,
+        1.5,
+        2.0
+      ],
+      "weights_frozen": [
+        2.0,
+        0.5,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "loo_mean_crps": 0.16764727145931133
+    }
+  ],
+  "cells": [
+    {
+      "symbol": "BTCUSDT",
+      "window": "W1",
+      "window_range": [
+        "2025-10-01",
+        "2026-03-26"
+      ],
+      "n_forecast_days": 177,
+      "n_har_refits": 6,
+      "sum_crps_anen": 26.623978231118215,
+      "sum_crps_har": 37.59068487216204,
+      "mean_crps_anen": 0.1504179561080125,
+      "mean_crps_har": 0.21237675069018103,
+      "mean_abs_err_ensemble_mean": 0.20244306741158793,
+      "crpss": 0.29174000628983676,
+      "crpss_ge_min": true,
+      "mean_crps_diff_har_minus_anen": 0.06195879458216852,
+      "bootstrap_p": 0.000999000999000999,
+      "pit_rank_histogram": [
+        3,
+        7,
+        7,
+        9,
+        8,
+        6,
+        9,
+        6,
+        6,
+        7,
+        5,
+        7,
+        13,
+        13,
+        12,
+        12,
+        13,
+        8,
+        7,
+        5,
+        14
+      ],
+      "pit_n_bins": 21,
+      "fdr_significant": true,
+      "boot_p_le_max": true,
+      "cell_pass": true
+    },
+    {
+      "symbol": "BTCUSDT",
+      "window": "W2",
+      "window_range": [
+        "2026-03-27",
+        "2026-06-30"
+      ],
+      "n_forecast_days": 96,
+      "n_har_refits": 4,
+      "sum_crps_anen": 12.442607195621484,
+      "sum_crps_har": 16.37350702838693,
+      "mean_crps_anen": 0.12961049162105712,
+      "mean_crps_har": 0.1705573648790305,
+      "mean_abs_err_ensemble_mean": 0.17820627492580784,
+      "crpss": 0.24007684034644505,
+      "crpss_ge_min": true,
+      "mean_crps_diff_har_minus_anen": 0.040946873257973394,
+      "bootstrap_p": 0.000999000999000999,
+      "pit_rank_histogram": [
+        2,
+        4,
+        9,
+        5,
+        3,
+        10,
+        7,
+        2,
+        4,
+        3,
+        7,
+        10,
+        4,
+        6,
+        6,
+        5,
+        3,
+        1,
+        0,
+        1,
+        4
+      ],
+      "pit_n_bins": 21,
+      "fdr_significant": true,
+      "boot_p_le_max": true,
+      "cell_pass": true
+    },
+    {
+      "symbol": "ETHUSDT",
+      "window": "W1",
+      "window_range": [
+        "2025-10-01",
+        "2026-03-26"
+      ],
+      "n_forecast_days": 177,
+      "n_har_refits": 6,
+      "sum_crps_anen": 29.21240040285064,
+      "sum_crps_har": 38.82278107561045,
+      "mean_crps_anen": 0.16504181018559683,
+      "mean_crps_har": 0.21933774618988955,
+      "mean_abs_err_ensemble_mean": 0.22649381539473862,
+      "crpss": 0.24754487974580774,
+      "crpss_ge_min": true,
+      "mean_crps_diff_har_minus_anen": 0.05429593600429275,
+      "bootstrap_p": 0.000999000999000999,
+      "pit_rank_histogram": [
+        8,
+        8,
+        14,
+        5,
+        6,
+        12,
+        11,
+        6,
+        2,
+        8,
+        9,
+        7,
+        7,
+        9,
+        10,
+        7,
+        14,
+        6,
+        8,
+        8,
+        12
+      ],
+      "pit_n_bins": 21,
+      "fdr_significant": true,
+      "boot_p_le_max": true,
+      "cell_pass": true
+    },
+    {
+      "symbol": "ETHUSDT",
+      "window": "W2",
+      "window_range": [
+        "2026-03-27",
+        "2026-06-30"
+      ],
+      "n_forecast_days": 96,
+      "n_har_refits": 4,
+      "sum_crps_anen": 15.00517644955954,
+      "sum_crps_har": 20.31726263010704,
+      "mean_crps_anen": 0.15630392134957855,
+      "mean_crps_har": 0.21163815239694836,
+      "mean_abs_err_ensemble_mean": 0.21760465749695201,
+      "crpss": 0.26145678565358554,
+      "crpss_ge_min": true,
+      "mean_crps_diff_har_minus_anen": 0.05533423104736982,
+      "bootstrap_p": 0.000999000999000999,
+      "pit_rank_histogram": [
+        10,
+        8,
+        9,
+        8,
+        5,
+        3,
+        4,
+        3,
+        3,
+        3,
+        7,
+        4,
+        5,
+        7,
+        5,
+        3,
+        1,
+        4,
+        1,
+        2,
+        1
+      ],
+      "pit_n_bins": 21,
+      "fdr_significant": true,
+      "boot_p_le_max": true,
+      "cell_pass": true
+    }
+  ],
+  "any_symbol_both_windows_pass": true,
+  "per_symbol_rollup": [
+    {
+      "symbol": "BTCUSDT",
+      "windows_measured": 2,
+      "windows_pass": 2,
+      "both_windows_pass": true
+    },
+    {
+      "symbol": "ETHUSDT",
+      "windows_measured": 2,
+      "windows_pass": 2,
+      "both_windows_pass": true
+    }
+  ]
+}
