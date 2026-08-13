@@ -1076,3 +1076,24 @@ Lauf 2 reproduziert Lauf 1 **bit-identisch** in allen vier Zellen (`sum_crps_ane
 
 ### Programm-Bilanz (nach GL-024)
 Welle 1–3 unveraendert. Welle 4: H-09/H-10/H-12 DROP · H-11 WEITER kapitalfrei mit Etiketten (GL-022) · **H-11c DROP (GL-024)** · H-13 gesperrt. Welle 5: H-18 Audit (GL-014) · H-16 WEITER kapitalfrei (GL-015 + Nachtrag) · H-17 Verdikt ausstehend (GL-019) · H-14 methodisch invalide (GL-020) · H-15 WEITER kapitalfrei (GL-021). **24 GL-Eintraege, 0 Torpfosten-Verschiebungen, 0 handelbare Kanten.**
+
+> **Nachtrag zu GL-024 · 2026-08-13 (append-only, KORREKTUR einer Orchestrator-Fehlaussage; Verdikt UNVERAENDERT):**
+>
+> Ein dritter, unmittelbar an Lauf 2 angehaengter Lauf (`state/h11c_20260813_112523/`, 2026-08-13 11:25–12:16 UTC, rc=0, `gate_valid=true`) **widerlegt die Ursachen-Aussage im GL-024-Abschnitt „Nachtrag zu GL-023"**. Dort stand: „DuckDB-Nichtdeterminismus ist ausgeschlossen; der lebende Harvest-Speicher hat sich zwischen 2026-08-11 und 2026-08-12 in der ETH-Historie bewegt." **Das ist falsch.** Richtig ist das Gegenteil: die Daten haben sich nie bewegt, die Aggregation ist nicht-deterministisch.
+>
+> Beleg — drei Laeufe, identischer Code (git-verifiziert), identischer Datenstand:
+>
+> | Zelle | Lauf 1 (08-12) | Lauf 2 (08-13 10:17) | Lauf 3 (08-13 11:25) | Spanne | rel. |
+> |---|---:|---:|---:|---:|---:|
+> | BTC W1 | 26,623978231118 | 26,623978231118 | 26,623978231118 | 3,6e-15 | 1,3e-16 |
+> | BTC W2 | 12,442607195621 | 12,442607195621 | 12,442607195621 | 5,3e-15 | 4,3e-16 |
+> | **ETH W1** | 29,2124002916 | 29,2124002916 | **29,2124004029** | **1,1e-07** | **3,8e-09** |
+> | ETH W2 | 15,005176449560 | 15,005176449560 | 15,005176449560 | 0 | 0 |
+>
+> Der entscheidende Punkt: **Lauf 3 trifft in ETH W1 exakt den archivierten GL-022-Wert 29,2124004029.** Die Aggregation hat also (mindestens) zwei diskrete Ergebnisse, und der H-11-Lauf vom 2026-08-11 lag schlicht auf dem anderen. Zusaetzlich weichen die neu eingefuehrten Panel-rv-Fingerabdruecke zwischen Lauf 2 und Lauf 3 **fuer beide Symbole** ab (BTC `d0b7f1a0…` vs `ce5cd2bd…`, ETH `98068d79…` vs `47fa76fc…`), waehrend die Funding-Fingerabdruecke identisch bleiben — die Nichtdeterminismus-Quelle sitzt im Trade-/RV-Pfad, nicht im Funding-Pfad. Der Fingerabdruck war zwei Stunden alt und hat den Fehler des Orchestrators sofort gefunden; genau dafuer wurde er eingebaut.
+>
+> **Mechanismus (zwei Kandidaten, nicht isoliert):** (a) Assoziativitaets-Verlust bei der parallelen Float-Summation von `sum(r*r)` — erklaert die 1e-16-Ebene bei BTC zwanglos, aber nicht die 1,1e-7 bei ETH W1; (b) ein **nicht eindeutiger Tie-Break in `max_by(price, ts_exchange_ms)`** bei der Minutenbar-Bildung: zwei Trades derselben Minute mit identischem `ts_exchange_ms`, aber verschiedenem Preis — dann haengt der Bar-Schlusskurs von der Scan-Reihenfolge ab, zwei 1-Minuten-Renditen aendern sich um echte Tick-Betraege, und die Groessenordnung 1e-7 auf der Zellsumme passt. (b) ist die wahrscheinlichere Erklaerung fuer die ETH-W1-Zelle; belastbar isoliert ist sie nicht. **Betroffen sind vier Loader** (`c11_anen/features.py`, `c12_frag/panel.py`, `c14_panellag/panel.py`, `c10_pointer/loaders.py`) — der Befund ist also programmweit, nicht c11-spezifisch. Konsequenz: DEC-34.
+>
+> **Was sich NICHT aendert:** Das Verdikt **DROP** steht unveraendert. Ueber alle drei Laeufe schwankt der CRPSS_dressed um hoechstens **1,5e-09** (BTC W1 +0,0154103 · BTC W2 −0,0304856 · ETH W1 −0,0435116 · ETH W2 −0,0593609), die Bootstrap-p-Werte sind auf vier Stellen identisch (0,2917 / 0,7602 / 0,9401 / 0,9161), `n_fdr_significant=0` und `any_symbol_both_windows_pass=false` in allen drei Laeufen. Die Messunsicherheit ist rund **sieben Groessenordnungen** kleiner als der Abstand der besten Zelle zur Schwelle (0,0346). Auch GL-022 ist unberuehrt: die H-11-Groesse schwankt in derselben Groessenordnung.
+>
+> **Was sich damit BESTAETIGT:** DEC-32 war sachlich richtig, aber aus dem falschen Grund begruendet. Die dortige Materialitaets-Schranke ist jetzt nicht mehr nur aus der Gate-Arithmetik hergeleitet, sondern hat einen **gemessenen Rausch-Boden**: maximale relative Lauf-zu-Lauf-Streuung 3,8e-09 gegen die Schranke 1e-4 — vier Groessenordnungen Reserve. Die urspruengliche 1e-9-Vorbedingung war nicht wegen eines lebenden Speichers unerreichbar, sondern weil sie **unter dem Rauschboden der eigenen Pipeline** lag. Das Verbot von Bit-Identitaets-Vorbedingungen (DEC-32, Prozess-Lehre) gilt damit erst recht.
