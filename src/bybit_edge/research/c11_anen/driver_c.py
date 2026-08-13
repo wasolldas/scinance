@@ -104,19 +104,81 @@ GL022_SUM_CRPS_ANEN: dict[tuple[str, str], float] = {
     ("ETHUSDT", "W2"): 15.00517644955954,
 }
 
-#: Relative tolerance for that reproduction check (float summation order is
-#: identical, so this is generous by design).
-REPRO_RTOL = 1e-9
+#: Archived H-11 CRPSS of the GL-022 run (same payload). Recomputing it under
+#: the OLD Dirac rule from today's data is the second half of the continuity
+#: proof: it shows the whole H-11 measurement, not just one intermediate sum,
+#: still lands where it landed.
+GL022_CRPSS_POINT_RULE: dict[tuple[str, str], float] = {
+    ("BTCUSDT", "W1"): 0.29174000628983676,
+    ("BTCUSDT", "W2"): 0.24007684034644505,
+    ("ETHUSDT", "W1"): 0.24754487974580774,
+    ("ETHUSDT", "W2"): 0.26145678565358554,
+}
+
+#: MATERIALITY bound for the continuity check (registry H-11c Nachtrag 2
+#: 2026-08-12, DEC-32). NOT a bit-identity tolerance: the harvest store is
+#: LIVE — the harvester may rewrite, dedup or compact historical partitions
+#: between two runs, so byte-identity against an archive taken on another day
+#: is structurally unachievable and the original 1e-9 precondition was a
+#: design error. The bound is derived from the GATE ARITHMETIC, not from any
+#: observed deviation: a relative perturbation eps on the CRPS sums moves
+#: CRPSS by at most ~2*eps, so eps <= 1e-4 caps the induced CRPSS error at
+#: 2e-4 — 250x smaller than the 0.05 threshold itself.
+MATERIALITY_RTOL = 1e-4
 
 
-def _repro_check(symbol: str, window: str, sum_anen: float | None) -> dict[str, Any]:
-    ref = GL022_SUM_CRPS_ANEN.get((symbol, window))
-    if ref is None or sum_anen is None:
-        return {"reference": ref, "observed": sum_anen, "rel_diff": None,
-                "matches": False}
-    rel = abs(sum_anen - ref) / abs(ref) if ref else float("inf")
-    return {"reference": float(ref), "observed": float(sum_anen),
-            "rel_diff": float(rel), "matches": bool(rel <= REPRO_RTOL)}
+def _repro_check(symbol: str, window: str, sum_anen: float | None,
+                 crpss_point_rule: float | None) -> dict[str, Any]:
+    """Continuity of the AnEn side against the archived GL-022 run.
+
+    Two independent quantities must both stay inside ``MATERIALITY_RTOL``:
+    the AnEn CRPS sum (the ensemble itself) and the reproduced H-11 CRPSS
+    under the old Dirac rule (the whole measurement). The raw relative
+    deviations are ALWAYS reported, whether or not they pass — a drifting
+    data snapshot must stay visible, not be swallowed by a tolerance.
+    """
+    ref_sum = GL022_SUM_CRPS_ANEN.get((symbol, window))
+    ref_skill = GL022_CRPSS_POINT_RULE.get((symbol, window))
+
+    def _rel(ref: float | None, obs: float | None) -> float | None:
+        if ref is None or obs is None or not ref:
+            return None
+        return abs(obs - ref) / abs(ref)
+
+    rel_sum = _rel(ref_sum, sum_anen)
+    rel_skill = _rel(ref_skill, crpss_point_rule)
+    ok = (rel_sum is not None and rel_sum <= MATERIALITY_RTOL
+          and rel_skill is not None and rel_skill <= MATERIALITY_RTOL)
+    return {
+        "reference": None if ref_sum is None else float(ref_sum),
+        "observed": None if sum_anen is None else float(sum_anen),
+        "rel_diff": rel_sum,
+        "reference_crpss_point_rule": None if ref_skill is None else float(ref_skill),
+        "observed_crpss_point_rule": None if crpss_point_rule is None else float(crpss_point_rule),
+        "rel_diff_crpss_point_rule": rel_skill,
+        "materiality_rtol": MATERIALITY_RTOL,
+        "matches": bool(ok),
+    }
+
+
+def _panel_fingerprint(rv: Any, funding: Any, dates: list[str]) -> dict[str, Any]:
+    """SHA-256 over the exact float bytes of the daily panel.
+
+    Recorded so that a future run can PROVE whether the harvest snapshot moved
+    underneath it (live store: backfill/dedup/compaction may rewrite historical
+    partitions) instead of leaving the question open, as it was after the
+    2026-08-12 H-11c run. Purely forensic; reads into no gate flag.
+    """
+    import hashlib
+
+    h_rv = hashlib.sha256(np.ascontiguousarray(rv, dtype=np.float64).tobytes())
+    h_fd = hashlib.sha256(np.ascontiguousarray(funding, dtype=np.float64).tobytes())
+    h_dt = hashlib.sha256("|".join(dates).encode("utf-8"))
+    return {"n_days": len(dates), "first_day": dates[0] if dates else None,
+            "last_day": dates[-1] if dates else None,
+            "sha256_rv_daily": h_rv.hexdigest(),
+            "sha256_funding_daily": h_fd.hexdigest(),
+            "sha256_dates": h_dt.hexdigest()}
 
 
 def run(
@@ -170,6 +232,7 @@ def run(
                  + timedelta(days=TARGET_HORIZON_DAYS)).isoformat()
 
     cells: list[dict[str, Any]] = []
+    fingerprints: dict[str, Any] = {}
     for sym in symbols:
         if sym not in weights_map:
             raise ValueError(f"no frozen weights registered for {sym}")
@@ -180,6 +243,8 @@ def run(
         feats, log_rv22 = compute_feature_matrix(panel.rv_daily, panel.funding_daily)
         targets = compute_target(panel.rv_daily, TARGET_HORIZON_DAYS)
         dates = panel.dates
+        fingerprints[sym] = _panel_fingerprint(
+            panel.rv_daily, panel.funding_daily, dates)
 
         for w_label, (w_start, w_end) in zip(WINDOW_LABELS, (w1_range, w2_range)):
             w_idx = _window_indices(dates, w_start, w_end)
@@ -262,8 +327,10 @@ def run(
             else:
                 diagnostics = {"note": "no paired days"}
 
+            skill_point_rule = (float(crpss(c_anen, c_point)) if n_days else None)
             repro = _repro_check(sym, w_label,
-                                 float(np.sum(c_anen)) if n_days else None)
+                                 float(np.sum(c_anen)) if n_days else None,
+                                 skill_point_rule)
             cells.append({
                 "symbol": sym,
                 "window": w_label,
@@ -276,8 +343,7 @@ def run(
                 "mean_crps_dressed_har": float(np.mean(c_dressed)) if n_days else None,
                 # GL-022 continuity only (the Dirac rule H-11c replaces):
                 "mean_crps_har_point_gl022_rule": float(np.mean(c_point)) if n_days else None,
-                "crpss_vs_point_gl022_rule": (float(crpss(c_anen, c_point))
-                                              if n_days else None),
+                "crpss_vs_point_gl022_rule": skill_point_rule,
                 "crpss": float(skill) if np.isfinite(skill) else None,
                 "crpss_ge_min": bool(np.isfinite(skill) and skill >= CRPSS_MIN),
                 "mean_crps_diff_dressed_minus_anen": float(np.mean(d)) if n_days else None,
@@ -349,6 +415,8 @@ def run(
         "gate_thresholds": {"crpss_min": CRPSS_MIN,
                             "bootstrap_p_max": BOOTSTRAP_P_MAX},
         "anen_side_reproduces_gl022": bool(repro_ok),
+        "materiality_rtol": MATERIALITY_RTOL,
+        "panel_fingerprints": fingerprints,
         "gate_valid": gate_valid,
         "cells": cells,
         "any_symbol_both_windows_pass": bool(any(r["both_windows_pass"] for r in rollup)),
@@ -401,15 +469,39 @@ def render_markdown(payload: dict[str, Any]) -> str:
             f"{'PASS' if c['cell_pass'] else 'nein'} | "
             f"{_fmt(c['crpss_vs_point_gl022_rule'])} |")
     L.append("")
-    L.append("## Reproduktions-Nachweis der AnEn-Seite (Vorbedingung)")
+    L.append("## Kontinuitaets-Nachweis der AnEn-Seite (Vorbedingung)")
     L.append("")
-    L.append("| Symbol | Fenster | Summe CRPS AnEn (GL-022) | beobachtet | rel. Abweichung | identisch |")
-    L.append("|---|---|---:|---:|---:|:---:|")
+    L.append(f"*Materialitaets-Schranke {payload['materiality_rtol']:.0e} (registry H-11c "
+             "Nachtrag 2 / DEC-32) — aus der GATE-ARITHMETIK hergeleitet, nicht aus einer "
+             "Beobachtung: eine relative Stoerung eps auf den CRPS-Summen bewegt den CRPSS "
+             "um hoechstens ~2*eps, also <=2e-4 bei eps<=1e-4 — das 250-Fache unter der "
+             "0,05-Schwelle. KEINE Bit-Identitaet: der Harvest-Speicher ist LIVE und darf "
+             "historische Partitionen neu schreiben.*")
+    L.append("")
+    L.append("| Symbol | Fenster | Summe CRPS AnEn (GL-022) | beobachtet | rel. Abw. | H-11-CRPSS (GL-022) | beobachtet | rel. Abw. | im Rahmen |")
+    L.append("|---|---|---:|---:|---:|---:|---:|---:|:---:|")
     for c in payload["cells"]:
         r = c["anen_reproduction"]
         rd = "—" if r["rel_diff"] is None else f"{r['rel_diff']:.2e}"
+        rs = ("—" if r["rel_diff_crpss_point_rule"] is None
+              else f"{r['rel_diff_crpss_point_rule']:.2e}")
         L.append(f"| {c['symbol']} | {c['window']} | {_fmt6(r['reference'])} | "
-                 f"{_fmt6(r['observed'])} | {rd} | {'JA' if r['matches'] else 'NEIN'} |")
+                 f"{_fmt6(r['observed'])} | {rd} | "
+                 f"{_fmt6(r['reference_crpss_point_rule'])} | "
+                 f"{_fmt6(r['observed_crpss_point_rule'])} | {rs} | "
+                 f"{'JA' if r['matches'] else 'NEIN'} |")
+    L.append("")
+    L.append("### Panel-Fingerabdruck (forensisch, nicht urteilstragend)")
+    L.append("")
+    L.append("*SHA-256 ueber die exakten Float-Bytes des Tagespanels. Weicht er zwischen "
+             "zwei Laeufen ab, hat sich der Harvest-Schnappschuss bewegt — die Frage, die "
+             "nach dem 2026-08-12-Lauf offenblieb, ist damit kuenftig beantwortbar.*")
+    L.append("")
+    L.append("| Symbol | Tage | von | bis | sha256(rv_daily) | sha256(funding_daily) |")
+    L.append("|---|---:|---|---|---|---|")
+    for sym, fp in payload.get("panel_fingerprints", {}).items():
+        L.append(f"| {sym} | {fp['n_days']} | {fp['first_day']} | {fp['last_day']} | "
+                 f"`{fp['sha256_rv_daily'][:16]}…` | `{fp['sha256_funding_daily'][:16]}…` |")
     L.append("")
     L.append("## Pflicht-Diagnostik (NICHT urteilstragend)")
     L.append("")

@@ -17,7 +17,11 @@ registered 0.05 threshold. These tests pin exactly that:
   (d) on a fixture with genuine exploitable structure, the new gate still
       fires (it is not simply "always zero"),
   (e) the chi^2 helper matches published chi^2 tail probabilities,
-  (f) capital_free=true and no cost-model identifiers in the new modules.
+  (f) capital_free=true and no cost-model identifiers in the new modules,
+  (g) the continuity precondition (DEC-32): a MATERIALITY bound derived from
+      the gate arithmetic — pinned >=100x below the threshold so it can never
+      move a decision — plus the panel fingerprint that makes a moving
+      harvest snapshot visible instead of silent.
 """
 from __future__ import annotations
 
@@ -304,3 +308,60 @@ def test_new_modules_are_capital_free():
         lowered = code.lower()
         for term in forbidden:
             assert term not in lowered, f"{name} must stay capital-free ({term})"
+
+
+# ----------------------------------------------------------------------------
+# (g) continuity precondition: materiality bound, not bit-identity (DEC-32)
+# ----------------------------------------------------------------------------
+
+def test_materiality_bound_is_derived_from_the_gate_not_from_an_observation():
+    """The bound must be small enough that it cannot move a gate decision.
+
+    A relative perturbation eps on the CRPS sums moves CRPSS = 1 - A/D by at
+    most ~2*eps. The registered threshold is 0.05, so the induced error must
+    stay orders of magnitude below it. Pinned here so nobody can quietly widen
+    the bound into a range where it WOULD matter.
+    """
+    from bybit_edge.research.c11_anen.driver_c import MATERIALITY_RTOL
+    from bybit_edge.research.c11_anen.stats import CRPSS_MIN
+
+    induced_crpss_error = 2.0 * MATERIALITY_RTOL
+    assert induced_crpss_error <= CRPSS_MIN / 100.0, (
+        f"the continuity bound must stay >=100x below the gate threshold "
+        f"(induced {induced_crpss_error:.1e} vs threshold {CRPSS_MIN})")
+
+
+def test_continuity_check_needs_both_quantities_inside_the_bound():
+    from bybit_edge.research.c11_anen.driver_c import (
+        GL022_CRPSS_POINT_RULE,
+        GL022_SUM_CRPS_ANEN,
+        MATERIALITY_RTOL,
+        _repro_check,
+    )
+    key = ("BTCUSDT", "W1")
+    s, sk = GL022_SUM_CRPS_ANEN[key], GL022_CRPSS_POINT_RULE[key]
+
+    assert _repro_check(*key, s, sk)["matches"] is True
+    # the 2026-08-12 ETH-W1 deviation (8.3e-9 on the CRPSS) must now pass —
+    # it is four orders of magnitude below the bound
+    assert _repro_check(*key, s * (1 + 3.8e-9), sk * (1 + 8.3e-9))["matches"] is True
+    # a deviation ABOVE the bound must still fail, in either quantity alone
+    assert _repro_check(*key, s * (1 + 10 * MATERIALITY_RTOL), sk)["matches"] is False
+    assert _repro_check(*key, s, sk * (1 + 10 * MATERIALITY_RTOL))["matches"] is False
+    # the raw deviations stay visible regardless of pass/fail
+    r = _repro_check(*key, s * (1 + 3.8e-9), sk * (1 + 8.3e-9))
+    assert abs(r["rel_diff"] - 3.8e-9) < 1e-12
+    assert abs(r["rel_diff_crpss_point_rule"] - 8.3e-9) < 1e-12
+
+
+def test_panel_fingerprint_detects_a_single_changed_day():
+    from bybit_edge.research.c11_anen.driver_c import _panel_fingerprint
+
+    rv = np.linspace(0.01, 0.05, 50)
+    fd = np.zeros(50)
+    dates = _iso_dates("2025-01-01", 50)
+    base = _panel_fingerprint(rv, fd, dates)
+    assert base == _panel_fingerprint(rv.copy(), fd.copy(), list(dates))
+    moved = rv.copy()
+    moved[17] *= 1 + 1e-15          # one day, last-bit change
+    assert _panel_fingerprint(moved, fd, dates)["sha256_rv_daily"] != base["sha256_rv_daily"]

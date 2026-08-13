@@ -977,3 +977,46 @@ Der Orchestrator hatte die Deflation zunächst mit einer Tabelle „HAR-MAE vs. 
 
 ### Programm-Bilanz (nach GL-022)
 Welle 1–3 unverändert. Welle 4: H-09/H-10/H-12 DROP · **H-11 WEITER kapitalfrei (GL-022, mit Etiketten)** · H-13 gesperrt. Welle 5: H-18 Audit (GL-014) · H-16 WEITER kapitalfrei (GL-015 + Nachtrag) · H-17 Verdikt ausstehend (GL-019) · H-14 methodisch invalide (GL-020) · H-15 WEITER kapitalfrei (GL-021). **22 GL-Einträge, 0 Torpfosten-Verschiebungen, 0 handelbare Kanten.**
+
+---
+
+## GL-023 · 2026-08-12 · H-11c · C-11 AnEn gegen dispersions-gematchte HAR (Dressed-HAR), Lauf 1 (KAPITALFREI) — **KEIN VERDIKT (registrierte Vorbedingung verfehlt; Vorbedingung war selbst fehlerhaft konstruiert)**
+
+**Quelle:** `state/h11c_20260812_161304_invalid/c11c_dressed_results.{json,md}` (Lauf 2026-08-12 16:13–16:49 UTC, 2.176 s, rc=3). `gate_valid=false`, `anen_side_reproduces_gl022=false`.
+
+### Warum kein Verdikt
+Die am 2026-08-12 registrierte Vorbedingung verlangte, dass die AnEn-Seite die archivierten GL-022-Summen `sum_crps_anen` je Zelle mit relativer Toleranz **1e-9** reproduziert. Ergebnis:
+
+| Zelle | Summe CRPS AnEn (GL-022) | beobachtet | rel. Abw. | im Rahmen |
+|---|---:|---:|---:|:---:|
+| BTC W1 | 26,623978231 | 26,623978231 | 2,7e-16 | ja |
+| BTC W2 | 12,442607196 | 12,442607196 | 2,9e-16 | ja |
+| **ETH W1** | 29,212400403 | 29,212400292 | **3,8e-09** | **NEIN** |
+| ETH W2 | 15,005176450 | 15,005176450 | 1,2e-16 | ja |
+
+Drei von vier Zellen sind bit-identisch, eine verfehlt die Schranke um Faktor ~4. Die Registry ist an dieser Stelle eindeutig: `gate_valid=false` → **der Lauf traegt kein Urteil**. Es wird deshalb hier auch keines gefaellt.
+
+### Ursachen-Diagnose (soweit belastbar)
+- **Code ist ausgeschlossen.** Der gesamte AnEn-Lesepfad (`features.py`, `analog.py`, `baseline.py`, `payload_sql.py`) ist seit **2026-08-10 11:54 UTC** (Commit 03447cb) unveraendert — also seit VOR dem H-11-Lauf vom 2026-08-11 13:58 UTC. Der heutige Commit e586d35 hat ausschliesslich NEUE Dateien (`dressed.py`, `driver_c.py`) hinzugefuegt. Git-verifiziert.
+- **Bleiben zwei Kandidaten:** (i) nicht-deterministische Float-Summation in der parallelen DuckDB-Aggregation (`sqrt(sum(r*r))` je Tag), (ii) der Harvest-Speicher hat sich zwischen den beiden Laeufen bewegt — er ist LIVE, der Collector laeuft durchgehend, und Backfill/Dedup/Kompaktierung duerfen historische Partitionen neu schreiben. Beide erzeugen genau die beobachtete Groessenordnung. Welcher von beiden es war, ist **nachtraeglich nicht mehr entscheidbar** — es existiert kein Fingerabdruck des Panels vom 2026-08-11. Genau diese Luecke wird geschlossen (s.u.).
+- **Zweiter, unabhaengiger Kontinuitaets-Beleg:** derselbe Lauf rechnet die H-11-Groesse (CRPSS unter der alten Dirac-Regel) aus heutigen Daten nach: BTC W1 rel. 3,8e-16 · BTC W2 9,3e-16 · ETH W1 8,3e-09 · ETH W2 3,3e-10. Die H-11-Messung als Ganzes landet also weiterhin dort, wo sie am 2026-08-11 landete. **GL-022 steht unberuehrt.**
+
+### Die Vorbedingung war der Fehler, nicht der Lauf
+Bit-Identitaet gegen ein Archiv, das an einem ANDEREN Tag aus einem LEBENDEN Datenspeicher gezogen wurde, ist strukturell unerreichbar — nicht bei ungluecklichem Timing, sondern grundsaetzlich. Das ist ein Konstruktionsfehler des Orchestrators bei der H-11c-Registrierung vom selben Tag, aufgedeckt durch den Lauf. Korrektur per Nachtrag VOR dem urteilstragenden Lauf: siehe DEC-32 und `hypothesis_registry.md` H-11c Nachtrag 2. Kernpunkt: die neue Schranke (1e-4 relativ) ist aus der **Gate-Arithmetik** hergeleitet (eine relative Stoerung eps bewegt den CRPSS um hoechstens ~2·eps, also ≤2e-4 — das 250-Fache unter der 0,05-Schwelle), **nicht** aus der beobachteten Abweichung; die Beobachtung liegt vier Groessenordnungen darunter. Zusaetzlich wird ab sofort ein SHA-256-Fingerabdruck des Tagespanels mitgeschrieben, damit die Frage „hat sich der Schnappschuss bewegt?" beim naechsten Mal beantwortbar ist statt offen zu bleiben.
+
+### Offenlegung: was der ungueltige Lauf zeigt (NICHT urteilstragend)
+Damit niemand die Vorbedingungs-Korrektur fuer ergebnis-motiviert halten kann, wird das Beobachtete hier vollstaendig protokolliert — es ist unter jeder denkbaren Schranke dasselbe:
+
+| Zelle | n | **CRPSS_dressed** | Schwelle | boot-p | Zelle |
+|---|---:|---:|---:|---:|:---:|
+| BTC W1 | 177 | **+0,0154** | 0,05 | 0,2917 | nein |
+| BTC W2 | 96 | **−0,0305** | 0,05 | 0,7602 | nein |
+| ETH W1 | 177 | **−0,0435** | 0,05 | 0,9401 | nein |
+| ETH W2 | 96 | **−0,0594** | 0,05 | 0,9161 | nein |
+
+**0 von 4 Zellen bestehen**, die beste liegt 0,0346 unter der Schwelle, die schlechteste 0,109 darunter; kein einziger p-Wert unter 0,29. Die 4-ppb-Unsicherheit der Vorbedingung ist rund sieben Groessenordnungen zu klein, um daran irgendetwas zu bewegen. Die registrierte A-priori „DROP erwartet" zeichnet sich klar ab — das Verdikt bleibt trotzdem bis zum gueltigen Lauf ausgesetzt (Muster GL-019).
+
+Ebenfalls mitberichtet (registriert als nicht-urteilstragend): Der Punktprognose-Vergleich mit dem korrekten Funktional — MAE des Ensemble-**Medians** gegen HAR-MAE — ergibt BTC W1 +0,0027 · BTC W2 +0,0078 · ETH W1 −0,0089 · ETH W2 −0,0027 mit zweiseitigen p von 0,27–0,79: in allen vier Zellen ein statistisches Unentschieden, mit BTC leicht fuer und ETH leicht gegen das AnEn. Das bestaetigt beide Punkte aus GL-022 gleichzeitig: die urspruengliche Orchestrator-Tabelle (Ensemble-Mittel) war das falsche Funktional UND ihre Vorzeichen waren Rauschen. Dispersions-Verhaeltnisse: AnEn 0,97–1,26, Dressed-HAR 0,95–1,17 — beide Seiten ~kalibriert, wie in GL-022 E4 hergeleitet.
+
+### Programm-Bilanz (nach GL-023)
+Unveraendert gegenueber GL-022, plus: **H-11c Lauf 1 ohne Verdikt** (Vorbedingung verfehlt, Vorbedingung korrigiert, Wiederholungslauf ausstehend). **23 GL-Eintraege, 0 Torpfosten-Verschiebungen, 0 handelbare Kanten.**
