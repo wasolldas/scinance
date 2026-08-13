@@ -1020,3 +1020,59 @@ Ebenfalls mitberichtet (registriert als nicht-urteilstragend): Der Punktprognose
 
 ### Programm-Bilanz (nach GL-023)
 Unveraendert gegenueber GL-022, plus: **H-11c Lauf 1 ohne Verdikt** (Vorbedingung verfehlt, Vorbedingung korrigiert, Wiederholungslauf ausstehend). **23 GL-Eintraege, 0 Torpfosten-Verschiebungen, 0 handelbare Kanten.**
+
+---
+
+## GL-024 · 2026-08-13 · H-11c · C-11 AnEn gegen dispersions-gematchte HAR (Dressed-HAR), Lauf 2 — **DROP (empirisch; 0 von 4 Zellen, kein p-Wert unter 0,29)**
+
+**Quelle:** `state/h11c_20260813_101714/c11c_dressed_results.{json,md}` (Lauf 2026-08-13 10:17–11:04 UTC, 2.852 s, rc=0). `gate_valid=true`, Kontinuitaets-Vorbedingung nach Registry-Nachtrag 2 / DEC-32 **erfuellt**: maximale relative Abweichung 8,3e-09 (ETH W1, H-11-Groesse) gegen die Materialitaets-Schranke 1e-4 — vier Groessenordnungen Reserve. Entsperr-Check gruen (`manifest_done_days`).
+
+### Registriertes Gate (wörtlich) und Messergebnis
+
+Gate: „WEITER, wenn fuer mindestens ein Symbol in {BTC,ETH} in BEIDEN Fenstern: CRPSS_dressed = 1 - Summe(CRPS_AnEn)/Summe(CRPS_DressedHAR) >= 0,05 UND Block-Bootstrap-p <= 0,05 nach BH-FDR alpha=0,10 ueber F-ANEN-C." · DROP: hartes Ein-Fenster-Kriterium, „Kein Graubereich."
+
+| Zelle | n | CRPS AnEn | CRPS Dressed-HAR | **CRPSS_dressed** | >=0,05 | Bootstrap-p | <=0,05 | Zelle |
+|---|---:|---:|---:|---:|:---:|---:|:---:|:---:|
+| BTC W1 | 177 | 0,15042 | 0,15277 | **+0,0154** | nein | 0,2917 | nein | **nein** |
+| BTC W2 | 96 | 0,12961 | 0,12578 | **−0,0305** | nein | 0,7602 | nein | **nein** |
+| ETH W1 | 177 | 0,16504 | 0,15816 | **−0,0435** | nein | 0,9401 | nein | **nein** |
+| ETH W2 | 96 | 0,15630 | 0,14755 | **−0,0594** | nein | 0,9161 | nein | **nein** |
+
+F-ANEN-C: 4 Zellen, BH-FDR alpha=0,10 → `n_fdr_significant=0`, `p_crit=0`. `any_symbol_both_windows_pass=false`; beide Symbole 0 von 2 Fenstern. Die registrierte A-priori „DROP erwartet" ist bestaetigt.
+
+### URTEIL: **DROP.**
+Kein Symbol besteht ein einziges Fenster — weder die CRPSS-Schwelle noch die Bootstrap-Bedingung, in keiner Zelle. Die beste Zelle liegt 0,035 unter der Schwelle, drei von vier sind negativ (das AnEn ist dort SCHLECHTER als eine informationsfrei gedresste HAR), und der kleinste p-Wert ist 0,29. Das harte Ein-Fenster-Kriterium greift zweifach. **Sobald die HAR-Baseline dieselbe Verteilungs-Geometrie erhaelt wie das AnEn, verschwindet der gesamte in H-11 gemessene Vorsprung.**
+
+### Der strukturelle Geschenk-Term, jetzt empirisch gemessen
+Derselbe Lauf bewertet die HAR zusaetzlich unter der alten Dirac-Regel. Die Differenz ist der Betrag, den reines Dressing ohne jede Zusatzinformation einbringt:
+
+| Zelle | CRPS HAR als Dirac | CRPS HAR gedresst | **Geschenk allein durch Dressing** | CRPSS unter alter Regel (= H-11) |
+|---|---:|---:|---:|---:|
+| BTC W1 | 0,21238 | 0,15277 | **28,1 %** | 0,2917 |
+| BTC W2 | 0,17056 | 0,12578 | **26,3 %** | 0,2401 |
+| ETH W1 | 0,21934 | 0,15816 | **27,9 %** | 0,2475 |
+| ETH W2 | 0,21164 | 0,14755 | **30,3 %** | 0,2615 |
+
+GL-022 hatte diesen Term theoretisch auf 0,21–0,29 veranschlagt (Laplace bis Gauss k→∞). Gemessen: **26,3–30,3 %** — die Vorhersage trifft, und in jeder einzelnen Zelle ist das Geschenk **groesser** als der unter der alten Regel gemessene „Vorsprung". Damit ist Etikett E1/E2/E6 aus GL-022 nicht mehr Argument, sondern Befund.
+
+### Pflicht-Diagnostik (vorab als NICHT urteilstragend registriert)
+| Zelle | MAE AnEn-Median | MAE HAR-Punkt | Diff (HAR−Median) | 2-seitig p | Disp. AnEn | Disp. Dressed | PIT χ² AnEn (p) |
+|---|---:|---:|---:|---:|---:|---:|---:|
+| BTC W1 | 0,20970 | 0,21238 | +0,00267 | 0,717 | 0,987 | 0,988 | 23,9 (0,248) |
+| BTC W2 | 0,16278 | 0,17056 | +0,00777 | 0,433 | 1,257 | 1,173 | 35,7 (0,017) |
+| ETH W1 | 0,22820 | 0,21934 | −0,00887 | 0,269 | 0,973 | 0,951 | 20,8 (0,410) |
+| ETH W2 | 0,21430 | 0,21164 | −0,00267 | 0,794 | 1,090 | 1,136 | 31,3 (0,051) |
+
+Der Punktprognose-Vergleich mit dem **korrekten Funktional** (Median, nicht Mittel — die in GL-022 offengelegte Luecke) ist in allen vier Zellen ein statistisches Unentschieden: BTC leicht fuer, ETH leicht gegen das AnEn, kein p unter 0,27. Das bestaetigt beide Haelften der GL-022-Korrektur gleichzeitig: die urspruengliche Orchestrator-Tabelle nutzte das falsche Funktional UND ihre Vorzeichen waren Rauschen. Dispersions-Verhaeltnisse 0,95–1,26 auf beiden Seiten — beide Ensembles sind naeherungsweise kalibriert, „Hedging-Blaehung" liegt nicht vor (GL-022 E4 bestaetigt).
+
+### Nachtrag zu GL-023: die offene Ursachenfrage ist beantwortet
+Lauf 2 reproduziert Lauf 1 **bit-identisch** in allen vier Zellen (`sum_crps_anen` Delta 0, CRPSS-Delta <=2,2e-16) — inklusive der Zelle ETH W1, die ihren eigenen Wert 29,212400292 exakt wiederholt statt des GL-022-Werts 29,212400403. Damit ist Kandidat (i) aus GL-023 — nicht-deterministische Float-Summation in der parallelen DuckDB-Aggregation — **ausgeschlossen**: die Pipeline ist ueber Laeufe hinweg deterministisch. Es bleibt Kandidat (ii): der LEBENDE Harvest-Speicher hat sich zwischen dem H-11-Lauf (2026-08-11 13:58 UTC) und dem ersten H-11c-Lauf (2026-08-12 16:13 UTC) in der ETH-Historie bewegt und ist seither stabil. Die ab GL-023 mitgeschriebenen Panel-Fingerabdruecke belegen das kuenftig direkt (Lauf 2, 829 Tage 2024-03-27..2026-07-03: BTC `d0b7f1a00066e97e…`, ETH `98068d794b7e7bd1…`).
+
+### Folgen (verbindlich)
+1. **GL-022 bleibt unveraendert** (append-only). H-11 hat sein registriertes Gate bestanden; das wird nicht rueckwirkend kassiert. Aber die dort angehaengten Etiketten sind ab jetzt empirisch belegt statt theoretisch begruendet.
+2. **Jede Zitierung von H-11 muss GL-024 mitfuehren.** Die Formulierung „das AnEn prognostiziert Vol-Regime besser als HAR" ist von den eigenen Payloads NICHT gedeckt und darf im Programm nicht verwendet werden. Korrekt ist: „das AnEn liefert eine annaehernd kalibrierte Verteilung; einen Prognose-Vorsprung gegenueber einer gleich breit gedressten HAR hat es nicht."
+3. **H-11b (Monetarisierung) ist a fortiori tot** und wird nicht registriert: eine Tradability-Hypothese auf einem Mess-Vorsprung, den es nicht gibt, ist gegenstandslos. Die „~25–75x ueber der Wand"-Notiz bleibt entkoppelt (GL-022 E5) und traegt nichts.
+4. **Die C-11-Linie (Analog-Ensemble-Vol-Prognose) ist als Quelle eines Prognose-Vorsprungs geschlossen.** Siehe DEC-33.
+
+### Programm-Bilanz (nach GL-024)
+Welle 1–3 unveraendert. Welle 4: H-09/H-10/H-12 DROP · H-11 WEITER kapitalfrei mit Etiketten (GL-022) · **H-11c DROP (GL-024)** · H-13 gesperrt. Welle 5: H-18 Audit (GL-014) · H-16 WEITER kapitalfrei (GL-015 + Nachtrag) · H-17 Verdikt ausstehend (GL-019) · H-14 methodisch invalide (GL-020) · H-15 WEITER kapitalfrei (GL-021). **24 GL-Eintraege, 0 Torpfosten-Verschiebungen, 0 handelbare Kanten.**
