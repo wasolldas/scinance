@@ -18,6 +18,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import sys
 import time
 from pathlib import Path
@@ -53,6 +54,11 @@ def main(argv: list[str] | None = None) -> int:
                    help="Force rebuild of already-cached days (rarely needed).")
     p.add_argument("--progress-every", type=int, default=50,
                    help="Print a heartbeat every N processed days.")
+    p.add_argument("--memory-limit",
+                   default=os.environ.get("BARCACHE_MEMORY_LIMIT", "4GB"),
+                   help="DuckDB memory cap per connection (spills to disk "
+                        "above it). Default 4GB / env BARCACHE_MEMORY_LIMIT. "
+                        "The 2026-08-14 run OOM-crashed without a cap (DEC-36).")
     args = p.parse_args(argv)
 
     symbols = tuple(s.strip() for s in args.symbols.split(",") if s.strip())
@@ -65,7 +71,8 @@ def main(argv: list[str] | None = None) -> int:
 
     print(f"[barcache] base={base.resolve()} cache={cache.resolve()} "
           f"{args.exchange}/{args.stream} symbols={list(symbols)} "
-          f"range={args.start}..{args.end}", file=sys.stderr, flush=True)
+          f"range={args.start}..{args.end} memory_limit={args.memory_limit}",
+          file=sys.stderr, flush=True)
 
     ok = True
     summaries = []
@@ -83,7 +90,8 @@ def main(argv: list[str] | None = None) -> int:
         try:
             summary = build_range(
                 base, cache, args.exchange, args.stream, sym,
-                args.start, args.end, rebuild=args.rebuild, progress=_progress)
+                args.start, args.end, rebuild=args.rebuild, progress=_progress,
+                memory_limit=args.memory_limit)
         except BarCacheError as exc:
             print(f"[barcache] FATAL {sym}: {exc}", file=sys.stderr, flush=True)
             ok = False
@@ -95,7 +103,7 @@ def main(argv: list[str] | None = None) -> int:
         print(f"[barcache] {sym}: cached={summary['cached']} "
               f"exists={summary['exists']} no_raw={summary['no_raw']} "
               f"not_done={summary['days_not_done']} in {summary['seconds']}s "
-              f"| fp {fp['sha256_values'][:16]}… ({fp['n_days_present']} days, "
+              f"| fp {fp['sha256_values'][:16]}... ({fp['n_days_present']} days, "
               f"{fp['n_minutes']} minutes)", file=sys.stderr, flush=True)
 
     print(json.dumps({"summaries": summaries}, indent=2))

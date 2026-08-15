@@ -1,0 +1,4927 @@
+{
+  "generated_at": "2026-08-14T08:37:57+00:00",
+  "base_dir": "E:\\Claude\\Projects\\scinance\\data\\harvest",
+  "exchange": "bybit",
+  "sample_every": 14,
+  "streams_discovered": [
+    "orderbook"
+  ],
+  "symbols": {
+    "BTCUSDT": {
+      "streams": {
+        "orderbook": {
+          "days_total": 964,
+          "first_day": "2023-01-18",
+          "last_day": "2026-08-13",
+          "days_sampled": 70,
+          "seconds": 563.9,
+          "regimes": {
+            "orderbook.500.BTCUSDT - delta": {
+              "first_sampled_day": "2023-01-18",
+              "last_sampled_day": "2025-08-13",
+              "days_sampled": 66,
+              "rows": 56695351,
+              "bytes": 84733435270,
+              "depth_b_min": 0,
+              "depth_b_max": 1000,
+              "seq_non_increasing_total": 66,
+              "seq_checked_total": 56695486
+            },
+            "orderbook.500.BTCUSDT - snapshot": {
+              "first_sampled_day": "2023-01-18",
+              "last_sampled_day": "2025-08-13",
+              "days_sampled": 66,
+              "rows": 135,
+              "bytes": 2876165,
+              "depth_b_min": 500,
+              "depth_b_max": 500,
+              "seq_non_increasing_total": 66,
+              "seq_checked_total": 56695486
+            },
+            "orderbook.1000.BTCUSDT - delta": {
+              "first_sampled_day": "2026-06-22",
+              "last_sampled_day": "2026-08-13",
+              "days_sampled": 4,
+              "rows": 787944,
+              "bytes": 1742380237,
+              "depth_b_min": 0,
+              "depth_b_max": 1393,
+              "seq_non_increasing_total": 2,
+              "seq_checked_total": 787951
+            },
+            "orderbook.1000.BTCUSDT - snapshot": {
+              "first_sampled_day": "2026-06-22",
+              "last_sampled_day": "2026-08-13",
+              "days_sampled": 4,
+              "rows": 7,
+              "bytes": 295310,
+              "depth_b_min": 1000,
+              "depth_b_max": 1000,
+              "seq_non_increasing_total": 2,
+              "seq_checked_total": 787951
+            }
+          },
+          "day_rows": [
+            {
+              "day": "2023-01-18",
+              "topic": "orderbook.500.BTCUSDT",
+              "type": "delta",
+              "n_rows": 619905,
+              "payload_bytes": 447740070,
+              "depth_b": [
+                0,
+                7,
+                240
+              ],
+              "depth_a": [
+                0,
+                8,
+                292
+              ],
+              "n_with_update_id": 619905,
+              "seq": {
+                "n": 619907,
+                "n_non_increasing": 1
+              }
+            },
+            {
+              "day": "2023-01-18",
+              "topic": "orderbook.500.BTCUSDT",
+              "type": "snapshot",
+              "n_rows": 2,
+              "payload_bytes": 42540,
+              "depth_b": [
+                500,
+                500,
+                500
+              ],
+              "depth_a": [
+                500,
+                500,
+                500
+              ],
+              "n_with_update_id": 2,
+              "seq": {
+                "n": 619907,
+                "n_non_increasing": 1
+              }
+            },
+            {
+              "day": "2023-02-01",
+              "topic": "orderbook.500.BTCUSDT",
+              "type": "delta",
+              "n_rows": 855781,
+              "payload_bytes": 506853314,
+              "depth_b": [
+                0,
+                6,
+                252
+              ],
+              "depth_a": [
+                0,
+                6,
+                247
+              ],
+              "n_with_update_id": 855781,
+              "seq": {
+                "n": 855783,
+                "n_non_increasing": 1
+              }
+            },
+            {
+              "day": "2023-02-01",
+              "topic": "orderbook.500.BTCUSDT",
+              "type": "snapshot",
+              "n_rows": 2,
+              "payload_bytes": 42534,
+              "depth_b": [
+                500,
+                500,
+                500
+              ],
+              "depth_a": [
+                500,
+                500,
+                500
+              ],
+              "n_with_update_id": 2,
+              "seq": {
+                "n": 855783,
+                "n_non_increasing": 1
+              }
+            },
+            {
+              "day": "2023-02-15",
+              "topic": "orderbook.500.BTCUSDT",
+              "type": "delta",
+              "n_rows": 862591,
+              "payload_bytes": 653431217,
+              "depth_b": [
+                0,
+                8,
+                382
+              ],
+              "depth_a": [
+                0,
+                8,
+                531
+              ],
+              "n_with_update_id": 862591,
+              "seq": {
+                "n": 862593,
+                "n_non_increasing": 1
+              }
+            },
+            {
+              "day": "2023-02-15",
+              "topic": "orderbook.500.BTCUSDT",
+              "type": "snapshot",
+              "n_rows": 2,
+              "payload_bytes": 42323,
+              "depth_b": [
+                500,
+                500,
+                500
+              ],
+              "depth_a": [
+                500,
+                500,
+                500
+              ],
+              "n_with_update_id": 2,
+              "seq": {
+                "n": 862593,
+                "n_non_increasing": 1
+              }
+            },
+            {
+              "day": "2023-03-01",
+              "topic": "orderbook.500.BTCUSDT",
+              "type": "delta",
+              "n_rows": 862504,
+              "payload_bytes": 648172595,
+              "depth_b": [
+                0,
+                9,
+                659
+              ],
+              "depth_a": [
+                0,
+                9,
+                496
+              ],
+              "n_with_update_id": 862504,
+              "seq": {
+                "n": 862506,
+                "n_non_increasing": 1
+              }
+            },
+            {
+              "day": "2023-03-01",
+              "topic": "orderbook.500.BTCUSDT",
+              "type": "snapshot",
+              "n_rows": 2,
+              "payload_bytes": 42319,
+              "depth_b": [
+                500,
+                500,
+                500
+              ],
+              "depth_a": [
+                500,
+                500,
+                500
+              ],
+              "n_with_update_id": 2,
+              "seq": {
+                "n": 862506,
+                "n_non_increasing": 1
+              }
+            },
+            {
+              "day": "2023-03-15",
+              "topic": "orderbook.500.BTCUSDT",
+              "type": "delta",
+              "n_rows": 863686,
+              "payload_bytes": 1193564084,
+              "depth_b": [
+                0,
+                18,
+                544
+              ],
+              "depth_a": [
+                0,
+                19,
+                710
+              ],
+              "n_with_update_id": 863686,
+              "seq": {
+                "n": 863688,
+                "n_non_increasing": 1
+              }
+            },
+            {
+              "day": "2023-03-15",
+              "topic": "orderbook.500.BTCUSDT",
+              "type": "snapshot",
+              "n_rows": 2,
+              "payload_bytes": 42340,
+              "depth_b": [
+                500,
+                500,
+                500
+              ],
+              "depth_a": [
+                500,
+                500,
+                500
+              ],
+              "n_with_update_id": 2,
+              "seq": {
+                "n": 863688,
+                "n_non_increasing": 1
+              }
+            },
+            {
+              "day": "2023-03-29",
+              "topic": "orderbook.500.BTCUSDT",
+              "type": "delta",
+              "n_rows": 855379,
+              "payload_bytes": 701090128,
+              "depth_b": [
+                0,
+                8,
+                585
+              ],
+              "depth_a": [
+                0,
+                8,
+                603
+              ],
+              "n_with_update_id": 855379,
+              "seq": {
+                "n": 855381,
+                "n_non_increasing": 1
+              }
+            },
+            {
+              "day": "2023-03-29",
+              "topic": "orderbook.500.BTCUSDT",
+              "type": "snapshot",
+              "n_rows": 2,
+              "payload_bytes": 42322,
+              "depth_b": [
+                500,
+                500,
+                500
+              ],
+              "depth_a": [
+                500,
+                500,
+                500
+              ],
+              "n_with_update_id": 2,
+              "seq": {
+                "n": 855381,
+                "n_non_increasing": 1
+              }
+            },
+            {
+              "day": "2023-04-12",
+              "topic": "orderbook.500.BTCUSDT",
+              "type": "delta",
+              "n_rows": 857957,
+              "payload_bytes": 673022907,
+              "depth_b": [
+                0,
+                8,
+                510
+              ],
+              "depth_a": [
+                0,
+                8,
+                707
+              ],
+              "n_with_update_id": 857957,
+              "seq": {
+                "n": 857959,
+                "n_non_increasing": 1
+              }
+            },
+            {
+              "day": "2023-04-12",
+              "topic": "orderbook.500.BTCUSDT",
+              "type": "snapshot",
+              "n_rows": 2,
+              "payload_bytes": 42316,
+              "depth_b": [
+                500,
+                500,
+                500
+              ],
+              "depth_a": [
+                500,
+                500,
+                500
+              ],
+              "n_with_update_id": 2,
+              "seq": {
+                "n": 857959,
+                "n_non_increasing": 1
+              }
+            },
+            {
+              "day": "2023-04-26",
+              "topic": "orderbook.500.BTCUSDT",
+              "type": "delta",
+              "n_rows": 859043,
+              "payload_bytes": 919907617,
+              "depth_b": [
+                0,
+                10,
+                913
+              ],
+              "depth_a": [
+                0,
+                10,
+                741
+              ],
+              "n_with_update_id": 859043,
+              "seq": {
+                "n": 859045,
+                "n_non_increasing": 1
+              }
+            },
+            {
+              "day": "2023-04-26",
+              "topic": "orderbook.500.BTCUSDT",
+              "type": "snapshot",
+              "n_rows": 2,
+              "payload_bytes": 42324,
+              "depth_b": [
+                500,
+                500,
+                500
+              ],
+              "depth_a": [
+                500,
+                500,
+                500
+              ],
+              "n_with_update_id": 2,
+              "seq": {
+                "n": 859045,
+                "n_non_increasing": 1
+              }
+            },
+            {
+              "day": "2023-05-10",
+              "topic": "orderbook.500.BTCUSDT",
+              "type": "delta",
+              "n_rows": 858647,
+              "payload_bytes": 732327336,
+              "depth_b": [
+                0,
+                8,
+                1000
+              ],
+              "depth_a": [
+                0,
+                8,
+                844
+              ],
+              "n_with_update_id": 858647,
+              "seq": {
+                "n": 858649,
+                "n_non_increasing": 1
+              }
+            },
+            {
+              "day": "2023-05-10",
+              "topic": "orderbook.500.BTCUSDT",
+              "type": "snapshot",
+              "n_rows": 2,
+              "payload_bytes": 42311,
+              "depth_b": [
+                500,
+                500,
+                500
+              ],
+              "depth_a": [
+                500,
+                500,
+                500
+              ],
+              "n_with_update_id": 2,
+              "seq": {
+                "n": 858649,
+                "n_non_increasing": 1
+              }
+            },
+            {
+              "day": "2023-05-24",
+              "topic": "orderbook.500.BTCUSDT",
+              "type": "delta",
+              "n_rows": 858514,
+              "payload_bytes": 633009117,
+              "depth_b": [
+                0,
+                8,
+                528
+              ],
+              "depth_a": [
+                0,
+                8,
+                670
+              ],
+              "n_with_update_id": 858514,
+              "seq": {
+                "n": 858516,
+                "n_non_increasing": 1
+              }
+            },
+            {
+              "day": "2023-05-24",
+              "topic": "orderbook.500.BTCUSDT",
+              "type": "snapshot",
+              "n_rows": 2,
+              "payload_bytes": 42318,
+              "depth_b": [
+                500,
+                500,
+                500
+              ],
+              "depth_a": [
+                500,
+                500,
+                500
+              ],
+              "n_with_update_id": 2,
+              "seq": {
+                "n": 858516,
+                "n_non_increasing": 1
+              }
+            },
+            {
+              "day": "2023-06-07",
+              "topic": "orderbook.500.BTCUSDT",
+              "type": "delta",
+              "n_rows": 859098,
+              "payload_bytes": 729808543,
+              "depth_b": [
+                0,
+                9,
+                517
+              ],
+              "depth_a": [
+                0,
+                9,
+                561
+              ],
+              "n_with_update_id": 859098,
+              "seq": {
+                "n": 859100,
+                "n_non_increasing": 1
+              }
+            },
+            {
+              "day": "2023-06-07",
+              "topic": "orderbook.500.BTCUSDT",
+              "type": "snapshot",
+              "n_rows": 2,
+              "payload_bytes": 42312,
+              "depth_b": [
+                500,
+                500,
+                500
+              ],
+              "depth_a": [
+                500,
+                500,
+                500
+              ],
+              "n_with_update_id": 2,
+              "seq": {
+                "n": 859100,
+                "n_non_increasing": 1
+              }
+            },
+            {
+              "day": "2023-06-21",
+              "topic": "orderbook.500.BTCUSDT",
+              "type": "delta",
+              "n_rows": 860143,
+              "payload_bytes": 893656966,
+              "depth_b": [
+                0,
+                10,
+                609
+              ],
+              "depth_a": [
+                0,
+                11,
+                999
+              ],
+              "n_with_update_id": 860143,
+              "seq": {
+                "n": 860145,
+                "n_non_increasing": 1
+              }
+            },
+            {
+              "day": "2023-06-21",
+              "topic": "orderbook.500.BTCUSDT",
+              "type": "snapshot",
+              "n_rows": 2,
+              "payload_bytes": 42332,
+              "depth_b": [
+                500,
+                500,
+                500
+              ],
+              "depth_a": [
+                500,
+                500,
+                500
+              ],
+              "n_with_update_id": 2,
+              "seq": {
+                "n": 860145,
+                "n_non_increasing": 1
+              }
+            },
+            {
+              "day": "2023-07-05",
+              "topic": "orderbook.500.BTCUSDT",
+              "type": "delta",
+              "n_rows": 857120,
+              "payload_bytes": 556924865,
+              "depth_b": [
+                0,
+                7,
+                730
+              ],
+              "depth_a": [
+                0,
+                8,
+                538
+              ],
+              "n_with_update_id": 857120,
+              "seq": {
+                "n": 857122,
+                "n_non_increasing": 1
+              }
+            },
+            {
+              "day": "2023-07-05",
+              "topic": "orderbook.500.BTCUSDT",
+              "type": "snapshot",
+              "n_rows": 2,
+              "payload_bytes": 42332,
+              "depth_b": [
+                500,
+                500,
+                500
+              ],
+              "depth_a": [
+                500,
+                500,
+                500
+              ],
+              "n_with_update_id": 2,
+              "seq": {
+                "n": 857122,
+                "n_non_increasing": 1
+              }
+            },
+            {
+              "day": "2023-07-19",
+              "topic": "orderbook.500.BTCUSDT",
+              "type": "delta",
+              "n_rows": 860139,
+              "payload_bytes": 572739676,
+              "depth_b": [
+                0,
+                8,
+                509
+              ],
+              "depth_a": [
+                0,
+                8,
+                591
+              ],
+              "n_with_update_id": 860139,
+              "seq": {
+                "n": 860141,
+                "n_non_increasing": 1
+              }
+            },
+            {
+              "day": "2023-07-19",
+              "topic": "orderbook.500.BTCUSDT",
+              "type": "snapshot",
+              "n_rows": 2,
+              "payload_bytes": 42338,
+              "depth_b": [
+                500,
+                500,
+                500
+              ],
+              "depth_a": [
+                500,
+                500,
+                500
+              ],
+              "n_with_update_id": 2,
+              "seq": {
+                "n": 860141,
+                "n_non_increasing": 1
+              }
+            },
+            {
+              "day": "2023-08-02",
+              "topic": "orderbook.500.BTCUSDT",
+              "type": "delta",
+              "n_rows": 862637,
+              "payload_bytes": 648108272,
+              "depth_b": [
+                0,
+                9,
+                911
+              ],
+              "depth_a": [
+                0,
+                10,
+                722
+              ],
+              "n_with_update_id": 862637,
+              "seq": {
+                "n": 862639,
+                "n_non_increasing": 1
+              }
+            },
+            {
+              "day": "2023-08-02",
+              "topic": "orderbook.500.BTCUSDT",
+              "type": "snapshot",
+              "n_rows": 2,
+              "payload_bytes": 42348,
+              "depth_b": [
+                500,
+                500,
+                500
+              ],
+              "depth_a": [
+                500,
+                500,
+                500
+              ],
+              "n_with_update_id": 2,
+              "seq": {
+                "n": 862639,
+                "n_non_increasing": 1
+              }
+            },
+            {
+              "day": "2023-08-16",
+              "topic": "orderbook.500.BTCUSDT",
+              "type": "delta",
+              "n_rows": 861816,
+              "payload_bytes": 542596488,
+              "depth_b": [
+                0,
+                8,
+                739
+              ],
+              "depth_a": [
+                0,
+                8,
+                630
+              ],
+              "n_with_update_id": 861816,
+              "seq": {
+                "n": 861818,
+                "n_non_increasing": 1
+              }
+            },
+            {
+              "day": "2023-08-16",
+              "topic": "orderbook.500.BTCUSDT",
+              "type": "snapshot",
+              "n_rows": 2,
+              "payload_bytes": 42354,
+              "depth_b": [
+                500,
+                500,
+                500
+              ],
+              "depth_a": [
+                500,
+                500,
+                500
+              ],
+              "n_with_update_id": 2,
+              "seq": {
+                "n": 861818,
+                "n_non_increasing": 1
+              }
+            },
+            {
+              "day": "2023-08-30",
+              "topic": "orderbook.500.BTCUSDT",
+              "type": "delta",
+              "n_rows": 863062,
+              "payload_bytes": 682534827,
+              "depth_b": [
+                0,
+                10,
+                899
+              ],
+              "depth_a": [
+                0,
+                10,
+                575
+              ],
+              "n_with_update_id": 863062,
+              "seq": {
+                "n": 863064,
+                "n_non_increasing": 1
+              }
+            },
+            {
+              "day": "2023-08-30",
+              "topic": "orderbook.500.BTCUSDT",
+              "type": "snapshot",
+              "n_rows": 2,
+              "payload_bytes": 42338,
+              "depth_b": [
+                500,
+                500,
+                500
+              ],
+              "depth_a": [
+                500,
+                500,
+                500
+              ],
+              "n_with_update_id": 2,
+              "seq": {
+                "n": 863064,
+                "n_non_increasing": 1
+              }
+            },
+            {
+              "day": "2023-09-13",
+              "topic": "orderbook.500.BTCUSDT",
+              "type": "delta",
+              "n_rows": 862576,
+              "payload_bytes": 678523817,
+              "depth_b": [
+                0,
+                10,
+                601
+              ],
+              "depth_a": [
+                0,
+                9,
+                630
+              ],
+              "n_with_update_id": 862576,
+              "seq": {
+                "n": 862578,
+                "n_non_increasing": 1
+              }
+            },
+            {
+              "day": "2023-09-13",
+              "topic": "orderbook.500.BTCUSDT",
+              "type": "snapshot",
+              "n_rows": 2,
+              "payload_bytes": 42331,
+              "depth_b": [
+                500,
+                500,
+                500
+              ],
+              "depth_a": [
+                500,
+                500,
+                500
+              ],
+              "n_with_update_id": 2,
+              "seq": {
+                "n": 862578,
+                "n_non_increasing": 1
+              }
+            },
+            {
+              "day": "2023-09-27",
+              "topic": "orderbook.500.BTCUSDT",
+              "type": "delta",
+              "n_rows": 863094,
+              "payload_bytes": 622132915,
+              "depth_b": [
+                0,
+                9,
+                751
+              ],
+              "depth_a": [
+                0,
+                9,
+                549
+              ],
+              "n_with_update_id": 863094,
+              "seq": {
+                "n": 863096,
+                "n_non_increasing": 1
+              }
+            },
+            {
+              "day": "2023-09-27",
+              "topic": "orderbook.500.BTCUSDT",
+              "type": "snapshot",
+              "n_rows": 2,
+              "payload_bytes": 42345,
+              "depth_b": [
+                500,
+                500,
+                500
+              ],
+              "depth_a": [
+                500,
+                500,
+                500
+              ],
+              "n_with_update_id": 2,
+              "seq": {
+                "n": 863096,
+                "n_non_increasing": 1
+              }
+            },
+            {
+              "day": "2023-10-11",
+              "topic": "orderbook.500.BTCUSDT",
+              "type": "delta",
+              "n_rows": 863954,
+              "payload_bytes": 998737878,
+              "depth_b": [
+                0,
+                20,
+                754
+              ],
+              "depth_a": [
+                0,
+                20,
+                553
+              ],
+              "n_with_update_id": 863954,
+              "seq": {
+                "n": 863956,
+                "n_non_increasing": 1
+              }
+            },
+            {
+              "day": "2023-10-11",
+              "topic": "orderbook.500.BTCUSDT",
+              "type": "snapshot",
+              "n_rows": 2,
+              "payload_bytes": 42344,
+              "depth_b": [
+                500,
+                500,
+                500
+              ],
+              "depth_a": [
+                500,
+                500,
+                500
+              ],
+              "n_with_update_id": 2,
+              "seq": {
+                "n": 863956,
+                "n_non_increasing": 1
+              }
+            },
+            {
+              "day": "2023-10-25",
+              "topic": "orderbook.500.BTCUSDT",
+              "type": "delta",
+              "n_rows": 863992,
+              "payload_bytes": 1464144083,
+              "depth_b": [
+                0,
+                28,
+                714
+              ],
+              "depth_a": [
+                0,
+                26,
+                819
+              ],
+              "n_with_update_id": 863992,
+              "seq": {
+                "n": 863994,
+                "n_non_increasing": 1
+              }
+            },
+            {
+              "day": "2023-10-25",
+              "topic": "orderbook.500.BTCUSDT",
+              "type": "snapshot",
+              "n_rows": 2,
+              "payload_bytes": 42310,
+              "depth_b": [
+                500,
+                500,
+                500
+              ],
+              "depth_a": [
+                500,
+                500,
+                500
+              ],
+              "n_with_update_id": 2,
+              "seq": {
+                "n": 863994,
+                "n_non_increasing": 1
+              }
+            },
+            {
+              "day": "2023-11-08",
+              "topic": "orderbook.500.BTCUSDT",
+              "type": "delta",
+              "n_rows": 863823,
+              "payload_bytes": 1029201630,
+              "depth_b": [
+                0,
+                22,
+                774
+              ],
+              "depth_a": [
+                0,
+                15,
+                933
+              ],
+              "n_with_update_id": 863823,
+              "seq": {
+                "n": 863825,
+                "n_non_increasing": 1
+              }
+            },
+            {
+              "day": "2023-11-08",
+              "topic": "orderbook.500.BTCUSDT",
+              "type": "snapshot",
+              "n_rows": 2,
+              "payload_bytes": 42310,
+              "depth_b": [
+                500,
+                500,
+                500
+              ],
+              "depth_a": [
+                500,
+                500,
+                500
+              ],
+              "n_with_update_id": 2,
+              "seq": {
+                "n": 863825,
+                "n_non_increasing": 1
+              }
+            },
+            {
+              "day": "2023-11-22",
+              "topic": "orderbook.500.BTCUSDT",
+              "type": "delta",
+              "n_rows": 863994,
+              "payload_bytes": 1359607958,
+              "depth_b": [
+                0,
+                27,
+                737
+              ],
+              "depth_a": [
+                0,
+                25,
+                999
+              ],
+              "n_with_update_id": 863994,
+              "seq": {
+                "n": 863996,
+                "n_non_increasing": 1
+              }
+            },
+            {
+              "day": "2023-11-22",
+              "topic": "orderbook.500.BTCUSDT",
+              "type": "snapshot",
+              "n_rows": 2,
+              "payload_bytes": 42313,
+              "depth_b": [
+                500,
+                500,
+                500
+              ],
+              "depth_a": [
+                500,
+                500,
+                500
+              ],
+              "n_with_update_id": 2,
+              "seq": {
+                "n": 863996,
+                "n_non_increasing": 1
+              }
+            },
+            {
+              "day": "2023-12-06",
+              "topic": "orderbook.500.BTCUSDT",
+              "type": "delta",
+              "n_rows": 864000,
+              "payload_bytes": 1545925864,
+              "depth_b": [
+                0,
+                31,
+                676
+              ],
+              "depth_a": [
+                0,
+                29,
+                695
+              ],
+              "n_with_update_id": 864000,
+              "seq": {
+                "n": 864002,
+                "n_non_increasing": 1
+              }
+            },
+            {
+              "day": "2023-12-06",
+              "topic": "orderbook.500.BTCUSDT",
+              "type": "snapshot",
+              "n_rows": 2,
+              "payload_bytes": 42292,
+              "depth_b": [
+                500,
+                500,
+                500
+              ],
+              "depth_a": [
+                500,
+                500,
+                500
+              ],
+              "n_with_update_id": 2,
+              "seq": {
+                "n": 864002,
+                "n_non_increasing": 1
+              }
+            },
+            {
+              "day": "2023-12-20",
+              "topic": "orderbook.500.BTCUSDT",
+              "type": "delta",
+              "n_rows": 863998,
+              "payload_bytes": 1610795213,
+              "depth_b": [
+                0,
+                29,
+                999
+              ],
+              "depth_a": [
+                0,
+                29,
+                1000
+              ],
+              "n_with_update_id": 863998,
+              "seq": {
+                "n": 864000,
+                "n_non_increasing": 1
+              }
+            },
+            {
+              "day": "2023-12-20",
+              "topic": "orderbook.500.BTCUSDT",
+              "type": "snapshot",
+              "n_rows": 2,
+              "payload_bytes": 42337,
+              "depth_b": [
+                500,
+                500,
+                500
+              ],
+              "depth_a": [
+                500,
+                500,
+                500
+              ],
+              "n_with_update_id": 2,
+              "seq": {
+                "n": 864000,
+                "n_non_increasing": 1
+              }
+            },
+            {
+              "day": "2024-01-03",
+              "topic": "orderbook.500.BTCUSDT",
+              "type": "delta",
+              "n_rows": 863994,
+              "payload_bytes": 1659827165,
+              "depth_b": [
+                0,
+                30,
+                1000
+              ],
+              "depth_a": [
+                0,
+                28,
+                993
+              ],
+              "n_with_update_id": 863994,
+              "seq": {
+                "n": 863996,
+                "n_non_increasing": 1
+              }
+            },
+            {
+              "day": "2024-01-03",
+              "topic": "orderbook.500.BTCUSDT",
+              "type": "snapshot",
+              "n_rows": 2,
+              "payload_bytes": 42332,
+              "depth_b": [
+                500,
+                500,
+                500
+              ],
+              "depth_a": [
+                500,
+                500,
+                500
+              ],
+              "n_with_update_id": 2,
+              "seq": {
+                "n": 863996,
+                "n_non_increasing": 1
+              }
+            },
+            {
+              "day": "2024-01-17",
+              "topic": "orderbook.500.BTCUSDT",
+              "type": "delta",
+              "n_rows": 863973,
+              "payload_bytes": 1266919555,
+              "depth_b": [
+                0,
+                22,
+                1000
+              ],
+              "depth_a": [
+                0,
+                23,
+                914
+              ],
+              "n_with_update_id": 863973,
+              "seq": {
+                "n": 863975,
+                "n_non_increasing": 1
+              }
+            },
+            {
+              "day": "2024-01-17",
+              "topic": "orderbook.500.BTCUSDT",
+              "type": "snapshot",
+              "n_rows": 2,
+              "payload_bytes": 42335,
+              "depth_b": [
+                500,
+                500,
+                500
+              ],
+              "depth_a": [
+                500,
+                500,
+                500
+              ],
+              "n_with_update_id": 2,
+              "seq": {
+                "n": 863975,
+                "n_non_increasing": 1
+              }
+            },
+            {
+              "day": "2024-01-31",
+              "topic": "orderbook.500.BTCUSDT",
+              "type": "delta",
+              "n_rows": 863937,
+              "payload_bytes": 1295139894,
+              "depth_b": [
+                0,
+                22,
+                833
+              ],
+              "depth_a": [
+                0,
+                21,
+                786
+              ],
+              "n_with_update_id": 863937,
+              "seq": {
+                "n": 863939,
+                "n_non_increasing": 1
+              }
+            },
+            {
+              "day": "2024-01-31",
+              "topic": "orderbook.500.BTCUSDT",
+              "type": "snapshot",
+              "n_rows": 2,
+              "payload_bytes": 42334,
+              "depth_b": [
+                500,
+                500,
+                500
+              ],
+              "depth_a": [
+                500,
+                500,
+                500
+              ],
+              "n_with_update_id": 2,
+              "seq": {
+                "n": 863939,
+                "n_non_increasing": 1
+              }
+            },
+            {
+              "day": "2024-02-14",
+              "topic": "orderbook.500.BTCUSDT",
+              "type": "delta",
+              "n_rows": 863967,
+              "payload_bytes": 1471742124,
+              "depth_b": [
+                0,
+                26,
+                984
+              ],
+              "depth_a": [
+                0,
+                24,
+                1000
+              ],
+              "n_with_update_id": 863967,
+              "seq": {
+                "n": 863969,
+                "n_non_increasing": 1
+              }
+            },
+            {
+              "day": "2024-02-14",
+              "topic": "orderbook.500.BTCUSDT",
+              "type": "snapshot",
+              "n_rows": 2,
+              "payload_bytes": 42323,
+              "depth_b": [
+                500,
+                500,
+                500
+              ],
+              "depth_a": [
+                500,
+                500,
+                500
+              ],
+              "n_with_update_id": 2,
+              "seq": {
+                "n": 863969,
+                "n_non_increasing": 1
+              }
+            },
+            {
+              "day": "2024-02-28",
+              "topic": "orderbook.500.BTCUSDT",
+              "type": "delta",
+              "n_rows": 863991,
+              "payload_bytes": 2173351063,
+              "depth_b": [
+                0,
+                36,
+                1000
+              ],
+              "depth_a": [
+                0,
+                35,
+                1000
+              ],
+              "n_with_update_id": 863991,
+              "seq": {
+                "n": 863993,
+                "n_non_increasing": 1
+              }
+            },
+            {
+              "day": "2024-02-28",
+              "topic": "orderbook.500.BTCUSDT",
+              "type": "snapshot",
+              "n_rows": 2,
+              "payload_bytes": 42328,
+              "depth_b": [
+                500,
+                500,
+                500
+              ],
+              "depth_a": [
+                500,
+                500,
+                500
+              ],
+              "n_with_update_id": 2,
+              "seq": {
+                "n": 863993,
+                "n_non_increasing": 1
+              }
+            },
+            {
+              "day": "2024-03-14",
+              "topic": "orderbook.500.BTCUSDT",
+              "type": "delta",
+              "n_rows": 863996,
+              "payload_bytes": 1834338467,
+              "depth_b": [
+                0,
+                29,
+                1000
+              ],
+              "depth_a": [
+                0,
+                28,
+                1000
+              ],
+              "n_with_update_id": 863996,
+              "seq": {
+                "n": 863998,
+                "n_non_increasing": 1
+              }
+            },
+            {
+              "day": "2024-03-14",
+              "topic": "orderbook.500.BTCUSDT",
+              "type": "snapshot",
+              "n_rows": 2,
+              "payload_bytes": 42321,
+              "depth_b": [
+                500,
+                500,
+                500
+              ],
+              "depth_a": [
+                500,
+                500,
+                500
+              ],
+              "n_with_update_id": 2,
+              "seq": {
+                "n": 863998,
+                "n_non_increasing": 1
+              }
+            },
+            {
+              "day": "2024-03-28",
+              "topic": "orderbook.500.BTCUSDT",
+              "type": "delta",
+              "n_rows": 863957,
+              "payload_bytes": 1535048906,
+              "depth_b": [
+                0,
+                27,
+                990
+              ],
+              "depth_a": [
+                0,
+                25,
+                999
+              ],
+              "n_with_update_id": 863957,
+              "seq": {
+                "n": 863959,
+                "n_non_increasing": 1
+              }
+            },
+            {
+              "day": "2024-03-28",
+              "topic": "orderbook.500.BTCUSDT",
+              "type": "snapshot",
+              "n_rows": 2,
+              "payload_bytes": 42322,
+              "depth_b": [
+                500,
+                500,
+                500
+              ],
+              "depth_a": [
+                500,
+                500,
+                500
+              ],
+              "n_with_update_id": 2,
+              "seq": {
+                "n": 863959,
+                "n_non_increasing": 1
+              }
+            },
+            {
+              "day": "2024-04-11",
+              "topic": "orderbook.500.BTCUSDT",
+              "type": "delta",
+              "n_rows": 863903,
+              "payload_bytes": 1303519765,
+              "depth_b": [
+                0,
+                20,
+                1000
+              ],
+              "depth_a": [
+                0,
+                19,
+                978
+              ],
+              "n_with_update_id": 863903,
+              "seq": {
+                "n": 863905,
+                "n_non_increasing": 1
+              }
+            },
+            {
+              "day": "2024-04-11",
+              "topic": "orderbook.500.BTCUSDT",
+              "type": "snapshot",
+              "n_rows": 2,
+              "payload_bytes": 42329,
+              "depth_b": [
+                500,
+                500,
+                500
+              ],
+              "depth_a": [
+                500,
+                500,
+                500
+              ],
+              "n_with_update_id": 2,
+              "seq": {
+                "n": 863905,
+                "n_non_increasing": 1
+              }
+            },
+            {
+              "day": "2024-04-27",
+              "topic": "orderbook.500.BTCUSDT",
+              "type": "delta",
+              "n_rows": 863835,
+              "payload_bytes": 1094610028,
+              "depth_b": [
+                0,
+                18,
+                1000
+              ],
+              "depth_a": [
+                0,
+                18,
+                1000
+              ],
+              "n_with_update_id": 863835,
+              "seq": {
+                "n": 863837,
+                "n_non_increasing": 1
+              }
+            },
+            {
+              "day": "2024-04-27",
+              "topic": "orderbook.500.BTCUSDT",
+              "type": "snapshot",
+              "n_rows": 2,
+              "payload_bytes": 42325,
+              "depth_b": [
+                500,
+                500,
+                500
+              ],
+              "depth_a": [
+                500,
+                500,
+                500
+              ],
+              "n_with_update_id": 2,
+              "seq": {
+                "n": 863837,
+                "n_non_increasing": 1
+              }
+            },
+            {
+              "day": "2024-05-11",
+              "topic": "orderbook.500.BTCUSDT",
+              "type": "delta",
+              "n_rows": 863236,
+              "payload_bytes": 870024538,
+              "depth_b": [
+                0,
+                16,
+                1000
+              ],
+              "depth_a": [
+                0,
+                14,
+                877
+              ],
+              "n_with_update_id": 863236,
+              "seq": {
+                "n": 863238,
+                "n_non_increasing": 1
+              }
+            },
+            {
+              "day": "2024-05-11",
+              "topic": "orderbook.500.BTCUSDT",
+              "type": "snapshot",
+              "n_rows": 2,
+              "payload_bytes": 42324,
+              "depth_b": [
+                500,
+                500,
+                500
+              ],
+              "depth_a": [
+                500,
+                500,
+                500
+              ],
+              "n_with_update_id": 2,
+              "seq": {
+                "n": 863238,
+                "n_non_increasing": 1
+              }
+            },
+            {
+              "day": "2024-05-25",
+              "topic": "orderbook.500.BTCUSDT",
+              "type": "delta",
+              "n_rows": 862803,
+              "payload_bytes": 756084099,
+              "depth_b": [
+                0,
+                13,
+                990
+              ],
+              "depth_a": [
+                0,
+                13,
+                1000
+              ],
+              "n_with_update_id": 862803,
+              "seq": {
+                "n": 862805,
+                "n_non_increasing": 1
+              }
+            },
+            {
+              "day": "2024-05-25",
+              "topic": "orderbook.500.BTCUSDT",
+              "type": "snapshot",
+              "n_rows": 2,
+              "payload_bytes": 42319,
+              "depth_b": [
+                500,
+                500,
+                500
+              ],
+              "depth_a": [
+                500,
+                500,
+                500
+              ],
+              "n_with_update_id": 2,
+              "seq": {
+                "n": 862805,
+                "n_non_increasing": 1
+              }
+            },
+            {
+              "day": "2024-06-08",
+              "topic": "orderbook.500.BTCUSDT",
+              "type": "delta",
+              "n_rows": 861095,
+              "payload_bytes": 554670411,
+              "depth_b": [
+                0,
+                11,
+                798
+              ],
+              "depth_a": [
+                0,
+                6,
+                751
+              ],
+              "n_with_update_id": 861095,
+              "seq": {
+                "n": 861097,
+                "n_non_increasing": 1
+              }
+            },
+            {
+              "day": "2024-06-08",
+              "topic": "orderbook.500.BTCUSDT",
+              "type": "snapshot",
+              "n_rows": 2,
+              "payload_bytes": 42320,
+              "depth_b": [
+                500,
+                500,
+                500
+              ],
+              "depth_a": [
+                500,
+                500,
+                500
+              ],
+              "n_with_update_id": 2,
+              "seq": {
+                "n": 861097,
+                "n_non_increasing": 1
+              }
+            },
+            {
+              "day": "2024-06-22",
+              "topic": "orderbook.500.BTCUSDT",
+              "type": "delta",
+              "n_rows": 859308,
+              "payload_bytes": 572402618,
+              "depth_b": [
+                0,
+                9,
+                840
+              ],
+              "depth_a": [
+                0,
+                10,
+                744
+              ],
+              "n_with_update_id": 859308,
+              "seq": {
+                "n": 859310,
+                "n_non_increasing": 1
+              }
+            },
+            {
+              "day": "2024-06-22",
+              "topic": "orderbook.500.BTCUSDT",
+              "type": "snapshot",
+              "n_rows": 2,
+              "payload_bytes": 42316,
+              "depth_b": [
+                500,
+                500,
+                500
+              ],
+              "depth_a": [
+                500,
+                500,
+                500
+              ],
+              "n_with_update_id": 2,
+              "seq": {
+                "n": 859310,
+                "n_non_increasing": 1
+              }
+            },
+            {
+              "day": "2024-07-06",
+              "topic": "orderbook.500.BTCUSDT",
+              "type": "delta",
+              "n_rows": 863734,
+              "payload_bytes": 1242169013,
+              "depth_b": [
+                0,
+                20,
+                773
+              ],
+              "depth_a": [
+                0,
+                21,
+                1000
+              ],
+              "n_with_update_id": 863734,
+              "seq": {
+                "n": 863736,
+                "n_non_increasing": 1
+              }
+            },
+            {
+              "day": "2024-07-06",
+              "topic": "orderbook.500.BTCUSDT",
+              "type": "snapshot",
+              "n_rows": 2,
+              "payload_bytes": 42322,
+              "depth_b": [
+                500,
+                500,
+                500
+              ],
+              "depth_a": [
+                500,
+                500,
+                500
+              ],
+              "n_with_update_id": 2,
+              "seq": {
+                "n": 863736,
+                "n_non_increasing": 1
+              }
+            },
+            {
+              "day": "2024-07-20",
+              "topic": "orderbook.500.BTCUSDT",
+              "type": "delta",
+              "n_rows": 863824,
+              "payload_bytes": 950072050,
+              "depth_b": [
+                0,
+                18,
+                961
+              ],
+              "depth_a": [
+                0,
+                17,
+                1000
+              ],
+              "n_with_update_id": 863824,
+              "seq": {
+                "n": 863826,
+                "n_non_increasing": 1
+              }
+            },
+            {
+              "day": "2024-07-20",
+              "topic": "orderbook.500.BTCUSDT",
+              "type": "snapshot",
+              "n_rows": 2,
+              "payload_bytes": 42318,
+              "depth_b": [
+                500,
+                500,
+                500
+              ],
+              "depth_a": [
+                500,
+                500,
+                500
+              ],
+              "n_with_update_id": 2,
+              "seq": {
+                "n": 863826,
+                "n_non_increasing": 1
+              }
+            },
+            {
+              "day": "2024-08-03",
+              "topic": "orderbook.500.BTCUSDT",
+              "type": "delta",
+              "n_rows": 863098,
+              "payload_bytes": 1479790896,
+              "depth_b": [
+                0,
+                25,
+                1000
+              ],
+              "depth_a": [
+                0,
+                26,
+                1000
+              ],
+              "n_with_update_id": 863098,
+              "seq": {
+                "n": 863100,
+                "n_non_increasing": 1
+              }
+            },
+            {
+              "day": "2024-08-03",
+              "topic": "orderbook.500.BTCUSDT",
+              "type": "snapshot",
+              "n_rows": 2,
+              "payload_bytes": 42317,
+              "depth_b": [
+                500,
+                500,
+                500
+              ],
+              "depth_a": [
+                500,
+                500,
+                500
+              ],
+              "n_with_update_id": 2,
+              "seq": {
+                "n": 863100,
+                "n_non_increasing": 1
+              }
+            },
+            {
+              "day": "2024-08-18",
+              "topic": "orderbook.500.BTCUSDT",
+              "type": "delta",
+              "n_rows": 863601,
+              "payload_bytes": 990939742,
+              "depth_b": [
+                0,
+                17,
+                1000
+              ],
+              "depth_a": [
+                0,
+                18,
+                990
+              ],
+              "n_with_update_id": 863601,
+              "seq": {
+                "n": 863603,
+                "n_non_increasing": 1
+              }
+            },
+            {
+              "day": "2024-08-18",
+              "topic": "orderbook.500.BTCUSDT",
+              "type": "snapshot",
+              "n_rows": 2,
+              "payload_bytes": 42324,
+              "depth_b": [
+                500,
+                500,
+                500
+              ],
+              "depth_a": [
+                500,
+                500,
+                500
+              ],
+              "n_with_update_id": 2,
+              "seq": {
+                "n": 863603,
+                "n_non_increasing": 1
+              }
+            },
+            {
+              "day": "2024-09-01",
+              "topic": "orderbook.500.BTCUSDT",
+              "type": "delta",
+              "n_rows": 863904,
+              "payload_bytes": 1409526099,
+              "depth_b": [
+                0,
+                22,
+                1000
+              ],
+              "depth_a": [
+                0,
+                24,
+                1000
+              ],
+              "n_with_update_id": 863904,
+              "seq": {
+                "n": 863906,
+                "n_non_increasing": 1
+              }
+            },
+            {
+              "day": "2024-09-01",
+              "topic": "orderbook.500.BTCUSDT",
+              "type": "snapshot",
+              "n_rows": 2,
+              "payload_bytes": 42316,
+              "depth_b": [
+                500,
+                500,
+                500
+              ],
+              "depth_a": [
+                500,
+                500,
+                500
+              ],
+              "n_with_update_id": 2,
+              "seq": {
+                "n": 863906,
+                "n_non_increasing": 1
+              }
+            },
+            {
+              "day": "2024-09-15",
+              "topic": "orderbook.500.BTCUSDT",
+              "type": "delta",
+              "n_rows": 862920,
+              "payload_bytes": 896890734,
+              "depth_b": [
+                0,
+                15,
+                1000
+              ],
+              "depth_a": [
+                0,
+                14,
+                1000
+              ],
+              "n_with_update_id": 862920,
+              "seq": {
+                "n": 862922,
+                "n_non_increasing": 1
+              }
+            },
+            {
+              "day": "2024-09-15",
+              "topic": "orderbook.500.BTCUSDT",
+              "type": "snapshot",
+              "n_rows": 2,
+              "payload_bytes": 42319,
+              "depth_b": [
+                500,
+                500,
+                500
+              ],
+              "depth_a": [
+                500,
+                500,
+                500
+              ],
+              "n_with_update_id": 2,
+              "seq": {
+                "n": 862922,
+                "n_non_increasing": 1
+              }
+            },
+            {
+              "day": "2024-09-29",
+              "topic": "orderbook.500.BTCUSDT",
+              "type": "delta",
+              "n_rows": 863233,
+              "payload_bytes": 824027700,
+              "depth_b": [
+                0,
+                14,
+                1000
+              ],
+              "depth_a": [
+                0,
+                15,
+                993
+              ],
+              "n_with_update_id": 863233,
+              "seq": {
+                "n": 863235,
+                "n_non_increasing": 1
+              }
+            },
+            {
+              "day": "2024-09-29",
+              "topic": "orderbook.500.BTCUSDT",
+              "type": "snapshot",
+              "n_rows": 2,
+              "payload_bytes": 42321,
+              "depth_b": [
+                500,
+                500,
+                500
+              ],
+              "depth_a": [
+                500,
+                500,
+                500
+              ],
+              "n_with_update_id": 2,
+              "seq": {
+                "n": 863235,
+                "n_non_increasing": 1
+              }
+            },
+            {
+              "day": "2024-10-13",
+              "topic": "orderbook.500.BTCUSDT",
+              "type": "delta",
+              "n_rows": 863252,
+              "payload_bytes": 936556596,
+              "depth_b": [
+                0,
+                15,
+                987
+              ],
+              "depth_a": [
+                0,
+                15,
+                1000
+              ],
+              "n_with_update_id": 863252,
+              "seq": {
+                "n": 863254,
+                "n_non_increasing": 1
+              }
+            },
+            {
+              "day": "2024-10-13",
+              "topic": "orderbook.500.BTCUSDT",
+              "type": "snapshot",
+              "n_rows": 2,
+              "payload_bytes": 42324,
+              "depth_b": [
+                500,
+                500,
+                500
+              ],
+              "depth_a": [
+                500,
+                500,
+                500
+              ],
+              "n_with_update_id": 2,
+              "seq": {
+                "n": 863254,
+                "n_non_increasing": 1
+              }
+            },
+            {
+              "day": "2024-10-27",
+              "topic": "orderbook.500.BTCUSDT",
+              "type": "delta",
+              "n_rows": 863361,
+              "payload_bytes": 868933221,
+              "depth_b": [
+                0,
+                15,
+                831
+              ],
+              "depth_a": [
+                0,
+                16,
+                1000
+              ],
+              "n_with_update_id": 863361,
+              "seq": {
+                "n": 863363,
+                "n_non_increasing": 1
+              }
+            },
+            {
+              "day": "2024-10-27",
+              "topic": "orderbook.500.BTCUSDT",
+              "type": "snapshot",
+              "n_rows": 2,
+              "payload_bytes": 42322,
+              "depth_b": [
+                500,
+                500,
+                500
+              ],
+              "depth_a": [
+                500,
+                500,
+                500
+              ],
+              "n_with_update_id": 2,
+              "seq": {
+                "n": 863363,
+                "n_non_increasing": 1
+              }
+            },
+            {
+              "day": "2024-11-10",
+              "topic": "orderbook.500.BTCUSDT",
+              "type": "delta",
+              "n_rows": 864000,
+              "payload_bytes": 1853164126,
+              "depth_b": [
+                0,
+                32,
+                1000
+              ],
+              "depth_a": [
+                0,
+                32,
+                1000
+              ],
+              "n_with_update_id": 864000,
+              "seq": {
+                "n": 864002,
+                "n_non_increasing": 1
+              }
+            },
+            {
+              "day": "2024-11-10",
+              "topic": "orderbook.500.BTCUSDT",
+              "type": "snapshot",
+              "n_rows": 2,
+              "payload_bytes": 42313,
+              "depth_b": [
+                500,
+                500,
+                500
+              ],
+              "depth_a": [
+                500,
+                500,
+                500
+              ],
+              "n_with_update_id": 2,
+              "seq": {
+                "n": 864002,
+                "n_non_increasing": 1
+              }
+            },
+            {
+              "day": "2024-11-26",
+              "topic": "orderbook.500.BTCUSDT",
+              "type": "delta",
+              "n_rows": 863994,
+              "payload_bytes": 2410236938,
+              "depth_b": [
+                0,
+                38,
+                1000
+              ],
+              "depth_a": [
+                0,
+                39,
+                1000
+              ],
+              "n_with_update_id": 863994,
+              "seq": {
+                "n": 863996,
+                "n_non_increasing": 1
+              }
+            },
+            {
+              "day": "2024-11-26",
+              "topic": "orderbook.500.BTCUSDT",
+              "type": "snapshot",
+              "n_rows": 2,
+              "payload_bytes": 42315,
+              "depth_b": [
+                500,
+                500,
+                500
+              ],
+              "depth_a": [
+                500,
+                500,
+                500
+              ],
+              "n_with_update_id": 2,
+              "seq": {
+                "n": 863996,
+                "n_non_increasing": 1
+              }
+            },
+            {
+              "day": "2024-12-10",
+              "topic": "orderbook.500.BTCUSDT",
+              "type": "delta",
+              "n_rows": 863999,
+              "payload_bytes": 2523494993,
+              "depth_b": [
+                0,
+                39,
+                1000
+              ],
+              "depth_a": [
+                0,
+                40,
+                1000
+              ],
+              "n_with_update_id": 863999,
+              "seq": {
+                "n": 864001,
+                "n_non_increasing": 1
+              }
+            },
+            {
+              "day": "2024-12-10",
+              "topic": "orderbook.500.BTCUSDT",
+              "type": "snapshot",
+              "n_rows": 2,
+              "payload_bytes": 42319,
+              "depth_b": [
+                500,
+                500,
+                500
+              ],
+              "depth_a": [
+                500,
+                500,
+                500
+              ],
+              "n_with_update_id": 2,
+              "seq": {
+                "n": 864001,
+                "n_non_increasing": 1
+              }
+            },
+            {
+              "day": "2024-12-24",
+              "topic": "orderbook.500.BTCUSDT",
+              "type": "delta",
+              "n_rows": 863992,
+              "payload_bytes": 1841177267,
+              "depth_b": [
+                0,
+                32,
+                988
+              ],
+              "depth_a": [
+                0,
+                33,
+                1000
+              ],
+              "n_with_update_id": 863992,
+              "seq": {
+                "n": 863994,
+                "n_non_increasing": 1
+              }
+            },
+            {
+              "day": "2024-12-24",
+              "topic": "orderbook.500.BTCUSDT",
+              "type": "snapshot",
+              "n_rows": 2,
+              "payload_bytes": 42315,
+              "depth_b": [
+                500,
+                500,
+                500
+              ],
+              "depth_a": [
+                500,
+                500,
+                500
+              ],
+              "n_with_update_id": 2,
+              "seq": {
+                "n": 863994,
+                "n_non_increasing": 1
+              }
+            },
+            {
+              "day": "2025-01-07",
+              "topic": "orderbook.500.BTCUSDT",
+              "type": "delta",
+              "n_rows": 863990,
+              "payload_bytes": 1976138966,
+              "depth_b": [
+                0,
+                29,
+                1000
+              ],
+              "depth_a": [
+                0,
+                30,
+                1000
+              ],
+              "n_with_update_id": 863990,
+              "seq": {
+                "n": 863992,
+                "n_non_increasing": 1
+              }
+            },
+            {
+              "day": "2025-01-07",
+              "topic": "orderbook.500.BTCUSDT",
+              "type": "snapshot",
+              "n_rows": 2,
+              "payload_bytes": 43316,
+              "depth_b": [
+                500,
+                500,
+                500
+              ],
+              "depth_a": [
+                500,
+                500,
+                500
+              ],
+              "n_with_update_id": 2,
+              "seq": {
+                "n": 863992,
+                "n_non_increasing": 1
+              }
+            },
+            {
+              "day": "2025-01-24",
+              "topic": "orderbook.500.BTCUSDT",
+              "type": "delta",
+              "n_rows": 864000,
+              "payload_bytes": 2112251254,
+              "depth_b": [
+                0,
+                35,
+                1000
+              ],
+              "depth_a": [
+                0,
+                37,
+                1000
+              ],
+              "n_with_update_id": 864000,
+              "seq": {
+                "n": 864002,
+                "n_non_increasing": 1
+              }
+            },
+            {
+              "day": "2025-01-24",
+              "topic": "orderbook.500.BTCUSDT",
+              "type": "snapshot",
+              "n_rows": 2,
+              "payload_bytes": 44314,
+              "depth_b": [
+                500,
+                500,
+                500
+              ],
+              "depth_a": [
+                500,
+                500,
+                500
+              ],
+              "n_with_update_id": 2,
+              "seq": {
+                "n": 864002,
+                "n_non_increasing": 1
+              }
+            },
+            {
+              "day": "2025-02-11",
+              "topic": "orderbook.500.BTCUSDT",
+              "type": "delta",
+              "n_rows": 863902,
+              "payload_bytes": 1738631610,
+              "depth_b": [
+                0,
+                32,
+                1000
+              ],
+              "depth_a": [
+                0,
+                32,
+                1000
+              ],
+              "n_with_update_id": 863902,
+              "seq": {
+                "n": 863905,
+                "n_non_increasing": 1
+              }
+            },
+            {
+              "day": "2025-02-11",
+              "topic": "orderbook.500.BTCUSDT",
+              "type": "snapshot",
+              "n_rows": 3,
+              "payload_bytes": 63471,
+              "depth_b": [
+                500,
+                500,
+                500
+              ],
+              "depth_a": [
+                500,
+                500,
+                500
+              ],
+              "n_with_update_id": 3,
+              "seq": {
+                "n": 863905,
+                "n_non_increasing": 1
+              }
+            },
+            {
+              "day": "2025-02-25",
+              "topic": "orderbook.500.BTCUSDT",
+              "type": "delta",
+              "n_rows": 863999,
+              "payload_bytes": 3647339751,
+              "depth_b": [
+                0,
+                61,
+                1000
+              ],
+              "depth_a": [
+                0,
+                63,
+                1000
+              ],
+              "n_with_update_id": 863999,
+              "seq": {
+                "n": 864001,
+                "n_non_increasing": 1
+              }
+            },
+            {
+              "day": "2025-02-25",
+              "topic": "orderbook.500.BTCUSDT",
+              "type": "snapshot",
+              "n_rows": 2,
+              "payload_bytes": 42315,
+              "depth_b": [
+                500,
+                500,
+                500
+              ],
+              "depth_a": [
+                500,
+                500,
+                500
+              ],
+              "n_with_update_id": 2,
+              "seq": {
+                "n": 864001,
+                "n_non_increasing": 1
+              }
+            },
+            {
+              "day": "2025-03-17",
+              "topic": "orderbook.500.BTCUSDT",
+              "type": "delta",
+              "n_rows": 863989,
+              "payload_bytes": 2176774939,
+              "depth_b": [
+                0,
+                38,
+                1000
+              ],
+              "depth_a": [
+                0,
+                37,
+                1000
+              ],
+              "n_with_update_id": 863989,
+              "seq": {
+                "n": 863991,
+                "n_non_increasing": 1
+              }
+            },
+            {
+              "day": "2025-03-17",
+              "topic": "orderbook.500.BTCUSDT",
+              "type": "snapshot",
+              "n_rows": 2,
+              "payload_bytes": 42316,
+              "depth_b": [
+                500,
+                500,
+                500
+              ],
+              "depth_a": [
+                500,
+                500,
+                500
+              ],
+              "n_with_update_id": 2,
+              "seq": {
+                "n": 863991,
+                "n_non_increasing": 1
+              }
+            },
+            {
+              "day": "2025-04-01",
+              "topic": "orderbook.500.BTCUSDT",
+              "type": "delta",
+              "n_rows": 863955,
+              "payload_bytes": 2041186068,
+              "depth_b": [
+                0,
+                34,
+                904
+              ],
+              "depth_a": [
+                0,
+                35,
+                1000
+              ],
+              "n_with_update_id": 863955,
+              "seq": {
+                "n": 863957,
+                "n_non_increasing": 1
+              }
+            },
+            {
+              "day": "2025-04-01",
+              "topic": "orderbook.500.BTCUSDT",
+              "type": "snapshot",
+              "n_rows": 2,
+              "payload_bytes": 42323,
+              "depth_b": [
+                500,
+                500,
+                500
+              ],
+              "depth_a": [
+                500,
+                500,
+                500
+              ],
+              "n_with_update_id": 2,
+              "seq": {
+                "n": 863957,
+                "n_non_increasing": 1
+              }
+            },
+            {
+              "day": "2025-04-21",
+              "topic": "orderbook.500.BTCUSDT",
+              "type": "delta",
+              "n_rows": 863985,
+              "payload_bytes": 2042327838,
+              "depth_b": [
+                0,
+                33,
+                993
+              ],
+              "depth_a": [
+                0,
+                35,
+                1000
+              ],
+              "n_with_update_id": 863985,
+              "seq": {
+                "n": 863987,
+                "n_non_increasing": 1
+              }
+            },
+            {
+              "day": "2025-04-21",
+              "topic": "orderbook.500.BTCUSDT",
+              "type": "snapshot",
+              "n_rows": 2,
+              "payload_bytes": 42316,
+              "depth_b": [
+                500,
+                500,
+                500
+              ],
+              "depth_a": [
+                500,
+                500,
+                500
+              ],
+              "n_with_update_id": 2,
+              "seq": {
+                "n": 863987,
+                "n_non_increasing": 1
+              }
+            },
+            {
+              "day": "2025-05-06",
+              "topic": "orderbook.500.BTCUSDT",
+              "type": "delta",
+              "n_rows": 863909,
+              "payload_bytes": 1535406420,
+              "depth_b": [
+                0,
+                25,
+                1000
+              ],
+              "depth_a": [
+                0,
+                26,
+                1000
+              ],
+              "n_with_update_id": 863909,
+              "seq": {
+                "n": 863911,
+                "n_non_increasing": 1
+              }
+            },
+            {
+              "day": "2025-05-06",
+              "topic": "orderbook.500.BTCUSDT",
+              "type": "snapshot",
+              "n_rows": 2,
+              "payload_bytes": 42316,
+              "depth_b": [
+                500,
+                500,
+                500
+              ],
+              "depth_a": [
+                500,
+                500,
+                500
+              ],
+              "n_with_update_id": 2,
+              "seq": {
+                "n": 863911,
+                "n_non_increasing": 1
+              }
+            },
+            {
+              "day": "2025-05-20",
+              "topic": "orderbook.500.BTCUSDT",
+              "type": "delta",
+              "n_rows": 863844,
+              "payload_bytes": 1867330035,
+              "depth_b": [
+                0,
+                27,
+                1000
+              ],
+              "depth_a": [
+                0,
+                27,
+                1000
+              ],
+              "n_with_update_id": 863844,
+              "seq": {
+                "n": 863846,
+                "n_non_increasing": 1
+              }
+            },
+            {
+              "day": "2025-05-20",
+              "topic": "orderbook.500.BTCUSDT",
+              "type": "snapshot",
+              "n_rows": 2,
+              "payload_bytes": 44315,
+              "depth_b": [
+                500,
+                500,
+                500
+              ],
+              "depth_a": [
+                500,
+                500,
+                500
+              ],
+              "n_with_update_id": 2,
+              "seq": {
+                "n": 863846,
+                "n_non_increasing": 1
+              }
+            },
+            {
+              "day": "2025-06-04",
+              "topic": "orderbook.500.BTCUSDT",
+              "type": "delta",
+              "n_rows": 863894,
+              "payload_bytes": 1458368775,
+              "depth_b": [
+                0,
+                25,
+                1000
+              ],
+              "depth_a": [
+                0,
+                24,
+                979
+              ],
+              "n_with_update_id": 863894,
+              "seq": {
+                "n": 863896,
+                "n_non_increasing": 1
+              }
+            },
+            {
+              "day": "2025-06-04",
+              "topic": "orderbook.500.BTCUSDT",
+              "type": "snapshot",
+              "n_rows": 2,
+              "payload_bytes": 44315,
+              "depth_b": [
+                500,
+                500,
+                500
+              ],
+              "depth_a": [
+                500,
+                500,
+                500
+              ],
+              "n_with_update_id": 2,
+              "seq": {
+                "n": 863896,
+                "n_non_increasing": 1
+              }
+            },
+            {
+              "day": "2025-06-18",
+              "topic": "orderbook.500.BTCUSDT",
+              "type": "delta",
+              "n_rows": 863574,
+              "payload_bytes": 2011471998,
+              "depth_b": [
+                0,
+                33,
+                1000
+              ],
+              "depth_a": [
+                0,
+                34,
+                1000
+              ],
+              "n_with_update_id": 863574,
+              "seq": {
+                "n": 863578,
+                "n_non_increasing": 1
+              }
+            },
+            {
+              "day": "2025-06-18",
+              "topic": "orderbook.500.BTCUSDT",
+              "type": "snapshot",
+              "n_rows": 4,
+              "payload_bytes": 88627,
+              "depth_b": [
+                500,
+                500,
+                500
+              ],
+              "depth_a": [
+                500,
+                500,
+                500
+              ],
+              "n_with_update_id": 4,
+              "seq": {
+                "n": 863578,
+                "n_non_increasing": 1
+              }
+            },
+            {
+              "day": "2025-07-02",
+              "topic": "orderbook.500.BTCUSDT",
+              "type": "delta",
+              "n_rows": 863960,
+              "payload_bytes": 1377678383,
+              "depth_b": [
+                0,
+                22,
+                1000
+              ],
+              "depth_a": [
+                0,
+                21,
+                1000
+              ],
+              "n_with_update_id": 863960,
+              "seq": {
+                "n": 863962,
+                "n_non_increasing": 1
+              }
+            },
+            {
+              "day": "2025-07-02",
+              "topic": "orderbook.500.BTCUSDT",
+              "type": "snapshot",
+              "n_rows": 2,
+              "payload_bytes": 44318,
+              "depth_b": [
+                500,
+                500,
+                500
+              ],
+              "depth_a": [
+                500,
+                500,
+                500
+              ],
+              "n_with_update_id": 2,
+              "seq": {
+                "n": 863962,
+                "n_non_increasing": 1
+              }
+            },
+            {
+              "day": "2025-07-16",
+              "topic": "orderbook.500.BTCUSDT",
+              "type": "delta",
+              "n_rows": 863998,
+              "payload_bytes": 1744462125,
+              "depth_b": [
+                0,
+                28,
+                1000
+              ],
+              "depth_a": [
+                0,
+                28,
+                1000
+              ],
+              "n_with_update_id": 863998,
+              "seq": {
+                "n": 864000,
+                "n_non_increasing": 1
+              }
+            },
+            {
+              "day": "2025-07-16",
+              "topic": "orderbook.500.BTCUSDT",
+              "type": "snapshot",
+              "n_rows": 2,
+              "payload_bytes": 44316,
+              "depth_b": [
+                500,
+                500,
+                500
+              ],
+              "depth_a": [
+                500,
+                500,
+                500
+              ],
+              "n_with_update_id": 2,
+              "seq": {
+                "n": 864000,
+                "n_non_increasing": 1
+              }
+            },
+            {
+              "day": "2025-07-30",
+              "topic": "orderbook.500.BTCUSDT",
+              "type": "delta",
+              "n_rows": 864000,
+              "payload_bytes": 1545193884,
+              "depth_b": [
+                0,
+                24,
+                1000
+              ],
+              "depth_a": [
+                0,
+                25,
+                1000
+              ],
+              "n_with_update_id": 864000,
+              "seq": {
+                "n": 864002,
+                "n_non_increasing": 1
+              }
+            },
+            {
+              "day": "2025-07-30",
+              "topic": "orderbook.500.BTCUSDT",
+              "type": "snapshot",
+              "n_rows": 2,
+              "payload_bytes": 44317,
+              "depth_b": [
+                500,
+                500,
+                500
+              ],
+              "depth_a": [
+                500,
+                500,
+                500
+              ],
+              "n_with_update_id": 2,
+              "seq": {
+                "n": 864002,
+                "n_non_increasing": 1
+              }
+            },
+            {
+              "day": "2025-08-13",
+              "topic": "orderbook.500.BTCUSDT",
+              "type": "delta",
+              "n_rows": 863992,
+              "payload_bytes": 1799657836,
+              "depth_b": [
+                0,
+                28,
+                1000
+              ],
+              "depth_a": [
+                0,
+                30,
+                1000
+              ],
+              "n_with_update_id": 863992,
+              "seq": {
+                "n": 863994,
+                "n_non_increasing": 1
+              }
+            },
+            {
+              "day": "2025-08-13",
+              "topic": "orderbook.500.BTCUSDT",
+              "type": "snapshot",
+              "n_rows": 2,
+              "payload_bytes": 44314,
+              "depth_b": [
+                500,
+                500,
+                500
+              ],
+              "depth_a": [
+                500,
+                500,
+                500
+              ],
+              "n_with_update_id": 2,
+              "seq": {
+                "n": 863994,
+                "n_non_increasing": 1
+              }
+            },
+            {
+              "day": "2026-06-22",
+              "topic": "orderbook.1000.BTCUSDT",
+              "type": "delta",
+              "n_rows": 144006,
+              "payload_bytes": 501974234,
+              "depth_b": [
+                0,
+                47,
+                1279
+              ],
+              "depth_a": [
+                0,
+                44,
+                1468
+              ],
+              "n_with_update_id": 144006,
+              "seq": {
+                "n": 144007,
+                "n_non_increasing": 0
+              }
+            },
+            {
+              "day": "2026-06-22",
+              "topic": "orderbook.1000.BTCUSDT",
+              "type": "snapshot",
+              "n_rows": 1,
+              "payload_bytes": 42187,
+              "depth_b": [
+                1000,
+                1000,
+                1000
+              ],
+              "depth_a": [
+                1000,
+                1000,
+                1000
+              ],
+              "n_with_update_id": 1,
+              "seq": {
+                "n": 144007,
+                "n_non_increasing": 0
+              }
+            },
+            {
+              "day": "2026-07-18",
+              "topic": "orderbook.1000.BTCUSDT",
+              "type": "delta",
+              "n_rows": 206650,
+              "payload_bytes": 312008674,
+              "depth_b": [
+                0,
+                24,
+                1393
+              ],
+              "depth_a": [
+                0,
+                24,
+                1854
+              ],
+              "n_with_update_id": 206650,
+              "seq": {
+                "n": 206651,
+                "n_non_increasing": 0
+              }
+            },
+            {
+              "day": "2026-07-18",
+              "topic": "orderbook.1000.BTCUSDT",
+              "type": "snapshot",
+              "n_rows": 1,
+              "payload_bytes": 42182,
+              "depth_b": [
+                1000,
+                1000,
+                1000
+              ],
+              "depth_a": [
+                1000,
+                1000,
+                1000
+              ],
+              "n_with_update_id": 1,
+              "seq": {
+                "n": 206651,
+                "n_non_increasing": 0
+              }
+            },
+            {
+              "day": "2026-08-02",
+              "topic": "orderbook.1000.BTCUSDT",
+              "type": "delta",
+              "n_rows": 159500,
+              "payload_bytes": 309157855,
+              "depth_b": [
+                0,
+                33,
+                1001
+              ],
+              "depth_a": [
+                0,
+                31,
+                1155
+              ],
+              "n_with_update_id": 159500,
+              "seq": {
+                "n": 159501,
+                "n_non_increasing": 0
+              }
+            },
+            {
+              "day": "2026-08-02",
+              "topic": "orderbook.1000.BTCUSDT",
+              "type": "snapshot",
+              "n_rows": 1,
+              "payload_bytes": 42188,
+              "depth_b": [
+                1000,
+                1000,
+                1000
+              ],
+              "depth_a": [
+                1000,
+                1000,
+                1000
+              ],
+              "n_with_update_id": 1,
+              "seq": {
+                "n": 159501,
+                "n_non_increasing": 0
+              }
+            },
+            {
+              "day": "2026-08-13",
+              "topic": "orderbook.1000.BTCUSDT",
+              "type": "delta",
+              "n_rows": 277788,
+              "payload_bytes": 619239474,
+              "depth_b": [
+                0,
+                38,
+                1293
+              ],
+              "depth_a": [
+                0,
+                38,
+                1045
+              ],
+              "n_with_update_id": 277788,
+              "seq": {
+                "n": 277792,
+                "n_non_increasing": 2
+              }
+            },
+            {
+              "day": "2026-08-13",
+              "topic": "orderbook.1000.BTCUSDT",
+              "type": "snapshot",
+              "n_rows": 4,
+              "payload_bytes": 168753,
+              "depth_b": [
+                1000,
+                1000,
+                1000
+              ],
+              "depth_a": [
+                1000,
+                1000,
+                1000
+              ],
+              "n_with_update_id": 4,
+              "seq": {
+                "n": 277792,
+                "n_non_increasing": 2
+              }
+            }
+          ],
+          "errors": []
+        }
+      }
+    },
+    "ETHUSDT": {
+      "streams": {
+        "orderbook": {
+          "days_total": 533,
+          "first_day": "2023-01-18",
+          "last_day": "2026-08-13",
+          "days_sampled": 39,
+          "seconds": 203.3,
+          "regimes": {
+            "orderbook.500.ETHUSDT - delta": {
+              "first_sampled_day": "2023-01-18",
+              "last_sampled_day": "2024-05-10",
+              "days_sampled": 35,
+              "rows": 29751490,
+              "bytes": 25814084498,
+              "depth_b_min": 0,
+              "depth_b_max": 1000,
+              "seq_non_increasing_total": 37,
+              "seq_checked_total": 29751564
+            },
+            "orderbook.500.ETHUSDT - snapshot": {
+              "first_sampled_day": "2023-01-18",
+              "last_sampled_day": "2024-05-10",
+              "days_sampled": 35,
+              "rows": 74,
+              "bytes": 1441506,
+              "depth_b_min": 500,
+              "depth_b_max": 500,
+              "seq_non_increasing_total": 37,
+              "seq_checked_total": 29751564
+            },
+            "orderbook.1000.ETHUSDT - delta": {
+              "first_sampled_day": "2026-06-19",
+              "last_sampled_day": "2026-08-13",
+              "days_sampled": 4,
+              "rows": 1284968,
+              "bytes": 2261261388,
+              "depth_b_min": 0,
+              "depth_b_max": 1152,
+              "seq_non_increasing_total": 32,
+              "seq_checked_total": 1284981
+            },
+            "orderbook.1000.ETHUSDT - snapshot": {
+              "first_sampled_day": "2026-06-19",
+              "last_sampled_day": "2026-08-13",
+              "days_sampled": 4,
+              "rows": 13,
+              "bytes": 505003,
+              "depth_b_min": 1000,
+              "depth_b_max": 1000,
+              "seq_non_increasing_total": 32,
+              "seq_checked_total": 1284981
+            }
+          },
+          "day_rows": [
+            {
+              "day": "2023-01-18",
+              "topic": "orderbook.500.ETHUSDT",
+              "type": "delta",
+              "n_rows": 620958,
+              "payload_bytes": 675189018,
+              "depth_b": [
+                0,
+                14,
+                751
+              ],
+              "depth_a": [
+                0,
+                15,
+                444
+              ],
+              "n_with_update_id": 620958,
+              "seq": {
+                "n": 620960,
+                "n_non_increasing": 1
+              }
+            },
+            {
+              "day": "2023-01-18",
+              "topic": "orderbook.500.ETHUSDT",
+              "type": "snapshot",
+              "n_rows": 2,
+              "payload_bytes": 39096,
+              "depth_b": [
+                500,
+                500,
+                500
+              ],
+              "depth_a": [
+                500,
+                500,
+                500
+              ],
+              "n_with_update_id": 2,
+              "seq": {
+                "n": 620960,
+                "n_non_increasing": 1
+              }
+            },
+            {
+              "day": "2023-02-01",
+              "topic": "orderbook.500.ETHUSDT",
+              "type": "delta",
+              "n_rows": 861367,
+              "payload_bytes": 669531353,
+              "depth_b": [
+                0,
+                12,
+                532
+              ],
+              "depth_a": [
+                0,
+                11,
+                443
+              ],
+              "n_with_update_id": 861367,
+              "seq": {
+                "n": 861369,
+                "n_non_increasing": 1
+              }
+            },
+            {
+              "day": "2023-02-01",
+              "topic": "orderbook.500.ETHUSDT",
+              "type": "snapshot",
+              "n_rows": 2,
+              "payload_bytes": 38894,
+              "depth_b": [
+                500,
+                500,
+                500
+              ],
+              "depth_a": [
+                500,
+                500,
+                500
+              ],
+              "n_with_update_id": 2,
+              "seq": {
+                "n": 861369,
+                "n_non_increasing": 1
+              }
+            },
+            {
+              "day": "2023-02-15",
+              "topic": "orderbook.500.ETHUSDT",
+              "type": "delta",
+              "n_rows": 863816,
+              "payload_bytes": 592586174,
+              "depth_b": [
+                0,
+                7,
+                419
+              ],
+              "depth_a": [
+                0,
+                8,
+                452
+              ],
+              "n_with_update_id": 863816,
+              "seq": {
+                "n": 863818,
+                "n_non_increasing": 1
+              }
+            },
+            {
+              "day": "2023-02-15",
+              "topic": "orderbook.500.ETHUSDT",
+              "type": "snapshot",
+              "n_rows": 2,
+              "payload_bytes": 38979,
+              "depth_b": [
+                500,
+                500,
+                500
+              ],
+              "depth_a": [
+                500,
+                500,
+                500
+              ],
+              "n_with_update_id": 2,
+              "seq": {
+                "n": 863818,
+                "n_non_increasing": 1
+              }
+            },
+            {
+              "day": "2023-03-01",
+              "topic": "orderbook.500.ETHUSDT",
+              "type": "delta",
+              "n_rows": 863810,
+              "payload_bytes": 572446720,
+              "depth_b": [
+                0,
+                8,
+                348
+              ],
+              "depth_a": [
+                0,
+                8,
+                375
+              ],
+              "n_with_update_id": 863810,
+              "seq": {
+                "n": 863812,
+                "n_non_increasing": 1
+              }
+            },
+            {
+              "day": "2023-03-01",
+              "topic": "orderbook.500.ETHUSDT",
+              "type": "snapshot",
+              "n_rows": 2,
+              "payload_bytes": 39037,
+              "depth_b": [
+                500,
+                500,
+                500
+              ],
+              "depth_a": [
+                500,
+                500,
+                500
+              ],
+              "n_with_update_id": 2,
+              "seq": {
+                "n": 863812,
+                "n_non_increasing": 1
+              }
+            },
+            {
+              "day": "2023-03-16",
+              "topic": "orderbook.500.ETHUSDT",
+              "type": "delta",
+              "n_rows": 862758,
+              "payload_bytes": 727816550,
+              "depth_b": [
+                0,
+                11,
+                417
+              ],
+              "depth_a": [
+                0,
+                11,
+                385
+              ],
+              "n_with_update_id": 862758,
+              "seq": {
+                "n": 862762,
+                "n_non_increasing": 2
+              }
+            },
+            {
+              "day": "2023-03-16",
+              "topic": "orderbook.500.ETHUSDT",
+              "type": "snapshot",
+              "n_rows": 4,
+              "payload_bytes": 77902,
+              "depth_b": [
+                500,
+                500,
+                500
+              ],
+              "depth_a": [
+                500,
+                500,
+                500
+              ],
+              "n_with_update_id": 4,
+              "seq": {
+                "n": 862762,
+                "n_non_increasing": 2
+              }
+            },
+            {
+              "day": "2023-03-30",
+              "topic": "orderbook.500.ETHUSDT",
+              "type": "delta",
+              "n_rows": 856991,
+              "payload_bytes": 605580839,
+              "depth_b": [
+                0,
+                7,
+                472
+              ],
+              "depth_a": [
+                0,
+                7,
+                465
+              ],
+              "n_with_update_id": 856991,
+              "seq": {
+                "n": 856993,
+                "n_non_increasing": 1
+              }
+            },
+            {
+              "day": "2023-03-30",
+              "topic": "orderbook.500.ETHUSDT",
+              "type": "snapshot",
+              "n_rows": 2,
+              "payload_bytes": 38929,
+              "depth_b": [
+                500,
+                500,
+                500
+              ],
+              "depth_a": [
+                500,
+                500,
+                500
+              ],
+              "n_with_update_id": 2,
+              "seq": {
+                "n": 856993,
+                "n_non_increasing": 1
+              }
+            },
+            {
+              "day": "2023-04-13",
+              "topic": "orderbook.500.ETHUSDT",
+              "type": "delta",
+              "n_rows": 850934,
+              "payload_bytes": 582657974,
+              "depth_b": [
+                0,
+                7,
+                505
+              ],
+              "depth_a": [
+                0,
+                7,
+                742
+              ],
+              "n_with_update_id": 850934,
+              "seq": {
+                "n": 850936,
+                "n_non_increasing": 1
+              }
+            },
+            {
+              "day": "2023-04-13",
+              "topic": "orderbook.500.ETHUSDT",
+              "type": "snapshot",
+              "n_rows": 2,
+              "payload_bytes": 39036,
+              "depth_b": [
+                500,
+                500,
+                500
+              ],
+              "depth_a": [
+                500,
+                500,
+                500
+              ],
+              "n_with_update_id": 2,
+              "seq": {
+                "n": 850936,
+                "n_non_increasing": 1
+              }
+            },
+            {
+              "day": "2023-04-27",
+              "topic": "orderbook.500.ETHUSDT",
+              "type": "delta",
+              "n_rows": 852200,
+              "payload_bytes": 721013649,
+              "depth_b": [
+                0,
+                8,
+                581
+              ],
+              "depth_a": [
+                0,
+                8,
+                538
+              ],
+              "n_with_update_id": 852200,
+              "seq": {
+                "n": 852202,
+                "n_non_increasing": 1
+              }
+            },
+            {
+              "day": "2023-04-27",
+              "topic": "orderbook.500.ETHUSDT",
+              "type": "snapshot",
+              "n_rows": 2,
+              "payload_bytes": 38888,
+              "depth_b": [
+                500,
+                500,
+                500
+              ],
+              "depth_a": [
+                500,
+                500,
+                500
+              ],
+              "n_with_update_id": 2,
+              "seq": {
+                "n": 852202,
+                "n_non_increasing": 1
+              }
+            },
+            {
+              "day": "2023-05-11",
+              "topic": "orderbook.500.ETHUSDT",
+              "type": "delta",
+              "n_rows": 855381,
+              "payload_bytes": 538176569,
+              "depth_b": [
+                0,
+                6,
+                515
+              ],
+              "depth_a": [
+                0,
+                6,
+                415
+              ],
+              "n_with_update_id": 855381,
+              "seq": {
+                "n": 855383,
+                "n_non_increasing": 1
+              }
+            },
+            {
+              "day": "2023-05-11",
+              "topic": "orderbook.500.ETHUSDT",
+              "type": "snapshot",
+              "n_rows": 2,
+              "payload_bytes": 38965,
+              "depth_b": [
+                500,
+                500,
+                500
+              ],
+              "depth_a": [
+                500,
+                500,
+                500
+              ],
+              "n_with_update_id": 2,
+              "seq": {
+                "n": 855383,
+                "n_non_increasing": 1
+              }
+            },
+            {
+              "day": "2023-05-25",
+              "topic": "orderbook.500.ETHUSDT",
+              "type": "delta",
+              "n_rows": 837885,
+              "payload_bytes": 424042752,
+              "depth_b": [
+                0,
+                5,
+                633
+              ],
+              "depth_a": [
+                0,
+                5,
+                551
+              ],
+              "n_with_update_id": 837885,
+              "seq": {
+                "n": 837887,
+                "n_non_increasing": 1
+              }
+            },
+            {
+              "day": "2023-05-25",
+              "topic": "orderbook.500.ETHUSDT",
+              "type": "snapshot",
+              "n_rows": 2,
+              "payload_bytes": 39102,
+              "depth_b": [
+                500,
+                500,
+                500
+              ],
+              "depth_a": [
+                500,
+                500,
+                500
+              ],
+              "n_with_update_id": 2,
+              "seq": {
+                "n": 837887,
+                "n_non_increasing": 1
+              }
+            },
+            {
+              "day": "2023-06-08",
+              "topic": "orderbook.500.ETHUSDT",
+              "type": "delta",
+              "n_rows": 810959,
+              "payload_bytes": 357516130,
+              "depth_b": [
+                0,
+                4,
+                419
+              ],
+              "depth_a": [
+                0,
+                4,
+                401
+              ],
+              "n_with_update_id": 810959,
+              "seq": {
+                "n": 810961,
+                "n_non_increasing": 1
+              }
+            },
+            {
+              "day": "2023-06-08",
+              "topic": "orderbook.500.ETHUSDT",
+              "type": "snapshot",
+              "n_rows": 2,
+              "payload_bytes": 39032,
+              "depth_b": [
+                500,
+                500,
+                500
+              ],
+              "depth_a": [
+                500,
+                500,
+                500
+              ],
+              "n_with_update_id": 2,
+              "seq": {
+                "n": 810961,
+                "n_non_increasing": 1
+              }
+            },
+            {
+              "day": "2023-06-22",
+              "topic": "orderbook.500.ETHUSDT",
+              "type": "delta",
+              "n_rows": 841609,
+              "payload_bytes": 524003095,
+              "depth_b": [
+                0,
+                6,
+                481
+              ],
+              "depth_a": [
+                0,
+                6,
+                469
+              ],
+              "n_with_update_id": 841609,
+              "seq": {
+                "n": 841611,
+                "n_non_increasing": 1
+              }
+            },
+            {
+              "day": "2023-06-22",
+              "topic": "orderbook.500.ETHUSDT",
+              "type": "snapshot",
+              "n_rows": 2,
+              "payload_bytes": 39136,
+              "depth_b": [
+                500,
+                500,
+                500
+              ],
+              "depth_a": [
+                500,
+                500,
+                500
+              ],
+              "n_with_update_id": 2,
+              "seq": {
+                "n": 841611,
+                "n_non_increasing": 1
+              }
+            },
+            {
+              "day": "2023-07-06",
+              "topic": "orderbook.500.ETHUSDT",
+              "type": "delta",
+              "n_rows": 854723,
+              "payload_bytes": 601249243,
+              "depth_b": [
+                0,
+                8,
+                650
+              ],
+              "depth_a": [
+                0,
+                8,
+                533
+              ],
+              "n_with_update_id": 854723,
+              "seq": {
+                "n": 854725,
+                "n_non_increasing": 1
+              }
+            },
+            {
+              "day": "2023-07-06",
+              "topic": "orderbook.500.ETHUSDT",
+              "type": "snapshot",
+              "n_rows": 2,
+              "payload_bytes": 39106,
+              "depth_b": [
+                500,
+                500,
+                500
+              ],
+              "depth_a": [
+                500,
+                500,
+                500
+              ],
+              "n_with_update_id": 2,
+              "seq": {
+                "n": 854725,
+                "n_non_increasing": 1
+              }
+            },
+            {
+              "day": "2023-07-20",
+              "topic": "orderbook.500.ETHUSDT",
+              "type": "delta",
+              "n_rows": 854461,
+              "payload_bytes": 482815826,
+              "depth_b": [
+                0,
+                7,
+                445
+              ],
+              "depth_a": [
+                0,
+                7,
+                461
+              ],
+              "n_with_update_id": 854461,
+              "seq": {
+                "n": 854463,
+                "n_non_increasing": 1
+              }
+            },
+            {
+              "day": "2023-07-20",
+              "topic": "orderbook.500.ETHUSDT",
+              "type": "snapshot",
+              "n_rows": 2,
+              "payload_bytes": 39088,
+              "depth_b": [
+                500,
+                500,
+                500
+              ],
+              "depth_a": [
+                500,
+                500,
+                500
+              ],
+              "n_with_update_id": 2,
+              "seq": {
+                "n": 854463,
+                "n_non_increasing": 1
+              }
+            },
+            {
+              "day": "2023-08-03",
+              "topic": "orderbook.500.ETHUSDT",
+              "type": "delta",
+              "n_rows": 846837,
+              "payload_bytes": 343417677,
+              "depth_b": [
+                0,
+                5,
+                463
+              ],
+              "depth_a": [
+                0,
+                4,
+                490
+              ],
+              "n_with_update_id": 846837,
+              "seq": {
+                "n": 846839,
+                "n_non_increasing": 1
+              }
+            },
+            {
+              "day": "2023-08-03",
+              "topic": "orderbook.500.ETHUSDT",
+              "type": "snapshot",
+              "n_rows": 2,
+              "payload_bytes": 39105,
+              "depth_b": [
+                500,
+                500,
+                500
+              ],
+              "depth_a": [
+                500,
+                500,
+                500
+              ],
+              "n_with_update_id": 2,
+              "seq": {
+                "n": 846839,
+                "n_non_increasing": 1
+              }
+            },
+            {
+              "day": "2023-08-17",
+              "topic": "orderbook.500.ETHUSDT",
+              "type": "delta",
+              "n_rows": 847213,
+              "payload_bytes": 512808221,
+              "depth_b": [
+                0,
+                6,
+                560
+              ],
+              "depth_a": [
+                0,
+                5,
+                476
+              ],
+              "n_with_update_id": 847213,
+              "seq": {
+                "n": 847215,
+                "n_non_increasing": 1
+              }
+            },
+            {
+              "day": "2023-08-17",
+              "topic": "orderbook.500.ETHUSDT",
+              "type": "snapshot",
+              "n_rows": 2,
+              "payload_bytes": 39027,
+              "depth_b": [
+                500,
+                500,
+                500
+              ],
+              "depth_a": [
+                500,
+                500,
+                500
+              ],
+              "n_with_update_id": 2,
+              "seq": {
+                "n": 847215,
+                "n_non_increasing": 1
+              }
+            },
+            {
+              "day": "2023-08-31",
+              "topic": "orderbook.500.ETHUSDT",
+              "type": "delta",
+              "n_rows": 851267,
+              "payload_bytes": 457211664,
+              "depth_b": [
+                0,
+                6,
+                574
+              ],
+              "depth_a": [
+                0,
+                5,
+                499
+              ],
+              "n_with_update_id": 851267,
+              "seq": {
+                "n": 851269,
+                "n_non_increasing": 1
+              }
+            },
+            {
+              "day": "2023-08-31",
+              "topic": "orderbook.500.ETHUSDT",
+              "type": "snapshot",
+              "n_rows": 2,
+              "payload_bytes": 39214,
+              "depth_b": [
+                500,
+                500,
+                500
+              ],
+              "depth_a": [
+                500,
+                500,
+                500
+              ],
+              "n_with_update_id": 2,
+              "seq": {
+                "n": 851269,
+                "n_non_increasing": 1
+              }
+            },
+            {
+              "day": "2023-09-14",
+              "topic": "orderbook.500.ETHUSDT",
+              "type": "delta",
+              "n_rows": 853215,
+              "payload_bytes": 455901871,
+              "depth_b": [
+                0,
+                6,
+                509
+              ],
+              "depth_a": [
+                0,
+                6,
+                672
+              ],
+              "n_with_update_id": 853215,
+              "seq": {
+                "n": 853217,
+                "n_non_increasing": 1
+              }
+            },
+            {
+              "day": "2023-09-14",
+              "topic": "orderbook.500.ETHUSDT",
+              "type": "snapshot",
+              "n_rows": 2,
+              "payload_bytes": 39205,
+              "depth_b": [
+                500,
+                500,
+                500
+              ],
+              "depth_a": [
+                500,
+                500,
+                500
+              ],
+              "n_with_update_id": 2,
+              "seq": {
+                "n": 853217,
+                "n_non_increasing": 1
+              }
+            },
+            {
+              "day": "2023-09-28",
+              "topic": "orderbook.500.ETHUSDT",
+              "type": "delta",
+              "n_rows": 858405,
+              "payload_bytes": 508261861,
+              "depth_b": [
+                0,
+                7,
+                708
+              ],
+              "depth_a": [
+                0,
+                7,
+                617
+              ],
+              "n_with_update_id": 858405,
+              "seq": {
+                "n": 858407,
+                "n_non_increasing": 1
+              }
+            },
+            {
+              "day": "2023-09-28",
+              "topic": "orderbook.500.ETHUSDT",
+              "type": "snapshot",
+              "n_rows": 2,
+              "payload_bytes": 39165,
+              "depth_b": [
+                500,
+                500,
+                500
+              ],
+              "depth_a": [
+                500,
+                500,
+                500
+              ],
+              "n_with_update_id": 2,
+              "seq": {
+                "n": 858407,
+                "n_non_increasing": 1
+              }
+            },
+            {
+              "day": "2023-10-12",
+              "topic": "orderbook.500.ETHUSDT",
+              "type": "delta",
+              "n_rows": 858956,
+              "payload_bytes": 537632538,
+              "depth_b": [
+                0,
+                7,
+                718
+              ],
+              "depth_a": [
+                0,
+                7,
+                497
+              ],
+              "n_with_update_id": 858956,
+              "seq": {
+                "n": 858958,
+                "n_non_increasing": 1
+              }
+            },
+            {
+              "day": "2023-10-12",
+              "topic": "orderbook.500.ETHUSDT",
+              "type": "snapshot",
+              "n_rows": 2,
+              "payload_bytes": 39128,
+              "depth_b": [
+                500,
+                500,
+                500
+              ],
+              "depth_a": [
+                500,
+                500,
+                500
+              ],
+              "n_with_update_id": 2,
+              "seq": {
+                "n": 858958,
+                "n_non_increasing": 1
+              }
+            },
+            {
+              "day": "2023-10-26",
+              "topic": "orderbook.500.ETHUSDT",
+              "type": "delta",
+              "n_rows": 863160,
+              "payload_bytes": 825622007,
+              "depth_b": [
+                0,
+                13,
+                654
+              ],
+              "depth_a": [
+                0,
+                12,
+                539
+              ],
+              "n_with_update_id": 863160,
+              "seq": {
+                "n": 863162,
+                "n_non_increasing": 1
+              }
+            },
+            {
+              "day": "2023-10-26",
+              "topic": "orderbook.500.ETHUSDT",
+              "type": "snapshot",
+              "n_rows": 2,
+              "payload_bytes": 39015,
+              "depth_b": [
+                500,
+                500,
+                500
+              ],
+              "depth_a": [
+                500,
+                500,
+                500
+              ],
+              "n_with_update_id": 2,
+              "seq": {
+                "n": 863162,
+                "n_non_increasing": 1
+              }
+            },
+            {
+              "day": "2023-11-09",
+              "topic": "orderbook.500.ETHUSDT",
+              "type": "delta",
+              "n_rows": 863609,
+              "payload_bytes": 1080120013,
+              "depth_b": [
+                0,
+                17,
+                714
+              ],
+              "depth_a": [
+                0,
+                16,
+                800
+              ],
+              "n_with_update_id": 863609,
+              "seq": {
+                "n": 863613,
+                "n_non_increasing": 2
+              }
+            },
+            {
+              "day": "2023-11-09",
+              "topic": "orderbook.500.ETHUSDT",
+              "type": "snapshot",
+              "n_rows": 4,
+              "payload_bytes": 77786,
+              "depth_b": [
+                500,
+                500,
+                500
+              ],
+              "depth_a": [
+                500,
+                500,
+                500
+              ],
+              "n_with_update_id": 4,
+              "seq": {
+                "n": 863613,
+                "n_non_increasing": 2
+              }
+            },
+            {
+              "day": "2023-11-23",
+              "topic": "orderbook.500.ETHUSDT",
+              "type": "delta",
+              "n_rows": 861115,
+              "payload_bytes": 695770711,
+              "depth_b": [
+                0,
+                11,
+                997
+              ],
+              "depth_a": [
+                0,
+                10,
+                615
+              ],
+              "n_with_update_id": 861115,
+              "seq": {
+                "n": 861117,
+                "n_non_increasing": 1
+              }
+            },
+            {
+              "day": "2023-11-23",
+              "topic": "orderbook.500.ETHUSDT",
+              "type": "snapshot",
+              "n_rows": 2,
+              "payload_bytes": 38939,
+              "depth_b": [
+                500,
+                500,
+                500
+              ],
+              "depth_a": [
+                500,
+                500,
+                500
+              ],
+              "n_with_update_id": 2,
+              "seq": {
+                "n": 861117,
+                "n_non_increasing": 1
+              }
+            },
+            {
+              "day": "2023-12-07",
+              "topic": "orderbook.500.ETHUSDT",
+              "type": "delta",
+              "n_rows": 862672,
+              "payload_bytes": 923284301,
+              "depth_b": [
+                0,
+                15,
+                584
+              ],
+              "depth_a": [
+                0,
+                15,
+                726
+              ],
+              "n_with_update_id": 862672,
+              "seq": {
+                "n": 862674,
+                "n_non_increasing": 1
+              }
+            },
+            {
+              "day": "2023-12-07",
+              "topic": "orderbook.500.ETHUSDT",
+              "type": "snapshot",
+              "n_rows": 2,
+              "payload_bytes": 39009,
+              "depth_b": [
+                500,
+                500,
+                500
+              ],
+              "depth_a": [
+                500,
+                500,
+                500
+              ],
+              "n_with_update_id": 2,
+              "seq": {
+                "n": 862674,
+                "n_non_increasing": 1
+              }
+            },
+            {
+              "day": "2023-12-21",
+              "topic": "orderbook.500.ETHUSDT",
+              "type": "delta",
+              "n_rows": 862991,
+              "payload_bytes": 888832467,
+              "depth_b": [
+                0,
+                14,
+                617
+              ],
+              "depth_a": [
+                0,
+                14,
+                593
+              ],
+              "n_with_update_id": 862991,
+              "seq": {
+                "n": 862993,
+                "n_non_increasing": 1
+              }
+            },
+            {
+              "day": "2023-12-21",
+              "topic": "orderbook.500.ETHUSDT",
+              "type": "snapshot",
+              "n_rows": 2,
+              "payload_bytes": 38922,
+              "depth_b": [
+                500,
+                500,
+                500
+              ],
+              "depth_a": [
+                500,
+                500,
+                500
+              ],
+              "n_with_update_id": 2,
+              "seq": {
+                "n": 862993,
+                "n_non_increasing": 1
+              }
+            },
+            {
+              "day": "2024-01-04",
+              "topic": "orderbook.500.ETHUSDT",
+              "type": "delta",
+              "n_rows": 863617,
+              "payload_bytes": 939779285,
+              "depth_b": [
+                0,
+                16,
+                603
+              ],
+              "depth_a": [
+                0,
+                16,
+                680
+              ],
+              "n_with_update_id": 863617,
+              "seq": {
+                "n": 863619,
+                "n_non_increasing": 1
+              }
+            },
+            {
+              "day": "2024-01-04",
+              "topic": "orderbook.500.ETHUSDT",
+              "type": "snapshot",
+              "n_rows": 2,
+              "payload_bytes": 38849,
+              "depth_b": [
+                500,
+                500,
+                500
+              ],
+              "depth_a": [
+                500,
+                500,
+                500
+              ],
+              "n_with_update_id": 2,
+              "seq": {
+                "n": 863619,
+                "n_non_increasing": 1
+              }
+            },
+            {
+              "day": "2024-01-18",
+              "topic": "orderbook.500.ETHUSDT",
+              "type": "delta",
+              "n_rows": 863595,
+              "payload_bytes": 1033800778,
+              "depth_b": [
+                0,
+                16,
+                749
+              ],
+              "depth_a": [
+                0,
+                16,
+                732
+              ],
+              "n_with_update_id": 863595,
+              "seq": {
+                "n": 863597,
+                "n_non_increasing": 1
+              }
+            },
+            {
+              "day": "2024-01-18",
+              "topic": "orderbook.500.ETHUSDT",
+              "type": "snapshot",
+              "n_rows": 2,
+              "payload_bytes": 38774,
+              "depth_b": [
+                500,
+                500,
+                500
+              ],
+              "depth_a": [
+                500,
+                500,
+                500
+              ],
+              "n_with_update_id": 2,
+              "seq": {
+                "n": 863597,
+                "n_non_increasing": 1
+              }
+            },
+            {
+              "day": "2024-02-01",
+              "topic": "orderbook.500.ETHUSDT",
+              "type": "delta",
+              "n_rows": 862861,
+              "payload_bytes": 798502222,
+              "depth_b": [
+                0,
+                12,
+                690
+              ],
+              "depth_a": [
+                0,
+                13,
+                999
+              ],
+              "n_with_update_id": 862861,
+              "seq": {
+                "n": 862863,
+                "n_non_increasing": 1
+              }
+            },
+            {
+              "day": "2024-02-01",
+              "topic": "orderbook.500.ETHUSDT",
+              "type": "snapshot",
+              "n_rows": 2,
+              "payload_bytes": 38914,
+              "depth_b": [
+                500,
+                500,
+                500
+              ],
+              "depth_a": [
+                500,
+                500,
+                500
+              ],
+              "n_with_update_id": 2,
+              "seq": {
+                "n": 862863,
+                "n_non_increasing": 1
+              }
+            },
+            {
+              "day": "2024-02-15",
+              "topic": "orderbook.500.ETHUSDT",
+              "type": "delta",
+              "n_rows": 863902,
+              "payload_bytes": 1131384838,
+              "depth_b": [
+                0,
+                18,
+                977
+              ],
+              "depth_a": [
+                0,
+                17,
+                713
+              ],
+              "n_with_update_id": 863902,
+              "seq": {
+                "n": 863904,
+                "n_non_increasing": 1
+              }
+            },
+            {
+              "day": "2024-02-15",
+              "topic": "orderbook.500.ETHUSDT",
+              "type": "snapshot",
+              "n_rows": 2,
+              "payload_bytes": 38785,
+              "depth_b": [
+                500,
+                500,
+                500
+              ],
+              "depth_a": [
+                500,
+                500,
+                500
+              ],
+              "n_with_update_id": 2,
+              "seq": {
+                "n": 863904,
+                "n_non_increasing": 1
+              }
+            },
+            {
+              "day": "2024-03-01",
+              "topic": "orderbook.500.ETHUSDT",
+              "type": "delta",
+              "n_rows": 863660,
+              "payload_bytes": 936450990,
+              "depth_b": [
+                0,
+                15,
+                995
+              ],
+              "depth_a": [
+                0,
+                15,
+                997
+              ],
+              "n_with_update_id": 863660,
+              "seq": {
+                "n": 863662,
+                "n_non_increasing": 1
+              }
+            },
+            {
+              "day": "2024-03-01",
+              "topic": "orderbook.500.ETHUSDT",
+              "type": "snapshot",
+              "n_rows": 2,
+              "payload_bytes": 38686,
+              "depth_b": [
+                500,
+                500,
+                500
+              ],
+              "depth_a": [
+                500,
+                500,
+                500
+              ],
+              "n_with_update_id": 2,
+              "seq": {
+                "n": 863662,
+                "n_non_increasing": 1
+              }
+            },
+            {
+              "day": "2024-03-15",
+              "topic": "orderbook.500.ETHUSDT",
+              "type": "delta",
+              "n_rows": 863920,
+              "payload_bytes": 1747343205,
+              "depth_b": [
+                0,
+                32,
+                994
+              ],
+              "depth_a": [
+                0,
+                31,
+                1000
+              ],
+              "n_with_update_id": 863920,
+              "seq": {
+                "n": 863922,
+                "n_non_increasing": 1
+              }
+            },
+            {
+              "day": "2024-03-15",
+              "topic": "orderbook.500.ETHUSDT",
+              "type": "snapshot",
+              "n_rows": 2,
+              "payload_bytes": 38759,
+              "depth_b": [
+                500,
+                500,
+                500
+              ],
+              "depth_a": [
+                500,
+                500,
+                500
+              ],
+              "n_with_update_id": 2,
+              "seq": {
+                "n": 863922,
+                "n_non_increasing": 1
+              }
+            },
+            {
+              "day": "2024-03-29",
+              "topic": "orderbook.500.ETHUSDT",
+              "type": "delta",
+              "n_rows": 862920,
+              "payload_bytes": 914340006,
+              "depth_b": [
+                0,
+                14,
+                908
+              ],
+              "depth_a": [
+                0,
+                13,
+                722
+              ],
+              "n_with_update_id": 862920,
+              "seq": {
+                "n": 862922,
+                "n_non_increasing": 1
+              }
+            },
+            {
+              "day": "2024-03-29",
+              "topic": "orderbook.500.ETHUSDT",
+              "type": "snapshot",
+              "n_rows": 2,
+              "payload_bytes": 38831,
+              "depth_b": [
+                500,
+                500,
+                500
+              ],
+              "depth_a": [
+                500,
+                500,
+                500
+              ],
+              "n_with_update_id": 2,
+              "seq": {
+                "n": 862922,
+                "n_non_increasing": 1
+              }
+            },
+            {
+              "day": "2024-04-12",
+              "topic": "orderbook.500.ETHUSDT",
+              "type": "delta",
+              "n_rows": 863566,
+              "payload_bytes": 1139295112,
+              "depth_b": [
+                0,
+                17,
+                987
+              ],
+              "depth_a": [
+                0,
+                17,
+                989
+              ],
+              "n_with_update_id": 863566,
+              "seq": {
+                "n": 863568,
+                "n_non_increasing": 1
+              }
+            },
+            {
+              "day": "2024-04-12",
+              "topic": "orderbook.500.ETHUSDT",
+              "type": "snapshot",
+              "n_rows": 2,
+              "payload_bytes": 38797,
+              "depth_b": [
+                500,
+                500,
+                500
+              ],
+              "depth_a": [
+                500,
+                500,
+                500
+              ],
+              "n_with_update_id": 2,
+              "seq": {
+                "n": 863568,
+                "n_non_increasing": 1
+              }
+            },
+            {
+              "day": "2024-04-26",
+              "topic": "orderbook.500.ETHUSDT",
+              "type": "delta",
+              "n_rows": 863021,
+              "payload_bytes": 924088119,
+              "depth_b": [
+                0,
+                14,
+                722
+              ],
+              "depth_a": [
+                0,
+                14,
+                909
+              ],
+              "n_with_update_id": 863021,
+              "seq": {
+                "n": 863023,
+                "n_non_increasing": 1
+              }
+            },
+            {
+              "day": "2024-04-26",
+              "topic": "orderbook.500.ETHUSDT",
+              "type": "snapshot",
+              "n_rows": 2,
+              "payload_bytes": 38647,
+              "depth_b": [
+                500,
+                500,
+                500
+              ],
+              "depth_a": [
+                500,
+                500,
+                500
+              ],
+              "n_with_update_id": 2,
+              "seq": {
+                "n": 863023,
+                "n_non_increasing": 1
+              }
+            },
+            {
+              "day": "2024-05-10",
+              "topic": "orderbook.500.ETHUSDT",
+              "type": "delta",
+              "n_rows": 863136,
+              "payload_bytes": 945610720,
+              "depth_b": [
+                0,
+                14,
+                1000
+              ],
+              "depth_a": [
+                0,
+                15,
+                749
+              ],
+              "n_with_update_id": 863136,
+              "seq": {
+                "n": 863138,
+                "n_non_increasing": 1
+              }
+            },
+            {
+              "day": "2024-05-10",
+              "topic": "orderbook.500.ETHUSDT",
+              "type": "snapshot",
+              "n_rows": 2,
+              "payload_bytes": 38759,
+              "depth_b": [
+                500,
+                500,
+                500
+              ],
+              "depth_a": [
+                500,
+                500,
+                500
+              ],
+              "n_with_update_id": 2,
+              "seq": {
+                "n": 863138,
+                "n_non_increasing": 1
+              }
+            },
+            {
+              "day": "2026-06-19",
+              "topic": "orderbook.1000.ETHUSDT",
+              "type": "delta",
+              "n_rows": 143929,
+              "payload_bytes": 228723333,
+              "depth_b": [
+                0,
+                22,
+                682
+              ],
+              "depth_a": [
+                0,
+                22,
+                730
+              ],
+              "n_with_update_id": 143929,
+              "seq": {
+                "n": 143931,
+                "n_non_increasing": 2
+              }
+            },
+            {
+              "day": "2026-06-19",
+              "topic": "orderbook.1000.ETHUSDT",
+              "type": "snapshot",
+              "n_rows": 2,
+              "payload_bytes": 77731,
+              "depth_b": [
+                1000,
+                1000,
+                1000
+              ],
+              "depth_a": [
+                1000,
+                1000,
+                1000
+              ],
+              "n_with_update_id": 2,
+              "seq": {
+                "n": 143931,
+                "n_non_increasing": 2
+              }
+            },
+            {
+              "day": "2026-07-04",
+              "topic": "orderbook.1000.ETHUSDT",
+              "type": "delta",
+              "n_rows": 431801,
+              "payload_bytes": 664484572,
+              "depth_b": [
+                0,
+                22,
+                1062
+              ],
+              "depth_a": [
+                0,
+                23,
+                1060
+              ],
+              "n_with_update_id": 431801,
+              "seq": {
+                "n": 431802,
+                "n_non_increasing": 0
+              }
+            },
+            {
+              "day": "2026-07-04",
+              "topic": "orderbook.1000.ETHUSDT",
+              "type": "snapshot",
+              "n_rows": 1,
+              "payload_bytes": 38595,
+              "depth_b": [
+                1000,
+                1000,
+                1000
+              ],
+              "depth_a": [
+                1000,
+                1000,
+                1000
+              ],
+              "n_with_update_id": 1,
+              "seq": {
+                "n": 431802,
+                "n_non_increasing": 0
+              }
+            },
+            {
+              "day": "2026-07-29",
+              "topic": "orderbook.1000.ETHUSDT",
+              "type": "delta",
+              "n_rows": 431646,
+              "payload_bytes": 1027129459,
+              "depth_b": [
+                0,
+                35,
+                1152
+              ],
+              "depth_a": [
+                0,
+                33,
+                1159
+              ],
+              "n_with_update_id": 431646,
+              "seq": {
+                "n": 431652,
+                "n_non_increasing": 26
+              }
+            },
+            {
+              "day": "2026-07-29",
+              "topic": "orderbook.1000.ETHUSDT",
+              "type": "snapshot",
+              "n_rows": 6,
+              "payload_bytes": 232821,
+              "depth_b": [
+                1000,
+                1000,
+                1000
+              ],
+              "depth_a": [
+                1000,
+                1000,
+                1000
+              ],
+              "n_with_update_id": 6,
+              "seq": {
+                "n": 431652,
+                "n_non_increasing": 26
+              }
+            },
+            {
+              "day": "2026-08-13",
+              "topic": "orderbook.1000.ETHUSDT",
+              "type": "delta",
+              "n_rows": 277592,
+              "payload_bytes": 340924024,
+              "depth_b": [
+                0,
+                17,
+                774
+              ],
+              "depth_a": [
+                0,
+                18,
+                823
+              ],
+              "n_with_update_id": 277592,
+              "seq": {
+                "n": 277596,
+                "n_non_increasing": 4
+              }
+            },
+            {
+              "day": "2026-08-13",
+              "topic": "orderbook.1000.ETHUSDT",
+              "type": "snapshot",
+              "n_rows": 4,
+              "payload_bytes": 155856,
+              "depth_b": [
+                1000,
+                1000,
+                1000
+              ],
+              "depth_a": [
+                1000,
+                1000,
+                1000
+              ],
+              "n_with_update_id": 4,
+              "seq": {
+                "n": 277596,
+                "n_non_increasing": 4
+              }
+            }
+          ],
+          "errors": []
+        }
+      }
+    }
+  }
+}

@@ -353,3 +353,67 @@ def test_e2e_cli_builds_and_prints_fingerprint(tmp_path):
     s2 = json.loads(proc2.stdout)["summaries"][0]
     assert s2["exists"] == 2 and s2["cached"] == 0
     assert s2["fingerprint"]["sha256_values"] == s["fingerprint"]["sha256_values"]
+
+
+# ----------------------------------------------------------------------------
+# (i) memory discipline (DEC-36): capped connection, OOM retry, loud second OOM
+# ----------------------------------------------------------------------------
+
+def test_memory_limit_is_validated_and_applied(tmp_path):
+    from bybit_edge.research.bar_cache import _connect
+    with pytest.raises(ValueError, match="memory limit"):
+        _connect(tmp_path, "4GB'; DROP TABLE x; --")
+    con = _connect(tmp_path, "512MB")
+    try:
+        limit = con.execute(
+            "SELECT value FROM duckdb_settings() WHERE name='memory_limit'"
+        ).fetchone()[0]
+        # duckdb normalises units (512MB -> "488.2 MiB"); assert the cap took
+        # effect and is far below the unlimited default (~80% of RAM)
+        value, unit = limit.split()
+        assert unit in ("KiB", "MiB") and float(value) <= 600.0, limit
+        order = con.execute(
+            "SELECT value FROM duckdb_settings() WHERE name='preserve_insertion_order'"
+        ).fetchone()[0]
+        assert order == "false"
+    finally:
+        con.close()
+    assert (tmp_path / "_ducktmp").is_dir(), "spill directory must exist"
+
+
+def test_oom_day_gets_one_fresh_connection_retry(tmp_path, monkeypatch):
+    import duckdb
+    from bybit_edge.research import bar_cache as bc
+    base, cache = tmp_path / "h", tmp_path / "c"
+    _mixed_day(base, "TSTUSDT", "2024-01-02")
+    real_build_day = bc.build_day
+    calls = {"n": 0}
+
+    def flaky(con, *a, **k):
+        calls["n"] += 1
+        if calls["n"] == 1:
+            raise duckdb.OutOfMemoryException("Out of Memory Error: simulated")
+        return real_build_day(con, *a, **k)
+
+    monkeypatch.setattr(bc, "build_day", flaky)
+    summary = bc.build_range(base, cache, "bybit", "publicTrade", "TSTUSDT",
+                             "2024-01-02", "2024-01-02",
+                             require_manifest_done=False)
+    assert summary["cached"] == 1 and calls["n"] == 2, (
+        "one OOM must trigger exactly one retry on a fresh connection")
+
+
+def test_second_oom_is_a_loud_barcache_error_naming_the_day(tmp_path, monkeypatch):
+    import duckdb
+    from bybit_edge.research import bar_cache as bc
+    base, cache = tmp_path / "h", tmp_path / "c"
+    _mixed_day(base, "TSTUSDT", "2024-01-02")
+
+    def always_oom(con, *a, **k):
+        raise duckdb.OutOfMemoryException("Out of Memory Error: simulated")
+
+    monkeypatch.setattr(bc, "build_day", always_oom)
+    with pytest.raises(BarCacheError, match="2024-01-02.*OOM"):
+        bc.build_range(base, cache, "bybit", "publicTrade", "TSTUSDT",
+                       "2024-01-02", "2024-01-02",
+                       require_manifest_done=False)

@@ -43,6 +43,9 @@ $Start   = if ($env:WP0_START) { $env:WP0_START } else { '2020-03-25' }
 $End     = if ($env:WP0_END) { $env:WP0_END } else { '2026-07-31' }
 # Eine CPU-Nacht laut Synthese; 12 h Budget, ueberschreibbar.
 $TmoStep = if ($env:WP0_TIMEOUT_SEC) { [int]$env:WP0_TIMEOUT_SEC } else { 43200 }
+# DuckDB-Speicherdeckel je Verbindung (DEC-36: Lauf 2026-08-14 crashte OOM
+# nach ~4300 Tages-Queries ohne Deckel). Ueberschuss spillt auf Platte.
+$MemLimit = if ($env:WP0_MEMORY_LIMIT) { $env:WP0_MEMORY_LIMIT } else { '4GB' }
 
 $PythonExe = if ($env:PYTHON) { $env:PYTHON } else { 'python' }
 $SrcPath = Join-Path $RepoRoot 'src'
@@ -138,7 +141,8 @@ if (-not $HarvestOk) {
         '--base-dir', $HarvestDir,
         '--cache-dir', $CacheDir,
         '--symbols', $Symbols,
-        '--start', $Start, '--end', $End
+        '--start', $Start, '--end', $End,
+        '--memory-limit', $MemLimit
     )
     # stdout (JSON mit Fingerabdruecken) in die Ergebnisse kopieren
     $stepLog = Join-Path $RunDir 'WP0_BARCACHE.log'

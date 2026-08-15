@@ -53,6 +53,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import re
 import sqlite3
 from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
@@ -276,6 +277,38 @@ def build_day(
             "sha256_values": meta["sha256_values"]}
 
 
+#: Accepted DuckDB memory-limit spellings (guards the SET statement).
+_MEMORY_LIMIT_RE = re.compile(
+    r"^\d+(\.\d+)?\s*(KB|MB|GB|TB|KiB|MiB|GiB|TiB)$", re.IGNORECASE)
+
+#: Fresh DuckDB connection every N day-queries. The 2026-08-14 WP-0 run
+#: (DEC-36) OOM-crashed after ~4300 day-queries on ONE reused connection —
+#: allocator growth across thousands of queries, not one oversized day
+#: (BTC's largest days had passed hours earlier on the same connection).
+RECYCLE_EVERY_DAYS = 200
+
+
+def _connect(cache_dir: Path | str, memory_limit: str) -> Any:
+    """DuckDB connection with a hard memory cap and disk spill.
+
+    ``preserve_insertion_order=false`` is safe HERE by design: every cached
+    aggregate is order-independent (that is the whole point of this module),
+    and it substantially lowers the memory footprint of the big scans.
+    """
+    import duckdb
+
+    if not _MEMORY_LIMIT_RE.match(memory_limit.strip()):
+        raise ValueError(f"invalid memory limit: {memory_limit!r}")
+    tmp = Path(cache_dir) / "_ducktmp"
+    tmp.mkdir(parents=True, exist_ok=True)
+    con = duckdb.connect()
+    con.execute(f"SET memory_limit='{memory_limit.strip()}'")
+    con.execute(f"SET temp_directory='{tmp.as_posix()}'")
+    con.execute("SET max_temp_directory_size='100GiB'")
+    con.execute("SET preserve_insertion_order=false")
+    return con
+
+
 def build_range(
     base_dir: Path | str,
     cache_dir: Path | str,
@@ -288,8 +321,16 @@ def build_range(
     rebuild: bool = False,
     require_manifest_done: bool = True,
     progress: Any = None,
+    memory_limit: str = "4GB",
+    recycle_every: int = RECYCLE_EVERY_DAYS,
 ) -> dict[str, Any]:
     """Build every manifest-DONE day of ``[start, end]`` incrementally.
+
+    Memory discipline (DEC-36): the connection carries a hard ``memory_limit``
+    with disk spill, is recycled every ``recycle_every`` day-queries, and an
+    ``OutOfMemoryException`` on one day gets exactly ONE retry on a fresh
+    connection — a second OOM raises ``BarCacheError`` naming the day, so the
+    CLI fails that symbol loudly and still proceeds to the next one.
 
     ``require_manifest_done=False`` exists ONLY for synthetic-fixture tests.
     Returns a summary dict (counts per status + the days skipped as not-DONE).
@@ -308,11 +349,32 @@ def build_range(
         days = all_days
 
     counts = {"cached": 0, "exists": 0, "no_raw": 0}
-    con = duckdb.connect()
+    con = _connect(cache_dir, memory_limit)
+    queries_since_recycle = 0
     try:
         for day in days:
-            res = build_day(con, base_dir, cache_dir, exchange, stream,
-                            symbol, day, rebuild=rebuild)
+            if recycle_every and queries_since_recycle >= recycle_every:
+                con.close()
+                con = _connect(cache_dir, memory_limit)
+                queries_since_recycle = 0
+            try:
+                res = build_day(con, base_dir, cache_dir, exchange, stream,
+                                symbol, day, rebuild=rebuild)
+            except duckdb.OutOfMemoryException:
+                con.close()
+                con = _connect(cache_dir, memory_limit)
+                queries_since_recycle = 0
+                try:
+                    res = build_day(con, base_dir, cache_dir, exchange, stream,
+                                    symbol, day, rebuild=rebuild)
+                except duckdb.OutOfMemoryException as exc:
+                    raise BarCacheError(
+                        f"{exchange}/{stream}/{symbol} {day}: OOM even on a "
+                        f"fresh connection (memory_limit={memory_limit}) — "
+                        "raise BARCACHE_MEMORY_LIMIT or inspect the day"
+                    ) from exc
+            if res["status"] != "exists":
+                queries_since_recycle += 1
             counts[res["status"]] += 1
             if progress is not None:
                 progress(symbol, res)
