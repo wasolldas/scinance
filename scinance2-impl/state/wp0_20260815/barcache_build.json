@@ -1,0 +1,144 @@
+{
+  "summaries": [
+    {
+      "symbol": "BTCUSDT",
+      "exchange": "bybit",
+      "stream": "publicTrade",
+      "range": [
+        "2020-03-25",
+        "2026-07-31"
+      ],
+      "days_in_range": 2320,
+      "days_manifest_done": 2320,
+      "days_not_done": 0,
+      "cached": 0,
+      "exists": 2320,
+      "no_raw": 0,
+      "seconds": 1.2,
+      "fingerprint": {
+        "schema_version": 1,
+        "exchange": "bybit",
+        "symbol": "BTCUSDT",
+        "range": [
+          "2020-03-25",
+          "2026-07-31"
+        ],
+        "n_minutes": 3311569,
+        "n_days_present": 2320,
+        "sha256_values": "3be122e350df98118b26eaa16471cc070375e7593c17524753069441681dd8b6"
+      }
+    },
+    {
+      "symbol": "ETHUSDT",
+      "exchange": "bybit",
+      "stream": "publicTrade",
+      "range": [
+        "2020-03-25",
+        "2026-07-31"
+      ],
+      "days_in_range": 2320,
+      "days_manifest_done": 2110,
+      "days_not_done": 210,
+      "cached": 70,
+      "exists": 2040,
+      "no_raw": 0,
+      "seconds": 781.5,
+      "fingerprint": {
+        "schema_version": 1,
+        "exchange": "bybit",
+        "symbol": "ETHUSDT",
+        "range": [
+          "2020-03-25",
+          "2026-07-31"
+        ],
+        "n_minutes": 3031135,
+        "n_days_present": 2110,
+        "sha256_values": "848ff87d3903cc59132e1653c915d79150288f424aa8d0eafe00c299ac54b098"
+      }
+    },
+    {
+      "symbol": "XRPUSDT",
+      "exchange": "bybit",
+      "stream": "publicTrade",
+      "range": [
+        "2020-03-25",
+        "2026-07-31"
+      ],
+      "days_in_range": 2320,
+      "days_manifest_done": 1906,
+      "days_not_done": 414,
+      "cached": 1906,
+      "exists": 0,
+      "no_raw": 0,
+      "seconds": 5572.5,
+      "fingerprint": {
+        "schema_version": 1,
+        "exchange": "bybit",
+        "symbol": "XRPUSDT",
+        "range": [
+          "2020-03-25",
+          "2026-07-31"
+        ],
+        "n_minutes": 2740892,
+        "n_days_present": 1906,
+        "sha256_values": "101284bf547ca534e02f901af54415e8185c525825c13b90d691667fd5ee47c3"
+      }
+    },
+    {
+      "symbol": "SOLUSDT",
+      "exchange": "bybit",
+      "stream": "publicTrade",
+      "range": [
+        "2020-03-25",
+        "2026-07-31"
+      ],
+      "days_in_range": 2320,
+      "days_manifest_done": 1859,
+      "days_not_done": 461,
+      "cached": 1859,
+      "exists": 0,
+      "no_raw": 0,
+      "seconds": 6849.7,
+      "fingerprint": {
+        "schema_version": 1,
+        "exchange": "bybit",
+        "symbol": "SOLUSDT",
+        "range": [
+          "2020-03-25",
+          "2026-07-31"
+        ],
+        "n_minutes": 2673710,
+        "n_days_present": 1859,
+        "sha256_values": "30d3705a316a262c0ad5e69b1ec946739a551863f7dbf4deb84c17b9d09726b6"
+      }
+    },
+    {
+      "symbol": "BNBUSDT",
+      "exchange": "bybit",
+      "stream": "publicTrade",
+      "range": [
+        "2020-03-25",
+        "2026-07-31"
+      ],
+      "days_in_range": 2320,
+      "days_manifest_done": 1859,
+      "days_not_done": 461,
+      "cached": 1859,
+      "exists": 0,
+      "no_raw": 0,
+      "seconds": 1245.0,
+      "fingerprint": {
+        "schema_version": 1,
+        "exchange": "bybit",
+        "symbol": "BNBUSDT",
+        "range": [
+          "2020-03-25",
+          "2026-07-31"
+        ],
+        "n_minutes": 2621727,
+        "n_days_present": 1859,
+        "sha256_values": "6f7b36259332de0b126e9d968c6ba9d0a5ffa9676bb400e627ee5358c117230a"
+      }
+    }
+  ]
+}

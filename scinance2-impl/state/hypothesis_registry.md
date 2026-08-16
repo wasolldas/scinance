@@ -483,6 +483,101 @@ Beide registrierten Fensterpaare (W1 2026-03-27..2026-05-15, W2 2026-05-16..2026
 
 ---
 
+## 2026-08-15 · Welle-6-Registrierung (H-19..H-22) — CPU-first, einzeln nacheinander
+
+> Grundlage: `WELLE6_KANDIDATEN_SYNTHESE_2026-08-10.md` (Auswahlbegruendung),
+> `WP1_L2_ZENSUS_BEFUND_2026-08-14.md` (L2-Vorbedingung ERFUELLT, DEC-36),
+> WP-0-Bar-Cache (DEC-34/35/36). Die vier Hypothesen laufen EINZELN
+> nacheinander (DRIFT → TAIL-AFTERMATH → LIQ-TAG → L2-TILT) — die
+> Kohorten-Regel greift nicht, KEINE Ueber-Familie (DEC-24-Muster).
+>
+> **Datenbindung (verbindlich, DEC-34 Punkt 4):** H-19 und H-20 lesen
+> AUSSCHLIESSLICH aus dem deterministischen WP-0-Bar-Cache
+> (`data/barcache`, Range 2020-03-25..2026-07-31, schema_version 1,
+> Lauf `state/wp0_20260815/barcache_build.json`). Registrierte
+> Wert-Fingerabdruecke (SHA-256 ueber die exakten Spalten-Bytes):
+>
+> | Symbol | Tage | Minuten | sha256_values |
+> |---|---:|---:|---|
+> | BTCUSDT | 2320 | 3.311.569 | `3be122e350df98118b26eaa16471cc070375e7593c17524753069441681dd8b6` |
+> | ETHUSDT | 2110 | 3.031.135 | `848ff87d3903cc59132e1653c915d79150288f424aa8d0eafe00c299ac54b098` |
+> | XRPUSDT | 1906 | 2.740.892 | `101284bf547ca534e02f901af54415e8185c525825c13b90d691667fd5ee47c3` |
+> | SOLUSDT | 1859 | 2.673.710 | `30d3705a316a262c0ad5e69b1ec946739a551863f7dbf4deb84c17b9d09726b6` |
+> | BNBUSDT | 1859 | 2.621.727 | `6f7b36259332de0b126e9d968c6ba9d0a5ffa9676bb400e627ee5358c117230a` |
+>
+> Der BTC-Fingerabdruck wurde ueber ZWEI unabhaengige Laeufe (2026-08-14,
+> 2026-08-15) bit-identisch reproduziert — die Cross-Run-Stabilitaet des
+> Cache ist damit auf echten Daten belegt. Jeder Lauf-Report nennt den
+> Fingerabdruck, gegen den er gerechnet hat; Abweichung => `gate_valid=false`.
+>
+> **Gemeinsames Fensterschema (H-19/H-20):** L = 2021-06-29..2022-12-31
+> (551 Tage; hier NUR deskriptiv — keine der beiden Hypothesen tunet
+> irgendetwas) · OOS-1 = 2023-01-01..2024-06-30 (547) · OOS-2 =
+> 2024-07-01..2025-12-31 (549). Alle Fenster liegen VOR jeder
+> Programm-Discovery (H-01..H-18 sahen nie Daten vor 2026-03-27).
+> H-21/H-22 haben EIGENE, unten registrierte Fenster (Datenlage).
+>
+> **DEC-31/33-Pflichtzeile:** Jeder Feasibility-Check unten rechnet den
+> STRUKTURELLEN NULLEFFEKT seiner Metrik aus und kalibriert die Schwelle
+> dagegen. Alle vier Hypothesen sind KAPITALFREI; bps-Groessen sind
+> Preisbewegungs-Messgroessen, keine Kosten-/PnL-Rechnung.
+
+### H-19 · C-19 DRIFT — Stationaritaet der Tape-Struktur ueber Kalenderzeit (META/AUDIT, KAPITALFREI)
+- **Registriert:** 2026-08-15 · **Herkunft:** Lane A (K-D), Synthese §2.
+- **Frage (Meta, H-18-Muster — beide Zweige informativ, KEIN WEITER/DROP):** Zeigt mindestens einer von drei vorab fixierten Tages-Deskriptoren der Tape-Struktur einen materiellen, nicht durch Vol-/Aktivitaetsniveau erklaerten Kalenderzeit-Drift?
+- **Deskriptoren (alle DETERMINISTISCH aus dem Bar-Cache; kein Tick-Zugriff):** **D1** lag-1-Autokorrelation der 1-min-Log-Renditen innerhalb des UTC-Tages (>=300 Minuten-Renditen, sonst Tag NaN) · **D2** Varianz-Signatur VR = RV(5-min)/RV(1-min) je Tag (5-min-Renditen aus denselben Bars aggregiert; Mikrostruktur-Rausch-Proxy) · **D3** Herfindahl-Konzentration der Minuten-`vol_total` ueber den Tag (Aktivitaets-Klumpung), normiert H* = (H − 1/n)/(1 − 1/n).
+- **Messgroesse:** je Deskriptor × Symbol × Fenster der **partielle Spearman-Rang** rho_p(Deskriptor, Tagesindex | log RV_Tag, log Volumen_Tag) via Rang-Residuen-Methode.
+- **Fenster:** OOS-1 und OOS-2 (urteilstragend fuer den Befund), L deskriptiv mitberichtet. Kein Tuning, nichts einzufrieren.
+- **BEFUND-Kriterium (magnitudengetrieben, vorab fixiert):** DRIFT-BEFUND fuer eine Deskriptor×Symbol-Zelle, wenn |rho_p| >= **0,30** in BEIDEN OOS-Fenstern mit GLEICHEM Vorzeichen. Sonst: stationaer-genug.
+- **Struktureller Nulleffekt (Pflichtzeile):** Metrik-Geometrie beidseitig identisch (Skalar vs. Skalar), Nulleffekt exakt 0; Rauschboden unter der Null 1/sqrt(547) ≈ 0,043 je Fenster. Die Schwelle 0,30 liegt ~7x darueber; die Beide-Fenster-gleiches-Vorzeichen-Bedingung drueckt die Null-Befundwahrscheinlichkeit je Zelle unter 1e-10. p-Werte sind hier absichtlich NICHT urteilstragend: bei N≈550 entspricht rho=0,30 z≈7 — ein p-Gate waere ueberpowert und wuerde triviale Drifts adeln (spiegelbildliche H-07-Lehre, GL-012).
+- **Statistik (mitberichtet, nicht urteilstragend):** Block-Bootstrap-KIs (5-Tage-Bloecke, 1000 Reps, Seed 42) je Zelle; BH-FDR alpha=0,10 ueber **F-DRIFT** (15 Zellen = 3 Deskriptoren × 5 Symbole) auf den Bootstrap-p.
+- **Bindende Konsequenzregel (vorab):** Jede Zelle mit DRIFT-BEFUND verpflichtet alle NACHFOLGENDEN Welle-6-Auswertungen, die diese Struktur nutzen, zu regime-gesplitteter Berichterstattung (Split an der registrierten OOS-1/OOS-2-Grenze). Kein Befund = keine Auflage.
+- **Feasibility:** CPU, Minuten (Panel liegt im Cache). Vollstaendige Daten fuer alle 5 Symbole vorhanden (Fingerprints oben).
+- **A-priori (ehrlich):** Drift in D2 plausibel (Tick-Size-/Fee-Regime-Aenderungen), D1/D3 offen. Beide Ausgaenge informativ.
+- **Status:** registriert, Lauf NICHT gestartet.
+
+### H-20 · C-20 TAIL-AFTERMATH — Reversions-signierte Nachbewegung nach 3,5-σ-Stundenereignissen (KAPITALFREI)
+- **Registriert:** 2026-08-15 · **Herkunft:** Lane A (K-A), oekonomisch staerkster Kandidat (Zielgroesse 25–50 bps ~1,7–3,3x ueber der 15-bps-Wand — NICHT-bindende Einordnung, GL-022-E5-Muster: entkoppelt vom Gate).
+- **Event-Definition (vorab fixiert):** Stunden-Log-Rendite r_h ueber die UTC-Kalenderstunde aus den 1-min-Bars (`px_last`); Stunden mit <45 vorhandenen Minutenbars sind kein Kandidat. Skala sigma_h = 1,4826 × Rolling-MAD der Stundenrenditen ueber die 720 vorangehenden Stunden (mind. 360 vorhanden), strikt kausal. Event: |r_h| >= **3,5 × sigma_h**. Non-Overlap: je Symbol zaehlt nur das ERSTE Event innerhalb 24 h (deterministisch).
+- **Outcome:** y = −sign(r_event) × Σ 1-min-Log-Renditen von t0+2h bis t0+24h (t0 = Ende der Eventstunde). Positives y = Reversion. Die 2-h-Luecke schliesst Bounce-/Kurzhorizont-Mikrostruktur aus dem Messfenster aus.
+- **Hypothese:** E[y] > 0, GEPOOLT ueber alle 5 Symbole. Per-Symbol-Zellen sind mitberichtet, aber NICHT urteilstragend (unterpowert, Synthese §4).
+- **Fenster:** OOS-1, OOS-2 (urteilstragend, gepoolt je Fenster); L deskriptiv.
+- **Nullhypothese/Statistik:** H0: E[y] <= 0. Tages-geclusterter zirkulaerer Block-Bootstrap (Cluster = UTC-Eventtag, 1000 Reps, Seed 42) auf dem gepoolten Mittel.
+- **Gate (woertlich, bindend):** WEITER, wenn in BEIDEN OOS-Fenstern gepoolt: mean(y) >= **+10 bps** UND Cluster-Bootstrap-p <= 0,05 nach BH-FDR alpha=0,10 ueber **F-TAIL** (2 Zellen = 2 Fenster). **DROP:** hartes Ein-Fenster-Kriterium. Kein Graubereich, keine Sigma-/Horizont-/Luecken-Nachsuche.
+- **N-Floor (hart, GL-017-Lehre, nicht absenkbar):** >= **100 Event-Tage** je OOS-Fenster gepoolt; darunter KEIN VERDIKT (methodisch nicht auswertbar, NICHT DROP).
+- **Struktureller Nulleffekt (Pflichtzeile):** Unter einer Null unabhaengiger Inkremente ist E[y] = 0 EXAKT (die Reversions-Signierung ist unter der Null vorzeichensymmetrisch); Geometrie beidseitig identisch. Die bekannte mechanische Reversionsquelle (Bid-Ask-Bounce) lebt auf Minutenskala und ist durch die 2-h-Luecke ausgeschlossen. Erwarteter Standardfehler des gepoolten Mittels bei ~150 Event-Tagen: ~5–15 bps ⇒ die +10-bps-Schwelle ist eine echte Huerde ueber dem Null-Boden 0 und liegt bewusst UNTER der oekonomischen Erwartung (25–50 bps), damit das Gate die Mess-, nicht die Wunschfrage stellt.
+- **Feasibility:** CPU 2–4 h. Ereignisdichte-Schaetzung: 3,5-sigma-Stunden ~0,05–0,1 % der Stunden × ~13.100 Stunden/Fenster × 5 Symbole ≈ 300–650 Events/Fenster vor Non-Overlap — der 100er-Floor ist realistisch, sein Riss waere selbst ein Befund.
+- **A-priori (ehrlich):** offen, ~30–40 % WEITER (Overreaction-Literatur pro Reversion; Momentum-Fortsetzung nach Vol-Schocks dagegen). Kein DROP-Vorurteil.
+- **KAPITALFREIHEIT (verbindlich):** Mess-Gate. Tradability waere NEUE H-20b (Friktions-Konfrontation, Latenz-Haircut), NICHT impliziert.
+- **Status:** registriert, Lauf NICHT gestartet.
+
+### H-21 · C-21 LIQ-TAG — Informationsgehalt des exogenen Liquidations-Labels (KAPITALFREI, DATA-GATED: GESPERRT)
+- **Registriert:** 2026-08-15 · **Herkunft:** Lane C (K3). Erste EXOGENE Flussmarkierung des Programms (alle bisherigen Flussgroessen waren tape-inferiert).
+- **Entsperr-Bedingung (vorab fixiert, H-11-Muster):** lueckenlose `done_days` fuer bybit `allLiquidation` UND `publicTrade`, BTC+ETH, ueber BEIDE Fenster: **W1 = 2026-07-01..2026-09-28, W2 = 2026-09-29..2026-12-27** (je 90 Tage). Der Lauf ist damit fruehestens Ende Dezember 2026 moeglich — bewusst: die Historie waechst kalendarisch (Stand 2026-08-10: 43 Tage), und ein Sofort-Lauf wiederholte die N-Fallen von H-10/H-13.
+- **Hypothese:** Das Liquidations-Label traegt Information ueber die Forward-Preisbewegung, die ein gematchter gewoehnlicher Trade NICHT traegt.
+- **Methode (vorab fixiert):** Events = `allLiquidation`-Records (Symbol, Seite, Groesse, Zeit). Kontrolle je Event: der zeitnaechste gewoehnliche Trade desselben Symbols mit gleicher Aggressor-Seite im gleichen Groessen-Dezil (Dezile je Symbol×Fenster auf gewoehnlichen Trades), mit >= 30 min Abstand zu JEDEM Liquidations-Event (Kontaminationsschutz). Outcome je Beobachtung: y = s × r(t → t+30 min) mit s = −1 fuer Long-Liquidation (erzwungener Verkauf), +1 fuer Short-Liquidation; Kontrollen erben s ihres Events. Messgroesse: **D = mean(y_Event) − mean(y_Kontrolle)**, Horizont EIN einziger (30 min, keine Suche).
+- **Nullhypothese/Statistik (urteilstragend):** stratifizierte Permutation — Label zwischen Event und seiner Kontrolle innerhalb der Straten (UTC-Tag × Seite × Groessendezil) permutiert, 10.000 Permutationen, Seed 42, zweiseitig. Tagesblock-Bootstrap NUR als Robustheitsbericht (~90 Tagesbloecke je Fenster tragen kein Urteil — Synthese §4).
+- **Gate (woertlich, bindend):** WEITER, wenn fuer >= 1 Symbol in {BTC, ETH} in BEIDEN Fenstern: |D| >= **5 bps** UND Permutations-p <= 0,05 nach BH-FDR alpha=0,10 ueber **F-LIQ** (2 Symbole × 2 Fenster = 4 Zellen). **DROP:** hartes Ein-Fenster-Kriterium je Symbol. Kein Graubereich.
+- **N-Floor:** >= 300 Events je Zelle; darunter zaehlt die Zelle als nicht bestanden und geht mit Sentinel-p = 1,0 in die Familie (Anti-Schrumpf-Doktrin).
+- **Struktureller Nulleffekt (Pflichtzeile):** Das Matching macht beide Seiten geometrie-identisch (Skalar vs. Skalar); unter der Null „Label traegt nichts" ist D per Konstruktion der stratifizierten Permutation um 0 zentriert. Boden = 0; die 5-bps-Schwelle ist gegen den Permutations-Rauschboden bei >= 300 Events (~1–3 bps se) kalibriert.
+- **A-priori (ehrlich):** offen; oekonomische Einordnung ~0,2–0,5x UNTER der Wand — H-21 ist eine reine Mess-/Mechanismus-Frage, ein WEITER impliziert keinerlei Handelsnaehe.
+- **KAPITALFREIHEIT (verbindlich).** · **Status:** registriert, **GESPERRT** bis Entsperr-Bedingung erfuellt.
+
+### H-22 · C-22 L2-TILT — Tages-Buchneigung → Folgetags-Rendite (KAPITALFREI; Vorbedingung WP-1 ERFUELLT)
+- **Registriert:** 2026-08-15 · **Herkunft:** Lane C (K4). Registrierungs-Vorbedingung durch den L2-Zensus erfuellt (Snapshot+Delta bestaetigt, `WP1_L2_ZENSUS_BEFUND_2026-08-14.md`, DEC-36); die dort genannten Einschraenkungen sind hier bindend eingearbeitet.
+- **Feature (vorab fixiert):** Rekonstruiertes L2-Buch je Tag per Snapshot+Delta-Replay (`orderbook.500`-Aera). Near-Touch-Tilt T = (B − A)/(B + A) mit B/A = Summe der Bid-/Ask-Groessen innerhalb **±25 bps** um den Mid; 1-min-Abtastung des rekonstruierten Buchs; Tagesgroesse = Median der Abtastungen des UTC-Tages (Median: robust gegen Snapshot-Luecken). **Rekonstruktions-Validierung (bindend):** an jedem periodischen Voll-Snapshot wird das replayte Buch verglichen; Abweichung => Resync + Bruchzaehler. Ein Tag mit > 10 Bruechen oder ohne Snapshot wird LAUT verworfen (zaehlt als fehlender Tag).
+- **Hypothese:** Das Tages-Tilt prognostiziert die Folgetags-Rendite: Rang-IC = Spearman(T_d, r_{d+1}) > 0. r_{d+1} aus dem WP-0-Bar-Cache (`px_last` Tagesschluss, UTC).
+- **Fenster (EIGENE, gegen die Zensus-Abdeckung registriert — das gemeinsame Welle-6-Schema ist hier NICHT verwendbar, L2 beginnt 2023-01-18):** **BTC W-L2-1 = 2023-07-01..2024-06-30 · BTC W-L2-2 = 2024-07-01..2025-06-30** (beide vollstaendig in der 500er-Aera, vor der BTC-Luecke 2025-08..2026-06). **ETH** (Abdeckung nur 41 %, 500er endet 2024-05-10): EIN Fenster 2023-04-01..2024-04-30, ausdruecklich NICHT urteilstragend (nur Bericht) — das Gate laeuft AUSSCHLIESSLICH auf BTC (BTC-first, Synthese).
+- **Abdeckungs-Floor (vorab fixiert, nicht absenkbar):** je urteilstragendem Fenster >= **85 %** der Kalendertage mit verwertbarem Buch (tagesgenau, programmatisch VOR dem Lauf geprueft). Darunter: SKIP, kein Verdikt.
+- **Nullhypothese/Statistik:** H0: IC <= 0. Block-Bootstrap (5-Tage-Bloecke, 1000 Reps, Seed 42) je Fenster.
+- **Gate (woertlich, bindend):** WEITER, wenn BTC in BEIDEN L2-Fenstern: **IC >= 0,10** UND Bootstrap-p <= 0,05 nach BH-FDR alpha=0,10 ueber **F-L2** (2 Zellen). **DROP:** hartes Ein-Fenster-Kriterium. Kein Graubereich, keine Band-/Sampling-/Aggregat-Nachsuche (±25 bps, 1-min, Median sind fixiert).
+- **Struktureller Nulleffekt (Pflichtzeile):** IC-Geometrie beidseitig skalar, Nulleffekt 0; Rauschboden je Fenster 1/sqrt(365) ≈ 0,052. Schwelle 0,10 ≈ 1,9 Rauschboeden; kombinierte Null-Passwahrscheinlichkeit beider Fenster (inkl. p-Bedingung) < 0,1 %. Zum Vergleich: die oekonomische 25–30-bps-Notiz der Lane C entspraeche |IC| ~ 0,1 — Schwelle und Notiz sind konsistent, die Notiz bleibt trotzdem NICHT-bindend und vom Gate entkoppelt (GL-022 E5).
+- **Vorleistung WP-2 (ein Pass, vor dem Lauf):** einmalige Tilt-Extraktion BTC+ETH ueber die registrierten Fenster, Ergebnis hash-gepinnt analog WP-0 (Sidecar je Tag; Fingerprint im Lauf-Report). Kein weiterer Roh-L2-Zugriff danach.
+- **A-priori (ehrlich, Lane C woertlich uebernommen):** **DROP erwartet** — ±5-bps-Buchtiefe gegen einen 1-Tages-Horizont widerspricht der ueblichen Zerfallsstruktur. H-22 laeuft, weil der Test nach WP-2 trivial billig ist und ein WEITER hochinformativ waere.
+- **KAPITALFREIHEIT (verbindlich).** · **Status:** registriert, Lauf NICHT gestartet (wartet auf WP-2).
+
+---
+
 ## Registry-Disziplin (verbindlich, PRD §8)
 
 1. **Pre-Registration (§8.3):** Jede Hypothese, jeder Schwellwert, jedes Fenster wird HIER festgeschrieben, BEVOR der Run startet.
