@@ -1,0 +1,203 @@
+{
+  "schema_version": 1,
+  "hypothesis": "H-20",
+  "hypothesis_registry": "scinance2-impl/state/hypothesis_registry.md",
+  "capital_free": true,
+  "status": "RUN",
+  "generated_at": "2026-08-17T09:10:22+00:00",
+  "source": "E:\\Claude\\Projects\\scinance\\data\\barcache/bars_1min (WP-0, read-only)",
+  "exchange": "bybit",
+  "symbols": [
+    "BTCUSDT",
+    "ETHUSDT",
+    "XRPUSDT",
+    "SOLUSDT",
+    "BNBUSDT"
+  ],
+  "cache_fingerprints": {
+    "BTCUSDT": {
+      "observed": "3be122e350df98118b26eaa16471cc070375e7593c17524753069441681dd8b6",
+      "registered": "3be122e350df98118b26eaa16471cc070375e7593c17524753069441681dd8b6",
+      "matches": true
+    },
+    "ETHUSDT": {
+      "observed": "848ff87d3903cc59132e1653c915d79150288f424aa8d0eafe00c299ac54b098",
+      "registered": "848ff87d3903cc59132e1653c915d79150288f424aa8d0eafe00c299ac54b098",
+      "matches": true
+    },
+    "XRPUSDT": {
+      "observed": "101284bf547ca534e02f901af54415e8185c525825c13b90d691667fd5ee47c3",
+      "registered": "101284bf547ca534e02f901af54415e8185c525825c13b90d691667fd5ee47c3",
+      "matches": true
+    },
+    "SOLUSDT": {
+      "observed": "30d3705a316a262c0ad5e69b1ec946739a551863f7dbf4deb84c17b9d09726b6",
+      "registered": "30d3705a316a262c0ad5e69b1ec946739a551863f7dbf4deb84c17b9d09726b6",
+      "matches": true
+    },
+    "BNBUSDT": {
+      "observed": "6f7b36259332de0b126e9d968c6ba9d0a5ffa9676bb400e627ee5358c117230a",
+      "registered": "6f7b36259332de0b126e9d968c6ba9d0a5ffa9676bb400e627ee5358c117230a",
+      "matches": true
+    }
+  },
+  "gate_valid": true,
+  "windows": {
+    "L": [
+      "2021-06-29",
+      "2022-12-31"
+    ],
+    "OOS1": [
+      "2023-01-01",
+      "2024-06-30"
+    ],
+    "OOS2": [
+      "2024-07-01",
+      "2025-12-31"
+    ]
+  },
+  "method": {
+    "event": "|r_hour| >= 3.5 x sigma; sigma = 1.4826 x rolling MAD of previous <= 720 hourly returns (>= 360), strictly causal; hour candidate needs >= 45 minute bars; non-overlap 24 h, first event wins",
+    "aftermath": "y = -sign(r_event) x logmove(t0+2h -> t0+24h) in bp; data-quality floors: >= 660 minutes present, boundary bars within 30 min",
+    "statistic": "pooled over symbols; day-clustered bootstrap (cluster = UTC event day, 1000 reps, seed 42) for H0: E[y] <= 0"
+  },
+  "fdr_family": "F-TAIL",
+  "fdr_alpha": 0.1,
+  "fdr_p_crit": 0.0,
+  "gate_thresholds": {
+    "mean_min_bp": 10.0,
+    "boot_p_max": 0.05,
+    "n_event_days_floor": 100
+  },
+  "n_events_dropped_data_quality": 0,
+  "cells": [
+    {
+      "window": "L",
+      "window_range": [
+        "2021-06-29",
+        "2022-12-31"
+      ],
+      "judgment_bearing": false,
+      "n_events": 889,
+      "n_event_days": 362,
+      "n_days_floor": 100,
+      "floor_met": true,
+      "mean_aftermath_bp": -40.467349644822136,
+      "median_aftermath_bp": -6.53730745654002,
+      "mean_ge_min": false,
+      "cluster_boot_p": 0.9310689310689311
+    },
+    {
+      "window": "OOS1",
+      "window_range": [
+        "2023-01-01",
+        "2024-06-30"
+      ],
+      "judgment_bearing": true,
+      "n_events": 1044,
+      "n_event_days": 403,
+      "n_days_floor": 100,
+      "floor_met": true,
+      "mean_aftermath_bp": 4.827622375118279,
+      "median_aftermath_bp": 14.237862656845124,
+      "mean_ge_min": false,
+      "cluster_boot_p": 0.39760239760239763,
+      "fdr_significant": false,
+      "boot_p_le_max": false,
+      "cell_pass": false
+    },
+    {
+      "window": "OOS2",
+      "window_range": [
+        "2024-07-01",
+        "2025-12-31"
+      ],
+      "judgment_bearing": true,
+      "n_events": 962,
+      "n_event_days": 362,
+      "n_days_floor": 100,
+      "floor_met": true,
+      "mean_aftermath_bp": 17.278420094280698,
+      "median_aftermath_bp": 20.214668340530206,
+      "mean_ge_min": true,
+      "cluster_boot_p": 0.17282717282717283,
+      "fdr_significant": false,
+      "boot_p_le_max": false,
+      "cell_pass": false
+    }
+  ],
+  "per_symbol_report": [
+    {
+      "symbol": "BTCUSDT",
+      "window": "OOS1",
+      "n_events": 244,
+      "mean_bp": -16.47798520940985,
+      "judgment_bearing": false
+    },
+    {
+      "symbol": "ETHUSDT",
+      "window": "OOS1",
+      "n_events": 236,
+      "mean_bp": 31.892361728847806,
+      "judgment_bearing": false
+    },
+    {
+      "symbol": "XRPUSDT",
+      "window": "OOS1",
+      "n_events": 190,
+      "mean_bp": 14.762632004250401,
+      "judgment_bearing": false
+    },
+    {
+      "symbol": "SOLUSDT",
+      "window": "OOS1",
+      "n_events": 176,
+      "mean_bp": -49.35755871344866,
+      "judgment_bearing": false
+    },
+    {
+      "symbol": "BNBUSDT",
+      "window": "OOS1",
+      "n_events": 198,
+      "mean_bp": 37.45504563369088,
+      "judgment_bearing": false
+    },
+    {
+      "symbol": "BTCUSDT",
+      "window": "OOS2",
+      "n_events": 225,
+      "mean_bp": 36.44342051977477,
+      "judgment_bearing": false
+    },
+    {
+      "symbol": "ETHUSDT",
+      "window": "OOS2",
+      "n_events": 226,
+      "mean_bp": -12.246835607676035,
+      "judgment_bearing": false
+    },
+    {
+      "symbol": "XRPUSDT",
+      "window": "OOS2",
+      "n_events": 186,
+      "mean_bp": -21.204519406499628,
+      "judgment_bearing": false
+    },
+    {
+      "symbol": "SOLUSDT",
+      "window": "OOS2",
+      "n_events": 154,
+      "mean_bp": 45.72617959756439,
+      "judgment_bearing": false
+    },
+    {
+      "symbol": "BNBUSDT",
+      "window": "OOS2",
+      "n_events": 171,
+      "mean_bp": 47.3220135243714,
+      "judgment_bearing": false
+    }
+  ],
+  "verdict_evaluable": true,
+  "both_windows_pass": false
+}

@@ -1126,3 +1126,35 @@ D3 (Aktivitaets-Konzentration) zeigt ein klares **abgeschlossenes Uebergangsmust
 
 ### Programm-Bilanz (nach GL-025)
 Welle 1–5 unveraendert (GL-022/023/024 inkl. H-11c DROP). Welle 6: **H-19 STATIONAER-GENUG (GL-025, META/AUDIT)** · H-20 registriert, Lauf ausstehend · H-21 GESPERRT bis Fensterschluss 2026-12-27 · H-22 registriert, wartet auf WP-2. **25 GL-Eintraege, 0 Torpfosten-Verschiebungen, 0 handelbare Kanten.**
+
+---
+
+## GL-026 · 2026-08-17 · H-20 · C-20 TAIL-AFTERMATH: Nachbewegung nach 3,5-σ-Stunden (Welle 6, KAPITALFREI) — **DROP (empirisch; beide OOS-Fenster verfehlen das Gate, Ein-Fenster-Kriterium greift zweifach)**
+
+**Quelle:** `state/h20_20260817/c20_tail_results.{json,md}` (Lauf 2026-08-17 09:08 UTC, 95 s, rc=0). Datenbindung einwandfrei: alle fuenf Cache-Fingerabdruecke bestaetigt (`gate_valid=true`). **Verdikt-Auswertbarkeit gegeben:** N-Floor (>=100 Event-Tage je Fenster) mit 403 (OOS-1) und 362 (OOS-2) Event-Tagen komfortabel erfuellt; 0 Events wegen Datenqualitaet verworfen. Die Feasibility-Schaetzung der Registrierung (300–650 Events/Fenster) wurde mit 1.044/962 sogar uebertroffen — die Ereignis-Maschinerie hat funktioniert.
+
+### Registriertes Gate (wörtlich) und Messergebnis
+
+Gate: „WEITER, wenn in BEIDEN OOS-Fenstern gepoolt: mean(y) >= +10 bp UND Cluster-Bootstrap-p <= 0,05 nach BH-FDR alpha=0,10 ueber F-TAIL (2 Zellen). DROP: hartes Ein-Fenster-Kriterium. Kein Graubereich."
+
+| Fenster | urteilstragend | Events | Event-Tage | mean y | median y | >= +10 bp | Cluster-p | <= 0,05 | Zelle |
+|---|:---:|---:|---:|---:|---:|:---:|---:|:---:|:---:|
+| L (deskriptiv) | nein | 889 | 362 | **−40,5 bp** | −6,5 bp | — | 0,9311 | — | — |
+| OOS-1 | ja | 1.044 | 403 | **+4,8 bp** | +14,2 bp | **nein** | 0,3976 | **nein** | **nein** |
+| OOS-2 | ja | 962 | 362 | **+17,3 bp** | +20,2 bp | ja | 0,1728 | **nein** | **nein** |
+
+F-TAIL: `n_fdr_significant=0`, `p_crit=0`.
+
+### URTEIL: **DROP.**
+OOS-1 verfehlt BEIDE Bedingungen (Mittel unter dem Boden, p weit ueber der Schwelle); OOS-2 erreicht zwar den +10-bp-Boden, aber p=0,17 ist dreieinhalbfach ueber der Schwelle. Das harte Ein-Fenster-Kriterium greift damit zweifach. Kein Graubereich registriert, keiner anwendbar.
+
+### Ehrliche Einordnung des Musters
+1. **Die Punktschaetzer sind in beiden OOS-Fenstern positiv** (Mittel +5/+17 bp, Mediane +14/+20 bp) — die Reversions-Richtung ist als Tendenz sichtbar, traegt aber keine Signifikanz: die tages-geclusterte Streuung der Nachbewegungen ist zu gross (~12–13 bp Standardfehler des gepoolten Mittels).
+2. **Das Vorzeichen ist ueber Symbole und Fenster instabil:** BTC −16 → +36, SOL −49 → +46, ETH +32 → −12, XRP +15 → −21 bp. Kein Symbol traegt den Effekt konsistent — das gepoolte Plus ist ein Durchschnitt wechselnder Vorzeichen, kein gemeinsames Phaenomen.
+3. **Das deskriptive L-Fenster (2021–2022) zeigt das GEGENTEIL:** −40,5 bp — nach Schocks dominierte dort FORTSETZUNG. Zusammen mit GL-025 (D3-Uebergang endet ~Mitte 2024) ergibt sich ein konsistentes Bild: das Nach-Schock-Verhalten ist selbst regime-abhaengig und hat in keiner Aera die registrierte Staerke.
+4. **Die oekonomische 25–50-bp-Erwartung der Synthese ist nicht bestaetigt** — die gemessenen +5/+17 bp laegen selbst bei Signifikanz unter bzw. knapp ueber der 15-bps-Wand. Die Notiz war nicht-bindend und faellt mit dem DROP ersatzlos.
+
+**Abgrenzung (vorab registriert, bleibt bindend):** Keine Sigma-/Horizont-/Luecken-Nachsuche. Eine konditionierte Neufassung (z. B. nur Crash-Events, nur High-Vol-Regime, anderer Horizont) waere eine NEUE Hypothese mit eigener Vorregistrierung und muesste die hier dokumentierte Vorzeichen-Instabilitaet als A-priori-Gegenevidenz zitieren.
+
+### Programm-Bilanz (nach GL-026)
+Welle 6: H-19 STATIONAER-GENUG (GL-025) · **H-20 DROP (GL-026)** · H-21 GESPERRT bis 2026-12-27 · H-22 registriert, wartet auf WP-2. **26 GL-Eintraege, 0 Torpfosten-Verschiebungen, 0 handelbare Kanten.**
