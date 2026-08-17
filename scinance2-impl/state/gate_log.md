@@ -1097,3 +1097,32 @@ Welle 1–3 unveraendert. Welle 4: H-09/H-10/H-12 DROP · H-11 WEITER kapitalfre
 > **Was sich NICHT aendert:** Das Verdikt **DROP** steht unveraendert. Ueber alle drei Laeufe schwankt der CRPSS_dressed um hoechstens **1,5e-09** (BTC W1 +0,0154103 · BTC W2 −0,0304856 · ETH W1 −0,0435116 · ETH W2 −0,0593609), die Bootstrap-p-Werte sind auf vier Stellen identisch (0,2917 / 0,7602 / 0,9401 / 0,9161), `n_fdr_significant=0` und `any_symbol_both_windows_pass=false` in allen drei Laeufen. Die Messunsicherheit ist rund **sieben Groessenordnungen** kleiner als der Abstand der besten Zelle zur Schwelle (0,0346). Auch GL-022 ist unberuehrt: die H-11-Groesse schwankt in derselben Groessenordnung.
 >
 > **Was sich damit BESTAETIGT:** DEC-32 war sachlich richtig, aber aus dem falschen Grund begruendet. Die dortige Materialitaets-Schranke ist jetzt nicht mehr nur aus der Gate-Arithmetik hergeleitet, sondern hat einen **gemessenen Rausch-Boden**: maximale relative Lauf-zu-Lauf-Streuung 3,8e-09 gegen die Schranke 1e-4 — vier Groessenordnungen Reserve. Die urspruengliche 1e-9-Vorbedingung war nicht wegen eines lebenden Speichers unerreichbar, sondern weil sie **unter dem Rauschboden der eigenen Pipeline** lag. Das Verbot von Bit-Identitaets-Vorbedingungen (DEC-32, Prozess-Lehre) gilt damit erst recht.
+
+---
+
+## GL-025 · 2026-08-17 · H-19 · C-19 DRIFT: Stationaritaet der Tape-Struktur (Welle 6, META/AUDIT, KAPITALFREI) — **BEFUND: STATIONAER-GENUG (0 von 15 Zellen; KEINE Regime-Splitting-Auflage)**
+
+**Quelle:** `state/h19_20260817/c19_drift_results.{json,md}` (Lauf 2026-08-17 08:26–08:35 UTC, 527 s, rc=0). **Datenbindung einwandfrei:** alle fuenf registrierten WP-0-Cache-Fingerabdruecke bit-genau bestaetigt (`gate_valid=true`) — der erste Welle-6-Lauf unter dem neuen Determinismus-Regime, und die Vorbedingungs-Maschinerie hat exakt wie entworfen funktioniert.
+
+### Registrierte Befund-Regel und Ergebnis
+
+Regel (Registry H-19, magnitudengetrieben): DRIFT-BEFUND je Deskriptor×Symbol, wenn |rho_p| >= 0,30 in BEIDEN OOS-Fenstern mit GLEICHEM Vorzeichen (partieller Spearman gegen den Tagesindex, konditioniert auf log-RV und log-Volumen).
+
+**Ergebnis: 0 von 15 Zellen erfuellen die Befund-Regel.** Kein Deskriptor zeigt in beiden Fenstern gleichgerichteten materiellen Drift; die Rotations-Null-p (nicht urteilstragend) sind nach BH-FDR alpha=0,10 ueber F-DRIFT in 0 von 30 OOS-Zellen signifikant.
+
+| Symbol | D1 lag1-AC (OOS1/OOS2) | D2 Varianz-Signatur | D3 Herfindahl |
+|---|---|---|---|
+| BTC | −0,08 / +0,08 | −0,10 / +0,25 | **−0,33** / +0,06 |
+| ETH | −0,09 / −0,09 | −0,07 / −0,04 | **−0,47** / +0,02 |
+| XRP | −0,13 / +0,08 | −0,18 / +0,14 | −0,05 / −0,16 |
+| SOL | −0,06 / −0,05 | −0,21 / −0,04 | **−0,49** / +0,09 |
+| BNB | −0,15 / +0,05 | −0,18 / +0,06 | −0,29 / −0,09 |
+
+### BEFUND (bindend fuer Welle 6): **STATIONAER-GENUG — die Regime-Splitting-Auflage wird NICHT ausgeloest.**
+H-20/H-21/H-22 duerfen ihre Mehrjahres-Fenster ungesplittet auswerten; die vorregistrierte Konsequenzregel ist leer gelaufen.
+
+### Deskriptive Beobachtung (ausdruecklich KEIN Befund, ehrlich protokolliert)
+D3 (Aktivitaets-Konzentration) zeigt ein klares **abgeschlossenes Uebergangsmuster statt eines laufenden Drifts**: in L (2021–2022) POSITIV (+0,36..+0,49 bei XRP/SOL/BNB), in OOS-1 (2023–2024H1) stark NEGATIV (BTC −0,33, ETH −0,47, SOL −0,49), in OOS-2 (2024H2–2025) ueberall nahe null. Lesart: Die Klumpung der Handelsaktivitaet stieg bis ~2022, fiel bis Mitte 2024 (Dekonzentration — konsistent mit Marktreifung/mehr kontinuierlichem Flow) und ist seither stabil. Genau diese Signatur — Vorzeichenwechsel zwischen den Fenstern — ist es, wofuer die Beide-Fenster-gleiches-Vorzeichen-Regel gebaut wurde: ein einmaliger Struktur-Uebergang ist KEIN fortlaufender Kalender-Drift. Bemerkenswert auch: selbst die −0,49-Zelle ist unter der Rotations-Null NICHT signifikant — die hohe Persistenz von D3 erzeugt unter der Null haeufig grosse Schein-|rho| gegen die Zeit, und die registrierte Null (zirkulaerer Shift, erhaelt die Autokorrelation) preist das korrekt ein. Ein naiver iid-Permutationstest haette hier falsch-positiv „Drift" gerufen.
+
+### Programm-Bilanz (nach GL-025)
+Welle 1–5 unveraendert (GL-022/023/024 inkl. H-11c DROP). Welle 6: **H-19 STATIONAER-GENUG (GL-025, META/AUDIT)** · H-20 registriert, Lauf ausstehend · H-21 GESPERRT bis Fensterschluss 2026-12-27 · H-22 registriert, wartet auf WP-2. **25 GL-Eintraege, 0 Torpfosten-Verschiebungen, 0 handelbare Kanten.**

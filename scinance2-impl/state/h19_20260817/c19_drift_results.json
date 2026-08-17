@@ -1,0 +1,993 @@
+{
+  "schema_version": 1,
+  "hypothesis": "H-19",
+  "hypothesis_registry": "scinance2-impl/state/hypothesis_registry.md",
+  "capital_free": true,
+  "status": "RUN",
+  "verdict_semantics": "META/AUDIT (H-18-Muster): kein WEITER/DROP; DRIFT-BEFUND je Zelle loest die registrierte Regime-Splitting-Auflage aus",
+  "generated_at": "2026-08-17T08:35:01+00:00",
+  "source": "E:\\Claude\\Projects\\scinance\\data\\barcache/bars_1min (WP-0, read-only)",
+  "exchange": "bybit",
+  "symbols": [
+    "BTCUSDT",
+    "ETHUSDT",
+    "XRPUSDT",
+    "SOLUSDT",
+    "BNBUSDT"
+  ],
+  "cache_fingerprints": {
+    "BTCUSDT": {
+      "observed": "3be122e350df98118b26eaa16471cc070375e7593c17524753069441681dd8b6",
+      "registered": "3be122e350df98118b26eaa16471cc070375e7593c17524753069441681dd8b6",
+      "n_days_present": 2320,
+      "matches": true
+    },
+    "ETHUSDT": {
+      "observed": "848ff87d3903cc59132e1653c915d79150288f424aa8d0eafe00c299ac54b098",
+      "registered": "848ff87d3903cc59132e1653c915d79150288f424aa8d0eafe00c299ac54b098",
+      "n_days_present": 2110,
+      "matches": true
+    },
+    "XRPUSDT": {
+      "observed": "101284bf547ca534e02f901af54415e8185c525825c13b90d691667fd5ee47c3",
+      "registered": "101284bf547ca534e02f901af54415e8185c525825c13b90d691667fd5ee47c3",
+      "n_days_present": 1906,
+      "matches": true
+    },
+    "SOLUSDT": {
+      "observed": "30d3705a316a262c0ad5e69b1ec946739a551863f7dbf4deb84c17b9d09726b6",
+      "registered": "30d3705a316a262c0ad5e69b1ec946739a551863f7dbf4deb84c17b9d09726b6",
+      "n_days_present": 1859,
+      "matches": true
+    },
+    "BNBUSDT": {
+      "observed": "6f7b36259332de0b126e9d968c6ba9d0a5ffa9676bb400e627ee5358c117230a",
+      "registered": "6f7b36259332de0b126e9d968c6ba9d0a5ffa9676bb400e627ee5358c117230a",
+      "n_days_present": 1859,
+      "matches": true
+    }
+  },
+  "gate_valid": true,
+  "windows": {
+    "L": [
+      "2021-06-29",
+      "2022-12-31"
+    ],
+    "OOS1": [
+      "2023-01-01",
+      "2024-06-30"
+    ],
+    "OOS2": [
+      "2024-07-01",
+      "2025-12-31"
+    ]
+  },
+  "judgment_windows": [
+    "OOS1",
+    "OOS2"
+  ],
+  "method": {
+    "descriptors": [
+      "D1_lag1_ac",
+      "D2_variance_signature",
+      "D3_herfindahl"
+    ],
+    "min_returns_per_day": 300,
+    "min_vol_bars_per_day": 60,
+    "measure": "partial Spearman rho_p(descriptor, day index | log RV_day, log volume_day), rank-residual method",
+    "finding_rule": "|rho_p| >= 0.3 in BOTH OOS windows, same sign (magnitude-driven; p report-only)",
+    "rotation_null": 1000,
+    "boot_block_days": 5,
+    "n_bootstrap": 1000,
+    "seed": 42
+  },
+  "fdr_family": "F-DRIFT",
+  "fdr_alpha": 0.1,
+  "fdr_report_p_crit": 0.0,
+  "rho_min": 0.3,
+  "cells": [
+    {
+      "symbol": "BTCUSDT",
+      "descriptor": "D1_lag1_ac",
+      "window": "L",
+      "window_range": [
+        "2021-06-29",
+        "2022-12-31"
+      ],
+      "n_days": 551,
+      "rho_partial": -0.11444303061736136,
+      "abs_ge_min": false,
+      "rotation_p": 0.3726273726273726,
+      "boot_ci90": [
+        -0.0896253674935391,
+        0.09762877747124464
+      ]
+    },
+    {
+      "symbol": "BTCUSDT",
+      "descriptor": "D2_variance_signature",
+      "window": "L",
+      "window_range": [
+        "2021-06-29",
+        "2022-12-31"
+      ],
+      "n_days": 551,
+      "rho_partial": -0.092662709638883,
+      "abs_ge_min": false,
+      "rotation_p": 0.4145854145854146,
+      "boot_ci90": [
+        -0.07998266320107124,
+        0.07949717919095219
+      ]
+    },
+    {
+      "symbol": "BTCUSDT",
+      "descriptor": "D3_herfindahl",
+      "window": "L",
+      "window_range": [
+        "2021-06-29",
+        "2022-12-31"
+      ],
+      "n_days": 551,
+      "rho_partial": 0.2527342255389273,
+      "abs_ge_min": false,
+      "rotation_p": 0.000999000999000999,
+      "boot_ci90": [
+        -0.08747818757649678,
+        0.09303676002822436
+      ]
+    },
+    {
+      "symbol": "BTCUSDT",
+      "descriptor": "D1_lag1_ac",
+      "window": "OOS1",
+      "window_range": [
+        "2023-01-01",
+        "2024-06-30"
+      ],
+      "n_days": 547,
+      "rho_partial": -0.07553241327190473,
+      "abs_ge_min": false,
+      "rotation_p": 0.25274725274725274,
+      "boot_ci90": [
+        -0.08051616468457765,
+        0.07630226970921185
+      ],
+      "fdr_report_significant": false
+    },
+    {
+      "symbol": "BTCUSDT",
+      "descriptor": "D2_variance_signature",
+      "window": "OOS1",
+      "window_range": [
+        "2023-01-01",
+        "2024-06-30"
+      ],
+      "n_days": 547,
+      "rho_partial": -0.09955882631033497,
+      "abs_ge_min": false,
+      "rotation_p": 0.5444555444555444,
+      "boot_ci90": [
+        -0.08968286751939131,
+        0.08496670553729863
+      ],
+      "fdr_report_significant": false
+    },
+    {
+      "symbol": "BTCUSDT",
+      "descriptor": "D3_herfindahl",
+      "window": "OOS1",
+      "window_range": [
+        "2023-01-01",
+        "2024-06-30"
+      ],
+      "n_days": 547,
+      "rho_partial": -0.3297031195114051,
+      "abs_ge_min": true,
+      "rotation_p": 0.006993006993006993,
+      "boot_ci90": [
+        -0.09028609583368263,
+        0.08708980707372102
+      ],
+      "fdr_report_significant": false
+    },
+    {
+      "symbol": "BTCUSDT",
+      "descriptor": "D1_lag1_ac",
+      "window": "OOS2",
+      "window_range": [
+        "2024-07-01",
+        "2025-12-31"
+      ],
+      "n_days": 549,
+      "rho_partial": 0.08039027238058596,
+      "abs_ge_min": false,
+      "rotation_p": 0.4075924075924076,
+      "boot_ci90": [
+        -0.08400831484284169,
+        0.08452141535239158
+      ],
+      "fdr_report_significant": false
+    },
+    {
+      "symbol": "BTCUSDT",
+      "descriptor": "D2_variance_signature",
+      "window": "OOS2",
+      "window_range": [
+        "2024-07-01",
+        "2025-12-31"
+      ],
+      "n_days": 549,
+      "rho_partial": 0.2524204391291895,
+      "abs_ge_min": false,
+      "rotation_p": 0.03796203796203796,
+      "boot_ci90": [
+        -0.08369947688312493,
+        0.08713451376330006
+      ],
+      "fdr_report_significant": false
+    },
+    {
+      "symbol": "BTCUSDT",
+      "descriptor": "D3_herfindahl",
+      "window": "OOS2",
+      "window_range": [
+        "2024-07-01",
+        "2025-12-31"
+      ],
+      "n_days": 549,
+      "rho_partial": 0.056059181101121014,
+      "abs_ge_min": false,
+      "rotation_p": 0.7492507492507493,
+      "boot_ci90": [
+        -0.09447435190230864,
+        0.08418066215848095
+      ],
+      "fdr_report_significant": false
+    },
+    {
+      "symbol": "ETHUSDT",
+      "descriptor": "D1_lag1_ac",
+      "window": "L",
+      "window_range": [
+        "2021-06-29",
+        "2022-12-31"
+      ],
+      "n_days": 551,
+      "rho_partial": -0.0258541980406288,
+      "abs_ge_min": false,
+      "rotation_p": 0.7452547452547452,
+      "boot_ci90": [
+        -0.09335336068343852,
+        0.09165202697566742
+      ]
+    },
+    {
+      "symbol": "ETHUSDT",
+      "descriptor": "D2_variance_signature",
+      "window": "L",
+      "window_range": [
+        "2021-06-29",
+        "2022-12-31"
+      ],
+      "n_days": 551,
+      "rho_partial": -0.04387072299336263,
+      "abs_ge_min": false,
+      "rotation_p": 0.41058941058941056,
+      "boot_ci90": [
+        -0.0834572627379257,
+        0.08293312856021115
+      ]
+    },
+    {
+      "symbol": "ETHUSDT",
+      "descriptor": "D3_herfindahl",
+      "window": "L",
+      "window_range": [
+        "2021-06-29",
+        "2022-12-31"
+      ],
+      "n_days": 551,
+      "rho_partial": 0.004245159352210824,
+      "abs_ge_min": false,
+      "rotation_p": 0.994005994005994,
+      "boot_ci90": [
+        -0.08331585522008592,
+        0.08716182219819169
+      ]
+    },
+    {
+      "symbol": "ETHUSDT",
+      "descriptor": "D1_lag1_ac",
+      "window": "OOS1",
+      "window_range": [
+        "2023-01-01",
+        "2024-06-30"
+      ],
+      "n_days": 547,
+      "rho_partial": -0.08569856841970981,
+      "abs_ge_min": false,
+      "rotation_p": 0.17282717282717283,
+      "boot_ci90": [
+        -0.07718887989432836,
+        0.079175818012164
+      ],
+      "fdr_report_significant": false
+    },
+    {
+      "symbol": "ETHUSDT",
+      "descriptor": "D2_variance_signature",
+      "window": "OOS1",
+      "window_range": [
+        "2023-01-01",
+        "2024-06-30"
+      ],
+      "n_days": 547,
+      "rho_partial": -0.06907649897658438,
+      "abs_ge_min": false,
+      "rotation_p": 0.5004995004995005,
+      "boot_ci90": [
+        -0.08264904105733456,
+        0.08110128119412627
+      ],
+      "fdr_report_significant": false
+    },
+    {
+      "symbol": "ETHUSDT",
+      "descriptor": "D3_herfindahl",
+      "window": "OOS1",
+      "window_range": [
+        "2023-01-01",
+        "2024-06-30"
+      ],
+      "n_days": 547,
+      "rho_partial": -0.46498439354293264,
+      "abs_ge_min": true,
+      "rotation_p": 0.08091908091908091,
+      "boot_ci90": [
+        -0.10860975284362906,
+        0.11167784888876267
+      ],
+      "fdr_report_significant": false
+    },
+    {
+      "symbol": "ETHUSDT",
+      "descriptor": "D1_lag1_ac",
+      "window": "OOS2",
+      "window_range": [
+        "2024-07-01",
+        "2025-12-31"
+      ],
+      "n_days": 549,
+      "rho_partial": -0.09294646113779259,
+      "abs_ge_min": false,
+      "rotation_p": 0.24175824175824176,
+      "boot_ci90": [
+        -0.09002262362494926,
+        0.08492183798483341
+      ],
+      "fdr_report_significant": false
+    },
+    {
+      "symbol": "ETHUSDT",
+      "descriptor": "D2_variance_signature",
+      "window": "OOS2",
+      "window_range": [
+        "2024-07-01",
+        "2025-12-31"
+      ],
+      "n_days": 549,
+      "rho_partial": -0.038609926258368205,
+      "abs_ge_min": false,
+      "rotation_p": 0.6263736263736264,
+      "boot_ci90": [
+        -0.08757219893946507,
+        0.08494270748099664
+      ],
+      "fdr_report_significant": false
+    },
+    {
+      "symbol": "ETHUSDT",
+      "descriptor": "D3_herfindahl",
+      "window": "OOS2",
+      "window_range": [
+        "2024-07-01",
+        "2025-12-31"
+      ],
+      "n_days": 549,
+      "rho_partial": 0.021026825614715944,
+      "abs_ge_min": false,
+      "rotation_p": 0.8811188811188811,
+      "boot_ci90": [
+        -0.10059576799538913,
+        0.0955275764571928
+      ],
+      "fdr_report_significant": false
+    },
+    {
+      "symbol": "XRPUSDT",
+      "descriptor": "D1_lag1_ac",
+      "window": "L",
+      "window_range": [
+        "2021-06-29",
+        "2022-12-31"
+      ],
+      "n_days": 551,
+      "rho_partial": -0.20089309644300898,
+      "abs_ge_min": false,
+      "rotation_p": 0.07492507492507493,
+      "boot_ci90": [
+        -0.09104013163228462,
+        0.0933539086217981
+      ]
+    },
+    {
+      "symbol": "XRPUSDT",
+      "descriptor": "D2_variance_signature",
+      "window": "L",
+      "window_range": [
+        "2021-06-29",
+        "2022-12-31"
+      ],
+      "n_days": 551,
+      "rho_partial": -0.18772358217348756,
+      "abs_ge_min": false,
+      "rotation_p": 0.000999000999000999,
+      "boot_ci90": [
+        -0.07742409517511836,
+        0.07702312708596137
+      ]
+    },
+    {
+      "symbol": "XRPUSDT",
+      "descriptor": "D3_herfindahl",
+      "window": "L",
+      "window_range": [
+        "2021-06-29",
+        "2022-12-31"
+      ],
+      "n_days": 551,
+      "rho_partial": 0.36020603620297353,
+      "abs_ge_min": true,
+      "rotation_p": 0.000999000999000999,
+      "boot_ci90": [
+        -0.09897519620738573,
+        0.09084975015230023
+      ]
+    },
+    {
+      "symbol": "XRPUSDT",
+      "descriptor": "D1_lag1_ac",
+      "window": "OOS1",
+      "window_range": [
+        "2023-01-01",
+        "2024-06-30"
+      ],
+      "n_days": 547,
+      "rho_partial": -0.13033613098216812,
+      "abs_ge_min": false,
+      "rotation_p": 0.1918081918081918,
+      "boot_ci90": [
+        -0.07783380727675308,
+        0.08449117988448056
+      ],
+      "fdr_report_significant": false
+    },
+    {
+      "symbol": "XRPUSDT",
+      "descriptor": "D2_variance_signature",
+      "window": "OOS1",
+      "window_range": [
+        "2023-01-01",
+        "2024-06-30"
+      ],
+      "n_days": 547,
+      "rho_partial": -0.17683108297944314,
+      "abs_ge_min": false,
+      "rotation_p": 0.21878121878121878,
+      "boot_ci90": [
+        -0.0837738363785982,
+        0.08331743662539882
+      ],
+      "fdr_report_significant": false
+    },
+    {
+      "symbol": "XRPUSDT",
+      "descriptor": "D3_herfindahl",
+      "window": "OOS1",
+      "window_range": [
+        "2023-01-01",
+        "2024-06-30"
+      ],
+      "n_days": 547,
+      "rho_partial": -0.04963821266275797,
+      "abs_ge_min": false,
+      "rotation_p": 0.7682317682317682,
+      "boot_ci90": [
+        -0.09634235608192118,
+        0.0829468022085909
+      ],
+      "fdr_report_significant": false
+    },
+    {
+      "symbol": "XRPUSDT",
+      "descriptor": "D1_lag1_ac",
+      "window": "OOS2",
+      "window_range": [
+        "2024-07-01",
+        "2025-12-31"
+      ],
+      "n_days": 549,
+      "rho_partial": 0.07947958417545427,
+      "abs_ge_min": false,
+      "rotation_p": 0.2047952047952048,
+      "boot_ci90": [
+        -0.08338671607732122,
+        0.08364938310260489
+      ],
+      "fdr_report_significant": false
+    },
+    {
+      "symbol": "XRPUSDT",
+      "descriptor": "D2_variance_signature",
+      "window": "OOS2",
+      "window_range": [
+        "2024-07-01",
+        "2025-12-31"
+      ],
+      "n_days": 549,
+      "rho_partial": 0.13830642863629267,
+      "abs_ge_min": false,
+      "rotation_p": 0.060939060939060936,
+      "boot_ci90": [
+        -0.08125366912030975,
+        0.0849868570816911
+      ],
+      "fdr_report_significant": false
+    },
+    {
+      "symbol": "XRPUSDT",
+      "descriptor": "D3_herfindahl",
+      "window": "OOS2",
+      "window_range": [
+        "2024-07-01",
+        "2025-12-31"
+      ],
+      "n_days": 549,
+      "rho_partial": -0.15851815090260435,
+      "abs_ge_min": false,
+      "rotation_p": 0.5774225774225774,
+      "boot_ci90": [
+        -0.09686825597969888,
+        0.08872720732402226
+      ],
+      "fdr_report_significant": false
+    },
+    {
+      "symbol": "SOLUSDT",
+      "descriptor": "D1_lag1_ac",
+      "window": "L",
+      "window_range": [
+        "2021-06-29",
+        "2022-12-31"
+      ],
+      "n_days": 551,
+      "rho_partial": 0.011005714740021131,
+      "abs_ge_min": false,
+      "rotation_p": 0.948051948051948,
+      "boot_ci90": [
+        -0.09973338230196978,
+        0.09655694306706906
+      ]
+    },
+    {
+      "symbol": "SOLUSDT",
+      "descriptor": "D2_variance_signature",
+      "window": "L",
+      "window_range": [
+        "2021-06-29",
+        "2022-12-31"
+      ],
+      "n_days": 551,
+      "rho_partial": 0.010831053285403071,
+      "abs_ge_min": false,
+      "rotation_p": 0.7912087912087912,
+      "boot_ci90": [
+        -0.07957834784358743,
+        0.0741246931644881
+      ]
+    },
+    {
+      "symbol": "SOLUSDT",
+      "descriptor": "D3_herfindahl",
+      "window": "L",
+      "window_range": [
+        "2021-06-29",
+        "2022-12-31"
+      ],
+      "n_days": 551,
+      "rho_partial": 0.3802569468173788,
+      "abs_ge_min": true,
+      "rotation_p": 0.03296703296703297,
+      "boot_ci90": [
+        -0.1009892936718078,
+        0.10803341329835936
+      ]
+    },
+    {
+      "symbol": "SOLUSDT",
+      "descriptor": "D1_lag1_ac",
+      "window": "OOS1",
+      "window_range": [
+        "2023-01-01",
+        "2024-06-30"
+      ],
+      "n_days": 547,
+      "rho_partial": -0.05777474656162241,
+      "abs_ge_min": false,
+      "rotation_p": 0.5134865134865135,
+      "boot_ci90": [
+        -0.09323264875494196,
+        0.08532253651464804
+      ],
+      "fdr_report_significant": false
+    },
+    {
+      "symbol": "SOLUSDT",
+      "descriptor": "D2_variance_signature",
+      "window": "OOS1",
+      "window_range": [
+        "2023-01-01",
+        "2024-06-30"
+      ],
+      "n_days": 547,
+      "rho_partial": -0.2071359760807943,
+      "abs_ge_min": false,
+      "rotation_p": 0.26673326673326675,
+      "boot_ci90": [
+        -0.08876103267362706,
+        0.08199610795120878
+      ],
+      "fdr_report_significant": false
+    },
+    {
+      "symbol": "SOLUSDT",
+      "descriptor": "D3_herfindahl",
+      "window": "OOS1",
+      "window_range": [
+        "2023-01-01",
+        "2024-06-30"
+      ],
+      "n_days": 547,
+      "rho_partial": -0.48715816138157547,
+      "abs_ge_min": true,
+      "rotation_p": 0.06393606393606394,
+      "boot_ci90": [
+        -0.105500105278037,
+        0.10902942458855844
+      ],
+      "fdr_report_significant": false
+    },
+    {
+      "symbol": "SOLUSDT",
+      "descriptor": "D1_lag1_ac",
+      "window": "OOS2",
+      "window_range": [
+        "2024-07-01",
+        "2025-12-31"
+      ],
+      "n_days": 549,
+      "rho_partial": -0.04908478695178286,
+      "abs_ge_min": false,
+      "rotation_p": 0.4645354645354645,
+      "boot_ci90": [
+        -0.0921645117468282,
+        0.09221065631265908
+      ],
+      "fdr_report_significant": false
+    },
+    {
+      "symbol": "SOLUSDT",
+      "descriptor": "D2_variance_signature",
+      "window": "OOS2",
+      "window_range": [
+        "2024-07-01",
+        "2025-12-31"
+      ],
+      "n_days": 549,
+      "rho_partial": -0.0390491424465481,
+      "abs_ge_min": false,
+      "rotation_p": 0.45354645354645357,
+      "boot_ci90": [
+        -0.08245303188024183,
+        0.08098369215790281
+      ],
+      "fdr_report_significant": false
+    },
+    {
+      "symbol": "SOLUSDT",
+      "descriptor": "D3_herfindahl",
+      "window": "OOS2",
+      "window_range": [
+        "2024-07-01",
+        "2025-12-31"
+      ],
+      "n_days": 549,
+      "rho_partial": 0.09147503277937143,
+      "abs_ge_min": false,
+      "rotation_p": 0.39760239760239763,
+      "boot_ci90": [
+        -0.08678549891294093,
+        0.08618140087947078
+      ],
+      "fdr_report_significant": false
+    },
+    {
+      "symbol": "BNBUSDT",
+      "descriptor": "D1_lag1_ac",
+      "window": "L",
+      "window_range": [
+        "2021-06-29",
+        "2022-12-31"
+      ],
+      "n_days": 551,
+      "rho_partial": -0.08036562061180462,
+      "abs_ge_min": false,
+      "rotation_p": 0.5644355644355644,
+      "boot_ci90": [
+        -0.09373120985734078,
+        0.09652682164582867
+      ]
+    },
+    {
+      "symbol": "BNBUSDT",
+      "descriptor": "D2_variance_signature",
+      "window": "L",
+      "window_range": [
+        "2021-06-29",
+        "2022-12-31"
+      ],
+      "n_days": 551,
+      "rho_partial": -0.14175621345118714,
+      "abs_ge_min": false,
+      "rotation_p": 0.2967032967032967,
+      "boot_ci90": [
+        -0.07793254106669667,
+        0.0853858268223907
+      ]
+    },
+    {
+      "symbol": "BNBUSDT",
+      "descriptor": "D3_herfindahl",
+      "window": "L",
+      "window_range": [
+        "2021-06-29",
+        "2022-12-31"
+      ],
+      "n_days": 551,
+      "rho_partial": 0.48666066578195316,
+      "abs_ge_min": true,
+      "rotation_p": 0.028971028971028972,
+      "boot_ci90": [
+        -0.11299062504604322,
+        0.10589147250924322
+      ]
+    },
+    {
+      "symbol": "BNBUSDT",
+      "descriptor": "D1_lag1_ac",
+      "window": "OOS1",
+      "window_range": [
+        "2023-01-01",
+        "2024-06-30"
+      ],
+      "n_days": 547,
+      "rho_partial": -0.15295995884748173,
+      "abs_ge_min": false,
+      "rotation_p": 0.18281718281718282,
+      "boot_ci90": [
+        -0.08875024975411447,
+        0.08322288713012824
+      ],
+      "fdr_report_significant": false
+    },
+    {
+      "symbol": "BNBUSDT",
+      "descriptor": "D2_variance_signature",
+      "window": "OOS1",
+      "window_range": [
+        "2023-01-01",
+        "2024-06-30"
+      ],
+      "n_days": 547,
+      "rho_partial": -0.1758819194365455,
+      "abs_ge_min": false,
+      "rotation_p": 0.1918081918081918,
+      "boot_ci90": [
+        -0.0968106653403476,
+        0.09355860372628302
+      ],
+      "fdr_report_significant": false
+    },
+    {
+      "symbol": "BNBUSDT",
+      "descriptor": "D3_herfindahl",
+      "window": "OOS1",
+      "window_range": [
+        "2023-01-01",
+        "2024-06-30"
+      ],
+      "n_days": 547,
+      "rho_partial": -0.28955238494957,
+      "abs_ge_min": false,
+      "rotation_p": 0.03796203796203796,
+      "boot_ci90": [
+        -0.09015532999250389,
+        0.09333731216579509
+      ],
+      "fdr_report_significant": false
+    },
+    {
+      "symbol": "BNBUSDT",
+      "descriptor": "D1_lag1_ac",
+      "window": "OOS2",
+      "window_range": [
+        "2024-07-01",
+        "2025-12-31"
+      ],
+      "n_days": 549,
+      "rho_partial": 0.0453917344891422,
+      "abs_ge_min": false,
+      "rotation_p": 0.37662337662337664,
+      "boot_ci90": [
+        -0.09594253713419772,
+        0.0911355009545403
+      ],
+      "fdr_report_significant": false
+    },
+    {
+      "symbol": "BNBUSDT",
+      "descriptor": "D2_variance_signature",
+      "window": "OOS2",
+      "window_range": [
+        "2024-07-01",
+        "2025-12-31"
+      ],
+      "n_days": 549,
+      "rho_partial": 0.056179219214134865,
+      "abs_ge_min": false,
+      "rotation_p": 0.2597402597402597,
+      "boot_ci90": [
+        -0.08177091482270764,
+        0.0796478099626942
+      ],
+      "fdr_report_significant": false
+    },
+    {
+      "symbol": "BNBUSDT",
+      "descriptor": "D3_herfindahl",
+      "window": "OOS2",
+      "window_range": [
+        "2024-07-01",
+        "2025-12-31"
+      ],
+      "n_days": 549,
+      "rho_partial": -0.09421376025351154,
+      "abs_ge_min": false,
+      "rotation_p": 0.1848151848151848,
+      "boot_ci90": [
+        -0.08583918925538547,
+        0.07918514657924673
+      ],
+      "fdr_report_significant": false
+    }
+  ],
+  "findings": [
+    {
+      "symbol": "BTCUSDT",
+      "descriptor": "D1_lag1_ac",
+      "rho_oos1": -0.07553241327190473,
+      "rho_oos2": 0.08039027238058596,
+      "drift_befund": false
+    },
+    {
+      "symbol": "BTCUSDT",
+      "descriptor": "D2_variance_signature",
+      "rho_oos1": -0.09955882631033497,
+      "rho_oos2": 0.2524204391291895,
+      "drift_befund": false
+    },
+    {
+      "symbol": "BTCUSDT",
+      "descriptor": "D3_herfindahl",
+      "rho_oos1": -0.3297031195114051,
+      "rho_oos2": 0.056059181101121014,
+      "drift_befund": false
+    },
+    {
+      "symbol": "ETHUSDT",
+      "descriptor": "D1_lag1_ac",
+      "rho_oos1": -0.08569856841970981,
+      "rho_oos2": -0.09294646113779259,
+      "drift_befund": false
+    },
+    {
+      "symbol": "ETHUSDT",
+      "descriptor": "D2_variance_signature",
+      "rho_oos1": -0.06907649897658438,
+      "rho_oos2": -0.038609926258368205,
+      "drift_befund": false
+    },
+    {
+      "symbol": "ETHUSDT",
+      "descriptor": "D3_herfindahl",
+      "rho_oos1": -0.46498439354293264,
+      "rho_oos2": 0.021026825614715944,
+      "drift_befund": false
+    },
+    {
+      "symbol": "XRPUSDT",
+      "descriptor": "D1_lag1_ac",
+      "rho_oos1": -0.13033613098216812,
+      "rho_oos2": 0.07947958417545427,
+      "drift_befund": false
+    },
+    {
+      "symbol": "XRPUSDT",
+      "descriptor": "D2_variance_signature",
+      "rho_oos1": -0.17683108297944314,
+      "rho_oos2": 0.13830642863629267,
+      "drift_befund": false
+    },
+    {
+      "symbol": "XRPUSDT",
+      "descriptor": "D3_herfindahl",
+      "rho_oos1": -0.04963821266275797,
+      "rho_oos2": -0.15851815090260435,
+      "drift_befund": false
+    },
+    {
+      "symbol": "SOLUSDT",
+      "descriptor": "D1_lag1_ac",
+      "rho_oos1": -0.05777474656162241,
+      "rho_oos2": -0.04908478695178286,
+      "drift_befund": false
+    },
+    {
+      "symbol": "SOLUSDT",
+      "descriptor": "D2_variance_signature",
+      "rho_oos1": -0.2071359760807943,
+      "rho_oos2": -0.0390491424465481,
+      "drift_befund": false
+    },
+    {
+      "symbol": "SOLUSDT",
+      "descriptor": "D3_herfindahl",
+      "rho_oos1": -0.48715816138157547,
+      "rho_oos2": 0.09147503277937143,
+      "drift_befund": false
+    },
+    {
+      "symbol": "BNBUSDT",
+      "descriptor": "D1_lag1_ac",
+      "rho_oos1": -0.15295995884748173,
+      "rho_oos2": 0.0453917344891422,
+      "drift_befund": false
+    },
+    {
+      "symbol": "BNBUSDT",
+      "descriptor": "D2_variance_signature",
+      "rho_oos1": -0.1758819194365455,
+      "rho_oos2": 0.056179219214134865,
+      "drift_befund": false
+    },
+    {
+      "symbol": "BNBUSDT",
+      "descriptor": "D3_herfindahl",
+      "rho_oos1": -0.28955238494957,
+      "rho_oos2": -0.09421376025351154,
+      "drift_befund": false
+    }
+  ],
+  "n_drift_befunde": 0
+}
