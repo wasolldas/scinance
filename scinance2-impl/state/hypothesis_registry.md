@@ -576,6 +576,16 @@ Beide registrierten Fensterpaare (W1 2026-03-27..2026-05-15, W2 2026-05-16..2026
 - **A-priori (ehrlich, Lane C woertlich uebernommen):** **DROP erwartet** — ±5-bps-Buchtiefe gegen einen 1-Tages-Horizont widerspricht der ueblichen Zerfallsstruktur. H-22 laeuft, weil der Test nach WP-2 trivial billig ist und ein WEITER hochinformativ waere.
 - **KAPITALFREIHEIT (verbindlich).** · **Status:** registriert, Lauf NICHT gestartet (wartet auf WP-2).
 
+> **Nachtrag 2026-08-17 (append-only, VOR dem urteilstragenden Lauf):** WP-2 ist gelaufen (Runner-Lauf `wp2_20260817_093800`, 35.542 s, rc=0; Archiv `state/wp2_20260817/l2tilt_extract.json`). Der 85-%-Abdeckungs-Floor ist in allen drei Fenstern erfuellt: BTC W-L2-1 **99,2 %** (363 ok-Tage, 0 verworfen, 32 Sequenzbrueche), BTC W-L2-2 **93,2 %** (340 ok, 0 verworfen, 35 Brueche; 25 no_raw-Tage — die Zensus-bekannten Abdeckungsloecher), ETH **99,8 %** (395 ok, 29 Brueche). Registrierte Tilt-Store-Fingerabdruecke (SHA-256 ueber die exakten Wertebytes aller ok-Tage; der Store ist unveraenderlich, Bit-Identitaet ist die korrekte Vorbedingung):
+>
+> | Fenster | n_samples | sha256_values |
+> |---|---:|---|
+> | BTC W-L2-1 | 522.720 | `bfaaf08b9c763ff404033cf7cd05052856de39dab53ea25015035dfe3f6131f6` |
+> | BTC W-L2-2 | 489.600 | `f22eba9eb698e1f4b5333ebb82824a46fcbf8798a90e08e5a90d9d9a5a9577b0` |
+> | ETH W-ETH | 568.800 | `7f18970ee329ea51fbd2498f3fb1afb3385f52fb23fa88db96e21ee193b2c330` |
+>
+> Der H-22-Treiber prueft diese drei Fingerabdruecke UND die beiden WP-0-Bar-Fingerabdruecke (BTC/ETH) vor der Messung; Abweichung => `gate_valid=false`, kein Verdikt. Gate, Schwellen, Fenster, Familie: UNVERAENDERT.
+
 ---
 
 ## Registry-Disziplin (verbindlich, PRD §8)

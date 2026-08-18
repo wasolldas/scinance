@@ -1,0 +1,103 @@
+{
+  "windows": [
+    {
+      "symbol": "BTCUSDT",
+      "window": "W-L2-1",
+      "range": [
+        "2023-07-01",
+        "2024-06-30"
+      ],
+      "judgment_bearing": true,
+      "exchange": "bybit",
+      "stream": "orderbook",
+      "days_in_range": 366,
+      "ok": 363,
+      "discarded": 0,
+      "no_raw": 3,
+      "total_seq_breaks": 32,
+      "coverage_days": 0.9918,
+      "coverage_floor": 0.85,
+      "floor_met": true,
+      "n_daily_medians": 363,
+      "fingerprint": {
+        "schema_version": 1,
+        "exchange": "bybit",
+        "symbol": "BTCUSDT",
+        "range": [
+          "2023-07-01",
+          "2024-06-30"
+        ],
+        "n_ok_days": 363,
+        "n_samples": 522720,
+        "sha256_values": "bfaaf08b9c763ff404033cf7cd05052856de39dab53ea25015035dfe3f6131f6"
+      },
+      "seconds": 11427.8
+    },
+    {
+      "symbol": "BTCUSDT",
+      "window": "W-L2-2",
+      "range": [
+        "2024-07-01",
+        "2025-06-30"
+      ],
+      "judgment_bearing": true,
+      "exchange": "bybit",
+      "stream": "orderbook",
+      "days_in_range": 365,
+      "ok": 340,
+      "discarded": 0,
+      "no_raw": 25,
+      "total_seq_breaks": 35,
+      "coverage_days": 0.9315,
+      "coverage_floor": 0.85,
+      "floor_met": true,
+      "n_daily_medians": 340,
+      "fingerprint": {
+        "schema_version": 1,
+        "exchange": "bybit",
+        "symbol": "BTCUSDT",
+        "range": [
+          "2024-07-01",
+          "2025-06-30"
+        ],
+        "n_ok_days": 340,
+        "n_samples": 489600,
+        "sha256_values": "f22eba9eb698e1f4b5333ebb82824a46fcbf8798a90e08e5a90d9d9a5a9577b0"
+      },
+      "seconds": 16486.0
+    },
+    {
+      "symbol": "ETHUSDT",
+      "window": "W-ETH",
+      "range": [
+        "2023-04-01",
+        "2024-04-30"
+      ],
+      "judgment_bearing": false,
+      "exchange": "bybit",
+      "stream": "orderbook",
+      "days_in_range": 396,
+      "ok": 395,
+      "discarded": 0,
+      "no_raw": 1,
+      "total_seq_breaks": 29,
+      "coverage_days": 0.9975,
+      "coverage_floor": 0.85,
+      "floor_met": true,
+      "n_daily_medians": 395,
+      "fingerprint": {
+        "schema_version": 1,
+        "exchange": "bybit",
+        "symbol": "ETHUSDT",
+        "range": [
+          "2023-04-01",
+          "2024-04-30"
+        ],
+        "n_ok_days": 395,
+        "n_samples": 568800,
+        "sha256_values": "7f18970ee329ea51fbd2498f3fb1afb3385f52fb23fa88db96e21ee193b2c330"
+      },
+      "seconds": 7627.3
+    }
+  ]
+}
