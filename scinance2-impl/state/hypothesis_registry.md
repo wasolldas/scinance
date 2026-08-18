@@ -588,6 +588,64 @@ Beide registrierten Fensterpaare (W1 2026-03-27..2026-05-15, W2 2026-05-16..2026
 
 ---
 
+## 2026-08-18 · Welle-7-Registrierung (What-else + Reserve): H-23, H-24
+
+> Anlass: Welle 6 ist bis auf das kalendarisch gesperrte H-21 adjudiziert
+> (GL-025/026/027); der Nutzer hat die What-else-Phase und die
+> Reservekandidaten freigegeben. Beide Hypothesen laufen EINZELN — keine
+> Ueber-Familie (DEC-24-Muster). Beide KAPITALFREI. Beide Eintraege
+> erfuellen die DEC-31/33-Pflichtzeile (struktureller Nulleffekt) und —
+> neu, verbindlich aus der Welle-6-Lehre (`WELLE6_BERICHT` §3) — die
+> **REZENZ-KLAUSEL**: urteilstragende Fenster muessen das juengste
+> verfuegbare Regime abdecken; aeltere Historie ist deskriptives
+> Aera-Profil, nie urteilstragend.
+
+### H-23 · C-17 Venue-Fingerprint: WIEDERHOLUNG mit Voll-Distanzserie — Aufloesung von GL-019 (KAPITALFREI, GPU)
+- **Registriert:** 2026-08-18 · **Herkunft:** GL-019-Aufloesungspfad (a) / DEC-29 (d). **Namens-Hinweis:** DEC-29 nannte diesen Pfad informell „H-17b"; die Registry reserviert H-17b fuer die (nicht implizierte) Tradability-Folge. Die Wiederholung laeuft daher als **H-23**.
+- **Frage:** Identisch H-17 (symbol-invarianter Venue-Fingerprint im shape-normalisierten Order-Flow) — jetzt mit auswertbarem Non-Redundanz-Gate.
+- **Einzige Aenderung gegenueber H-17 (vorab fixiert):** Die taegliche Embedding-Distanzserie wird ueber **ALLE Panel-Tage** definiert (Encoder-Inferenz ueber das volle Fenster 2026-03-27..2026-07-04), nicht nur ueber die Fold-Test-Tage. Erwartete Ueberlappung mit der c12-Tages-lambda2/IPR-Serie: **~85 Tage** (statt 2 bzw. 9) — erst das gibt dem Redundanz-Gate Trennschaerfe. ALLES andere identisch: Architektur (Contrastive VenueEncoder), Fenster, Folds, Batch>=2048, 10.000 Steps, Permutations-Null mit add-one-p, BH-FDR alpha=0,10.
+- **Gates (woertlich aus H-17 uebernommen, bindend):** Mess-Gate: >=4/5 Folds Balanced-Acc >=0,60 mit FDR-signifikanter Null-Ablehnung UND Pooled >=0,55. Non-Redundanz: |Spearman rho| < 0,6 der Distanzserie gegen die c12-Serie an >=10 Ueberlappungstagen; |rho| >= 0,6 = REDUNDANT = DROP. Der 10-Tage-Floor bleibt (DEC-29). **Beide Gates muessen auf dem NEUEN Lauf bestehen** — der GL-019-Messbefund wird nicht importiert (neue Trainings sind stochastisch neu).
+- **Redundanz-Referenz (eingefroren):** die ARCHIVIERTE c12-Serie aus `state/wave4_20260726/c12_frag_results.json` (Datei-Hash im Lauf-Report). Anmerkung, vorab protokolliert: H-12 ist inzwischen selbst DROP (GL-018) — das entschaerft die Redundanz-SORGE inhaltlich, aendert aber nichts am registrierten Gate; ein redundantes H-23 waere auch gegen ein gedropptes H-12 redundant (es misst dann dasselbe Nichts).
+- **Kosten/Feasibility:** 5 Haupt-Trainings NEU (~3-4 h GPU; die Encoder-Gewichte liegen nicht in den Checkpoints), die 100 Null-Retrainings sind aus den vorhandenen Checkpoints resumierbar; plus Voll-Inferenz (Minuten). Eine GPU-Nacht. Compute-Gating wie H-17 (echtes CUDA, sonst kein Verdikt).
+- **Rezenz-Klausel:** erfuellt per Konstruktion (Panel 2026-03-27..07-04 ist das juengste Cross-Venue-Fenster mit vollem 10-Node-Panel).
+- **Struktureller Nulleffekt (Pflichtzeile):** Mess-Gate: Balanced-Acc-Null = 0,5 bei 2 Klassen... (5 Venues: Null = 0,2; Schwelle 0,60 = 3x Null; die Permutations-Null mit vollen Retrainings preist schwere Schwaenze ein — GL-019 hat das dokumentiert). Redundanz-Gate: |rho|-Rauschboden bei n=85 ~ 0,11; die 0,6-Schwelle liegt 5,5x darueber — sie kann nur durch echte Kopplung gerissen werden, nicht durch Rauschen.
+- **A-priori (ehrlich):** Mess-Gate erneut PASS erwartet (~85 %; der GL-019-Befund war mit 5/5 und Pooled 0,89 sehr robust). Redundanz-Gate offen (50/50) — genau deshalb der Lauf. Verdikt ersetzt den GL-019-Schwebezustand durch WEITER oder DROP.
+- **KAPITALFREIHEIT (verbindlich):** H-17b-Tradability bleibt NICHT impliziert. · **Status:** registriert, Code-Anpassung (Voll-Inferenz) ausstehend, Lauf NICHT gestartet.
+
+### H-24 · C-24 IMPACT-PERSISTENZ — persistiert der Minuten-Fluss-Impact im juengsten Regime? (KAPITALFREI, Reservekandidat)
+- **Registriert:** 2026-08-18 · **Herkunft:** Lane A via Synthese §5 (Reservekandidat; aktiviert nach GL-026/027).
+- **Hypothese:** Der Preis-Impact des Minuten-Netto-Flusses ist im JUENGSTEN Regime ueber 30 Minuten PERSISTENT (Information), nicht transient (reine Liquiditaets-Reversion): der taegliche Rang-IC zwischen Minuten-Nettofluss und der 30-Minuten-FORWARD-Rendite ist im Mittel positiv und materiell.
+- **Datenbindung:** AUSSCHLIESSLICH WP-0-Bar-Cache (F_m = vol_buy − vol_sell exakt aus DECIMAL-Summen; Renditen aus px_last). Fingerabdruecke: die fuenf registrierten WP-0-Hashes (Welle-6-Block, 2026-08-15) — der Treiber prueft sie vor der Messung.
+- **Messgroessen (vorab fixiert):** je Symbol x Tag: **IC_λ(d)** = Spearman(F_m, r_m) (gleichzeitig; NUR Kontrolle) und **IC_P30(d)** = Spearman(F_m, Forward-Logmove vom Minuten-Close m zum letzten Bar <= m+30 min). Das Forward-Fenster beginnt beim NAECHSTEN Minuten-Close — kein Overlap mit der Impact-Minute selbst (Bounce-Ausschluss). Tag gueltig bei >=300 auswertbaren Minuten (F definiert, Forward-Preis vorhanden, Grenz-Toleranz 5 min); Horizonte 5 und 120 min werden MITBERICHTET, sind aber ausdruecklich NICHT urteilstragend (ein Horizont, keine Suche).
+- **Positivkontrolle (bindend, GL-020-Muster):** gepooltes Mittel der IC_λ(d) >= **0,10** je urteilstragendem Fenster. Scheitert sie in einem Fenster, ist der Lauf METHODISCH INVALIDE (kein Verdikt, NICHT DROP) — eine Maschinerie, die nicht einmal den GLEICHZEITIGEN Impact sieht, kann ueber Persistenz nichts sagen.
+- **Fenster (REZENZ-KLAUSEL, urteilstragend NUR die zwei juengsten Halbjahre der Cache-Range):** **W-R1 = 2025-08-01..2026-01-31 · W-R2 = 2026-02-01..2026-07-31.** Die aeltere Historie (2021-07-01..2025-07-31, 8 Halbjahres-Zellen) wird als AERA-PROFIL deskriptiv mitberichtet (nicht urteilstragend) — sie beantwortet, OB der Effekt frueher anders war, nie, ob er existiert.
+- **Nullhypothese/Statistik:** H0: gepooltes Mittel der IC_P30(d) <= 0. Tages-geclusterter Bootstrap (Cluster = UTC-Tag, gepoolt ueber 5 Symbole, 1.000 Reps, Seed 42) — identisches Muster wie H-20.
+- **Gate (woertlich, bindend):** WEITER, wenn in BEIDEN Rezenz-Fenstern gepoolt: mean(IC_P30) >= **0,02** UND Cluster-Bootstrap-p <= 0,05 nach BH-FDR alpha=0,10 ueber **F-IMP** (2 Zellen). **DROP:** hartes Ein-Fenster-Kriterium. Kein Graubereich, keine Horizont-/Flussdefinitions-Nachsuche.
+- **Struktureller Nulleffekt (Pflichtzeile):** beidseitig Skalar, unter einer Unabhaengigkeits-Null exakt 0. Rauschboden: sd(Tages-IC) ~ 1/sqrt(1400) ≈ 0,027; se des gepoolten Mittels bei ~180 Tagen x 5 Symbolen ≈ 0,0009 → ein p-Gate allein waere massiv ueberpowert (H-07/H-19-Spiegel-Lehre). Die 0,02-Schwelle = ~22 Standardfehler ist die eigentliche Huerde; p ist die Zusatzbedingung.
+- **Abgrenzung zum erschoepften OFI-Cluster (bindend, Zitierpflicht GL-007/GL-010):** H-05 testete Tick-OFI-VORZEICHEN → naechste Ticks (DROP; inverse Mess-Existenz GL-010, Kapital-PARK). H-24 misst die PERSISTENZ-Struktur des Minuten-Flusses mit Positivkontrolle — eine andere Skala, ein anderes Objekt. KEIN H-24-Ergebnis rehabilitiert C-01-Signale oder deren Tradability; jede Folgearbeit zitiert GL-007/GL-010 mit.
+- **Feasibility:** CPU, Minuten (alles im Cache). Power: ~180 Tage x 5 Symbole je Fenster >> jeder Floor; Tages-Floor 100 gueltige Tage je Fenster gepoolt (hart, darunter kein Verdikt — pro forma, Riss unplausibel).
+- **A-priori (ehrlich):** DROP leicht favorisiert (~60/40) — die Mikrostruktur-Literatur findet Impact auf Minutenskala ueberwiegend transient; die Gegenthese (persistenter Informationsanteil im Aggregatfluss) ist aber offen genug fuer den Lauf. Oekonomische Einordnung der Lane (~0,3–1,3x um die Wand) ist NICHT-bindend und entkoppelt (GL-022-E5-Muster).
+> **Nachtrag 2026-08-18 (append-only, VOR jedem Lauf; KORREKTUR der Hypothesen-PROSA, Gate unveraendert; DEC-39):** Die Erstformulierung nannte die Urteilsgroesse „PERSISTENZ (Information) statt transient (Liquiditaets-Reversion)". Das ist FALSCH und wurde vom eigenen Test-Fixture aufgedeckt, bevor irgendein Lauf stattfand. Rechnerisch (synthetische Kontrollen, drei Regime):
+>
+> | Impact-Modell | IC gleichzeitig | IC30 |
+> |---|---:|---:|
+> | rein transient (volle Reversion) | +0,96 | **−0,22** |
+> | halb-transient | +0,97 | −0,10 |
+> | **permanent** (Impact bleibt im Preis) | +0,98 | **+0,01 ≈ 0** |
+> | Fortsetzung (Fluss fuehrt weitere Bewegung) | +0,96 | **+0,13** |
+>
+> Grund: Ein PERMANENTER Impact steckt bereits im Preis der Impact-Minute; die FORWARD-Bewegung m→m+30 ist dann von F_m unabhaengig, also IC30 ≈ 0. Ein positiver Forward-IC verlangt mehr als Persistenz — er verlangt, dass der Fluss WEITERE gleichgerichtete Bewegung ankuendigt (Fortsetzung/Informations-Lead). Die registrierte Schwelle IC30 >= +0,02 testet damit die STRENGERE Frage, nicht die im Prosatext behauptete.
+>
+> **Korrigierte Hypothesen-Formulierung (ersetzt die Prosa, NICHT das Gate):** „Der Minuten-Nettofluss traegt Information ueber die FOLGENDE 30-Minuten-Bewegung — der taegliche Rang-IC zwischen F_m und der Forward-Rendite ist im Mittel positiv und materiell (Fortsetzungs-/Lead-Struktur)." **Unveraendert bleiben:** Urteilsgroesse IC_P30, Schwelle 0,02, Bootstrap-p 0,05, Positivkontrolle 0,10, Fenster W-R1/W-R2, Aera-Profil, FDR-Familie F-IMP, hartes Ein-Fenster-DROP, Tages-Floor. Es aendert sich kein einziger Wert, der ein Verdikt bewegen koennte — nur die Behauptung, die das Gate prueft, ist jetzt korrekt benannt.
+>
+> **Zusaetzlich vorab fixiert (NICHT urteilstragend):** Der Lauf berichtet je Zelle eine `impact_reading`-Klassifikation aus dem VORZEICHEN von IC30 — `reversal` (IC30 <= −0,02), `permanent` (|IC30| < 0,02), `continuation` (IC30 >= +0,02). Sie beantwortet die urspruenglich gemeinte Persistenz-Frage deskriptiv und geht in KEIN Gate-Flag ein. Damit liefert der Lauf beide Antworten sauber getrennt: das Gate entscheidet ueber Fortsetzung, die Klassifikation beschreibt Transienz.
+
+- **KAPITALFREIHEIT (verbindlich):** Mess-Gate; Monetarisierung waere NEUE H-24b. · **Status:** registriert, Lauf NICHT gestartet.
+
+> **SWEEP-PRE (V-01): ausdruecklich NOCH NICHT registriert.** Der Kandidat braucht eine eigene Ereignis-Extraktion aus dem L2-Strom (WP-3: Sweep-Definition, -Zensus und -Ein-Pass — die c22-Replay-Maschinerie ist wiederverwendbar), und sein Wert ist Execution-Timing UNTER der Friktionswand. Entscheidung und Zuschnitt: DEC-38. Er bleibt Kandidat fuer die Zeit nach H-23/H-24.
+
+---
+
 ## Registry-Disziplin (verbindlich, PRD §8)
 
 1. **Pre-Registration (§8.3):** Jede Hypothese, jeder Schwellwert, jedes Fenster wird HIER festgeschrieben, BEVOR der Run startet.
