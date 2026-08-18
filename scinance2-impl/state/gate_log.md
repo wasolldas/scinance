@@ -1158,3 +1158,34 @@ OOS-1 verfehlt BEIDE Bedingungen (Mittel unter dem Boden, p weit ueber der Schwe
 
 ### Programm-Bilanz (nach GL-026)
 Welle 6: H-19 STATIONAER-GENUG (GL-025) · **H-20 DROP (GL-026)** · H-21 GESPERRT bis 2026-12-27 · H-22 registriert, wartet auf WP-2. **26 GL-Eintraege, 0 Torpfosten-Verschiebungen, 0 handelbare Kanten.**
+
+---
+
+## GL-027 · 2026-08-18 · H-22 · C-22 L2-TILT: Tages-Buchneigung → Folgetags-Rendite (Welle 6, KAPITALFREI) — **DROP (empirisch; beide BTC-Fenster verfehlen das Gate; die registrierte A-priori „DROP erwartet" ist bestaetigt)**
+
+**Quelle:** `state/h22_20260818/c22_l2tilt_results.{json,md}` (Lauf 2026-08-18 07:56 UTC, 27 s, rc=0). **Datenbindung einwandfrei:** alle FUENF registrierten Fingerabdruecke bit-genau bestaetigt (3 WP-2-Tilt-Fenster + 2 WP-0-Bar-Symbole, `gate_valid=true`); der 85-%-Abdeckungs-Floor in beiden urteilstragenden Fenstern erfuellt (99,2 % / 93,2 %).
+
+### Registriertes Gate (wörtlich) und Messergebnis
+
+Gate: „WEITER, wenn BTC in BEIDEN L2-Fenstern: IC >= 0,10 UND Bootstrap-p <= 0,05 nach BH-FDR alpha=0,10 ueber F-L2 (2 Zellen). DROP: hartes Ein-Fenster-Kriterium. Kein Graubereich."
+
+| Symbol | Fenster | urteilstragend | Paare | Abdeckung | **IC** | >= 0,10 | boot-p | <= 0,05 | Zelle |
+|---|---|:---:|---:|---:|---:|:---:|---:|:---:|:---:|
+| BTC | W-L2-1 (2023-07..2024-06) | ja | 363 | 99,2 % | **+0,0665** | nein | 0,0969 | nein | **nein** |
+| BTC | W-L2-2 (2024-07..2025-06) | ja | 340 | 93,2 % | **−0,0112** | nein | 0,5704 | nein | **nein** |
+| ETH | W-ETH (2023-04..2024-04, Bericht) | nein | 395 | 99,8 % | +0,0618 | nein | 0,1059 | — | — |
+
+F-L2: `n_fdr_significant=0`, `p_crit=0`.
+
+### URTEIL: **DROP.**
+Beide BTC-Fenster verfehlen beide Bedingungen; das harte Ein-Fenster-Kriterium greift zweifach. Die von Lane C woertlich registrierte A-priori — „DROP erwartet: ±5-bp-Buchtiefe gegen einen 1-Tages-Horizont widerspricht der Zerfallsstruktur" — ist bestaetigt. Zum ersten Mal in Welle 6 stimmen A-priori und Verdikt ueberein.
+
+### Ehrliche Einordnung
+1. **Der 2023/24-Aera-IC ist nicht null, aber unterhalb jeder registrierten Relevanz:** BTC W-L2-1 (+0,067) und das nicht urteilstragende ETH-Fenster (+0,062) — zwei ueberlappende Zeitraeume, zwei Symbole, dasselbe schwach positive Signal knapp ueber dem reinen Rauschboden (1/sqrt(363) ≈ 0,052) und klar unter der Schwelle 0,10, die die Registrierung aus genau diesem Rauschboden kalibriert hat. In W-L2-2 (2024/25) ist auch das verschwunden (−0,011). Dieselbe Aera-Abhaengigkeit wie bei H-20 — was immer da war, ist duenn und nicht persistent.
+2. **Die oekonomische 1,7–2x-Notiz** der Synthese (25–30 bps entspraeche |IC| ~ 0,1) ist nicht erreicht und faellt mit dem DROP ersatzlos; sie war entkoppelt registriert.
+3. **Die WP-2-Maschinerie hat sich bewaehrt:** Snapshot-validierte Buchrekonstruktion ueber 1.098 Fenster-Tage, 0 verworfene Tage, 96 Sequenzbrueche gesamt (~1/11 Tage), fuenffache Fingerprint-Bindung — der Lauf selbst dauerte 27 Sekunden. Die Infrastruktur steht fuer jede kuenftige L2-Hypothese (SWEEP-PRE aus der Vertagt-Liste waere jetzt billig).
+
+**Abgrenzung (registriert, bindend):** Keine Band-/Sampling-/Aggregat-Nachsuche. Ein Intraday-Horizont (der zur Zerfallsstruktur passen wuerde) waere eine NEUE Hypothese mit eigener Registrierung.
+
+### Programm-Bilanz (nach GL-027)
+Welle 6: H-19 STATIONAER-GENUG (GL-025) · H-20 DROP (GL-026) · **H-22 DROP (GL-027)** · H-21 GESPERRT bis 2026-12-27. Damit ist Welle 6 bis auf H-21 vollstaendig adjudiziert. **27 GL-Eintraege, 0 Torpfosten-Verschiebungen, 0 handelbare Kanten.**

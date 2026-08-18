@@ -1,0 +1,116 @@
+{
+  "schema_version": 1,
+  "hypothesis": "H-22",
+  "hypothesis_registry": "scinance2-impl/state/hypothesis_registry.md",
+  "capital_free": true,
+  "status": "RUN",
+  "generated_at": "2026-08-18T07:57:15+00:00",
+  "source": "E:\\Claude\\Projects\\scinance\\data\\l2tilt (WP-2) + E:\\Claude\\Projects\\scinance\\data\\barcache (WP-0)",
+  "fingerprints": {
+    "tilt": {
+      "BTCUSDT/W-L2-1": {
+        "observed": "bfaaf08b9c763ff404033cf7cd05052856de39dab53ea25015035dfe3f6131f6",
+        "registered": "bfaaf08b9c763ff404033cf7cd05052856de39dab53ea25015035dfe3f6131f6",
+        "matches": true
+      },
+      "BTCUSDT/W-L2-2": {
+        "observed": "f22eba9eb698e1f4b5333ebb82824a46fcbf8798a90e08e5a90d9d9a5a9577b0",
+        "registered": "f22eba9eb698e1f4b5333ebb82824a46fcbf8798a90e08e5a90d9d9a5a9577b0",
+        "matches": true
+      },
+      "ETHUSDT/W-ETH": {
+        "observed": "7f18970ee329ea51fbd2498f3fb1afb3385f52fb23fa88db96e21ee193b2c330",
+        "registered": "7f18970ee329ea51fbd2498f3fb1afb3385f52fb23fa88db96e21ee193b2c330",
+        "matches": true
+      }
+    },
+    "bars": {
+      "BTCUSDT": {
+        "observed": "3be122e350df98118b26eaa16471cc070375e7593c17524753069441681dd8b6",
+        "registered": "3be122e350df98118b26eaa16471cc070375e7593c17524753069441681dd8b6",
+        "matches": true
+      },
+      "ETHUSDT": {
+        "observed": "848ff87d3903cc59132e1653c915d79150288f424aa8d0eafe00c299ac54b098",
+        "registered": "848ff87d3903cc59132e1653c915d79150288f424aa8d0eafe00c299ac54b098",
+        "matches": true
+      }
+    }
+  },
+  "gate_valid": true,
+  "method": {
+    "feature": "daily tilt = median of minute-sampled (B-A)/(B+A) within +-25 bp of mid (WP-2 store, frozen)",
+    "target": "next-day log return from WP-0 day closes",
+    "ic": "Spearman rank IC per window",
+    "null": "block bootstrap (5-day blocks, 1000 reps, seed 42), H0: IC <= 0, pairing broken under H0 with autocorrelation preserved"
+  },
+  "fdr_family": "F-L2",
+  "fdr_alpha": 0.1,
+  "fdr_p_crit": 0.0,
+  "gate_thresholds": {
+    "ic_min": 0.1,
+    "boot_p_max": 0.05,
+    "coverage_floor": 0.85
+  },
+  "cells": [
+    {
+      "symbol": "BTCUSDT",
+      "window": "W-L2-1",
+      "window_range": [
+        "2023-07-01",
+        "2024-06-30"
+      ],
+      "judgment_bearing": true,
+      "n_tilt_days": 363,
+      "coverage": 0.9918,
+      "coverage_floor": 0.85,
+      "floor_met": true,
+      "n_pairs": 363,
+      "ic": 0.06648474579162676,
+      "ic_ge_min": false,
+      "boot_p": 0.0969030969030969,
+      "fdr_significant": false,
+      "boot_p_le_max": false,
+      "cell_pass": false
+    },
+    {
+      "symbol": "BTCUSDT",
+      "window": "W-L2-2",
+      "window_range": [
+        "2024-07-01",
+        "2025-06-30"
+      ],
+      "judgment_bearing": true,
+      "n_tilt_days": 340,
+      "coverage": 0.9315,
+      "coverage_floor": 0.85,
+      "floor_met": true,
+      "n_pairs": 340,
+      "ic": -0.011173921207337945,
+      "ic_ge_min": false,
+      "boot_p": 0.5704295704295704,
+      "fdr_significant": false,
+      "boot_p_le_max": false,
+      "cell_pass": false
+    },
+    {
+      "symbol": "ETHUSDT",
+      "window": "W-ETH",
+      "window_range": [
+        "2023-04-01",
+        "2024-04-30"
+      ],
+      "judgment_bearing": false,
+      "n_tilt_days": 395,
+      "coverage": 0.9975,
+      "coverage_floor": 0.85,
+      "floor_met": true,
+      "n_pairs": 395,
+      "ic": 0.061791467330245195,
+      "ic_ge_min": false,
+      "boot_p": 0.10589410589410589
+    }
+  ],
+  "coverage_ok": true,
+  "both_btc_windows_pass": false
+}
