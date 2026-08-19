@@ -1189,3 +1189,46 @@ Beide BTC-Fenster verfehlen beide Bedingungen; das harte Ein-Fenster-Kriterium g
 
 ### Programm-Bilanz (nach GL-027)
 Welle 6: H-19 STATIONAER-GENUG (GL-025) · H-20 DROP (GL-026) · **H-22 DROP (GL-027)** · H-21 GESPERRT bis 2026-12-27. Damit ist Welle 6 bis auf H-21 vollstaendig adjudiziert. **27 GL-Eintraege, 0 Torpfosten-Verschiebungen, 0 handelbare Kanten.**
+
+---
+
+## GL-028 · 2026-08-18 · H-24 · C-24 Minuten-Fluss-Lead (Welle 7, KAPITALFREI) — **DROP (empirisch; IC30 in BEIDEN Rezenz-Fenstern NEGATIV, p am Ceiling)**
+
+**Quelle:** `state/h24_20260818/c24_impact_results.{json,md}` (Lauf 2026-08-18 14:36 UTC, 200 s, rc=0; ein zweiter Lauf am 2026-08-19 reproduziert **bit-identisch**). Alle fuenf WP-0-Fingerabdruecke bestaetigt (`gate_valid=true`).
+
+### Vorbedingungen: beide erfuellt
+- **Positivkontrolle (bindend, GL-020-Muster):** gleichzeitiger IC **+0,5376 / +0,5265** in den Rezenz-Fenstern — das **5,3-Fache** des registrierten Floors 0,10, und ueber alle zehn Halbjahre stabil zwischen +0,53 und +0,61. Die Messmaschinerie sieht den Impact ueberdeutlich; ihr Null-Befund auf dem Forward-Horizont ist damit informativ (anders als GL-020, wo genau das scheiterte).
+- **Tages-Floor:** 184 bzw. 181 Tage je Fenster gegen Floor 100. `verdict_evaluable=true`.
+
+### Registriertes Gate und Messergebnis
+
+Gate: „WEITER, wenn in BEIDEN Rezenz-Fenstern gepoolt: mean(IC_P30) >= 0,02 UND Cluster-Bootstrap-p <= 0,05 nach BH-FDR alpha=0,10 ueber F-IMP. DROP: hartes Ein-Fenster-Kriterium."
+
+| Fenster | Symbol-Tage | mean IC30 | median | >= +0,02 | Lesart | boot-p | Zelle |
+|---|---:|---:|---:|:---:|---|---:|:---:|
+| W-R1 (2025-08..2026-01) | 920 | **−0,0179** | −0,0186 | nein | permanent | 1,0000 | **nein** |
+| W-R2 (2026-02..2026-07) | 905 | **−0,0169** | −0,0165 | nein | permanent | 1,0000 | **nein** |
+
+Beide Fenster verfehlen beide Bedingungen — das Vorzeichen ist sogar entgegengesetzt zur Hypothese. `n_fdr_significant=0`. Der p-Wert 1,0000 ist der Deckelwert des einseitigen Tests (H0: Mittel <= 0) bei negativem beobachtetem Mittel.
+
+### URTEIL: **DROP.**
+Das harte Ein-Fenster-Kriterium greift zweifach. Die registrierte A-priori („DROP leicht favorisiert, ~60/40; die Mikrostruktur-Literatur findet Minuten-Impact ueberwiegend transient") ist bestaetigt. **Der Minuten-Nettofluss kuendigt KEINE weitere gleichgerichtete Bewegung an.**
+
+### Der eigentliche Befund: ein ueber FUENF JAHRE stabiler stilisierter Fakt
+
+| Halbjahr | 21H2 | 22H1 | 22H2 | 23H1 | 23H2 | 24H1 | 24H2 | 25H1 | **25H2** | **26H1** |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
+| IC gleichzeitig | +0,53 | +0,58 | +0,59 | +0,58 | +0,61 | +0,59 | +0,57 | +0,56 | **+0,54** | **+0,53** |
+| IC30 | −0,012 | −0,011 | −0,017 | −0,019 | −0,022 | −0,022 | −0,019 | −0,018 | **−0,018** | **−0,017** |
+
+Zehn Halbjahre, fuenf Symbole gepoolt, 2021–2026: der gleichzeitige Impact liegt konstant bei ~+0,57, der Forward-IC konstant bei ~−0,017. **Das ist die erste Groesse im gesamten Programm, die ueber alle Aeren stabil ist.** Welle 6 fand durchweg Aera-Abhaengigkeit (GL-025 D3-Uebergang, GL-026 Vorzeichenwechsel, GL-027 IC nur 2023/24); H-24 findet das Gegenteil — eine Konstante. Die `impact_reading`-Klassifikation (DEC-39, nicht urteilstragend) lautet in 8 von 10 Halbjahren `permanent`, in 2 (23H2, 24H1) `reversal`, beide direkt an der −0,02-Grenze. Lesart: **Der Minuten-Impact ist ganz ueberwiegend PERMANENT mit einer kleinen transienten Komponente** — er bleibt im Preis, aber er fuehrt nichts nach.
+
+Die mitberichteten Horizonte schliessen die „falscher Horizont"-Ausrede vorab aus: IC5 = −0,021/−0,024 und IC120 = −0,014/−0,016 in den Rezenz-Fenstern — dasselbe Bild auf 5 und 120 Minuten. Kein Horizont rettet die Hypothese.
+
+**Ehrlicher Interpretations-Vorbehalt (wichtig, nicht wegzulassen):** Die kleine negative Zahl ist NICHT zwingend Liquiditaets-Reversion. Bei starkem Kaufdruck liegt der Minuten-Schlusskurs mechanisch eher auf der Angebotsseite des Spreads; die Rueckkehr zur Mitte erzeugt allein daraus einen leicht negativen Forward-IC. Die Groessenordnung (−0,017 Rang-Korrelation) ist mit einem solchen Halb-Spread-Effekt gut vereinbar. Zu behaupten, hier sei echte Reversion gemessen, waere eine Ueberinterpretation — und sie ist fuer das Verdikt auch gleichgueltig: unter beiden Lesarten ist das Gate verfehlt.
+
+### Abgrenzung (registriert, bindend)
+Keine Horizont-/Flussdefinitions-Nachsuche. Zitierpflicht GL-007/GL-010: H-05 testete Tick-OFI-Vorzeichen auf Tick-Skala (DROP, inverse Mess-Existenz, Kapital-PARK); H-24 hat die Forward-Lead-Struktur des Minuten-Aggregatflusses gemessen. **Kein H-24-Ergebnis rehabilitiert C-01 oder dessen Tradability** — im Gegenteil, der Befund verengt den Raum: der Aggregatfluss traegt auf Minutenskala keine Vorlauf-Information.
+
+### Programm-Bilanz (nach GL-028)
+Welle 6 abgeschlossen bis auf H-21 (gesperrt bis 2026-12-27). Welle 7: **H-24 DROP (GL-028)** · H-23 registriert, Code (Voll-Inferenz) ausstehend. **28 GL-Eintraege, 0 Torpfosten-Verschiebungen, 0 handelbare Kanten.**
