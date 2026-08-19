@@ -610,6 +610,16 @@ Beide registrierten Fensterpaare (W1 2026-03-27..2026-05-15, W2 2026-05-16..2026
 - **Rezenz-Klausel:** erfuellt per Konstruktion (Panel 2026-03-27..07-04 ist das juengste Cross-Venue-Fenster mit vollem 10-Node-Panel).
 - **Struktureller Nulleffekt (Pflichtzeile):** Mess-Gate: Balanced-Acc-Null = 0,5 bei 2 Klassen... (5 Venues: Null = 0,2; Schwelle 0,60 = 3x Null; die Permutations-Null mit vollen Retrainings preist schwere Schwaenze ein — GL-019 hat das dokumentiert). Redundanz-Gate: |rho|-Rauschboden bei n=85 ~ 0,11; die 0,6-Schwelle liegt 5,5x darueber — sie kann nur durch echte Kopplung gerissen werden, nicht durch Rauschen.
 - **A-priori (ehrlich):** Mess-Gate erneut PASS erwartet (~85 %; der GL-019-Befund war mit 5/5 und Pooled 0,89 sehr robust). Redundanz-Gate offen (50/50) — genau deshalb der Lauf. Verdikt ersetzt den GL-019-Schwebezustand durch WEITER oder DROP.
+> **Nachtrag 2026-08-18 (append-only, VOR dem Lauf; fixiert drei Implementierungs-Freiheitsgrade, die das Ergebnis beeinflussen koennten):**
+>
+> **(1) Encoder-Zuordnungs-Regel.** Jedes Panel-Fenster wird von GENAU dem Fold-Encoder eingebettet, dessen ausgelassenes Symbol es traegt. Damit gilt die Symbol-Ausschluss-Eigenschaft der H-17-Test-Embeddings unveraendert fuer JEDES eingebettete Fenster: kein Encoder sieht je das Symbol, das er einbettet. Sauber ist das, weil `train_idx` in H-17 KEINEN Datumsfilter hat — der Encoder sieht ohnehin den vollen Datumsbereich der vier anderen Symbole, also besteht zwischen frueher und spaeter Zeit des ausgelassenen Symbols keine Expositions-Asymmetrie. Die lineare Probe (nur fuer die Accuracy) bleibt unberuehrt; die Distanzserie nutzt ausschliesslich Roh-Embeddings.
+>
+> **(2) Checkpoint-Abgrenzung.** Der globale Run-Fingerabdruck bleibt UNVERAENDERT, damit die 100 Null-Retrainings aus den vorhandenen Checkpoints resumierbar bleiben (ihre Ergebnisse — Accuracies auf permutierten Labels — sind von der Aenderung nicht beruehrt). Invalidiert werden ausschliesslich die fuenf HAUPT-Trainings, ueber ihre Task-Identitaet (neue `kind`-Kennung + `n_holdout_windows`); alte Haupt-Checkpoints werden dadurch nicht gelesen und nicht ueberschrieben. Das ist die registrierte Kosten-Erwartung aus DEC-29 (d).
+>
+> **(3) H-17 bleibt bit-exakt reproduzierbar.** Die Voll-Inferenz ist ein opt-in-Schalter; ohne ihn laeuft der bestehende H-17-Pfad unveraendert. H-23 setzt ihn und schreibt `hypothesis="H-23"` in den Payload — kein bestehender Lauf und kein archiviertes Ergebnis wird beruehrt.
+>
+> **Zusaetzlich vorab fixiert (NICHT urteilstragend):** Der Lauf berichtet die Redundanz-Korrelation zusaetzlich auf der Teilmenge der urspruenglichen TEST-Tage. Weicht sie stark von der Voll-Serien-Korrelation ab, ist das ein Warnsignal fuer die Adjudikation; urteilstragend ist ausschliesslich die registrierte Voll-Serien-Korrelation an >=10 Ueberlappungstagen.
+
 - **KAPITALFREIHEIT (verbindlich):** H-17b-Tradability bleibt NICHT impliziert. · **Status:** registriert, Code-Anpassung (Voll-Inferenz) ausstehend, Lauf NICHT gestartet.
 
 ### H-24 · C-24 IMPACT-PERSISTENZ — persistiert der Minuten-Fluss-Impact im juengsten Regime? (KAPITALFREI, Reservekandidat)

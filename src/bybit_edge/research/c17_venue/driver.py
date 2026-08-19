@@ -153,6 +153,10 @@ class Fold:
     test_idx: np.ndarray
     test_start_date: str
     test_end_date: str
+    #: ALL windows of the held-out symbol (H-23 full-panel inference,
+    #: registry Nachtrag 2026-08-18 (1)). Fully determined by the panel and
+    #: the held-out symbol, both already pinned by the run fingerprint.
+    holdout_idx: np.ndarray = None  # type: ignore[assignment]
 
 
 def _iso_to_date(s: str) -> datetime:
@@ -188,6 +192,7 @@ def build_loso_folds(panel: Panel, symbols: tuple[str, ...]) -> list[Fold]:
             test_idx=test_idx,
             test_start_date=cutoff.strftime("%Y-%m-%d"),
             test_end_date=max_d.strftime("%Y-%m-%d"),
+            holdout_idx=np.nonzero(sym_sel)[0],
         ))
     return folds
 
@@ -535,6 +540,7 @@ def run_fold(
     fold_index: int = 0,
     ckpt_dir: Path | str | None = None,
     fingerprint: dict[str, Any] | None = None,
+    full_panel_distance: bool = False,
 ) -> dict[str, Any]:
     """Run one LOSO fold: real training + n_perm FULL null retrainings.
 
@@ -562,8 +568,16 @@ def run_fold(
     if ckpt is not None and fingerprint is None:
         raise ValueError("run_fold: ckpt_dir set but fingerprint missing")
     tr, te = fold.train_idx, fold.test_idx
+    # H-23 (registry Nachtrag 2026-08-18 (1)): embed EVERY window of the
+    # held-out symbol, not only its test slice. The encoder never saw this
+    # symbol at all, so symbol exclusion holds for every embedded window;
+    # and since ``train_idx`` carries NO date filter, the encoder's exposure
+    # to dates is identical for early and late held-out windows.
+    ho = (fold.holdout_idx if (full_panel_distance
+                               and fold.holdout_idx is not None) else te)
     x_tr, m_tr = panel.x[tr], panel.mask[tr]
     x_te, m_te = panel.x[te], panel.mask[te]
+    x_ho, m_ho = (panel.x[ho], panel.mask[ho])
     y_tr = _venue_to_int(panel.venues[tr], venue_order)
     y_te = _venue_to_int(panel.venues[te], venue_order)
     # Audit finding H-2: a LOSO test period can degenerate to a SINGLE venue
@@ -581,15 +595,22 @@ def run_fold(
     # Encoder seed via _encoder_seed (== seed*1000 + fold_index, the exact
     # pre-checkpoint inline value — behaviour-neutral).
     main_seed = _encoder_seed(seed, fold_index, "main", 0)
+    # H-23 checkpoint boundary (registry Nachtrag 2026-08-18 (2)): the GLOBAL
+    # fingerprint stays untouched so the 100 null retrainings remain
+    # resumable; only the MAIN trainings are invalidated, via a distinct
+    # ``kind`` (own path) plus ``n_holdout_windows`` in the task identity.
+    main_kind = "main_full" if full_panel_distance else "main"
     main_task = {
         "fold_symbol": fold.held_out_symbol, "fold_index": int(fold_index),
-        "kind": "main", "index": 0,
+        "kind": main_kind, "index": 0,
         "encoder_seed": int(main_seed), "probe_seed": int(seed),
     }
+    if full_panel_distance:
+        main_task["n_holdout_windows"] = int(ho.size)
     main_path = None
     cached_main = None
     if ckpt is not None:
-        main_path = _training_ckpt_path(ckpt, fold.held_out_symbol, "main", 0)
+        main_path = _training_ckpt_path(ckpt, fold.held_out_symbol, main_kind, 0)
         cached_main = _load_training_checkpoint(
             main_path, fingerprint=fingerprint, task=main_task,
             expected_n_test=int(te.size))
@@ -598,6 +619,8 @@ def run_fold(
         fit_info = cached_main["fit_info"]
         pred_te = np.asarray(cached_main["y_pred"], dtype=np.int64)
         emb_te = np.asarray(cached_main["emb_test"], dtype=np.float64)
+        emb_ho = (np.asarray(cached_main["emb_holdout"], dtype=np.float64)
+                  if full_panel_distance else emb_te)
         print(f"[c17_venue] fold {fold.held_out_symbol}: main training RESUMED "
               f"from checkpoint ({main_path})", file=sys.stderr, flush=True)
     else:
@@ -607,6 +630,7 @@ def run_fold(
                            **fit_kwargs)
         emb_tr = enc.embed(x_tr, m_tr)
         emb_te = enc.embed(x_te, m_te)
+        emb_ho = enc.embed(x_ho, m_ho) if full_panel_distance else emb_te
         probe = train_linear_probe(emb_tr, y_tr, seed=seed)
         pred_te = probe_predict(emb_te, probe)
         acc = balanced_accuracy(y_te, pred_te)
@@ -622,6 +646,9 @@ def run_fold(
                     "fit_info": fit_info,
                     "y_pred": [int(v) for v in pred_te],
                     "emb_test": [[float(v) for v in row] for row in emb_te],
+                    **({"emb_holdout":
+                        [[float(v) for v in row] for row in emb_ho]}
+                       if full_panel_distance else {}),
                 },
                 wall_seconds=time.time() - t0,
             )
@@ -719,6 +746,11 @@ def run_fold(
         "_y_pred": pred_te,
         "_emb_test": emb_te,
         "_test_idx": te,
+        # H-23: embeddings + indices actually feeding the distance series
+        # (== the test slice when full_panel_distance is off).
+        "_emb_dist": emb_ho,
+        "_dist_idx": ho,
+        "n_holdout_windows": int(ho.size),
     }
 
 
@@ -741,6 +773,8 @@ def run(
     start_date: str = "",
     end_date: str = "",
     ckpt_dir: Path | str | None = None,
+    full_panel_distance: bool = False,
+    hypothesis_id: str = HYPOTHESIS_ID,
 ) -> dict[str, Any]:
     """Run the full H-17 measurement; returns the gate-neutral payload.
 
@@ -820,7 +854,8 @@ def run(
         run_fold(panel, fold, encoder_factory=encoder_factory,
                  venue_order=venue_order, fit_kwargs=fit_kwargs,
                  n_perm=n_perm, seed=seed, fold_index=fi,
-                 ckpt_dir=ckpt, fingerprint=ckpt_fingerprint)
+                 ckpt_dir=ckpt, fingerprint=ckpt_fingerprint,
+                 full_panel_distance=full_panel_distance)
         for fi, fold in enumerate(folds)
     ]
 
@@ -839,15 +874,31 @@ def run(
     y_pred_all = np.concatenate([r["_y_pred"] for r in fold_records])
     pooled_acc = balanced_accuracy(y_true_all, y_pred_all)
 
-    # secondary: daily cross-venue embedding-distance series (held-out only).
-    emb_all = np.concatenate([r["_emb_test"] for r in fold_records], axis=0)
-    idx_all = np.concatenate([r["_test_idx"] for r in fold_records])
+    # secondary: daily cross-venue embedding-distance series. H-17 builds it
+    # from the held-out TEST windows only; H-23 (full_panel_distance) builds
+    # it from ALL windows of each held-out symbol — same encoder-assignment
+    # rule, ~85 instead of ~2 overlap days for the redundancy gate.
+    emb_all = np.concatenate([r["_emb_dist"] for r in fold_records], axis=0)
+    idx_all = np.concatenate([r["_dist_idx"] for r in fold_records])
     distance = daily_embedding_distance_series(
         emb_all, panel.dates[idx_all], panel.symbols[idx_all],
         panel.venues[idx_all])
 
     # pre-registered non-redundancy gate against c12_frag/H-12.
     redundancy = redundancy_gate(distance["daily"], c12_payload)
+
+    # H-23 diagnostic (registry Nachtrag 2026-08-18, NOT judgment-bearing):
+    # the same gate restricted to the ORIGINAL test-period days. A wide gap
+    # to the full-series correlation is a warning flag for the adjudication;
+    # only the full-series result carries the verdict.
+    redundancy_test_days_only = None
+    if full_panel_distance:
+        test_days = {str(d) for r in fold_records
+                     for d in panel.dates[r["_test_idx"]]}
+        sub = {d: v for d, v in distance["daily"].items()
+               if str(d) in test_days}
+        redundancy_test_days_only = redundancy_gate(sub, c12_payload)
+        redundancy_test_days_only["judgment_bearing"] = False
 
     # gate arithmetic (gate-neutral — the gate-auditor adjudicates).
     n_folds_passed = sum(1 for r in fold_records if r["passed"])
@@ -915,7 +966,7 @@ def run(
 
     return {
         "schema_version": SCHEMA_VERSION,
-        "hypothesis": HYPOTHESIS_ID,
+        "hypothesis": hypothesis_id,
         "hypothesis_registry": REGISTRY_PATH,
         "capital_free": True,
         "generated_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
@@ -983,6 +1034,11 @@ def run(
         "pooled_balanced_accuracy": float(pooled_acc),
         "pooled_acc_ok": pooled_ok,
         "embedding_distance": distance,
+        "distance_scope": ("full_panel (H-23: every window of each held-out "
+                           "symbol, embedded by the fold that excluded it)"
+                           if full_panel_distance else
+                           "test_windows_only (H-17 registered scope)"),
+        "redundancy_test_days_only": redundancy_test_days_only,
         "redundancy_gate": redundancy,
         # Gate-neutral observation flag (the gate-auditor adjudicates):
         "weiter_indication": weiter_indication,

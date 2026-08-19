@@ -1089,3 +1089,74 @@ def test_no_ckpt_dir_writes_nothing(tmp_path: Path) -> None:
         ckpt_dir=None)
     assert sorted(tmp_path.rglob("*")) == cwd_before, (
         "ckpt_dir=None must not create any checkpoint files")
+
+
+# ----------------------------------------------------------------------------
+# H-23: full-panel distance series (registry 2026-08-18 + Nachtrag)
+# ----------------------------------------------------------------------------
+
+def test_h23_full_panel_distance_covers_more_days_than_h17() -> None:
+    """The whole point of H-23: the distance series must span ALL panel days.
+
+    H-17 defines it on the held-out TEST windows only (~last 21 days), which
+    left the redundancy gate with 2 overlap days (GL-019). H-23 embeds every
+    window of each held-out symbol with the fold that excluded it.
+    """
+    nodes = _small_synthetic_nodes(SYMBOLS5, VENUES2, n_days=40, seed=771)
+    base = run(nodes, n_perm=1, seed=1, cuda_used=False, torch_available=False)
+    full = run(nodes, n_perm=1, seed=1, cuda_used=False, torch_available=False,
+               full_panel_distance=True, hypothesis_id="H-23")
+
+    d_base = set(base["embedding_distance"]["daily"])
+    d_full = set(full["embedding_distance"]["daily"])
+    assert d_base <= d_full, "the H-17 days must all still be covered"
+    # sharp expectation: H-17 sees at most the TEST_DAYS tail, H-23 the panel
+    assert len(d_base) <= TEST_DAYS, len(d_base)
+    assert len(d_full) == 40, (
+        f"full-panel coverage must span every panel day, got {len(d_full)}")
+    assert len(d_full) > len(d_base), "and it must be strictly wider"
+    assert full["hypothesis"] == "H-23" and base["hypothesis"] == "H-17"
+    assert "full_panel" in full["distance_scope"]
+    assert "test_windows_only" in base["distance_scope"]
+
+
+def test_h23_does_not_change_the_h17_measurement() -> None:
+    """The accuracy side is untouched: only WHAT is embedded afterwards
+    changes, never the training. Bit-exact fold accuracies are required."""
+    nodes = _small_synthetic_nodes(SYMBOLS5, VENUES2, n_days=30, seed=772)
+    base = run(nodes, n_perm=1, seed=3, cuda_used=False, torch_available=False)
+    full = run(nodes, n_perm=1, seed=3, cuda_used=False, torch_available=False,
+               full_panel_distance=True, hypothesis_id="H-23")
+    for rb, rf in zip(base["folds"], full["folds"]):
+        assert rb["held_out_symbol"] == rf["held_out_symbol"]
+        assert rb["balanced_accuracy"] == rf["balanced_accuracy"]
+        assert rb["p_value"] == rf["p_value"]
+    assert base["pooled_balanced_accuracy"] == full["pooled_balanced_accuracy"]
+
+
+def test_h23_embeds_every_window_with_the_excluding_fold() -> None:
+    """Registry Nachtrag (1): symbol exclusion must hold for EVERY embedded
+    window — each fold contributes exactly the windows of its held-out
+    symbol, and the union covers the whole panel."""
+    panel = _dummy_panel(SYMBOLS5, VENUES2, n_days=26)
+    folds = build_loso_folds(panel, SYMBOLS5)
+    seen = np.concatenate([f.holdout_idx for f in folds])
+    assert seen.size == panel.x.shape[0], "union of holdouts must be the panel"
+    assert np.array_equal(np.unique(seen), np.arange(panel.x.shape[0])), (
+        "no window may be embedded twice or missed")
+    for f in folds:
+        assert set(panel.symbols[f.holdout_idx]) == {f.held_out_symbol}
+        assert not np.intersect1d(f.holdout_idx, f.train_idx).size, (
+            "a fold must never embed a window it was trained on")
+
+
+def test_h23_test_day_diagnostic_is_reported_and_not_judgment_bearing() -> None:
+    nodes = _small_synthetic_nodes(SYMBOLS5, VENUES2, n_days=30, seed=774)
+    full = run(nodes, n_perm=1, seed=5, cuda_used=False, torch_available=False,
+               full_panel_distance=True, hypothesis_id="H-23")
+    diag = full["redundancy_test_days_only"]
+    assert diag is not None
+    assert diag["judgment_bearing"] is False
+    base = run(nodes, n_perm=1, seed=5, cuda_used=False, torch_available=False)
+    assert base["redundancy_test_days_only"] is None, (
+        "the diagnostic exists only on the H-23 path")

@@ -159,6 +159,13 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--check-gpu-only", action="store_true",
                    help="Report torch/CUDA availability and exit (no run). "
                         "Compute-gating requirement (registry H-17).")
+    p.add_argument("--h23-full-panel", action="store_true",
+                   help="H-23 (registry 2026-08-18): define the daily "
+                        "embedding-distance series over ALL panel windows of "
+                        "each held-out symbol instead of only its test slice "
+                        "(~85 instead of ~2 redundancy-overlap days). Writes "
+                        "hypothesis=H-23; the 5 MAIN trainings rerun (own "
+                        "checkpoint kind), the 100 null retrainings resume.")
     p.add_argument("--allow-cpu-fallback", action="store_true",
                    help="TEST-ONLY escape hatch: run the full pipeline "
                         "without a real CUDA device anyway (numpy pipeline-"
@@ -273,6 +280,8 @@ def main(argv: list[str] | None = None) -> int:
             batch_size=args.batch_size, source=source,
             start_date=args.start_date, end_date=args.end_date,
             ckpt_dir=ckpt_dir,
+            full_panel_distance=args.h23_full_panel,
+            hypothesis_id="H-23" if args.h23_full_panel else "H-17",
         )
     except ValueError as exc:
         # Incl. CheckpointMismatchError (stale --ckpt-dir): a HARD rc=1 —
@@ -281,8 +290,9 @@ def main(argv: list[str] | None = None) -> int:
         return RC_ERROR
 
     out_dir.mkdir(parents=True, exist_ok=True)
-    json_path = out_dir / "c17_venue_results.json"
-    md_path = out_dir / "c17_venue_results.md"
+    stem = "c23_venue_full_results" if args.h23_full_panel else "c17_venue_results"
+    json_path = out_dir / f"{stem}.json"
+    md_path = out_dir / f"{stem}.md"
     json_path.write_text(_dumps(payload), encoding="utf-8")
     md_path.write_text(render_markdown(payload), encoding="utf-8")
     print(f"[c17_venue] wrote {json_path}", file=sys.stderr, flush=True)
