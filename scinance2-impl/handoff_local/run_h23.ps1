@@ -42,7 +42,13 @@ $ErrorActionPreference = 'Continue'
 $ScriptDir = $PSScriptRoot
 $RepoRoot  = (Resolve-Path (Join-Path $ScriptDir '..\..')).Path
 $HarvestDir = if ($env:HARVEST_DIR) { $env:HARVEST_DIR } else { Join-Path $RepoRoot 'data\harvest' }
-$C12ResultsJson = if ($env:C12_RESULTS_JSON) { $env:C12_RESULTS_JSON } else { '' }
+# H-23 REDUNDANZ-REFERENZ (registriert, eingefroren): die ARCHIVIERTE
+# c12-Serie. Anders als bei H-17 ist sie hier KEINE Option - ohne sie ist
+# das Non-Redundanz-Gate nicht auswertbar und der Lauf traegt kein Verdikt
+# (genau die GL-019-Falle). Der Runner bricht deshalb LAUT ab, statt eine
+# nicht-adjudizierbare GPU-Nacht zu verbrennen.
+$C12ResultsJson = if ($env:C12_RESULTS_JSON) { $env:C12_RESULTS_JSON }
+                  else { Join-Path $RepoRoot 'scinance2-impl\state\wave4_20260726\c12_frag_results.json' }
 
 $Symbols   = 'BTCUSDT,ETHUSDT,SOLUSDT,BNBUSDT,XRPUSDT'
 $Exchanges = 'bybit,binance'
@@ -197,7 +203,14 @@ Write-Host ("Harvest: " + $HarvestDir + " | Panel: " + $Symbols + " x {" + $Exch
 Write-Host ("Fenster: " + $StartDate + ".." + $EndDate + " (Cutoff gepinnt in " + $EndDatePin + ") | n_perm=" + $NPerm + " steps=" + $Steps + " batch_size=" + $BatchSize + " seed=" + $Seed)
 Write-Host ("Checkpoints (STABIL ueber Neustarts): " + $CkptDir)
 Write-Host ("RESUME-FAEHIG: bereits abgeschlossene Einzeltrainings werden uebersprungen - ein Timeout/Abbruch verliert hoechstens das gerade laufende Training; einfach erneut starten (s. Kopf-Kommentar).")
-Write-Host ("C12-Ergebnisse fuer Redundanz-Gate: " + $(if ($C12ResultsJson) { $C12ResultsJson } else { "<keiner - Gate bleibt nicht auswertbar>" }))
+Write-Host ("C12-Redundanz-Referenz: " + $C12ResultsJson)
+$C12Ok = (Test-Path $C12ResultsJson)
+if (-not $C12Ok) {
+    Write-Host ("FEHLER: registrierte C12-Redundanz-Referenz fehlt (" + $C12ResultsJson + ").")
+    Write-Host "H-23 waere ohne sie NICHT adjudizierbar - das Non-Redundanz-Gate bliebe"
+    Write-Host "nicht auswertbar, exakt die GL-019-Falle. Pfad per `$env:C12_RESULTS_JSON"
+    Write-Host "setzen oder das Archiv wiederherstellen. KEIN Lauf."
+}
 if ($DryRun) { Write-Host "ACHTUNG: HANDOFF_DRY_RUN aktiv - keine echten Laeufe." }
 
 $bybitPath   = Join-Path $HarvestDir 'raw\bybit\publicTrade'
@@ -214,7 +227,9 @@ if (-not $DryRun) {
 
 $Script = Join-Path $RepoRoot 'scripts\c17_venue.py'
 
-if (-not $HarvestOk) {
+if (-not $C12Ok) {
+    Record-Step -Name 'H23_VENUE_FULL' -Status 'SKIP' -Rc 2 -Dur 0 -Detail ("C12-Redundanz-Referenz fehlt (" + $C12ResultsJson + ")")
+} elseif (-not $HarvestOk) {
     Record-Step -Name 'H23_VENUE_FULL' -Status 'SKIP' -Rc 0 -Dur 0 -Detail ("Harvester fehlt (" + $bybitPath + " / " + $binancePath + ")")
 } else {
     # -- GPU-Vorbedingung (verbindlich) ------------------------------------
@@ -235,7 +250,7 @@ if (-not $HarvestOk) {
             '--h23-full-panel',
             '--out-dir', (Join-Path $RunDir 'h23')
         )
-        if ($C12ResultsJson) { $cmdArgs += @('--c12-results', $C12ResultsJson) }
+        $cmdArgs += @('--c12-results', $C12ResultsJson)
         [void](Invoke-Step -Name 'H23_VENUE_FULL' -TimeoutSec $TmoMain -CmdArgs $cmdArgs)
     }
 }
@@ -257,7 +272,7 @@ $sb = New-Object System.Text.StringBuilder
 [void]$sb.AppendLine("- **Fenster:** " + $StartDate + ".." + $EndDate + " (Cutoff gepinnt in ``" + $EndDatePin + "``)")
 [void]$sb.AppendLine("- **Checkpoints (STABIL, ueberlebt Neustarts):** ``" + $CkptDir + "``")
 [void]$sb.AppendLine("- **n_perm=" + $NPerm + " steps=" + $Steps + " batch_size=" + $BatchSize + " seed=" + $Seed + " | F-VENUE BH-FDR a=0.10**")
-[void]$sb.AppendLine("- **C12-Redundanz-Gate-Quelle:** " + $(if ($C12ResultsJson) { $C12ResultsJson } else { "<keine - Gate nicht auswertbar>" }))
+[void]$sb.AppendLine("- **C12-Redundanz-Referenz (registriert, eingefroren):** ``" + $C12ResultsJson + "``")
 [void]$sb.AppendLine("- **KAPITALFREI** - reine Struktur-/Existenzfrage, KEINE bps/PnL/Sharpe/Friction.")
 [void]$sb.AppendLine("- **H-23-Umfang:** 5 HAUPT-Trainings laufen NEU (eigene Checkpoint-Kennung); die 100 Null-Retrainings RESUMEN aus den H-17-Checkpoints. Distanzserie ueber ALLE Panel-Tage statt nur der Fold-Test-Tage -> Redundanz-Gate erstmals auswertbar.")
 [void]$sb.AppendLine("- **RESUME-FAEHIG:** ~105 volle Trainings (~35h+ GPU brutto; H-23 erwartet deutlich weniger, da die Nulls resumen) - jeder Aufruf setzt aus den Checkpoints in ``" + $CkptDir + "`` fort (je Einzeltraining atomar geschrieben). Ein TIMEOUT/FAIL bei unvollstaendigem Plan ist NORMAL, kein Datenverlust - ein Abbruch kostet hoechstens das gerade laufende Einzeltraining. EINFACH ERNEUT STARTEN. Steht im err.log eine CheckpointMismatchError: Lauf-Parameter wurden zwischen Aufrufen geaendert - Checkpoints loeschen ODER H23_CKPT_DIR wechseln ODER die alten Parameter wiederherstellen; NIEMALS mischen.")

@@ -1232,3 +1232,39 @@ Keine Horizont-/Flussdefinitions-Nachsuche. Zitierpflicht GL-007/GL-010: H-05 te
 
 ### Programm-Bilanz (nach GL-028)
 Welle 6 abgeschlossen bis auf H-21 (gesperrt bis 2026-12-27). Welle 7: **H-24 DROP (GL-028)** · H-23 registriert, Code (Voll-Inferenz) ausstehend. **28 GL-Eintraege, 0 Torpfosten-Verschiebungen, 0 handelbare Kanten.**
+
+---
+
+## GL-029 · 2026-08-19 · H-23 · C-17-Wiederholung mit Voll-Distanzserie, Lauf 1 (Welle 7, KAPITALFREI, GPU) — **KEIN VERDIKT (Redundanz-Referenz nicht uebergeben — Runner-Bedienfehler des Orchestrators, nicht Methode oder Daten)**
+
+**Quelle:** `state/h23_20260819_nogate/c23_venue_full_results.{json,md}` (Lauf 2026-08-19 12:32–16:47 UTC, 15.272 s, rc=0). `verdict_bearing=true`, `blocked_reasons=[]` — echtes CUDA, Batch >= 2048, 10.000 Steps.
+
+### Was funktioniert hat (alles Registrierte)
+- **Die Voll-Distanzserie steht:** `distance_scope="full_panel"`, **100 Tage** statt der 2 aus GL-019. Je Fold wurden 55.831–57.600 Fenster eingebettet statt nur ~12.000 Test-Fenster. Genau der Zweck der Hypothese ist erreicht.
+- **Die Checkpoint-Abgrenzung (Nachtrag (2)) hat exakt gegriffen:** die 100 Null-Retrainings RESUMTEN aus den H-17-Checkpoints (im Log je Fold nachlesbar), nur die 5 Haupt-Trainings liefen neu. Kosten: 4,2 h statt der ~35 h eines Vollaufs.
+- **Der Mess-Befund repliziert GL-019 unabhaengig** — mit frisch trainierten Encodern, also stochastisch neuen Laeufen:
+
+| Fold | GL-019 (2026-07) | H-23 Lauf 1 | p |
+|---|---:|---:|---:|
+| BTC | 0,9424 | 0,9312 | 0,0476 |
+| ETH | 0,9950 | 0,9773 | 0,0476 |
+| SOL | 0,9679 | 0,9531 | 0,0476 |
+| BNB | 0,7130 | 0,7603 | 0,0952 |
+| XRP | 0,8535 | 0,8370 | 0,0476 |
+| **Pooled** | **0,8944** | **0,8914** | — |
+
+5/5 Folds bestanden, Pooled 0,8914 gegen die registrierte 0,55-Schwelle. Der symbol-invariante Venue-Fingerprint ist damit ueber zwei unabhaengige Trainings-Kohorten stabil — das war in GL-019 nicht belegbar und ist ein echter Zugewinn.
+
+### Warum trotzdem kein Verdikt
+`c12_payload_present: false` → `n_overlap_days: 0` → `evaluable: false` → `redundant: false`, `passed: false` → `weiter_indication=false`. Die **registrierte Redundanz-Referenz** (`state/wave4_20260726/c12_frag_results.json`) wurde dem Lauf nie uebergeben: Der H-23-Runner hatte den Default aus `run_h17.ps1` geerbt, wo der Pfad per `$env:C12_RESULTS_JSON` manuell zu setzen war. **Das ist ein Bedienfehler im Runner des Orchestrators** — nicht Datenlage, nicht Methode, nicht Compute. Der registrierte Eintrag benennt die Referenzdatei woertlich; der Runner haette sie verdrahten muessen.
+
+Die registrierten WEITER-Bedingungen verlangen das BESTEHEN des Non-Redundanz-Gates. Es kann nicht bestehen, was nicht auswertbar ist — **dieselbe formale Lage wie GL-019, aber aus einem trivial behebbaren Grund.** Ein WEITER allein auf dem Mess-Befund waere die Torpfosten-Verschiebung, die GL-019 bereits verweigert hat.
+
+### Behebung (bereits umgesetzt, Kosten: Minuten)
+`run_h23.ps1` verdrahtet die registrierte Referenz jetzt als Default und **bricht LAUT ab**, wenn sie fehlt (`rc=2`, SKIP) — statt eine nicht-adjudizierbare GPU-Nacht zu verbrennen. Der Wiederholungslauf ist billig, weil das `c12_payload` NICHT in den Run-Fingerabdruck eingeht (es ist ein Nach-Trainings-Vergleich, kein Trainings-Parameter): alle 105 Trainings resumen aus den Checkpoints — die 5 Haupt-Trainings jetzt aus den in diesem Lauf geschriebenen `main_full`-Checkpoints —, und nur das Redundanz-Gate wird neu gerechnet.
+
+### Prozess-Lehre
+Ein Runner, dessen Lauf ohne einen optionalen Parameter **strukturell nicht adjudizierbar** ist, darf diesen Parameter nicht optional lassen. Die Regel gilt ab sofort fuer alle Runner: **Was die Registrierung als Referenz oder Vorbedingung BENENNT, prueft der Runner VOR dem Start und bricht sonst laut ab.** (Verwandt mit der Loud-Fail-Doktrin aus GL-018 und dem Fingerprint-Guard aus DEC-34 — dort geht es um falsche Daten, hier um fehlende.)
+
+### Programm-Bilanz (nach GL-029)
+Welle 7: H-24 DROP (GL-028) · **H-23 Lauf 1 ohne Verdikt (GL-029), Wiederholung ausstehend**. H-21 gesperrt bis 2026-12-27. **29 GL-Eintraege, 0 Torpfosten-Verschiebungen, 0 handelbare Kanten.**
