@@ -367,6 +367,9 @@ def tilt_fingerprint(out_dir: Path | str, exchange: str, symbol: str,
 
 __all__ = [
     "BAND_BP",
+    "SPREAD_COLUMNS",
+    "extract_spread_window",
+    "load_daily_spread",
     "Book",
     "L2ExtractError",
     "MAX_BREAKS_PER_DAY",
@@ -374,3 +377,178 @@ __all__ = [
     "load_daily_tilt",
     "tilt_fingerprint",
 ]
+
+
+# ----------------------------------------------------------------------------
+# WP-4: minute-sampled quote spread (DEC-40 — the census that decides the
+# maker-spread-capture candidate binarily)
+# ----------------------------------------------------------------------------
+
+SPREAD_COLUMNS = ("minute_idx", "spread_bp", "mid")
+
+
+def _spread_hash(arrays: dict[str, np.ndarray]) -> str:
+    h = hashlib.sha256()
+    for col in SPREAD_COLUMNS:
+        h.update(col.encode("ascii"))
+        h.update(np.ascontiguousarray(arrays[col]).tobytes())
+    return h.hexdigest()
+
+
+def extract_spread_window(
+    base_dir: Path | str,
+    out_dir: Path | str,
+    symbol: str,
+    start: str,
+    end: str,
+    *,
+    exchange: str = "bybit",
+    stream: str = "orderbook",
+    max_breaks: int = MAX_BREAKS_PER_DAY,
+    progress: Any = None,
+) -> dict[str, Any]:
+    """One deterministic pass sampling best-bid/ask SPREAD per minute (WP-4).
+
+    Same replay, validation, break accounting and day-discard rules as
+    :func:`extract_window`; writes ``spread_1min`` partitions with
+    ``spread_bp = 1e4 * (best_ask - best_bid) / mid`` sampled at each minute
+    boundary. Kept as a SEPARATE store — the WP-2 tilt store is frozen and
+    fingerprint-registered; its files are never touched.
+    """
+    import duckdb
+
+    base, out = Path(base_dir), Path(out_dir)
+    raw_dir = base / "raw" / exchange / stream / f"symbol={symbol}"
+    if not raw_dir.is_dir():
+        raise L2ExtractError(f"no orderbook stream at {raw_dir}")
+
+    d0, d1 = date.fromisoformat(start), date.fromisoformat(end)
+    days = [(d0 + timedelta(days=i)).isoformat()
+            for i in range((d1 - d0).days + 1)]
+
+    def _sample(book: Book) -> tuple[float, float] | None:
+        if not book.valid or not book.bids or not book.asks:
+            return None
+        best_bid = max(float(p) for p in book.bids)
+        best_ask = min(float(p) for p in book.asks)
+        if best_bid <= 0 or best_ask <= best_bid * 0.5 or best_ask < best_bid:
+            return None
+        mid = 0.5 * (best_bid + best_ask)
+        return 1e4 * (best_ask - best_bid) / mid, mid
+
+    con = duckdb.connect()
+    book = Book()
+    counts = {"ok": 0, "discarded": 0, "no_raw": 0}
+    total_breaks = 0
+    try:
+        for day in days:
+            if not list((raw_dir / f"date={day}").glob("*.parquet")):
+                counts["no_raw"] += 1
+                if progress is not None:
+                    progress(symbol, {"day": day, "status": "no_raw"})
+                continue
+            day_ms0 = (date.fromisoformat(day) - date(1970, 1, 1)).days * MS_PER_DAY
+            next_boundary = day_ms0 + MS_PER_MINUTE
+            minute_idx: list[int] = []
+            spreads: list[float] = []
+            mids: list[float] = []
+            n_breaks = 0
+            n_snaps = 0
+
+            def _sample_upto(ts_limit: int) -> None:
+                nonlocal next_boundary
+                while next_boundary <= ts_limit:
+                    s = _sample(book)
+                    if s is not None:
+                        minute_idx.append(next_boundary // MS_PER_MINUTE - 1)
+                        spreads.append(s[0])
+                        mids.append(s[1])
+                    next_boundary += MS_PER_MINUTE
+
+            for ts, rec, _u in _day_records(con, raw_dir, day):
+                _sample_upto(ts)
+                rtype, b, a, u = _rec_parts(rec)
+                if rtype == "snapshot":
+                    n_snaps += 1
+                    if book.valid and not book.matches_snapshot(b, a):
+                        n_breaks += 1
+                    book.apply_snapshot(b, a, u)
+                elif rtype == "delta":
+                    if book.valid and not book.apply_delta(b, a, u):
+                        n_breaks += 1
+            _sample_upto(day_ms0 + MS_PER_DAY)
+
+            total_breaks += n_breaks
+            part = (out / "spread_1min" / f"exchange={exchange}"
+                    / f"symbol={symbol}" / f"date={day}")
+            part.mkdir(parents=True, exist_ok=True)
+            arrays = {"minute_idx": np.asarray(minute_idx, dtype=np.int64),
+                      "spread_bp": np.asarray(spreads, dtype=np.float64),
+                      "mid": np.asarray(mids, dtype=np.float64)}
+            if n_breaks > max_breaks:
+                status, reason = "discarded", f"{n_breaks} sequence breaks > {max_breaks}"
+                book = Book()
+                counts["discarded"] += 1
+            elif n_snaps == 0 and not minute_idx:
+                status, reason = "discarded", "no snapshot and no valid state"
+                counts["discarded"] += 1
+            else:
+                status, reason = "ok", ""
+                counts["ok"] += 1
+                import pyarrow as pa
+                import pyarrow.parquet as pq
+                pq.write_table(pa.table({
+                    "minute_idx": pa.array(arrays["minute_idx"], pa.int64()),
+                    "spread_bp": pa.array(arrays["spread_bp"], pa.float64()),
+                    "mid": pa.array(arrays["mid"], pa.float64()),
+                }), part / "spread.parquet")
+            (part / "manifest.json").write_text(json.dumps({
+                "schema_version": SCHEMA_VERSION, "kind": "spread_1min",
+                "exchange": exchange, "symbol": symbol, "date": day,
+                "status": status, "reason": reason,
+                "n_samples": len(minute_idx),
+                "coverage": len(minute_idx) / 1440.0,
+                "n_seq_breaks": n_breaks, "n_snapshots": n_snaps,
+                "sha256_values": _spread_hash(arrays),
+            }, indent=2), encoding="utf-8")
+            if progress is not None:
+                progress(symbol, {"day": day, "status": status,
+                                  "n_samples": len(minute_idx)})
+    finally:
+        con.close()
+    return {"symbol": symbol, "exchange": exchange, "stream": stream,
+            "range": [start, end], "days_in_range": len(days), **counts,
+            "total_seq_breaks": total_breaks}
+
+
+def load_daily_spread(out_dir: Path | str, exchange: str, symbol: str,
+                      start: str, end: str) -> dict[str, np.ndarray]:
+    """(day_idx, spread_median_bp, spread_p10_bp, spread_p90_bp, coverage)."""
+    import pyarrow.parquet as pq
+
+    out = Path(out_dir)
+    d0, d1 = date.fromisoformat(start), date.fromisoformat(end)
+    day_idx, med, p10, p90, cov = [], [], [], [], []
+    for i in range((d1 - d0).days + 1):
+        day = (d0 + timedelta(days=i)).isoformat()
+        part = (out / "spread_1min" / f"exchange={exchange}"
+                / f"symbol={symbol}" / f"date={day}")
+        meta_path = part / "manifest.json"
+        if not meta_path.is_file():
+            continue
+        meta = json.loads(meta_path.read_text(encoding="utf-8"))
+        if meta.get("status") != "ok" or meta.get("n_samples", 0) == 0:
+            continue
+        s = pq.read_table(part / "spread.parquet",
+                          columns=["spread_bp"]).column("spread_bp"
+                          ).to_numpy(zero_copy_only=False)
+        day_idx.append((date.fromisoformat(day) - date(1970, 1, 1)).days)
+        med.append(float(np.median(s)))
+        p10.append(float(np.quantile(s, 0.10)))
+        p90.append(float(np.quantile(s, 0.90)))
+        cov.append(float(meta["coverage"]))
+    return {"day_idx": np.asarray(day_idx, dtype=np.int64),
+            "spread_median_bp": np.asarray(med, dtype=np.float64),
+            "spread_p10_bp": np.asarray(p10, dtype=np.float64),
+            "spread_p90_bp": np.asarray(p90, dtype=np.float64),
+            "coverage": np.asarray(cov, dtype=np.float64)}

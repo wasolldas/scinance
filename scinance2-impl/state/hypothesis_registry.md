@@ -656,6 +656,35 @@ Beide registrierten Fensterpaare (W1 2026-03-27..2026-05-15, W2 2026-05-16..2026
 
 ---
 
+## 2026-08-20 · Welle-8-Registrierung (Options-Pfad): H-26 — ZWEISEITIGE VRP-Messung (KAPITALFREI, DATA-GATED: GESPERRT)
+
+> Herkunft: Strategie-Design-Runde DEC-40 + Nutzer-Auftrag (zweiseitig: die
+> Messung soll BEIDE Strategie-Fragen beantworten — Verkaeufer-Seite
+> „Praemie ernten" UND Kaeufer-Seite „RV>IV-Episoden erkennbar?").
+> C-33-Abgrenzung vorab: H-26 ist die kapitalfreie MESSUNG; die
+> C-33-Bedingung (>=12 Monate IV-Recording + >=1 Stress-Periode) bleibt
+> fuer jede Kapital-Freigabe unabhaengig bindend. Deribit-Daten
+> substituieren die C-33-Aufzeichnungsbedingung NICHT.
+
+### H-26 · C-26 Varianz-Risiko-Praemie auf Deribit: Niveau UND Episodenstruktur (KAPITALFREI)
+- **Registriert:** 2026-08-20 · **Markt:** Deribit BTC/ETH (Messbasis; Bybit-Optionen haben KEINE Quote-Historie — `option_tickers` NO_DATA seit GL-004, Schema ohne bid/ask).
+- **Hypothesen (zweiseitig, EIN Lauf):**
+  - **(S) Verkaeufer-Seite:** Die implizite 30-Tage-Vol (deribit/dvol) liegt im Mittel ueber der nachfolgend realisierten 30-Tage-Vol desselben Underlyings: mittlere Praemie (IV − RV_fwd30) > 0 und materiell.
+  - **(K) Kaeufer-Seite:** Der Anteil der Tage mit RV_fwd30 > IV („Kaeufer-Episoden") und deren zeitliche Klumpung werden gemessen; ZUSAETZLICH (nicht urteilstragend) eine Vorhersagbarkeits-Sonde: prognostiziert eine der GEMESSENEN Programm-Groessen (Envelope-Niveau, D3-Konzentration, 3,5-σ-Ereignisdichte der Vortage) die Episoden besser als der Zufall?
+- **Datenbindung:** `deribit/dvol` (IV-Quelle, BTC+ETH), `deribit/publicTrade` BTC-/ETH-PERPETUAL (RV-Quelle — GLEICHES Underlying wie die IV, kein Bybit-Mismatch; Minutenbars via WP-0-Bar-Cache-Maschinerie, exchange=deribit, deterministisch, Fingerprint im Report), `deribit/markprice.options` als Kontrollserie.
+- **Entsperr-Bedingung (vorab fixiert, H-11/H-21-Muster):** lueckenlose `done_days` fuer dvol UND publicTrade je Symbol ueber **>=210 zusammenhaengende Tage** (180 Beobachtungstage + 30 Tage Forward-Spill). Stand Inventur 2026-08-10: 112 dvol-Tage → Entsperrung fruehestens ~Mitte November 2026. KEINE Absenkung bei Ungeduld — mit 30-Tage-ueberlappenden Zielen und Blocklaenge 30 traegt weniger Historie kein Urteil (H-21-Lehre).
+- **Fenster:** W1 = erste 90 Beobachtungstage nach Streambeginn-Kalibrierung, W2 = zweite 90 — als KALENDERDATEN beim Erreichen der Entsperrung im Lauf-Report fixiert und ab dann unveraenderlich; die Registrierung nennt die Formel, weil der exakte Streambeginn erst der Manifest-Query entnehmbar ist (analog H-21-Fensterschluss-Klausel: Formel jetzt, Zahlen beim Unlock, danach Torpfosten).
+- **Messgroessen:** taeglich P(t) = IV_dvol(t) − RV_fwd30(t), RV_fwd30 = annualisierte realisierte Vol der Minuten-Renditen t+1..t+30 (UTC-Tage) desselben Underlyings, gleiche Annualisierung/Day-Count 24/7 auf BEIDEN Seiten (Konventions-Mismatch ist eine der realen Artefaktquellen — im Treiber EINE gemeinsame Konstante).
+- **Gate (S) (woertlich, bindend):** WEITER-S, wenn in BEIDEN Fenstern: mittlere Praemie **>= 3 Vol-Punkte** (C-33-Schwelle uebernommen) UND Block-Bootstrap-p <= 0,05 (Blocklaenge 30 Tage — die Ziele ueberlappen 30-taegig, kuerzere Bloecke waeren anti-konservativ; ~3 unabhaengige Bloecke je Fenster sind als POWER-GRENZE im A-priori benannt) nach BH-FDR alpha=0,10 ueber **F-VRP** (2 Symbole × 2 Fenster = 4 Zellen). Hartes Ein-Fenster-Kriterium je Symbol. Kein Graubereich. Ein WEITER-S ist maximal „kapitalfrei WEITER; C-33-Uhr laeuft unabhaengig" — NIEMALS eine Handels-Freigabe.
+- **Befund (K) (META, kein WEITER/DROP):** Episoden-Anteil, mittlere Episodenlaenge, Klumpungs-Test (Runs-Test gegen Unabhaengigkeit) je Symbol; Vorhersagbarkeits-Sonde als Rang-IC der drei registrierten Praediktoren gegen den Episoden-Indikator — ausdruecklich NICHT urteilstragend, dient der Entscheidung, ob eine Kaeufer-Hypothese H-27 je registriert wird.
+- **Struktureller Nulleffekt (DEC-31/33-Pflichtzeile):** (IV − RV) ist eine Skalar-Differenz, Geometrie beidseitig identisch. Die realen Artefaktquellen sind benannt und kontrolliert: Jensen-Verzerrung (RV-Schaetzer aus endlicher Stichprobe ist als Vol-Schaetzer nach unten verzerrt → erzeugt Schein-Praemie bei echter Null) — quantifiziert im Kontrollpaar; Horizont-Match exakt 30/30; Day-Count identisch; Underlying identisch (deribit/deribit).
+- **DEC-39-Kontrollpaar (bindend, Fixtures gepinnt):** (POS) synthetischer Pfad mit injizierter 3-Punkte-Praemie → Pipeline muss sie zurueckgewinnen; (NULL) Pfad mit IV ≡ wahrer Forward-Vol durch DIESELBE Pipeline → Ergebnis muss von 0 ununterscheidbar sein; die dabei gemessene Jensen-Restverzerrung wird als Korrektur-Konstante im Report ausgewiesen. Ohne bestandenes Kontrollpaar kein Verdikt.
+- **A-priori (ehrlich):** (S): PASS erwartet (~70/30) — die VRP ist literaturbekannt und breit dokumentiert; genau deshalb ist sie auch breit geerntet, und der spaetere H-26b-Spread-Abzug ist der eigentliche Filter. (K): Episoden existieren sicher (jede Stress-Phase); offen ist NUR die Vorhersagbarkeit — dort ist Skepsis angebracht (GL-024-Lehre: unsere RV-Prognose schlaegt keine Gratis-Baseline).
+- **Power-Grenze (offen benannt):** 90-Tage-Fenster mit 30-Tage-Blocklaenge ≈ 3 unabhaengige Bloecke — das Gate ist bewusst konservativ schwach; ein knappes Scheitern an p waere KEIN starker Gegenbeweis, ein Bestehen trotz der Schwaeche umso staerker. Die Fenster wachsen mit jedem Kalendermonat; eine spaetere H-26-Wiederholung auf laengeren Fenstern waere eine NEUE Registrierung.
+- **KAPITALFREIHEIT (verbindlich):** reine Messung; H-26b (Tradability, pfadabhaengige dollar-gamma-P&L nach GEMESSENEN Options-Spreads) ist NICHT impliziert und erst nach Options-Spread-Zensus mit reparierter Bybit-Aufzeichnung registrierbar. · **Status:** registriert, **GESPERRT** bis Entsperr-Bedingung erfuellt (~Mitte November 2026).
+
+---
+
 ## Registry-Disziplin (verbindlich, PRD §8)
 
 1. **Pre-Registration (§8.3):** Jede Hypothese, jeder Schwellwert, jedes Fenster wird HIER festgeschrieben, BEVOR der Run startet.

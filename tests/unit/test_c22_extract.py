@@ -214,3 +214,71 @@ def test_no_raw_days_reduce_coverage_only(tmp_path):
     out = tmp_path / "o"
     s = extract_window(base, out, "TSTUSDT", d1, d3)
     assert s["ok"] == 2 and s["no_raw"] == 1
+
+
+# ----------------------------------------------------------------------------
+# WP-4: spread census (DEC-40)
+# ----------------------------------------------------------------------------
+
+def test_spread_extraction_samples_correct_bp(tmp_path):
+    from bybit_edge.research.c22_l2tilt.extract import (
+        extract_spread_window, load_daily_spread)
+    base = tmp_path / "h"
+    d1 = "2026-07-01"
+    ms = _day_ms(d1)
+    # best bid 99.9, best ask 100.1 -> mid 100.0, spread 0.2 -> 20 bp;
+    # a delta later tightens to 99.95/100.05 -> 10 bp
+    _write_day(base, "TSTUSDT", d1, [
+        _snap(ms + 1000, 1, 99.9, 100.1),
+        _delta(ms + 300_000, 2, [["99.95", "1"]], [["100.05", "1"]]),
+    ])
+    out = tmp_path / "o"
+    s = extract_spread_window(base, out, "TSTUSDT", d1, d1)
+    assert s["ok"] == 1 and s["total_seq_breaks"] == 0
+    daily = load_daily_spread(out, "bybit", "TSTUSDT", d1, d1)
+    assert daily["day_idx"].size == 1
+    import pyarrow.parquet as pq
+    part = (out / "spread_1min" / "exchange=bybit" / "symbol=TSTUSDT"
+            / f"date={d1}")
+    t = pq.read_table(part / "spread.parquet").to_pydict()
+    assert t["spread_bp"][0] == pytest.approx(20.0, rel=1e-9)
+    assert t["spread_bp"][-1] == pytest.approx(10.0, rel=1e-9)
+    # the daily median mixes 5 minutes at 20bp and the rest at 10bp
+    assert daily["spread_median_bp"][0] == pytest.approx(10.0, rel=1e-9)
+    assert daily["spread_p90_bp"][0] <= 20.0 + 1e-9
+
+
+def test_spread_store_is_separate_from_frozen_tilt_store(tmp_path):
+    from bybit_edge.research.c22_l2tilt.extract import extract_spread_window
+    base = tmp_path / "h"
+    d1 = "2026-07-01"
+    _write_day(base, "TSTUSDT", d1, [_snap(_day_ms(d1) + 1000, 1, 99.9, 100.1)])
+    out = tmp_path / "o"
+    extract_window(base, out, "TSTUSDT", d1, d1)          # WP-2 tilt store
+    fp_before = tilt_fingerprint(out, "bybit", "TSTUSDT", d1, d1)
+    extract_spread_window(base, out, "TSTUSDT", d1, d1)   # WP-4 spread store
+    fp_after = tilt_fingerprint(out, "bybit", "TSTUSDT", d1, d1)
+    assert fp_before["sha256_values"] == fp_after["sha256_values"], (
+        "the WP-4 pass must never touch the frozen WP-2 tilt store")
+    assert (out / "spread_1min").is_dir() and (out / "tilt_1min").is_dir()
+
+
+def test_spread_extraction_is_deterministic(tmp_path):
+    from bybit_edge.research.c22_l2tilt.extract import (
+        extract_spread_window, load_daily_spread)
+    base = tmp_path / "h"
+    d1, d2 = "2026-07-01", "2026-07-02"
+    _write_day(base, "TSTUSDT", d1, [
+        _snap(_day_ms(d1) + 1000, 1, 99.9, 100.1),
+        _delta(_day_ms(d1) + 400_000, 2, [["99.8", "2"]], []),
+    ])
+    _write_day(base, "TSTUSDT", d2, [
+        _delta(_day_ms(d2) + 60_500, 3, [], [["100.2", "1"]]),
+    ])
+    r1, r2 = tmp_path / "o1", tmp_path / "o2"
+    extract_spread_window(base, r1, "TSTUSDT", d1, d2)
+    extract_spread_window(base, r2, "TSTUSDT", d1, d2)
+    a = load_daily_spread(r1, "bybit", "TSTUSDT", d1, d2)
+    b = load_daily_spread(r2, "bybit", "TSTUSDT", d1, d2)
+    assert np.array_equal(a["spread_median_bp"], b["spread_median_bp"])
+    assert a["day_idx"].size == 2, "day 2 inherits carried state"
