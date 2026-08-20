@@ -1296,3 +1296,37 @@ GL-029 lehrte: was die Registrierung benennt, prueft der Runner vor dem Start. G
 
 ### Programm-Bilanz (nach GL-030)
 Unveraendert gegenueber GL-029; H-23 weiterhin ohne Verdikt, Wiederholung ausstehend. **30 GL-Eintraege, 0 Torpfosten-Verschiebungen, 0 handelbare Kanten.**
+
+---
+
+## GL-031 · 2026-08-20 · H-23 · C-17-Venue-Fingerprint mit Voll-Distanzserie (Welle 7, KAPITALFREI, GPU) — **WEITER (kapitalfrei) — der GL-019-Schwebezustand ist aufgeloest; BEIDE Gates bestanden**
+
+**Quelle:** `state/h23_20260820/c23_venue_full_results.{json,md}` (Lauf 2026-08-20 12:40–14:24 UTC, 6.249 s, rc=0). `verdict_bearing=true` (echtes CUDA, Batch >= 2048, 10.000 Steps, `blocked_reasons=[]`). Registrierte C12-Referenz uebergeben (`c12_payload_present=true`) — der GL-029-Fix greift.
+
+### Resume-Disziplin (Vorbedingung des billigen Laufs) — BEWIESEN
+Alle 105 Trainings resumten aus Checkpoints: die 100 Nulls aus den H-17-Checkpoints, die 5 Haupt-Trainings aus den in Lauf 1 geschriebenen `main_full`-Checkpoints (GL-030-Fix). **Beleg: alle fuenf Fold-Accuracies und p-Werte sind bit-identisch zu Lauf 1** (0,9312/0,9773/0,9531/0,7603/0,8370; Pooled 0,8914). Gesamtkosten des Verdikts nach den zwei Werkzeug-Fehlschlaegen: 104 Minuten, keine neue GPU-Trainingszeit.
+
+### Gate 1 — Mess-Gate (registriert, woertlich aus H-17): **BESTANDEN**
+5/5 Folds mit Balanced-Acc >= 0,60 und FDR-signifikanter Null-Ablehnung (p 0,0476 x4, BNB 0,0952; BH-FDR alpha=0,10 ueber F-VENUE); Pooled 0,8914 >= 0,55. Da die Haupt-Trainings von Lauf 1 stochastisch NEU waren (andere Encoder als GL-019), ist der Befund damit ueber ZWEI unabhaengige Trainings-Kohorten repliziert (GL-019: 0,8944; H-23: 0,8914).
+
+### Gate 2 — Non-Redundanz-Gate (registriert, an GL-019 gescheitert): **ERSTMALS AUSWERTBAR — BESTANDEN**
+
+| Groesse | GL-019 | H-23 |
+|---|---:|---:|
+| Ueberlappungstage (Floor 10) | 2 | **78** |
+| Spearman rho gegen c12-Tages-lambda2 | nicht berechenbar | **−0,414** |
+| Spearman rho gegen c12-IPR(v2) | nicht berechenbar | −0,034 |
+| max \|rho\| (Gate-Statistik, Schwelle 0,6) | — | **0,414 < 0,6** |
+
+`evaluable=true`, `redundant=false`, `passed=true`. **Der Venue-Fingerprint ist NICHT redundant zur H-12-Fragmentierung** — genau die Frage, fuer die das Gate registriert wurde, ist jetzt beantwortet, mit 78 statt 2 Tagen Trennschaerfe.
+
+### URTEIL: **WEITER (kapitalfrei).**
+Beide registrierten Gates auf EINEM verdikt-tragenden Lauf bestanden. Der GL-019-Schwebezustand (Verdikt ausstehend seit 2026-07-29) ist damit aufgeloest; GL-019 bleibt als historischer Eintrag stehen, das Verdikt zur Venue-Fingerprint-Frage traegt ab jetzt GL-031. **Kern-Befund des Programms:** Der Order-Flow traegt eine massiv lernbare, SYMBOL-INVARIANTE Boersen-Signatur (auf nie gesehenen Symbolen bis 97,7 % Balanced-Accuracy), und diese Signatur ist ein EIGENSTAENDIGES Strukturmerkmal — nicht die von H-12 gemessene (und dort gedroppte) Fragmentierung unter anderem Namen.
+
+### Ehrliche Randnotizen
+1. **rho_lambda2 = −0,414 ist kein Rauschen** (bei n=78 ist der Rauschboden ~0,11): die Venue-Distanz ANTI-korreliert moderat mit der c12-Fragmentierungs-lambda2. Deskriptive Lesart: an Tagen, an denen die Boersen im PREIS staerker gekoppelt sind, unterscheiden sie sich im FLOW-Verhalten staerker — ein interessanter Nebenbefund, aber weit unter der 0,6-Redundanzschwelle und hier ausdruecklich nicht urteilstragend.
+2. **Die vorregistrierte Diagnose bestaetigt die GL-019-Diagnose:** auf den urspruenglichen Test-Tagen allein bleibt das Gate mit n=2 nicht auswertbar — der Voll-Serien-Umbau war notwendig, nicht kosmetisch.
+3. **Registrierte Grenzen bleiben:** WEITER ist eine Mess-Existenz. H-17b (Tradability) ist NICHT impliziert; die Registry-Klausel gilt unveraendert. Was eine Handelsrelevanz der Venue-Signatur waere, ist vollstaendig offen und wuerde eine neue, kapital-behaftete Registrierung mit Friktions-Konfrontation verlangen.
+
+### Programm-Bilanz (nach GL-031)
+Welle 7 abgeschlossen: H-24 DROP (GL-028) · **H-23 WEITER kapitalfrei (GL-031)**. Offen im Programm: H-21 (gesperrt bis 2026-12-27) · SWEEP-PRE (unregistriert, braucht WP-3). Mess-Existenzen kapitalfrei: H-04, H-05b, H-11 (mit Etiketten), H-15, H-16, **H-23/Venue-Fingerprint**. **31 GL-Eintraege, 0 Torpfosten-Verschiebungen, 0 handelbare Kanten.**
