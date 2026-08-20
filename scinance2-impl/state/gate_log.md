@@ -1268,3 +1268,31 @@ Ein Runner, dessen Lauf ohne einen optionalen Parameter **strukturell nicht adju
 
 ### Programm-Bilanz (nach GL-029)
 Welle 7: H-24 DROP (GL-028) · **H-23 Lauf 1 ohne Verdikt (GL-029), Wiederholung ausstehend**. H-21 gesperrt bis 2026-12-27. **29 GL-Eintraege, 0 Torpfosten-Verschiebungen, 0 handelbare Kanten.**
+
+---
+
+## GL-030 · 2026-08-20 · H-23 · Lauf 2 — **KEIN VERDIKT (Absturz beim Checkpoint-Load: Implementierungsfehler des Orchestrators)**
+
+**Quelle:** Runner-Lauf `h23_20260820_083008`, 5.400 s, rc=1. Abbruch mit `KeyError: 'main_full'` in `_load_training_checkpoint`.
+
+### Ursache — mein Fehler, zweiter Anlauf
+Der H-23-Pfad schreibt die Haupt-Checkpoints unter einer NEUEN Kennung `main_full` (registrierter Nachtrag (2): so bleiben die 100 Null-Checkpoints resumierbar, waehrend nur die Haupt-Trainings invalidiert werden). Der SCHREIB-Pfad kannte die neue Kennung, die Tabelle der Pflicht-Schluessel `_REQUIRED_RESULT_KEYS` aber nicht — sie hatte nur `main` und `null`. Lauf 1 schrieb die `main_full`-Checkpoints also erfolgreich; Lauf 2 stuerzte beim ERSTEN Versuch ab, sie zu lesen.
+
+**Warum die Tests das nicht gefangen haben:** Die vier H-23-Tests aus dem Bau deckten den Rechenpfad ab, aber KEINER benutzte `ckpt_dir`. Der Checkpoint-Round-Trip — schreiben, dann lesen — war schlicht ungetestet. Das ist die eigentliche Luecke, nicht der KeyError.
+
+**Kosten:** 90 Minuten Panel-Bau (196 Mio. + 221 Mio. Trades je Symbol ueber 100 Tage), dann sofortiger Absturz. Keine GPU-Trainingszeit verloren — die Haupt-Checkpoints aus Lauf 1 sind intakt und vollstaendig (inklusive `emb_holdout`).
+
+### Behebung (umgesetzt)
+1. `main_full` in `_REQUIRED_RESULT_KEYS` eingetragen — mit `emb_holdout` als Pflichtschluessel, damit ein Checkpoint ohne die Voll-Embedding-Matrix (er koennte die Voll-Distanzserie nicht bedienen) verworfen und neu trainiert statt uebernommen wird.
+2. **Eine unbekannte Kennung wirft jetzt einen sprechenden `ValueError`** statt eines nackten `KeyError` tief im Loader. Eine neue Kennung ohne Tabelleneintrag wuerde sonst die Vollstaendigkeitspruefung still ueberspringen — der gefaehrlichere Fall.
+3. Eigene Laengenpruefung fuer die Holdout-Matrix (`expected_n_holdout`); die bestehende `n_test`-Pruefung passt darauf nicht.
+4. **Drei neue Tests** schliessen die Luecke: Checkpoint-Round-Trip auf dem H-23-Pfad (schreiben, dann resumen, Ergebnis identisch), Verwerfen eines Checkpoints ohne bzw. mit falsch langer `emb_holdout`, und lauter Abbruch bei unbekannter Kennung. 37 c17-Tests gruen.
+
+### Bestaetigt: der GL-029-Fix greift
+Der Runner uebergibt die registrierte C12-Redundanz-Referenz jetzt korrekt (`state/wave4_20260726/c12_frag_results.json` steht im Lauf-Report). Der Bedienfehler aus GL-029 ist erledigt; Lauf 2 scheiterte an einer anderen, neuen Stelle.
+
+### Prozess-Lehre (Ergaenzung zu GL-029)
+GL-029 lehrte: was die Registrierung benennt, prueft der Runner vor dem Start. GL-030 ergaenzt die Code-Seite: **wer einen neuen Checkpoint-Typ einfuehrt, testet den ROUND-TRIP, nicht nur den Rechenpfad.** Schreiben und Lesen sind zwei Pfade; ein Test, der nur ohne Checkpoints laeuft, deckt genau die Haelfte ab. Zwei aufeinanderfolgende Laeufe haben denselben Verdikt-Zustand (kein Verdikt) aus zwei verschiedenen, je banalen Gruenden erzeugt — beide auf der Werkzeug-, keiner auf der Methodenseite.
+
+### Programm-Bilanz (nach GL-030)
+Unveraendert gegenueber GL-029; H-23 weiterhin ohne Verdikt, Wiederholung ausstehend. **30 GL-Eintraege, 0 Torpfosten-Verschiebungen, 0 handelbare Kanten.**

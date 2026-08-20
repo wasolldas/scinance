@@ -1160,3 +1160,75 @@ def test_h23_test_day_diagnostic_is_reported_and_not_judgment_bearing() -> None:
     base = run(nodes, n_perm=1, seed=5, cuda_used=False, torch_available=False)
     assert base["redundancy_test_days_only"] is None, (
         "the diagnostic exists only on the H-23 path")
+
+
+def test_h23_checkpoint_roundtrip_resumes_and_stays_identical(tmp_path) -> None:
+    """GL-030: the gap that cost a GPU night.
+
+    The H-23 path writes main checkpoints under a NEW kind ("main_full").
+    A run that only ever writes them is not enough — the LOAD path must
+    accept them and reproduce the run exactly. This exercises write THEN
+    read, which is precisely what the first H-23 re-run crashed on.
+    """
+    nodes = _small_synthetic_nodes(SYMBOLS5, VENUES2, n_days=26, seed=775)
+    ck = tmp_path / "ck"
+    kw = dict(n_perm=1, seed=11, cuda_used=False, torch_available=False,
+              full_panel_distance=True, hypothesis_id="H-23")
+    first = run(nodes, ckpt_dir=ck, **kw)
+    written = sorted(p.name for p in ck.rglob("*.json"))
+    assert any(n.startswith("main_full") for n in written), written
+
+    second = run(nodes, ckpt_dir=ck, **kw)   # must RESUME, not crash
+    assert second["pooled_balanced_accuracy"] == first["pooled_balanced_accuracy"]
+    assert (second["embedding_distance"]["daily"]
+            == first["embedding_distance"]["daily"])
+    for a, b in zip(first["folds"], second["folds"]):
+        assert a["balanced_accuracy"] == b["balanced_accuracy"]
+        assert a["p_value"] == b["p_value"]
+
+
+def test_h23_checkpoint_without_holdout_matrix_is_rejected(tmp_path) -> None:
+    """A main checkpoint lacking emb_holdout could not serve the full-panel
+    series — it must be retrained, never adopted."""
+    from bybit_edge.research.c17_venue.driver import _load_training_checkpoint
+
+    path = tmp_path / "c.json"
+    fp = {"x": 1}
+    task = {"fold_symbol": "BTCUSDT", "fold_index": 0, "kind": "main_full",
+            "index": 0, "encoder_seed": 1, "probe_seed": 2}
+    path.write_text(json.dumps({
+        "fingerprint": fp, "task": task,
+        "result": {"balanced_accuracy": 0.9, "fit_info": {},
+                   "y_pred": [0, 1], "emb_test": [[0.0], [1.0]]},
+    }), encoding="utf-8")
+    assert _load_training_checkpoint(path, fingerprint=fp, task=task) is None
+
+    path.write_text(json.dumps({
+        "fingerprint": fp, "task": task,
+        "result": {"balanced_accuracy": 0.9, "fit_info": {},
+                   "y_pred": [0, 1], "emb_test": [[0.0], [1.0]],
+                   "emb_holdout": [[0.0], [1.0], [2.0]]},
+    }), encoding="utf-8")
+    assert _load_training_checkpoint(
+        path, fingerprint=fp, task=task, expected_n_test=2,
+        expected_n_holdout=3) is not None
+    # wrong holdout length -> reject
+    assert _load_training_checkpoint(
+        path, fingerprint=fp, task=task, expected_n_test=2,
+        expected_n_holdout=99) is None
+
+
+def test_unknown_checkpoint_kind_fails_loudly(tmp_path) -> None:
+    """A new task kind without a _REQUIRED_RESULT_KEYS entry must raise a
+    clear error instead of a bare KeyError deep inside the loader."""
+    from bybit_edge.research.c17_venue.driver import _load_training_checkpoint
+
+    path = tmp_path / "c.json"
+    fp = {"x": 1}
+    task = {"fold_symbol": "BTCUSDT", "fold_index": 0, "kind": "brand_new",
+            "index": 0, "encoder_seed": 1, "probe_seed": 2}
+    path.write_text(json.dumps({"fingerprint": fp, "task": task,
+                                "result": {"balanced_accuracy": 0.9,
+                                           "fit_info": {}}}), encoding="utf-8")
+    with pytest.raises(ValueError, match="unknown checkpoint task kind"):
+        _load_training_checkpoint(path, fingerprint=fp, task=task)

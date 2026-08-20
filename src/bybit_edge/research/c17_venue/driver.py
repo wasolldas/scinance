@@ -429,6 +429,11 @@ def _write_training_checkpoint(
 #: checkpoints alone.
 _REQUIRED_RESULT_KEYS = {
     "main": ("balanced_accuracy", "fit_info", "y_pred", "emb_test"),
+    # H-23 full-panel main training: same payload PLUS the held-out symbol's
+    # complete embedding matrix. A checkpoint missing it must be retrained,
+    # never adopted (it could not serve the full-panel distance series).
+    "main_full": ("balanced_accuracy", "fit_info", "y_pred", "emb_test",
+                  "emb_holdout"),
     "null": ("balanced_accuracy", "fit_info"),
 }
 
@@ -439,6 +444,7 @@ def _load_training_checkpoint(
     fingerprint: dict[str, Any],
     task: dict[str, Any],
     expected_n_test: int | None = None,
+    expected_n_holdout: int | None = None,
 ) -> dict[str, Any] | None:
     """Load one training checkpoint; ``None`` = retrain, mismatch = ABORT.
 
@@ -487,7 +493,13 @@ def _load_training_checkpoint(
     result = payload["result"]
     if not isinstance(result, dict):
         return None
-    for key in _REQUIRED_RESULT_KEYS[task["kind"]]:
+    kind = task.get("kind")
+    if kind not in _REQUIRED_RESULT_KEYS:
+        raise ValueError(
+            f"unknown checkpoint task kind {kind!r} — add it to "
+            "_REQUIRED_RESULT_KEYS before using it (a new kind without an "
+            "entry would silently skip the completeness check)")
+    for key in _REQUIRED_RESULT_KEYS[kind]:
         if key not in result:
             return None
     acc = result.get("balanced_accuracy")
@@ -501,6 +513,10 @@ def _load_training_checkpoint(
         if not isinstance(y_pred, list) or len(y_pred) != expected_n_test:
             return None
         if not isinstance(emb, list) or len(emb) != expected_n_test:
+            return None
+    if expected_n_holdout is not None:
+        emb_ho = result.get("emb_holdout")
+        if not isinstance(emb_ho, list) or len(emb_ho) != expected_n_holdout:
             return None
     return result
 
@@ -613,7 +629,8 @@ def run_fold(
         main_path = _training_ckpt_path(ckpt, fold.held_out_symbol, main_kind, 0)
         cached_main = _load_training_checkpoint(
             main_path, fingerprint=fingerprint, task=main_task,
-            expected_n_test=int(te.size))
+            expected_n_test=int(te.size),
+            expected_n_holdout=int(ho.size) if full_panel_distance else None)
     if cached_main is not None:
         acc = float(cached_main["balanced_accuracy"])
         fit_info = cached_main["fit_info"]
