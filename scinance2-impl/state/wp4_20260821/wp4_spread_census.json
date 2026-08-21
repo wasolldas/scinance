@@ -1,0 +1,77 @@
+{
+  "windows": [
+    {
+      "symbol": "BTCUSDT",
+      "window": "RECENT",
+      "range": [
+        "2026-06-22",
+        "2026-08-15"
+      ],
+      "exchange": "bybit",
+      "stream": "orderbook",
+      "days_in_range": 55,
+      "ok": 38,
+      "discarded": 2,
+      "no_raw": 15,
+      "total_seq_breaks": 129,
+      "n_ok_days": 38,
+      "spread_bp_median_of_daily_medians": 0.015690608108557137,
+      "spread_bp_p10": 0.015533074401314146,
+      "spread_bp_p90": 0.015727737962447204,
+      "half_spread_bp": 0.007845304054278569,
+      "fee_maker_bp_per_leg": 2.0,
+      "fee_taker_bp_per_leg": 5.5,
+      "half_spread_covers_maker_leg": false,
+      "seconds": 1037.7
+    },
+    {
+      "symbol": "ETHUSDT",
+      "window": "RECENT",
+      "range": [
+        "2026-06-19",
+        "2026-08-15"
+      ],
+      "exchange": "bybit",
+      "stream": "orderbook",
+      "days_in_range": 58,
+      "ok": 39,
+      "discarded": 4,
+      "no_raw": 15,
+      "total_seq_breaks": 168,
+      "n_ok_days": 39,
+      "spread_bp_median_of_daily_medians": 0.05365310584411576,
+      "spread_bp_p10": 0.05337047918679883,
+      "spread_bp_p90": 0.05377836001824664,
+      "half_spread_bp": 0.02682655292205788,
+      "fee_maker_bp_per_leg": 2.0,
+      "fee_taker_bp_per_leg": 5.5,
+      "half_spread_covers_maker_leg": false,
+      "seconds": 674.1
+    },
+    {
+      "symbol": "BTCUSDT",
+      "window": "HIST-2024H1",
+      "range": [
+        "2024-01-01",
+        "2024-03-31"
+      ],
+      "exchange": "bybit",
+      "stream": "orderbook",
+      "days_in_range": 91,
+      "ok": 90,
+      "discarded": 0,
+      "no_raw": 1,
+      "total_seq_breaks": 10,
+      "n_ok_days": 90,
+      "spread_bp_median_of_daily_medians": 0.019563865383604336,
+      "spread_bp_p10": 0.019427409423949125,
+      "spread_bp_p90": 0.01994515343852346,
+      "half_spread_bp": 0.009781932691802168,
+      "fee_maker_bp_per_leg": 2.0,
+      "fee_taker_bp_per_leg": 5.5,
+      "half_spread_covers_maker_leg": false,
+      "seconds": 3457.2
+    }
+  ],
+  "fee_source": "bybit_edge.config FEE_MAKER/FEE_TAKER (kanonische Repo-Konstanten; das reale Konto kann abweichen \u2014 dann Zahl HIER eintragen und neu bewerten, nie still ersetzen)"
+}

@@ -518,3 +518,14 @@
 - **Spur 4 (kalendarisch): H-21 LIQ-TAG** entsperrt 2026-12-27; H-26 ~Mitte November — Dezember wird der naechste Mess-Block.
 - **Nicht beschlossen:** keine H-25-, keine H-26b-, keine C-33-Freigabe — alle kapitalnahen Folgeentscheidungen erst nach den jeweiligen Mess-Ergebnissen und mit dem Nutzer.
 - **Rueckbauweg:** WP-4 ist ein additiver Store + Skripte; H-26 ist registriert-gesperrt (Streichung vor dem Lauf waere ein neuer DEC).
+
+---
+
+### DEC-42 · WP-4-Zensus entscheidet: Maker-Spread-Capture ist tot; H-25 wird nicht registriert
+- **Befund (Lauf 2026-08-21, 86 min, rc=0):** Der Top-of-Book-Spread auf Bybit-Perp-Majors betraegt **exakt einen Tick** und ist praktisch konstant (Dispersion p90−p10 = 0,8–2,7 % des Medians): BTC 0,0157 bp (RECENT) bzw. 0,0196 bp (2024Q1), ETH 0,0537 bp. Rueckrechnung Tick/Spread liefert plausible Preisniveaus (~63.700 / ~51.100 / ~3.728) — die Messung sitzt auf dem HARTEN BODEN, unter den nicht gemessen werden kann.
+- **Entscheidung (vorab fixierte Regel aus DEC-40/41 hat gefeuert): H-25 wird NICHT registriert.** Der halbe Spread (0,008–0,027 bp) liegt um Faktor 75–255 unter dem Maker-Roundtrip (4,0 bp). Robust gegen die Gebuehren-Annahme: bei Gebuehr null bleibt der Bruttoertrag oekonomisch vernachlaessigbar; bei negativer Gebuehr waere der Ertrag die Rebate statt des Spreads — eine andere Strategie (Rebate-Farming) und eine ZUGANGS-, keine Forschungsfrage. Damit ist auch das Rebate-Artefakt aus dem Entwurf (Code-Kommentar −2,5 bp vs. kanonische Konstante FEE_MAKER = +2 bp) endgueltig gegenstandslos.
+- **Kollateral erledigt:** Die Entwurfs-Idee „Spread in Stress verbreitern" (H-16-Envelope-Regel) ist gegenstandslos — man kann nicht innerhalb eines Ticks quotieren, und wer ausserhalb quotet, steht hinter der gesamten Warteschlange.
+- **Verallgemeinerbarer Programm-Befund (ab sofort zitierfaehige Konstante):** Jede Strategie-Idee, deren Ertragsquelle „den Spread einfangen" ist, ist auf Bybit-Perp-Majors **a priori tot** und braucht keine eigene Untersuchung. Handelbare Ertragsquellen muessen dort **Preisbewegung** sein. Das spart kuenftigen Wellen die gesamte Market-Making-Familie.
+- **Bleibender Ertrag des WP:** ein deterministischer, wiederverwendbarer `spread_1min`-Store (WP-2-Store per Test nachweislich unberuehrt). Fragen nach Buch-Enge, Spread-Regimen oder Execution-Timing sind damit in Minuten beantwortbar.
+- **Konsequenz fuer den Vorgehensplan (DEC-41):** Spur 1 ist abgeschlossen (negativ, sauber). Spur 2 (H-26, gesperrt bis ~Mitte November) ist damit der EINZIGE verbliebene aktive Strategie-Pfad; Spur 3 (Recorder-Reparatur) gewinnt an Prioritaet, weil sie die Vorbedingung fuer die Bybit-Options-Seite von H-26b/C-33 ist.
+- **Rueckbauweg:** reine Dokumentation; der Store bleibt als Werkzeug bestehen.

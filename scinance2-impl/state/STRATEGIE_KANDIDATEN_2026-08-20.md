@@ -72,7 +72,18 @@ bindend (fruehestens Mitte 2027 erfuellbar). Danach **H-26b** (Tradability)
 erst nach Options-Spread-Zensus mit reparierter Aufzeichnung. §8.4:
 Zwei-Fenster-PASS ohne Walk-Forward (>=L2) zaehlt nicht als bestanden.
 
-## Kandidat 2 (Rang 2) · MAKER-SPREAD-CAPTURE auf Perpetuals — reduziert auf die Vorfrage
+## Kandidat 2 — **TOT (WP-4-Zensus, 2026-08-21)**
+
+> **NACHTRAG 2026-08-21:** Die Vorfrage ist beantwortet und der Kandidat ist
+> erledigt. Gemessener Spread auf Bybit-Perp-Majors: **exakt ein Tick,
+> praktisch konstant** — BTC 0,016–0,020 bp, ETH 0,054 bp. Der halbe Spread
+> (0,008–0,027 bp) liegt um **Faktor 75–255 unter** dem Maker-Roundtrip von
+> 4,0 bp. Auch bei Gebuehr null bleibt der Bruttoertrag vernachlaessigbar.
+> **H-25 wird nicht registriert.** Verallgemeinerbar: jede Strategie, deren
+> Ertragsquelle „Spread einfangen" ist, ist auf diesen Maerkten a priori tot.
+> Volltext: `WP4_SPREAD_ZENSUS_BEFUND_2026-08-21.md`.
+
+### (historisch) Der urspruengliche Entwurf und seine Reduktion auf die Vorfrage
 
 Der urspruengliche Entwurf (passives beidseitiges Quoting, Envelope-
 gesteuerte Spread-Breite, 3,5-σ-Kill) hatte vier je fuer sich toedliche
