@@ -200,3 +200,40 @@ Jeder kuenftige Options-Snapshot ist damit in Sekunden nach DTE, abs(Delta),
 Verfall, Liquiditaet und Gebuehren-Break-even auswertbar, ohne numpy und
 ohne Netzzugang. Die beiden Fixture-Ketten („eng" und „weit") erfuellen die
 DEC-39-Pflicht in beide Richtungen.
+
+
+---
+
+## NACHTRAG 2026-08-24: die Gebuehr ist gemessen (DEC-45)
+
+Abschnitt 5 nannte das Gebuehrenschema als die eine ungepruefte, bindende
+Groesse. Sie ist jetzt abgelesen: **Options Maker 0,0200 %, Taker 0,0300 %**
+des Index (kein Rabatt aktiv auf der Options-Karte). Als Repo-Konstanten
+`FEE_OPTION_{MAKER,TAKER}_OF_INDEX` eingetragen, getrennt von den
+Perp-Konstanten.
+
+Gegen die registrierte Schwelle von 3 Vol-Punkten, Kosten inklusive des in
+Abschnitt 3 gemessenen Quote-Spreads:
+
+| Szenario | Fills | BTC | ETH | Rest BTC | Rest ETH |
+|---|---:|---:|---:|---:|---:|
+| Taker rein + Taker raus | 4 | 2,55 (85 %) | 2,87 (96 %) | 0,45 | 0,13 |
+| Taker rein, halten bis Verfall | 2 | 1,28 (43 %) | 1,44 (48 %) | 1,72 | 1,56 |
+| Maker rein + Maker raus | 4 | 1,51 (50 %) | 1,57 (52 %) | 1,49 | 1,43 |
+| **Maker rein, halten bis Verfall** | 2 | **0,76 (25 %)** | **0,78 (26 %)** | 2,24 | 2,22 |
+
+Noetige Praemie fuer 1,5 Vol-Punkte netto: 4,05 / 4,37 (Taker-Round-Trip)
+gegen **2,26 / 2,28** (passiv gehalten).
+
+**Lesart:** Der aktiv gehandelte Round-Trip ist tot. Der Kandidat lebt in
+genau einer Form — passiver Einstieg, Halten bis Verfall. Diese
+Beschraenkung ist mit DEC-45 vorab festgeschrieben, vor der Messung der
+tatsaechlichen Praemie.
+
+**Drei Einschraenkungen, die mitzulesen sind:** (1) die Vol-Punkt-Rechnung
+ist eine lineare Vega-Naeherung und damit ein Screen, kein P&L-Modell — die
+Auszahlung eines gehaltenen Strangles ist pfadabhaengige Gamma-P&L; (2) die
+Delivery-Gebuehr bei Verfall ist nicht verifiziert und trifft ausgerechnet
+das beste Szenario, das damit eine Obergrenze der Guete ist; (3) 3
+Vol-Punkte sind die Gate-Schwelle, nicht die gemessene Praemie — die ist bis
+~Mitte November 2026 gesperrt.

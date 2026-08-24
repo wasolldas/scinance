@@ -129,6 +129,29 @@ FEE_TAKER: Final[float] = 0.00055  # 0.055%
 FEE_MAKER: Final[float] = 0.0002  # 0.02%
 SLIPPAGE_DEFAULT_BPS: Final[float] = 2.0  # 2 bps
 
+# --- OPTIONEN: eigene Groesse, NICHT mit den Perp-Konstanten mischen -------
+# Bybit berechnet Options-Gebuehren als Bruchteil des INDEXPREISES, nicht des
+# Positions-Notionals. Ein direkter Vergleich mit FEE_TAKER/FEE_MAKER oben ist
+# deshalb bedeutungslos.
+#
+# Quelle: Konto-Gebuehrenseite des Nutzers, abgelesen 2026-08-24 (WP-5/DEC-45).
+# Auf der Options-Karte war KEIN Rabatt-Schalter aktiv, d. h. dies sind die
+# effektiven Saetze.
+FEE_OPTION_TAKER_OF_INDEX: Final[float] = 0.0003  # 0.0300% = 3,0 bp des Index
+FEE_OPTION_MAKER_OF_INDEX: Final[float] = 0.0002  # 0.0200% = 2,0 bp des Index
+
+# Umrechnung in Vol-Punkte (WP-5, per Unit-Test gepinnt, skalen-invariant):
+#     Kosten [Vol-Pkt] = n_Fills * Gebuehr [bp Index] / VEGA_OVER_INDEX_BP
+# Gemessen im Strangle-Bein-Band (7-14 DTE, abs(Delta) 0,15-0,30) am
+# Snapshot 2026-08-24: BTC 5,282 / ETH 5,100.
+VEGA_OVER_INDEX_BP_BTC: Final[float] = 5.282
+VEGA_OVER_INDEX_BP_ETH: Final[float] = 5.100
+
+# NICHT verifiziert und deshalb bewusst KEINE Konstante: die Delivery-/
+# Exercise-Gebuehr bei Verfall und eine etwaige Deckelung als Anteil der
+# Praemie. Beide treffen genau die Halten-bis-Verfall-Variante. Wer sie
+# braucht, misst sie erst.
+
 # ═══════════════════════════════════════════════════════════════════
 # PERSISTENCE (PRD Abschnitt 8, Phase 0)
 # ═══════════════════════════════════════════════════════════════════

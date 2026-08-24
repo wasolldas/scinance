@@ -556,3 +556,26 @@
 - **Reihenfolge der offenen Punkte (verbindlich):** (1) Options-Gebuehrenschema verifizieren und als eigene, von den Perp-Konstanten getrennte Repo-Konstante eintragen; (2) Harvester-Auftrag ausloesen; (3) **erst danach** H-26b registrieren — vorher wuerde die Schwelle nach dem Sehen der Zahl gesetzt.
 - **Bleibender Ertrag:** `src/bybit_edge/research/wp5_optchain/census.py`, `scripts/wp5_option_chain_census.py`, 17 Unit-Tests, beide Snapshots + Zensus-JSON mit SHA-256 im State gepinnt. Zwei Fixture-Ketten („eng" und „weit") erfuellen die DEC-39-Pflicht in beide Richtungen. Kein numpy, kein Netzzugang noetig.
 - **Rueckbauweg:** additives Modul + Skript + Tests, kein bestehender Pfad beruehrt; Loeschen genuegt.
+
+---
+
+### DEC-45 · Options-Gebuehr verifiziert (2/3 bp des Index): die Kante ueberlebt, aber nur passiv und gehalten — Round-Trip-Taker ist tot
+- **Anlass:** Der Nutzer hat die Gebuehrenseite seines Kontos abgelesen (Screenshot 2026-08-24). **Options: Maker 0,0200 %, Taker 0,0300 %** — also **2,0 bzw. 3,0 bp des Index**. Auf der Options-Karte war kein Rabatt-Schalter aktiv (der MNT-Rabatt lief auf Futures, nicht auf Optionen), d. h. das sind die effektiven Saetze. Damit ist die in DEC-44 als bindend und ungeprueft benannte Groesse gemessen.
+- **Als Repo-Konstanten eingetragen** (`config.py`, ausdruecklich getrennt von den Perp-Konstanten, weil Bybit Options-Gebuehren auf den **Index** und nicht auf das Notional rechnet): `FEE_OPTION_TAKER_OF_INDEX = 0.0003`, `FEE_OPTION_MAKER_OF_INDEX = 0.0002`, dazu die WP-5-Umrechnung `VEGA_OVER_INDEX_BP_BTC = 5.282` / `_ETH = 5.100`.
+- **Ergebnis gegen die registrierte H-26/C-33-Schwelle von 3 Vol-Punkten** (Kosten inkl. gemessenem Quote-Spread):
+
+  | Szenario | BTC | ETH |
+  |---|---:|---:|
+  | Taker rein + Taker raus (4 Fills) | 2,55 Vol-Pkt (**85 %**) | 2,87 (**96 %**) |
+  | Taker rein, halten bis Verfall (2 Fills) | 1,28 (43 %) | 1,44 (48 %) |
+  | Maker rein + Maker raus (4 Fills) | 1,51 (50 %) | 1,57 (52 %) |
+  | **Maker rein, halten bis Verfall (2 Fills)** | **0,76 (25 %)** | **0,78 (26 %)** |
+
+- **Entscheidung 1: Die aktiv gehandelte Round-Trip-Variante ist tot** und wird nicht weiter entworfen. Bei einer Praemie an der registrierten Schwelle frisst sie 85 % (BTC) bzw. 96 % (ETH) der Kante; bei ETH bleiben 0,13 Vol-Punkte, was innerhalb jeder Modellunsicherheit liegt. Das ist keine knappe Sache, ueber die man verhandelt.
+- **Entscheidung 2: Der Kandidat lebt, aber mit einer VORAB fixierten Ausfuehrungs-Beschraenkung.** Ein kuenftiges H-26b wird nur in der Form **passiver Einstieg (Maker) + Halten bis Verfall** registriert. Diese Beschraenkung wird JETZT festgeschrieben, vor der Messung der tatsaechlichen Praemie — nicht spaeter aus dem Ergebnis herausgelesen. Preis dieser Wahl, offen benannt: Maker-Fills sind nicht garantiert (Fill-Risiko ist eine eigene, ungemessene Groesse), und Halten bis Verfall verzichtet auf jedes Ausstiegs-Risikomanagement.
+- **Entscheidung 3: Die Gegenprobe wird ebenfalls vorab fixiert.** Notwendige Praemie fuer 1,5 Vol-Punkte Netto-Kante: **2,26 (BTC) / 2,28 (ETH)** im passiven Halten-Szenario gegen 4,05 / 4,37 im Taker-Round-Trip. Misst H-26 im November eine Praemie unter ~2,3 Vol-Punkten, ist der Kandidat auch passiv tot.
+- **Ehrlichkeits-Vermerk 1 — die Vol-Punkt-Rechnung ist ein SCREEN, kein P&L-Modell.** Sie ist eine lineare Vega-Naeherung. Die Auszahlung eines bis zum Verfall gehaltenen Strangles ist pfadabhaengige Gamma-P&L, nicht linear in der Vola. Die Rechnung beantwortet zuverlaessig „ist das offensichtlich tot?" (Antwort: nein) und ausdruecklich NICHT „ist das profitabel?". Genau dafuer ist H-26b registrierungspflichtig — die Registry benennt dort bereits „pfadabhaengige dollar-gamma-P&L".
+- **Ehrlichkeits-Vermerk 2 — unangenehmes Zusammentreffen.** Die **Delivery-/Exercise-Gebuehr** bei Verfall ist nicht verifiziert und wurde deshalb bewusst NICHT als Konstante eingetragen. Sie trifft exakt das Szenario, das am besten aussieht. Das guenstigste Ergebnis der Tabelle hat damit die groesste ungemessene Kostenkomponente; es ist eine Obergrenze der Guete, kein Ergebnis. Vor einer H-26b-Registrierung ist diese Zahl nachzutragen.
+- **Ehrlichkeits-Vermerk 3 — 3 Vol-Punkte sind die SCHWELLE, nicht die Messung.** Die tatsaechliche Praemie ist unbekannt, H-26 ist bis ~Mitte November 2026 gesperrt. Die ganze Tabelle rechnet am Gate-Boden; faellt die gemessene Praemie hoeher aus, wird das Bild deutlich komfortabler. Eine Absenkung der 3-Punkte-Schwelle, weil die Kostenrechnung knapp ausgeht, findet nicht statt.
+- **Nicht beschlossen:** keine H-26b-Registrierung, keine Kapital-Freigabe, kein Live-Order-Code (Programm-Konstitution).
+- **Rueckbauweg:** zwei Konstanten in `config.py` und Dokumentation; kein Verhalten geaendert.
