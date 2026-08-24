@@ -73,12 +73,28 @@ keine verifizierte Tatsache:
    Linear-Endpunkt abweicht. Das ist der wahrscheinlichste Grund, warum die
    Scinance-Engine nie Daten bekam.
 
-**Ein-Zeilen-Verifikation auf deiner Maschine (public, keine Keys):**
+**Verifikation auf deiner Maschine (PowerShell, public, keine Keys):**
+
+```powershell
+# 1) Wie viele Optionssymbole, und welche Felder hat EIN Ticker?
+$t = (Invoke-RestMethod "https://api.bybit.com/v5/market/tickers?category=option&baseCoin=BTC").result.list
+$t.Count
+$t[0] | Format-List *
+
+# 2) DER KERNTEST: sind bid/ask ueberhaupt im Ticker-Frame?
+$t[0].PSObject.Properties.Name -match 'bid|ask|Iv|delta'
+
+# 3) Instrumentendefinition (Strike, Verfall, Tick-Size) fuer den Symbol-Refresh
+(Invoke-RestMethod "https://api.bybit.com/v5/market/instruments-info?category=option&baseCoin=BTC&limit=2").result.list[0] | Format-List *
 ```
-curl -s "https://api.bybit.com/v5/market/tickers?category=option&baseCoin=BTC" | head -c 2000
-```
-Das zeigt die realen Feldnamen eines Options-Tickers. Analog
-`instruments-info?category=option&baseCoin=BTC` fuer die Symbolliste.
+
+Punkt 2 entscheidet den Aufwand: liefert er `bid1Price`/`ask1Price`, genuegt
+der Ticker-Strom allein. Liefert er sie NICHT, braucht der Harvester
+zusaetzlich ein Orderbook-Topic je Optionssymbol — deutlich mehr Verbindungen,
+mehr Volumen, und das muss VOR dem Bau feststehen.
+
+*(Hinweis: `curl` ist in PowerShell ein Alias fuer `Invoke-WebRequest`, und
+`head` gibt es dort nicht — die Unix-Pipe schlaegt fehl.)*
 
 ## 5. Betriebliche Anforderungen (aus den Programm-Lehren)
 
