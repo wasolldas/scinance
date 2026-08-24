@@ -95,7 +95,14 @@ def load_snapshot(path: str | Path, asof: date) -> list[dict[str, Any]]:
     with or without a UTF-8 BOM (PowerShell ``Out-File`` writes one).
     """
     raw = json.loads(Path(path).read_text(encoding="utf-8-sig"))
-    rows = raw if isinstance(raw, list) else raw["result"]["list"]
+    if isinstance(raw, list):
+        rows = raw
+    elif "result" in raw:
+        rows = raw["result"]["list"]
+    else:
+        # PowerShell's ConvertTo-Json unwraps a one-element array into a bare
+        # object; accept that rather than losing the snapshot.
+        rows = [raw]
     out: list[dict[str, Any]] = []
     for r in rows:
         meta = parse_symbol(r["symbol"])

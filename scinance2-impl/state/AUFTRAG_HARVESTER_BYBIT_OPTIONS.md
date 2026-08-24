@@ -55,6 +55,27 @@ Feld-Subset. Was heute weggelassen wird, fehlt spaeter unwiederbringlich.
 
 ## 4. Zu verifizieren (NICHT aus dem Gedaechtnis uebernehmen)
 
+> **NACHTRAG 2026-08-24 (WP-5): Punkt 2 ist ERLEDIGT — und positiv.**
+> Der Nutzer hat auf seiner Maschine die vollstaendigen REST-Ketten gezogen
+> (BTC 762 / ETH 658 Symbole, gepinnt unter `state/wp5_20260824/`).
+> `/v5/market/tickers?category=option` liefert **bid1Price, bid1Size,
+> ask1Price, ask1Size, bid1Iv, ask1Iv** sowie markPrice, markIv,
+> underlyingPrice, delta/gamma/vega/theta, openInterest, volume24h,
+> turnover24h. Zweiseitig quotiert sind 98 % (BTC) / 97 % (ETH) der Symbole.
+> **Konsequenz fuer den Bauaufwand:** ein zusaetzliches Orderbook-Topic je
+> Optionssymbol ist NICHT noetig — der Ticker-Strom allein genuegt. Das war
+> der teuerste Zweig des Auftrags und er entfaellt.
+> **Einschraenkung, die bestehen bleibt:** verifiziert ist der **REST**-Ticker.
+> Dass der **WS**-Frame dieselben Felder fuehrt, ist damit sehr wahrscheinlich,
+> aber nicht bewiesen. Punkt 1 (Endpunkt/Topic-Format), Punkt 3
+> (Subscribe-Limits) und Punkt 4 (Keepalive — der GL-004-Verdacht) bleiben
+> unveraendert offen und sind vor dem Bau zu pruefen.
+> **Notausgang, falls der WS-Frame doch kein bid/ask fuehrt:** REST-Polling
+> derselben Endpoints in festem Intervall. Zwei Aufrufe (baseCoin=BTC, =ETH)
+> decken die gesamte Kette ab — genau das tut
+> `handoff_local/snap_bybit_optchain.ps1` bereits als Ueberbrueckung.
+
+
 Ich konnte die Bybit-API aus meiner Umgebung nicht abfragen (Proxy blockt).
 Die folgenden Punkte bitte vor dem Bau gegen die **aktuelle** Doku bzw. ein
 Live-Sample pruefen — die Feldnamen oben sind eine begruendete Erwartung,

@@ -227,3 +227,11 @@ def test_module_states_no_verdict():
     for term in ("pnl", "sharpe", "verdikt", "befund", "threshold",
                  "fee_taker", "fee_maker"):
         assert term not in lowered, term
+
+
+def test_single_object_snapshot_is_wrapped(tmp_path):
+    """PowerShell ConvertTo-Json unwraps a one-element array into an object."""
+    p = tmp_path / "one.json"
+    p.write_text(json.dumps(_chain(0.14)[0]), encoding="utf-8")
+    rows = load_snapshot(p, ASOF)
+    assert len(rows) == 1 and rows[0]["quoted_iv"] is True
