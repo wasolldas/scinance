@@ -235,3 +235,45 @@ def test_single_object_snapshot_is_wrapped(tmp_path):
     p.write_text(json.dumps(_chain(0.14)[0]), encoding="utf-8")
     rows = load_snapshot(p, ASOF)
     assert len(rows) == 1 and rows[0]["quoted_iv"] is True
+
+
+# ---------------------------------------------------------------------------
+# Snapshot-Zeitreihe: der DTE-Anker ist die eine stille Fehlerquelle
+# ---------------------------------------------------------------------------
+
+def _load_ts_script():
+    import importlib.util
+    p = (Path(__file__).resolve().parents[2] / "scripts"
+         / "wp5_snap_timeseries.py")
+    spec = importlib.util.spec_from_file_location("wp5_ts", p)
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    return mod
+
+
+def test_snapshot_timestamp_is_parsed():
+    from datetime import datetime, timezone
+    ts = _load_ts_script()
+    got = ts.parse_stamp(Path("BTC_20260824_135629Z.json"))
+    assert got == datetime(2026, 8, 24, 13, 56, 29, tzinfo=timezone.utc)
+    assert ts.parse_stamp(Path("nonsense.json")) is None
+
+
+def test_dte_anchors_to_the_snapshot_not_to_today(tmp_path):
+    """A snapshot taken 100 days ago must still see an 11-DTE front expiry.
+
+    If the anchor were "today", the leg band would silently drift out of the
+    horizon and every historical row would come back empty -- a failure that
+    looks like "no liquidity" instead of like a bug.
+    """
+    ts = _load_ts_script()
+    d = tmp_path / "BTC"
+    d.mkdir()
+    # _chain() expires 2026-09-04; stamp the file 2026-08-24 -> 11 DTE.
+    (d / "BTC_20260824_120000Z.json").write_text(json.dumps(_chain(0.14)),
+                                                 encoding="utf-8")
+    row = ts.snapshot_row(d / "BTC_20260824_120000Z.json", "BTC",
+                          (7, 14), (0.15, 0.30))
+    assert row["n_legs"] == 6, "leg band must be populated at the snapshot date"
+    assert row["leg_w_p50"] == pytest.approx(0.14)
+    assert row["front_dte"] == 11
