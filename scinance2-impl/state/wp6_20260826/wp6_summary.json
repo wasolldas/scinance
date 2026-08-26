@@ -1,0 +1,88 @@
+{
+ "wp": "WP-6",
+ "dates": [
+  "2026-08-15",
+  "2026-08-16",
+  "2026-08-17",
+  "2026-08-18",
+  "2026-08-19",
+  "2026-08-20",
+  "2026-08-21",
+  "2026-08-22",
+  "2026-08-23"
+ ],
+ "horizon_dte": [
+  7,
+  14
+ ],
+ "leg_delta": [
+  0.15,
+  0.3
+ ],
+ "days": {
+  "2026-08-15": {
+   "status": "OK",
+   "minute_rows": 850,
+   "unparseable": 0,
+   "BTC_leg_w_p50_of_minutes": 0.145,
+   "ETH_leg_w_p50_of_minutes": 0.095,
+   "BTC_leg_w_p95_of_minutes": 0.155,
+   "ETH_leg_w_p95_of_minutes": 0.185
+  },
+  "2026-08-16": {
+   "status": "OK",
+   "minute_rows": 2506,
+   "unparseable": 0,
+   "BTC_leg_w_p50_of_minutes": 0.15,
+   "ETH_leg_w_p50_of_minutes": 0.1,
+   "BTC_leg_w_p95_of_minutes": 0.16,
+   "ETH_leg_w_p95_of_minutes": 0.195
+  },
+  "2026-08-17": {
+   "status": "OK",
+   "minute_rows": 1960,
+   "unparseable": 0,
+   "BTC_leg_w_p50_of_minutes": 0.16,
+   "ETH_leg_w_p50_of_minutes": 0.105,
+   "BTC_leg_w_p95_of_minutes": 0.165,
+   "ETH_leg_w_p95_of_minutes": 0.155
+  },
+  "2026-08-18": {
+   "status": "OK",
+   "minute_rows": 2408,
+   "unparseable": 0,
+   "BTC_leg_w_p50_of_minutes": 0.16,
+   "ETH_leg_w_p50_of_minutes": 0.115,
+   "BTC_leg_w_p95_of_minutes": 0.18,
+   "ETH_leg_w_p95_of_minutes": 1.33
+  },
+  "2026-08-19": {
+   "status": "OK",
+   "minute_rows": 2643,
+   "unparseable": 0,
+   "BTC_leg_w_p50_of_minutes": 0.17,
+   "ETH_leg_w_p50_of_minutes": 0.12,
+   "BTC_leg_w_p95_of_minutes": 0.18,
+   "ETH_leg_w_p95_of_minutes": 0.5198
+  },
+  "2026-08-20": {
+   "status": "NO_OPTION_FRAMES",
+   "minute_rows": 0,
+   "unparseable": 0,
+   "BTC_leg_w_p50_of_minutes": null,
+   "ETH_leg_w_p50_of_minutes": null,
+   "BTC_leg_w_p95_of_minutes": null,
+   "ETH_leg_w_p95_of_minutes": null
+  },
+  "2026-08-21": {
+   "status": "UNREADABLE"
+  },
+  "2026-08-22": {
+   "status": "UNREADABLE"
+  },
+  "2026-08-23": {
+   "status": "UNREADABLE"
+  }
+ },
+ "unparseable_frames": 0
+}
