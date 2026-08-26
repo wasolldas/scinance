@@ -144,3 +144,44 @@ mehr Volumen, und das muss VOR dem Bau feststehen.
 **Das ist der Grund, warum dieser Auftrag Prioritaet hat, obwohl er nichts
 sofort misst: er ist der einzige Posten im Programm mit einem
 Zwoelf-Monats-Vorlauf.**
+
+---
+
+## NACHTRAG 2026-08-26 (DEC-46): Auftrag in weiten Teilen GEGENSTANDSLOS — der Kern schrumpft auf Manifest-Hygiene
+
+Rueckmeldung aus dem Harvest-Projekt (config/harvester.yaml, bybit_live.py:29-38,
+dortige DEC-08/DEC-20):
+
+1. **Die Aufzeichnung laeuft bereits.** SRC-04 mit `option_per_strike_tickers:
+   true`, `option_base_coins: [BTC, ETH]`, taeglichem Instrumenten-Refresh;
+   Quartalskontrakte seit dortigem DEC-20. Die Frames liegen im Strom
+   `raw/bybit/tickers/` neben den Perp-Tickern. Abschnitt 3 dieses Auftrags
+   ist damit erledigt; die Aussage in Abschnitt 3, der Bestand enthalte
+   „keinen Optionsinhalt", war falsch (Namens- statt Inhaltspruefung).
+2. **§4 Punkt 4 (Keepalive-Verdacht) ist geloest — Ursache war der ENDPUNKT.**
+   Options-Ticker liegen auf `wss://stream.bybit.com/v5/public/option`;
+   `tickers.<OPTION>` auf der Linear-Verbindung ergibt `handler not found`
+   und null Frames (Live-Smoke 15.06.2026). Der Harvester nutzt eine zweite,
+   unabhaengige Verbindung.
+3. **§4 Punkte 1-3 sind damit ebenfalls hinfaellig** (im Harvester bereits
+   geloest und in Betrieb).
+
+**Was von diesem Auftrag UEBRIG BLEIBT — ein einziger Punkt, dafuer mit
+Frist:**
+
+> **Der Live-Pfad schreibt keine Manifest-Zeilen.** `mark_done` ruft nur der
+> Backfill-Scheduler; harvest_live.py/bybit_live.py fassen
+> `harvest_manifest.sqlite` nicht an. Betroffen sind alle live gesammelten
+> Stroeme, auch `deribit/tickers` und `deribit/dvol`-artige.
+>
+> Gefordert (unveraendert §5, jetzt als Kern): ein **Manifest-Registrar fuer
+> Live-Tage** — DONE erst nach Validierung (Zeilen vorhanden, Tag
+> abgeschlossen, keine stillen Nulltage), und **rueckwirkend fuer den
+> Bestand**. Frist-Kontext: die H-26-Entsperrung (~Mitte November 2026)
+> fragt `done_days` ab. Ohne Registrar feuert sie nie — nicht weil Daten
+> fehlen, sondern weil die Buchhaltung fehlt.
+
+Zusaetzlich zu verifizieren (macht die Scinance-Seite selbst, per
+WP-6-Probe am Bestand): fuehren die gespeicherten WS-Frames
+bid1Price/ask1Price/bid1Iv/ask1Iv? Die REST-Seite ist per WP-5 verifiziert,
+die WS-Seite noch nicht.

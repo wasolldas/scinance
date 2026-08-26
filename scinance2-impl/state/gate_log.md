@@ -169,6 +169,15 @@ Zeitkritisch: C-36 ist Vorbedingung aller recording-abhängigen Welle-2-Pilots; 
 
 ---
 
+> **Nachtrag 2026-08-26 (DEC-46) zum C-36-Eintrag oben:** Die Ursache des
+> `option_tickers`-NO_DATA ist geklaert — falscher WS-ENDPUNKT, nicht das
+> Keepalive. Optionen liegen auf `wss://stream.bybit.com/v5/public/option`;
+> ein Subscribe auf der Linear-Verbindung liefert `handler not found` und
+> null Frames bei „erfolgreichem" Subscribe (Harvester-Live-Smoke 15.06.2026,
+> bybit_live.py:29-38 im Harvest-Projekt). Der Harvester zeichnet die
+> Options-Ticker seit dortigem WP-12/DEC-08 im Strom `raw/bybit/tickers/`
+> auf. Die C-36-Engine bleibt gemaess DEC-43 unrepariert.
+
 ## GL-004 · 2026-06-13 · H-01 · E-15 / CS-03 (S3 Pre-Settlement, iter-5) — **DROP**
 
 **Status:** Geurteilt. Löst GL-002 (PENDING) ab — der konfirmatorische iter-5-Lauf liegt jetzt vor
