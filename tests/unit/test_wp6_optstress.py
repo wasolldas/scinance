@@ -192,4 +192,53 @@ def test_probe_flags_missing_options_and_missing_bidask(tmp_path):
                          "--dates", "2026-08-19", "--probe"],
                         capture_output=True, text=True)
     assert r3.returncode == 0, r3.stdout
-    assert "'ask1Iv': True" in r3.stdout or '"ask1Iv": True' in r3.stdout
+    assert "'ask_iv': 'ask1Iv'" in r3.stdout
+
+
+# ------------------------------------------------- WS-Dialekt (DEC-46-Probe)
+
+def _ws_tick(sym, biv, aiv, delta, under=77_900.0):
+    """Feldnamen exakt wie im Probe-Lauf 2026-08-19 am Bestand gesehen."""
+    return {"symbol": sym, "bidPrice": "600", "askPrice": "605",
+            "bidSize": "2", "askSize": "3",
+            "bidIv": str(biv), "askIv": str(aiv), "delta": str(delta),
+            "markPrice": "602", "markPriceIv": str(0.5 * (biv + aiv)),
+            "underlyingPrice": str(under), "indexPrice": str(under),
+            "lastPrice": "601", "gamma": "0", "vega": "40", "theta": "-1",
+            "openInterest": "10", "totalVolume": "1", "turnover24h": "0",
+            "highPrice24h": "0", "lowPrice24h": "0", "change24h": "0",
+            "predictedDeliveryPrice": "0", "totalTurnover": "0",
+            "volume24h": "0"}
+
+
+def test_ws_dialect_fields_are_read():
+    r = frame_record("BTC-20AUG26-65000-C-USDT",
+                     _ws_tick("BTC-20AUG26-65000-C-USDT", 0.40, 0.42, 0.22),
+                     date(2026, 8, 19))
+    assert r is not None and r["quoted_iv"] is True
+    assert r["iv_width_pts"] == pytest.approx(2.0)
+    assert r["mark_iv"] == pytest.approx(0.41)
+    assert r["dte"] == 1
+
+
+def test_rest_dialect_takes_precedence_when_both_present():
+    t = _ws_tick("BTC-4SEP26-73000-P", 0.10, 0.99, -0.2)
+    t["bid1Iv"], t["ask1Iv"] = "0.40", "0.42"   # REST-Namen zuerst im Alias
+    r = frame_record("BTC-4SEP26-73000-P", t, DAY)
+    assert r["iv_width_pts"] == pytest.approx(2.0)
+
+
+@pytest.mark.filterwarnings("ignore")
+def test_probe_accepts_ws_dialect(tmp_path):
+    pytest.importorskip("duckdb")
+    b = tmp_path / "h"
+    ms = (date(2026, 8, 19) - date(1970, 1, 1)).days * 86_400_000
+    sym = "BTC-20AUG26-65000-C-USDT"
+    _write_day(b, "2026-08-19",
+               [(sym, ms, json.dumps({"topic": f"tickers.{sym}",
+                                      "data": _ws_tick(sym, .4, .42, .22)}))])
+    r = subprocess.run([sys.executable, str(SCRIPT), "--base", str(b),
+                        "--dates", "2026-08-19", "--probe"],
+                       capture_output=True, text=True)
+    assert r.returncode == 0, r.stdout
+    assert "bidIv" in r.stdout

@@ -31,7 +31,8 @@ from typing import Any
 from bybit_edge.research.wp5_optchain.census import parse_symbol, quantile
 
 __all__ = [
-    "OPTION_SYMBOL_RE", "unwrap_payload", "frame_record", "minute_stats",
+    "FIELD_ALIASES", "OPTION_SYMBOL_RE", "unwrap_payload", "frame_record",
+    "minute_stats",
 ]
 
 # BTC-4SEP26-73000-P oder BTC-25AUG26-76500-C-USDT (REST fuehrt das
@@ -77,6 +78,29 @@ def _f(x: Any) -> float | None:
         return None
 
 
+# REST- und WS-Dialekt derselben Groessen. Der WP-6-Probe-Lauf am Bestand
+# (2026-08-19, DEC-46) hat gezeigt: der Harvester speichert die WS-Frames
+# mit bidPrice/askPrice/bidIv/askIv/markPriceIv — dieselben Groessen, andere
+# Namen als der per WP-5 vermessene REST-Ticker.
+FIELD_ALIASES: dict[str, tuple[str, ...]] = {
+    "bid": ("bid1Price", "bidPrice"),
+    "ask": ("ask1Price", "askPrice"),
+    "bid_iv": ("bid1Iv", "bidIv"),
+    "ask_iv": ("ask1Iv", "askIv"),
+    "mark_iv": ("markIv", "markPriceIv"),
+    "bid_size": ("bid1Size", "bidSize"),
+    "ask_size": ("ask1Size", "askSize"),
+}
+
+
+def _get(tick: dict[str, Any], key: str) -> float | None:
+    """Wert unter dem ersten vorhandenen Alias (None statt raten)."""
+    for name in FIELD_ALIASES[key]:
+        if name in tick:
+            return _f(tick[name])
+    return None
+
+
 def frame_record(symbol: str, tick: dict[str, Any],
                  frame_date: date) -> dict[str, Any] | None:
     """Ein Ticker-Frame -> Zensus-Record (None fuer Nicht-Optionen)."""
@@ -85,8 +109,8 @@ def frame_record(symbol: str, tick: dict[str, Any],
     meta = parse_symbol(symbol)
     if meta is None:
         return None
-    bid, ask = _f(tick.get("bid1Price")), _f(tick.get("ask1Price"))
-    biv, aiv = _f(tick.get("bid1Iv")), _f(tick.get("ask1Iv"))
+    bid, ask = _get(tick, "bid"), _get(tick, "ask")
+    biv, aiv = _get(tick, "bid_iv"), _get(tick, "ask_iv")
     two_sided = bool(bid and ask and bid > 0 and ask > 0)
     quoted_iv = bool(two_sided and biv is not None and aiv is not None
                      and biv > 0.0 and aiv > biv)
@@ -94,7 +118,7 @@ def frame_record(symbol: str, tick: dict[str, Any],
         "symbol": symbol,
         "dte": (meta["expiry"] - frame_date).days,
         "delta": _f(tick.get("delta")),
-        "mark_iv": _f(tick.get("markIv")),
+        "mark_iv": _get(tick, "mark_iv"),
         "under": _f(tick.get("underlyingPrice")),
         "two_sided": two_sided,
         "quoted_iv": quoted_iv,

@@ -31,7 +31,8 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
 from bybit_edge.research.wp5_optchain.census import quantile  # noqa: E402
 from bybit_edge.research.wp6_optstress.extract import (  # noqa: E402
-    OPTION_SYMBOL_RE, frame_record, minute_stats, unwrap_payload,
+    FIELD_ALIASES, OPTION_SYMBOL_RE, frame_record, minute_stats,
+    unwrap_payload,
 )
 
 COINS = ("BTC", "ETH")
@@ -90,11 +91,13 @@ def probe(base: Path, days: list[str]) -> int:
             ok = False
             continue
         keys = sorted(tick.keys())
-        need = ["bid1Price", "ask1Price", "bid1Iv", "ask1Iv", "delta"]
-        have = {k: (k in tick) for k in need}
+        have = {k: next((nm for nm in names if nm in tick), None)
+                for k, names in FIELD_ALIASES.items()
+                if k in ("bid", "ask", "bid_iv", "ask_iv")}
+        have["delta"] = "delta" if "delta" in tick else None
         print(f"  Beispiel {s} ({n} Frames): Felder = {keys}")
-        print(f"  KERNTEST bid/ask/iv/delta: {have}")
-        if not all(have.values()):
+        print(f"  KERNTEST bid/ask/iv/delta (gefundener Alias): {have}")
+        if any(v is None for v in have.values()):
             print("  -> PFLICHTFELDER FEHLEN. Zensus waere sinnlos; "
                   "erst die Aufzeichnung pruefen.")
             ok = False
