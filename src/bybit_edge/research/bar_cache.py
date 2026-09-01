@@ -119,20 +119,42 @@ class BarCacheError(RuntimeError):
 # harvest-manifest DONE-day gate (own copy of the DATASET.md §7 query)
 # ----------------------------------------------------------------------------
 
+def resolve_manifest_path(base_dir: Path | str) -> Path:
+    """The CURRENT-TRUTH manifest file under ``<base>/state/``.
+
+    Since the harvester's registrar rework (Scinance DEC-49/50) there are
+    TWO manifest files on the measurement machine:
+
+    * ``harvest_manifest.backup.sqlite`` — regenerated from the thin-client
+      manifest on every offload run; carries the registrar rows.  This is
+      the truth.
+    * ``harvest_manifest.sqlite`` — the frozen Windows-era file WITHOUT any
+      registrar rows.  Querying it shows live-collected streams as absent
+      forever.
+
+    Prefer the backup file whenever it exists; fall back to the legacy name
+    only when it is the sole file (older snapshots, test fixtures).
+    """
+    state = Path(base_dir) / "state"
+    backup = state / "harvest_manifest.backup.sqlite"
+    return backup if backup.is_file() else state / "harvest_manifest.sqlite"
+
+
 def manifest_done_days(
     base_dir: Path | str, exchange: str, stream: str, symbol: str,
     start: str, end: str,
 ) -> set[str]:
-    """DONE days from ``<base>/state/harvest_manifest.sqlite`` (read-only).
+    """DONE days from the harvest manifest (read-only, current truth).
 
     Raises ``BarCacheError`` when the manifest is missing or unreadable —
     the cache NEVER falls back to a folder scan: freezing a day that the
     harvester has not marked DONE could persist a partial day forever.
     """
-    path = Path(base_dir) / "state" / "harvest_manifest.sqlite"
+    path = resolve_manifest_path(base_dir)
     if not path.is_file():
         raise BarCacheError(
-            f"harvest manifest not found: {path} — the bar cache only "
+            f"harvest manifest not found: {path} (also checked the "
+            "harvest_manifest.backup.sqlite variant) — the bar cache only "
             "freezes manifest-DONE days (no folder-scan fallback)")
     try:
         con = sqlite3.connect(f"file:{path.as_posix()}?mode=ro", uri=True)

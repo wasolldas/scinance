@@ -36,6 +36,14 @@ def main(argv: list[str] | None = None) -> int:
     args = p.parse_args(argv)
 
     mpath = Path(args.manifest)
+    # DEC-50: die aktuelle Wahrheit ist harvest_manifest.backup.sqlite
+    # (Offload-Export mit Registrar-Zeilen); die alte harvest_manifest.sqlite
+    # ist die eingefrorene Windows-Aera OHNE Registrar-Zeilen.
+    if args.manifest == str(DEFAULT_MANIFEST):
+        backup = mpath.with_name("harvest_manifest.backup.sqlite")
+        if backup.exists():
+            mpath = backup
+            print(f"HINWEIS: nutze aktuelles Manifest {mpath}")
     if not mpath.exists():
         print(f"FEHLER: Manifest nicht gefunden: {mpath}", file=sys.stderr)
         print("Junction angelegt? -> data\\harvest sollte auf den Harvester-data-Ordner zeigen.",

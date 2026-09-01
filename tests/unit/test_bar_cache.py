@@ -417,3 +417,43 @@ def test_second_oom_is_a_loud_barcache_error_naming_the_day(tmp_path, monkeypatc
         bc.build_range(base, cache, "bybit", "publicTrade", "TSTUSDT",
                        "2024-01-02", "2024-01-02",
                        require_manifest_done=False)
+
+
+def test_manifest_resolver_prefers_backup_over_frozen_legacy(tmp_path):
+    """DEC-50: harvest_manifest.backup.sqlite ist die aktuelle Wahrheit.
+
+    Liegt neben der eingefrorenen Windows-Aera-Datei ein Offload-Export,
+    MUSS der Export gelesen werden — die Legacy-Datei enthaelt keine
+    Registrar-Zeilen und meldet live-gesammelte Stroeme fuer immer als
+    fehlend.
+    """
+    import sqlite3 as _sq
+    from bybit_edge.research.bar_cache import (
+        manifest_done_days, resolve_manifest_path)
+    state = tmp_path / "state"
+    state.mkdir()
+
+    def _mk(name, days):
+        con = _sq.connect(state / name)
+        con.execute("CREATE TABLE partitions "
+                    "(exchange TEXT, stream TEXT, symbol TEXT, date TEXT, "
+                    "status TEXT)")
+        con.executemany(
+            "INSERT INTO partitions VALUES ('deribit','dvol','BTC',?, 'DONE')",
+            [(d,) for d in days])
+        con.commit()
+        con.close()
+
+    _mk("harvest_manifest.sqlite", [])                       # eingefroren, leer
+    _mk("harvest_manifest.backup.sqlite", ["2026-08-01", "2026-08-02"])
+    assert resolve_manifest_path(tmp_path).name == "harvest_manifest.backup.sqlite"
+    got = manifest_done_days(tmp_path, "deribit", "dvol", "BTC",
+                             "2026-08-01", "2026-08-31")
+    assert got == {"2026-08-01", "2026-08-02"}, (
+        "die Registrar-Zeilen aus dem Backup muessen sichtbar sein")
+
+    # Nur die Legacy-Datei vorhanden (alte Snapshots, Fixtures) -> weiter ok
+    (state / "harvest_manifest.backup.sqlite").unlink()
+    assert resolve_manifest_path(tmp_path).name == "harvest_manifest.sqlite"
+    assert manifest_done_days(tmp_path, "deribit", "dvol", "BTC",
+                              "2026-08-01", "2026-08-31") == set()
