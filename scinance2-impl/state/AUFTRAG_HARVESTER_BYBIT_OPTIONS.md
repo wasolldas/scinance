@@ -185,3 +185,15 @@ Zusaetzlich zu verifizieren (macht die Scinance-Seite selbst, per
 WP-6-Probe am Bestand): fuehren die gespeicherten WS-Frames
 bid1Price/ask1Price/bid1Iv/ask1Iv? Die REST-Seite ist per WP-5 verifiziert,
 die WS-Seite noch nicht.
+
+---
+
+## SCHLUSSVERMERK 2026-09-01 (DEC-49): AUFTRAG ABGESCHLOSSEN
+
+Abschlussmeldung des Harvest-Projekts: Ursache des ETH-Ausfalls war ein
+serverseitiger Subscription-Verlust im Settlement-Fenster, den der Refresh
+mangels Ist-Abgleich nicht heilen konnte. Behoben; dazu 30-Minuten-Watchdog,
+Baseline-Alarm und der Manifest-Registrar aus diesem Auftrag — der beide
+Schadensfaelle korrekt sichtbar gemacht hat. Die ETH-Luecke 22.-27.08. ist
+endgueltig; einzige Quelle fuer 24.-27.08. ist der Scinance-REST-Sampler.
+Keine offenen Punkte mehr in diesem Auftrag.
