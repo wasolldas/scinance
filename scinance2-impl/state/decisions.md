@@ -604,3 +604,18 @@
 - **Nicht beschlossen:** keine H-26b-Registrierung (weiter gemaess DEC-45-Reihenfolge), keine Long-Vol-Hypothese — die waere erst nach einer Prognose-Hypothese sinnvoll, die VOR dem Schub feuert, und die existiert nicht (GL-024-Lehre).
 - **Artefakte:** `state/WP6_STRESS_SPREAD_BEFUND_2026-08-26.md`, `state/wp6_20260826/{wp6_summary.json,wp6_minute_spread.csv}`.
 - **Rueckbauweg:** reine Dokumentation + Messdaten.
+
+> **Nachtrag 2026-09-01 zu Befund 4 (siehe DEC-48):** „vier Tage endgueltig
+> verloren" war falsch — 20.-21.08. waren Archiv-Verzug. Der reale Ausfall
+> ist ein anderer: ETH-only, 22.08. 08:00 bis 27.08. 08:00 UTC.
+
+---
+
+### DEC-48 · WP-6 erweitert (15.-28.08.): DEC-47-Ausfallsbefund korrigiert; realer ETH-only-Ausfall 22.-27.08. gefunden; Enge haengt am Schock, nicht am IV-Niveau
+- **Anlass:** Wiederholung des WP-6-Zensus nach Archiv-Kompaktierung (Nutzer-Lauf, 26.390 Minuten-Zeilen, alle 14 Tage OK). Artefakte: `state/wp6_ext_20260828/`.
+- **Korrektur zu DEC-47 Befund 4 (append-only):** Der vermutete Recorder-Ausfall am 20.-23.08. war fuer den 20.-21.08. **Archiv-Verzug**, kein Ausfall — beide Tage liegen vollstaendig vor und sind normal. Die DEC-47-Formulierung „vier Tage Historie endgueltig verloren" ist damit zurueckgenommen.
+- **Neuer, ECHTER Ausfall (praeziser und beunruhigender):** ETH-Options-Frames fehlen von **22.08. 08:00 UTC bis 27.08. 08:00 UTC** — exakt 5 Tage, auf die Stunde rund, BTC laeuft durch. Der WP-5-REST-Sampler belegt fuer 24.-26.08. eine voll quotierte ETH-Kette an der Boerse: **der Ausfall lag in der Harvester-ETH-Subscription, nicht bei Bybit.** Die 08:00-Grenze deutet auf den taeglichen Instrumenten-Refresh. Zweiter Schadensfall fuer den DEC-46-Manifest-Registrar binnen einer Woche; an das Harvest-Projekt uebergeben zur Ursachenklaerung (warum verlor der Refresh NUR ETH, und warum kam es am 27. zurueck?).
+- **Messbefund 1 (Beruhigungsphase):** Am 20.-21.08. war die ATM-IV noch 38-59 Vol-Punkte hoch, die Bein-Breite aber wieder auf Ruhe-Niveau (p50 0,14-0,16 BTC / 0,12-0,15 ETH). **Die Quote-Enge haengt nicht am IV-Niveau, sondern am Schock-Uebergang.** Konsequenz fuer die DEC-45-Form: auch ein Einstieg im erhoehten-aber-ruhigen Regime zahlt Normal-Spread — guenstig, denn genau dort ist die VRP typischerweise am fettesten.
+- **Messbefund 2 (Rollover):** An Tagen mit zwei Terminen im 7-14-DTE-Band (21./28.08.) verdoppelt sich die Band-Population sauber (n_legs 10, horizon_med 118-138); erhoehte p95 dieser Tage stammen von frisch aufgesetzten, duenn quotierten neuen Serien, nicht von Stress. Fuer eine kuenftige H-26b-Banddefinition ist damit belegt, dass das rollierende 7-14-DTE-Band ohne Definitionsluecke funktioniert.
+- **Ehrlichkeits-Vermerk:** Der 19.08.-Lauf unterscheidet sich nach Kompaktierung minimal vom DEC-47-Stand (2.649 statt 2.643 Minuten-Zeilen; ETH p95 0,55 statt 0,52) — Nachzuegler-Frames. Richtungsaenderung: keine.
+- **Rueckbauweg:** Dokumentation + Messdaten; keine Code-Aenderung.

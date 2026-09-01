@@ -93,3 +93,39 @@ DEC-39-Fixturepaar Ruhe/Stress Ende-zu-Ende). Jedes kuenftige Fenster ist
 mit einem Befehl nachmessbar; die Minuten-CSV (10.367 Zeilen) liegt im
 State fuer Folgeanalysen (z. B. Breite-vs-IV-Sprung-Regression, sobald
 mehr Stress-Episoden vorliegen).
+
+
+---
+
+## NACHTRAG 2026-09-01: erweitertes Fenster 15.-28.08. (`state/wp6_ext_20260828/`)
+
+Nach der Archiv-Kompaktierung im Harvest-Projekt wurde der Zensus ueber
+2026-08-15..28 wiederholt. Vier Ergebnisse:
+
+**1. Abschnitt 4 dieses Befunds ist zu KORRIGIEREN: der 20.-21.08. war KEIN
+Recorder-Ausfall,** sondern Archiv-Verzug (der lokale Baum erhaelt Tage erst
+~2 Tage spaeter, kompaktiert). Beide Tage sind vollstaendig vorhanden und
+normal (20.08.: p50 0,16/0,12 — am Tag nach dem Stress).
+
+**2. Aber es gab einen ECHTEN Ausfall, und zwar nur ETH:** ETH-Options-Frames
+enden am **22.08. 08:00 UTC** und kehren am **27.08. 08:00 UTC** zurueck —
+exakt 5 Tage, auf die Stunde rund, waehrend BTC durchgehend laeuft. Der
+REST-Sampler (WP-5) belegt fuer den 24.-26.08. eine voll quotierte
+ETH-Kette an der Boerse: der Ausfall lag im Harvester (ETH-Subscription),
+nicht bei Bybit. Die runde 08:00-Grenze deutet auf einen taeglichen
+Refresh-/Restart-Job. **Wieder unbemerkt, wieder mangels Manifest** — der
+zweite Schadensfall fuer den DEC-46-Registrar binnen einer Woche.
+
+**3. Die Beruhigungsphase bestaetigt den Kernbefund in verschaerfter Form:**
+Am 20.-21.08. lag die ATM-IV noch bei 38-59 Vol-Punkten (gegen 26-41 vor dem
+Stress) — die Bein-Breite war trotzdem wieder normal (p50 0,14-0,16 BTC,
+0,12-0,15 ETH). **Die Enge haengt nicht am IV-NIVEAU, sondern nur am
+SCHOCK-UEBERGANG.** Fuer die DEC-45-Form heisst das: auch der Einstieg in
+einem erhoehten, aber ruhigen Vol-Regime zahlt den Normal-Spread.
+
+**4. Verfalls-Rollover funktioniert wie erhofft:** Am 21.08. und 28.08.
+liegen zwei Termine gleichzeitig im 7-14-DTE-Band (horizon_med 118-138
+statt 62-76, n_legs 10 statt 4-6). Das Band laeuft ohne Definitionsluecke
+ueber die Woechentlichen hinweg; die p95-Werte dieser Tage (0,45/0,76-1,08)
+spiegeln die frisch aufgesetzten, noch duenn quotierten neuen Serien und
+sind KEIN Stress-Signal.
