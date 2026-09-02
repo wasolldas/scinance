@@ -89,8 +89,9 @@ foreach ($s in $symbols) {
     # Funding-Intervall aus den Zeitstempeln ableiten (1h- vs 8h-Symbole!)
     $tsSorted = $recs | ForEach-Object { [int64]$_.fundingRateTimestamp } | Sort-Object
     $gaps = @(); for ($i = 1; $i -lt $tsSorted.Count; $i++) { $gaps += ($tsSorted[$i] - $tsSorted[$i-1]) }
-    $gapH = [Math]::Round((($gaps | Measure-Object -Median -ErrorAction SilentlyContinue).Median / 3600000.0), 2)
-    if (-not $gapH) { $gapH = [Math]::Round((($gaps | Sort-Object)[[int]($gaps.Count/2)]) / 3600000.0, 2) }
+    # Median von Hand (PowerShell 5.1 kennt Measure-Object -Median nicht)
+    $gs = $gaps | Sort-Object
+    $gapH = [Math]::Round(($gs[[int]($gs.Count/2)]) / 3600000.0, 2)
     $perYear = 8760.0 / $gapH
     $I = 0.0001 * ($gapH / 8.0)
     $cut = [int64]((Get-Date).ToUniversalTime().AddDays(-43) - (Get-Date "1970-01-01")).TotalMilliseconds
