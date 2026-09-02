@@ -11,7 +11,7 @@ Vorher immer: `git pull origin claude/subagent-prd-development-T16fE`.
 | 1 | `powershell -ExecutionPolicy Bypass -File .\scinance3-impl\handoff_local\run_wp9_dvol.ps1` | Minuten | DVOL-Tiefe (F1) und Quellen-Austauschbarkeit (F2, Befund a/b/nicht entscheidbar) | `scinance3-impl\state\wp9_<datum>\` |
 | 2 | `powershell -ExecutionPolicy Bypass -File .\scinance3-impl\handoff_local\run_wp7_universe.ps1` | ~10 min Download + ~1 h Rechnen | K, SD_null, N_eff, sigma_xs, sigma_LS, rho(BTC,ETH), Spread je Dezil; Befund B1..B5 | Report-Verzeichnis laut Ausgabe (JSON+MD, NICHT den Panel-Store) |
 | 3 | `powershell -ExecutionPolicy Bypass -File .\scinance3-impl\handoff_local\run_wp10a.ps1` | Minuten | Kohaerenz-Matrizen Stress/Ruhe, STRESS_REL/STRESS_ABS-Fixtures, Portfolio-Nulleffekt + Selektions-Decke | Report-Verzeichnis laut Ausgabe |
-| 4 | `run_wp10b.ps1` (folgt nach Bau) | Stunden | Fill-Rate-Kurven, adv_sel | Report-Verzeichnis |
+| 4 | `powershell -ExecutionPolicy Bypass -File .\scinance3-impl\handoff_local\run_wp10b.ps1` | Stunden (Positivkontrolle zuerst, ~1 h; dann Replay) | Fill-Rate-Kurven p_fill(10 s/60 s) je Symbol/Seite/Stunde, Stress vs. Ruhe, FIFO- und Pro-rata-Schranke, adv_sel mit Etikett | Report-Verzeichnis laut Ausgabe (NICHT den fillshadow-Store) |
 
 Reihenfolge ist Empfehlung, nicht Zwang - die Pakete sind unabhaengig.
 Jeder Runner beginnt mit einer Probe (Feldnamen, Tiefe); bricht die Probe
