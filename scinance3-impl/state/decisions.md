@@ -55,3 +55,23 @@
 - **Entscheidung:** Jeder 3.0-Treiber schreibt neben dem Summary (a) die urteilstragende Serie auf Cluster-Ebene (je Kalendertag/Woche/Ereignis, gemaess DEC-51 Cluster-Einheit) als Parquet/CSV mit SHA-256, (b) die Bootstrap-Replikate des Gate-Schaetzers (mindestens die 1.000 Ziehungen) oder den Seed + Generator-Fingerprint, aus dem sie bit-identisch reproduzierbar sind. Ein Lauf ohne (a)+(b) ist KEIN VERDIKT (loud fail im Treiber, Test gepinnt).
 - **Begruendung:** Ohne Cluster-Serien sind Regel-Retro-Checks, Meta-Analysen ueber Kohorten und die Portfolio-Sicht (R4 6.2a) unmoeglich; die Kosten sind Megabytes.
 - **Rueckbauweg:** Treiber-Konvention; alte 2.0-Laeufe bleiben, wie sie sind.
+
+---
+
+### DEC-54 · Repo-Umbau fuer 3.0: Versionsordner fuer Akten/Artefakte, Quarantaene fuer toten Code, lebender Baum unveraendert
+- **Anlass:** Nutzer-Auftrag "Repo aufraeumen, Struktur erzeugen, Basis fuer einen ueberdachten Ansatz". Grundlage: Code-Map (Import-Graph), Infra/Ops-Map (lokale Kopplungen), bestaetigter `CLEANUP_PLAN.md` (2026-06-23).
+- **Optionen:** (a) starre Versionsordner `v1/ v2/ v3/` fuer Code; (b) Versionsordner nur fuer Akten und Artefakte, toter Code als Quarantaene-Unterpaket im selben Paket; (c) toten Code loeschen (Git-Historie als Archiv).
+- **Entscheidung: (b).** (a) haette ~13.000 Zeilen Import-Umschreibungen ueber Paketgrenzen oder doppelte Pakete erzeugt; (c) verletzt den Nutzer-Wunsch, verworfene Ansaetze als Artefakte sichtbar zu halten, und das Schutzgut "Test-Suite wird nie reduziert". Ergebnis: `archive/v1_frameworks/` (vier Doku-Frameworks, 0 Code), `archive/v1_scripts/` (9 Legacy-Skripte), `src/bybit_edge/_legacy_v1/` (kompletter 1.0-Stack, importierbar, getestet), `scinance2-impl/` unveraendert plus `FINAL_PRD_SCINANCE2.md`, `scinance3-impl/` als 3.0-Akte; lebender Baum `config.py`, `recorder/`, `persistence/db.py`, `research/` unangetastet (Diff = 0 Dateien).
+- **Abnahme (vom Orchestrator nachvollzogen, nicht nur gemeldet):** 1.495 gesammelte Tests vorher und nachher; 1.483 bestanden / 3 vorbestehende Fehler (torch-Abwesenheit in `test_execution_live.py`) / 9 Dependency-Skips - identisch; die vier Forensik-Tests byteidentisch (`git diff --stat` leer) und gruen; kein lebendes Modul importiert Legacy (grep leer); Schutzgut-Pfade (Recorder, config, db, research, .ps1/.bat, fixtures, scinance2-impl) ohne Aenderung. Eine vom Agenten vorgenommene Docstring-Aenderung in `research/c14_panellag/encoder.py` wurde ZURUECKGENOMMEN - "research/** unangetastet" gilt woertlich, auch fuer Kommentare.
+- **Compat-Shims:** `src/bybit_edge/strategies/__init__.py` und `src/bybit_edge/replay_backtester.py` servieren das REALE `_legacy_v1`-Modulobjekt unter dem alten Namen (sys.modules-Alias), damit `mock.patch`-Ziele der Forensik-Tests weiter das echte Objekt treffen. Neuer Code schreibt nie gegen die Shims.
+- **Bekannte Folgearbeit:** `scripts/evaluate_e15.py` traegt veraltete Default-Pfade (zeigen auf das verschobene `edge-reconciliation/`); als Schutzgut-Skript unveraendert gelassen, von keinem Test erreicht. Bei naechster Nutzung anpassen (eigene DEC).
+- **Lokale Kopplungen:** keine der drei Scheduled Tasks, die Junction, `start.bat` oder ein `handoff_local`-Pfad ist betroffen; kein Re-Registrieren noetig.
+- **Rueckbauweg:** reine `git mv`-Historie; `git revert` des Umbau-Commits stellt den Vorzustand her.
+
+---
+
+### DEC-55 · Kanonischer Stress-Kanon als Fixture (Design-Parameter, keine Gate-Schwelle)
+- **Anlass:** "Stress-Episode" war in den Recherchen ein undefinierter Gate-Begriff (Review R1-R4 6.6); DEC-45 und WP-6 benutzen ihn bereits. Ohne kanonische Definition ist jede stress-bedingte Klausel ein offener Torpfosten.
+- **Entscheidung:** Der Stress-Kanon ist eine deterministisch erzeugte Tagesliste aus dem WP-0-Bar-Cache: alle UTC-Tage, deren realisierte Tagesvol (BTC oder ETH) ueber dem 97,5-Perzentil der juengsten 24 Monate liegt, plus der 2026-08-19 als Referenz-Ereignis; zusammenhaengende Tage mit hoechstens einem Nicht-Stress-Tag Luecke bilden EINE Episode. Die Liste wird als Fixture mit SHA-256 gepinnt und je Kalendermonat fortgeschrieben (append-only; alte Eintraege aendern sich nicht).
+- **Etikett (bindend):** 97,5 %, 24 Monate und die Luecken-Regel sind DESIGN-PARAMETER, keine Gate-Schwellen. Keine Hypothese darf sie variieren oder eine eigene Stress-Definition einfuehren; wer eine andere braucht, registriert sie als neue DEC vor dem Lauf.
+- **Rueckbauweg:** Fixture-Datei + Generator-Skript; Entfernen stellt den Vorzustand her.
