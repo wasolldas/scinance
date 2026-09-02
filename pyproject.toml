@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "bybit-edge"
 version = "0.1.0"
-description = "Bybit V5 algorithmic trading system with 26 quantitative methods"
+description = "Scinance 3.0 -- Bybit V5 quantitative research package (RESEARCH-V2 + recorder live infra; Scinance-1.0 live-trading stack quarantined under bybit_edge._legacy_v1)"
 requires-python = ">=3.11"
 dependencies = [
     "websockets>=12.0",

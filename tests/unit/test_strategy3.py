@@ -24,7 +24,7 @@ from unittest.mock import patch
 import numpy as np
 import pytest
 
-from bybit_edge.strategies.strategy3_pre_settlement import (
+from bybit_edge._legacy_v1.strategies.strategy3_pre_settlement import (
     Strategy3PreSettlement,
     _ENTRY_WINDOW_SECONDS,
     _EXIT_BAND_HIGH,

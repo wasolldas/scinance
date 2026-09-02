@@ -1,4 +1,4 @@
-"""Tests für die Dashboard-Daten-Schicht (``bybit_edge.dashboard.data``).
+"""Tests für die Dashboard-Daten-Schicht (``bybit_edge._legacy_v1.dashboard.data``).
 
 Streamlit darf NICHT importiert werden — die Datenfunktionen sind bewusst
 ohne UI-Deps gehalten. Wir nutzen ausschließlich Pandas und eine In-Memory-
@@ -14,7 +14,7 @@ import duckdb
 import pandas as pd
 import pytest
 
-from bybit_edge.dashboard.data import (
+from bybit_edge._legacy_v1.dashboard.data import (
     JOURNAL_COLUMNS,
     load_account_status,
     load_coverage,
@@ -333,7 +333,7 @@ def test_load_account_status_multiple_refreshes_no_loop_error(monkeypatch) -> No
     """
     _FakeBybitExecutor.instances.clear()
     monkeypatch.setattr(
-        "bybit_edge.dashboard.data.BybitExecutor", _FakeBybitExecutor
+        "bybit_edge._legacy_v1.dashboard.data.BybitExecutor", _FakeBybitExecutor
     )
 
     # Erster (cached) Executor — wie ihn ``@st.cache_resource`` in der App
@@ -375,7 +375,7 @@ def test_load_account_status_closes_fresh_executor_on_error(monkeypatch) -> None
 
     _FakeBybitExecutor.instances.clear()
     monkeypatch.setattr(
-        "bybit_edge.dashboard.data.BybitExecutor", _ExplodingExec
+        "bybit_edge._legacy_v1.dashboard.data.BybitExecutor", _ExplodingExec
     )
 
     cached = _FakeBybitExecutor("BTCUSDT")
@@ -520,9 +520,9 @@ def test_liverunner_exports_dashboard_snapshots_on_flush(
     """Beim Flush exportiert der LiveRunner row_counts/liquidations/coverage
     als Parquet — damit das Dashboard ohne DuckDB-Lock-Konflikt liest.
     """
-    from bybit_edge import live_runner as lr_mod
+    from bybit_edge._legacy_v1 import live_runner as lr_mod
     from bybit_edge.persistence.db import PersistenceLayer
-    from bybit_edge.state.liquidation_buffer import LiquidationEvent
+    from bybit_edge._legacy_v1.state.liquidation_buffer import LiquidationEvent
 
     # In-Memory-Persistenz + Snapshot-Dir auf tmp_path umlenken
     monkeypatch.setattr(lr_mod, "DASHBOARD_SNAPSHOT_DIR", tmp_path)
@@ -839,7 +839,7 @@ def test_load_replay_results_multi_symbol_per_symbol_typed(tmp_path: Path) -> No
 
 def test_top_n_symbol_strategy_ranks_by_sharpe(tmp_path: Path) -> None:
     """Top-N helper filters on min_trades and sorts descending by sharpe."""
-    from bybit_edge.dashboard.data import top_n_symbol_strategy
+    from bybit_edge._legacy_v1.dashboard.data import top_n_symbol_strategy
     per_symbol = {
         "AAA": {
             "S1": {"sharpe": 2.0, "n_trades": 10},

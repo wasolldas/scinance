@@ -16,7 +16,7 @@ from __future__ import annotations
 
 import pytest
 
-from bybit_edge.layers.l4_pattern.m21_ls_ratio import M21LSRatio
+from bybit_edge._legacy_v1.layers.l4_pattern.m21_ls_ratio import M21LSRatio
 
 
 class TestM21LSRatio:

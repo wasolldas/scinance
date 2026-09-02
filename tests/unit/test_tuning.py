@@ -11,13 +11,13 @@ from typing import Any
 import pytest
 
 import bybit_edge.config as cfg
-from bybit_edge.backtester.engine import BacktestResult
+from bybit_edge._legacy_v1.backtester.engine import BacktestResult
 from bybit_edge.persistence.db import PersistenceLayer
-from bybit_edge.replay_backtester import ReplayBacktester
-from bybit_edge.state.liquidation_buffer import LiquidationEvent
-from bybit_edge.state.ticker_state import TickerSnapshot
-from bybit_edge.state.trade_buffer import TradeEvent
-from bybit_edge.tuning import ParameterContext, SPACES, sample_from_space
+from bybit_edge._legacy_v1.replay_backtester import ReplayBacktester
+from bybit_edge._legacy_v1.state.liquidation_buffer import LiquidationEvent
+from bybit_edge._legacy_v1.state.ticker_state import TickerSnapshot
+from bybit_edge._legacy_v1.state.trade_buffer import TradeEvent
+from bybit_edge._legacy_v1.tuning import ParameterContext, SPACES, sample_from_space
 
 _SYMBOL = "BTCUSDT"
 _BASE_TS = 1_700_000_000_000
@@ -108,13 +108,13 @@ def test_parameter_context_overrides_and_restores() -> None:
         # The strategy module imported S3_PRESSURE_QUANTILE via from-import;
         # the context must also patch its module-level binding so that
         # runtime reads inside the strategy see the override.
-        from bybit_edge.strategies import strategy3_pre_settlement as s3mod
+        from bybit_edge._legacy_v1.strategies import strategy3_pre_settlement as s3mod
         assert s3mod.S3_PRESSURE_QUANTILE == 0.876
 
     # Originals fully restored.
     assert cfg.PRESSURE_ZSCORE_THRESHOLD == original_z
     assert cfg.S3_PRESSURE_QUANTILE == original_q
-    from bybit_edge.strategies import strategy3_pre_settlement as s3mod
+    from bybit_edge._legacy_v1.strategies import strategy3_pre_settlement as s3mod
     assert s3mod.S3_PRESSURE_QUANTILE == original_q
 
 
@@ -136,17 +136,17 @@ def test_parameter_context_restores_on_exception() -> None:
         with ParameterContext({"HAWKES_CRITICAL_RHO": 0.42}):
             assert cfg.HAWKES_CRITICAL_RHO == 0.42
             # Verify strategy module is patched too.
-            from bybit_edge.strategies import strategy1_cascade as s1mod
+            from bybit_edge._legacy_v1.strategies import strategy1_cascade as s1mod
             # S1 does not import HAWKES_CRITICAL_RHO directly, but the
             # M14 Hawkes layer module does — confirm at least one module
             # got patched besides config.
-            from bybit_edge.layers.l4_pattern import m14_hawkes
+            from bybit_edge._legacy_v1.layers.l4_pattern import m14_hawkes
             assert m14_hawkes.HAWKES_CRITICAL_RHO == 0.42
             del s1mod  # silence unused-import lint
             raise Boom("intentional")
 
     assert cfg.HAWKES_CRITICAL_RHO == original
-    from bybit_edge.layers.l4_pattern import m14_hawkes
+    from bybit_edge._legacy_v1.layers.l4_pattern import m14_hawkes
     assert m14_hawkes.HAWKES_CRITICAL_RHO == original
 
 
@@ -326,7 +326,7 @@ def test_tuner_objective_returns_negative_sharpe_or_maximizes(
     optuna = pytest.importorskip("optuna")
     del optuna  # only needed for importorskip; OptunaTuner imports its own.
 
-    from bybit_edge.tuning.optuna_tuner import OptunaTuner
+    from bybit_edge._legacy_v1.tuning.optuna_tuner import OptunaTuner
 
     # Enough data for at least one fold with min_train_events=1.
     persist.write_tickers_batch([_ticker(i) for i in range(150)])
@@ -375,7 +375,7 @@ def test_tuner_objective_returns_negative_sharpe_or_maximizes(
 def test_tuner_handles_zero_trades(persist: PersistenceLayer) -> None:
     """A space that produces zero trades must yield the penalty (no crash)."""
     pytest.importorskip("optuna")
-    from bybit_edge.tuning.optuna_tuner import OptunaTuner
+    from bybit_edge._legacy_v1.tuning.optuna_tuner import OptunaTuner
 
     # Multi-day data without fake_eval -> S3 cannot reach its pressure
     # quantile gate on this short synthetic set, so every trial yields 0
@@ -406,7 +406,7 @@ def test_tuner_handles_zero_trades(persist: PersistenceLayer) -> None:
 def test_tuner_empty_space_skipped(persist: PersistenceLayer) -> None:
     """S4 has an empty search space — the tuner must mark the run as skipped."""
     pytest.importorskip("optuna")
-    from bybit_edge.tuning.optuna_tuner import OptunaTuner
+    from bybit_edge._legacy_v1.tuning.optuna_tuner import OptunaTuner
 
     persist.write_tickers_batch([_ticker(i) for i in range(150)])
     bt = _new_bt(persist)
@@ -434,7 +434,7 @@ def test_tuner_study_persists_to_sqlite(
 ) -> None:
     """Passing a ``study_path`` materialises an Optuna SQLite study file."""
     pytest.importorskip("optuna")
-    from bybit_edge.tuning.optuna_tuner import OptunaTuner
+    from bybit_edge._legacy_v1.tuning.optuna_tuner import OptunaTuner
 
     persist.write_tickers_batch([_ticker(i) for i in range(150)])
     bt = _new_bt(persist)

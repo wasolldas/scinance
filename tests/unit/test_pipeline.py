@@ -15,7 +15,7 @@ from unittest.mock import MagicMock, patch
 import numpy as np
 import pytest
 
-from bybit_edge.pipeline import Pipeline
+from bybit_edge._legacy_v1.pipeline import Pipeline
 
 
 # ═══════════════════════════════════════════════════════════════════

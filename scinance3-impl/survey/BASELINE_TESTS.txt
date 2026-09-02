@@ -1,0 +1,46 @@
+Scinance 3.0 Umbau -- Baseline test run (VOR dem Umbau)
+=========================================================
+Datum: 2026-09-02
+Kommando: PYTHONPATH=src python -m pytest tests/unit -q -p no:cacheprovider
+Env: sandbox, deps aus `pip install -e ".[dev,vol]" pykalman filterpy hmmlearn
+     PyWavelets numba statsmodels sortedcontainers structlog websockets aiohttp
+     polars` (torch/streamlit NICHT installiert).
+Laufzeit: 901.37s (0:15:01)
+
+Ergebnis (aus dem finalen Summary des vollen Laufs):
+  3 failed, 1483 passed, 9 skipped, 15180 warnings
+  N (collected) = 1483 + 3 + 9 = 1495
+
+Hinweis Kollisions-Check: `pytest --collect-only -q` (separater, schneller Lauf,
+selbe Umgebung, ohne Testausfuehrung) meldet 1491 gesammelte Tests -- eine
+Differenz von 4 zum Summen-Wert des vollen Laufs (1495). Ursache nicht mit
+Sicherheit geklaert (moeglich: laufzeit-abhaengige Parametrisierung/Skips,
+die sich zwischen reiner Sammel-Phase und echtem Lauf unterscheiden); fuer den
+Vorher/Nachher-Vergleich ist der Summen-Wert aus dem ECHTEN Lauf (1495)
+massgeblich, da genau das die Abnahme-Metrik der Spezifikation ist
+("`pytest tests/unit -q` sammelt vorher N Tests").
+
+Fehlschlaege (3, VOR dem Umbau bereits rot -- nicht Restrukturierungs-bedingt):
+  FAILED tests/unit/test_execution_live.py::TestRiskLoopRobustness::test_risk_loop_logs_warning_on_first_timeout
+  FAILED tests/unit/test_execution_live.py::TestSnapshotExportRetry::test_export_retries_on_permission_denied
+  FAILED tests/unit/test_execution_live.py::TestSnapshotExportRetry::test_export_gives_up_after_3_retries
+
+  (Assertion-Mismatches bei captured-log-Zaehlung, z.B.
+  `assert len(warnings) == 1` bei tatsaechlich 2 WARNING-Records -- einer davon
+  ist die "torch nicht verfuegbar" M18-No-Op-Warnung, die in dieser
+  Sandbox-Umgebung (kein torch installiert) zusaetzlich auftritt. Diese 3
+  Fehlschlaege sind Sandbox-/Dependency-bedingt (fehlendes torch aendert die
+  Warn-Log-Zeilenzahl), nicht durch den Umbau verursacht -- MUESSEN nach dem
+  Umbau in identischer Form/Anzahl weiterbestehen, nicht schlechter werden.)
+
+Skipped: 9 (Grund nicht einzeln geloggt in `-q`-Modus ohne `-rs`; plausibel
+  torch-/foundation-Extras-bedingt, da torch/streamlit laut Auftrag NICHT
+  installiert werden. Nach Spezifikation §4.1 muessen dieselben
+  dependency-bedingten Skips/Fehler nach dem Umbau in identischer Form
+  bestehen bleiben, nicht schlechter.)
+
+Keine Collection-Errors beobachtet (kein "N errors" im Summary).
+
+Rohausgabe (letzte 60 Zeilen des Laufs) liegt im Task-Output dieser Session;
+zusammengefasste Kennzahlen oben sind die fuer den Vorher/Nachher-Vergleich
+massgeblichen.

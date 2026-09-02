@@ -14,7 +14,7 @@ from __future__ import annotations
 import numpy as np
 import pytest
 
-from bybit_edge.layers.l2_denoising.m5_ffd import M5FFD, _HAS_STATSMODELS
+from bybit_edge._legacy_v1.layers.l2_denoising.m5_ffd import M5FFD, _HAS_STATSMODELS
 
 
 class TestFFDWeights:

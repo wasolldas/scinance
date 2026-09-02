@@ -16,7 +16,7 @@ from __future__ import annotations
 
 import pytest
 
-from bybit_edge.layers.l1_ingestion.m3_iceberg import M3IcebergDetector
+from bybit_edge._legacy_v1.layers.l1_ingestion.m3_iceberg import M3IcebergDetector
 
 
 class TestM3IcebergDetector:

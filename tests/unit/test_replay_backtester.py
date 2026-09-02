@@ -13,12 +13,12 @@ from typing import Any
 import numpy as np
 import pytest
 
-from bybit_edge.backtester.engine import BacktestResult
+from bybit_edge._legacy_v1.backtester.engine import BacktestResult
 from bybit_edge.persistence.db import PersistenceLayer
-from bybit_edge.replay_backtester import ReplayBacktester
-from bybit_edge.state.liquidation_buffer import LiquidationEvent
-from bybit_edge.state.ticker_state import TickerSnapshot
-from bybit_edge.state.trade_buffer import TradeEvent
+from bybit_edge._legacy_v1.replay_backtester import ReplayBacktester
+from bybit_edge._legacy_v1.state.liquidation_buffer import LiquidationEvent
+from bybit_edge._legacy_v1.state.ticker_state import TickerSnapshot
+from bybit_edge._legacy_v1.state.trade_buffer import TradeEvent
 
 _SYMBOL = "BTCUSDT"
 _BASE_TS = 1_700_000_000_000  # arbitrary fixed ms epoch
@@ -136,8 +136,8 @@ def test_no_lookahead(persist: PersistenceLayer) -> None:
 
     # Reconstruct the causal buffer state at each ticker tick and assert that
     # no event with ts > current ticker ts has been ingested.
-    from bybit_edge.state.liquidation_buffer import LiquidationBuffer
-    from bybit_edge.state.trade_buffer import TradeBuffer
+    from bybit_edge._legacy_v1.state.liquidation_buffer import LiquidationBuffer
+    from bybit_edge._legacy_v1.state.trade_buffer import TradeBuffer
 
     tb = TradeBuffer(maxlen=2000)
     lb = LiquidationBuffer(maxlen=2000)
@@ -349,7 +349,7 @@ def test_replay_uses_persisted_orderbook(persist: PersistenceLayer) -> None:
         * The replay loop sees the OB snapshot first (ts=T0), then a later
           ticker at ts=T1 with no fresh OB → the cached snapshot is reused.
     """
-    from bybit_edge.layers.l3_regime.m6_entropy import M6ShannonEntropy
+    from bybit_edge._legacy_v1.layers.l3_regime.m6_entropy import M6ShannonEntropy
 
     n_levels = 5
     base_bid_price = 29_999.0
@@ -865,7 +865,7 @@ class TestReplayWalkForward:
         )
         # Override the trade ts so they match the ticker grid.
         persist.conn.execute("DELETE FROM trades")
-        from bybit_edge.state.trade_buffer import TradeEvent as TE
+        from bybit_edge._legacy_v1.state.trade_buffer import TradeEvent as TE
         persist.write_trades_batch(
             [TE(timestamp_ms=ts, price=30_000.0 + i, volume=1.0,
                 side="Buy", is_block=False) for i, ts in enumerate(ts_list)],
@@ -948,7 +948,7 @@ class TestReplayReadOnlyConnect:
                 pass
 
         monkeypatch.setattr(
-            "bybit_edge.replay_backtester.PersistenceLayer", _StubLayer
+            "bybit_edge._legacy_v1.replay_backtester.PersistenceLayer", _StubLayer
         )
 
         try:
@@ -1653,7 +1653,7 @@ class TestReplayOptimizationPreservesResults:
         self, persist: PersistenceLayer, monkeypatch: pytest.MonkeyPatch
     ) -> None:
         from tests.unit.test_m15_gr_omori import _legacy_compute
-        from bybit_edge.layers.l4_pattern.m15_gr_omori import M15GROmori
+        from bybit_edge._legacy_v1.layers.l4_pattern.m15_gr_omori import M15GROmori
 
         _persist_cascade_for_s1(persist)
 
@@ -1694,7 +1694,7 @@ class TestHawkesRefitThrottled:
         self, monkeypatch: pytest.MonkeyPatch
     ) -> None:
         from bybit_edge.config import HAWKES_REFIT_SECONDS
-        from bybit_edge.layers.l4_pattern.m14_hawkes import M14HawkesSingleChannel
+        from bybit_edge._legacy_v1.layers.l4_pattern.m14_hawkes import M14HawkesSingleChannel
 
         m14 = M14HawkesSingleChannel()
         calls = {"n": 0}
@@ -1727,7 +1727,7 @@ class TestHawkesRefitThrottled:
         self, monkeypatch: pytest.MonkeyPatch
     ) -> None:
         from bybit_edge.config import HAWKES_REFIT_SECONDS
-        from bybit_edge.layers.l4_pattern.m14_hawkes import M14HawkesSingleChannel
+        from bybit_edge._legacy_v1.layers.l4_pattern.m14_hawkes import M14HawkesSingleChannel
 
         m14 = M14HawkesSingleChannel()
         calls = {"n": 0}
@@ -1761,7 +1761,7 @@ class TestProgressLogging:
         bt = _new_bt(persist)
         bt.load_events()
 
-        with caplog.at_level("INFO", logger="bybit_edge.replay_backtester"):
+        with caplog.at_level("INFO", logger="bybit_edge._legacy_v1.replay_backtester"):
             # Tiny cadence so a progress line fires within the short stream.
             # The wall-clock floor is bypassed by the final finish() line, which
             # always emits, so we assert on that deterministically.
@@ -1787,7 +1787,7 @@ class TestProgressLogging:
         bt = _new_bt(persist)
         bt.load_events()
 
-        with caplog.at_level("INFO", logger="bybit_edge.replay_backtester"):
+        with caplog.at_level("INFO", logger="bybit_edge._legacy_v1.replay_backtester"):
             bt.run(pipeline_interval_seconds=1.0)  # progress defaults OFF
 
         progress_lines = [
@@ -1928,7 +1928,7 @@ class TestReplayM15RefitThrottle:
         freshly constructed M15 inside the replay).
         """
         from unittest import mock
-        from bybit_edge.layers.l4_pattern.m15_gr_omori import M15GROmori
+        from bybit_edge._legacy_v1.layers.l4_pattern.m15_gr_omori import M15GROmori
 
         self._persist_real_cascade(persist)
 

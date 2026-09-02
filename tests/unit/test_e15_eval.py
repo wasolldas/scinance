@@ -11,7 +11,7 @@ Covers, network-free and read-only on inputs:
 - end-to-end CLI runs over the three verdict fixtures
   (``tests/fixtures/e15/{weiter,drop,grau}``),
 - a regression against the real iter-4 artifacts
-  (``edge-reconciliation/input/iter4_raw/``, read-only), and
+  (``archive/v1_frameworks/edge-reconciliation/input/iter4_raw/``, read-only), and
 - robustness: defective inputs exit with code 1 and a clean message,
   never a traceback.
 """
@@ -37,7 +37,7 @@ from bybit_edge.research.e15_eval import (
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 FIXTURE_DIR = REPO_ROOT / "tests" / "fixtures" / "e15"
-ITER4_DIR = REPO_ROOT / "edge-reconciliation" / "input" / "iter4_raw"
+ITER4_DIR = REPO_ROOT / "archive" / "v1_frameworks" / "edge-reconciliation" / "input" / "iter4_raw"
 
 _BASE_TS = 1_781_000_000_000
 TRADES_HEADER = (

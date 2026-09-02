@@ -10,7 +10,7 @@ the opt-in performance throttle matches the ``replay_all.py`` CLI.
 """
 from __future__ import annotations
 
-import scripts.replay_backtest as replay_backtest
+import archive.v1_scripts.replay_backtest as replay_backtest
 from bybit_edge.config import OMORI_REFIT_SECONDS
 
 

@@ -1,5 +1,5 @@
 """
-Tests für :class:`bybit_edge.multi_runner.MultiSymbolRunner`.
+Tests für :class:`bybit_edge._legacy_v1.multi_runner.MultiSymbolRunner`.
 
 Alle Tests sind netzwerk-frei — wir testen Orchestrierung und Lebenszyklus,
 nicht echte WS-Connections. Wo nötig wird die ``run``/``stop``-Methode der
@@ -13,8 +13,8 @@ from unittest.mock import AsyncMock, patch
 
 import pytest
 
-from bybit_edge.live_runner import LiveRunner
-from bybit_edge.multi_runner import MultiSymbolRunner
+from bybit_edge._legacy_v1.live_runner import LiveRunner
+from bybit_edge._legacy_v1.multi_runner import MultiSymbolRunner
 from bybit_edge.persistence.db import PersistenceLayer
 
 
@@ -25,22 +25,22 @@ from bybit_edge.persistence.db import PersistenceLayer
 
 class TestMultiSymbolRunnerInit:
     def test_init_validates_non_empty_symbols(self, monkeypatch):
-        monkeypatch.setattr("bybit_edge.multi_runner.PERSIST_ENABLED", False)
+        monkeypatch.setattr("bybit_edge._legacy_v1.multi_runner.PERSIST_ENABLED", False)
         with pytest.raises(ValueError):
             MultiSymbolRunner([])
 
     def test_init_validates_unique_symbols(self, monkeypatch):
-        monkeypatch.setattr("bybit_edge.multi_runner.PERSIST_ENABLED", False)
+        monkeypatch.setattr("bybit_edge._legacy_v1.multi_runner.PERSIST_ENABLED", False)
         with pytest.raises(ValueError):
             MultiSymbolRunner(["BTCUSDT", "ETHUSDT", "BTCUSDT"])
 
     def test_init_rejects_empty_symbol_entry(self, monkeypatch):
-        monkeypatch.setattr("bybit_edge.multi_runner.PERSIST_ENABLED", False)
+        monkeypatch.setattr("bybit_edge._legacy_v1.multi_runner.PERSIST_ENABLED", False)
         with pytest.raises(ValueError):
             MultiSymbolRunner(["BTCUSDT", "  "])
 
     def test_creates_one_liverunner_per_symbol(self, monkeypatch):
-        monkeypatch.setattr("bybit_edge.multi_runner.PERSIST_ENABLED", False)
+        monkeypatch.setattr("bybit_edge._legacy_v1.multi_runner.PERSIST_ENABLED", False)
         m = MultiSymbolRunner(["BTCUSDT", "ETHUSDT", "SOLUSDT"])
         assert len(m.runners) == 3
         assert all(isinstance(r, LiveRunner) for r in m.runners)
@@ -54,10 +54,10 @@ class TestMultiSymbolRunnerInit:
 
 class TestSharedPersistence:
     def test_shared_persist_layer_when_enabled(self, monkeypatch):
-        monkeypatch.setattr("bybit_edge.multi_runner.PERSIST_ENABLED", True)
+        monkeypatch.setattr("bybit_edge._legacy_v1.multi_runner.PERSIST_ENABLED", True)
         # In-Memory-DuckDB, damit der Test keine Disk-IO braucht.
         with patch(
-            "bybit_edge.multi_runner.PersistenceLayer",
+            "bybit_edge._legacy_v1.multi_runner.PersistenceLayer",
             lambda: PersistenceLayer(db_path=pathlib.Path(":memory:")),
         ):
             m = MultiSymbolRunner(["BTCUSDT", "ETHUSDT"])
@@ -69,7 +69,7 @@ class TestSharedPersistence:
             m.persist.close()
 
     def test_no_persist_when_disabled(self, monkeypatch):
-        monkeypatch.setattr("bybit_edge.multi_runner.PERSIST_ENABLED", False)
+        monkeypatch.setattr("bybit_edge._legacy_v1.multi_runner.PERSIST_ENABLED", False)
         m = MultiSymbolRunner(["BTCUSDT", "ETHUSDT"])
         assert m.persist is None
         for r in m.runners:
@@ -85,7 +85,7 @@ class TestSharedPersistence:
 
 class TestExecutionAssignment:
     def test_execution_only_on_execution_symbol(self, monkeypatch):
-        monkeypatch.setattr("bybit_edge.multi_runner.PERSIST_ENABLED", False)
+        monkeypatch.setattr("bybit_edge._legacy_v1.multi_runner.PERSIST_ENABLED", False)
         m = MultiSymbolRunner(["BTCUSDT", "ETHUSDT"], execution_symbol="BTCUSDT")
         assert m.execution_symbol == "BTCUSDT"
         runners_by_sym = {r.symbol: r for r in m.runners}
@@ -103,8 +103,8 @@ class TestExecutionAssignment:
         adversarial review round: even the designated execution_symbol's
         runner must stay OFF when the global EXECUTION_ENABLED master switch
         is False -- MultiSymbolRunner must never force execution on."""
-        monkeypatch.setattr("bybit_edge.multi_runner.PERSIST_ENABLED", False)
-        monkeypatch.setattr("bybit_edge.live_runner.EXECUTION_ENABLED", False)
+        monkeypatch.setattr("bybit_edge._legacy_v1.multi_runner.PERSIST_ENABLED", False)
+        monkeypatch.setattr("bybit_edge._legacy_v1.live_runner.EXECUTION_ENABLED", False)
         m = MultiSymbolRunner(["BTCUSDT", "ETHUSDT"], execution_symbol="BTCUSDT")
         runners_by_sym = {r.symbol: r for r in m.runners}
         assert runners_by_sym["BTCUSDT"]._execution_active() is False
@@ -113,8 +113,8 @@ class TestExecutionAssignment:
     def test_execution_symbol_active_when_execution_enabled_true(self, monkeypatch):
         """Complementary case: with the master switch ON, exactly the
         execution_symbol's runner is active, no other."""
-        monkeypatch.setattr("bybit_edge.multi_runner.PERSIST_ENABLED", False)
-        monkeypatch.setattr("bybit_edge.live_runner.EXECUTION_ENABLED", True)
+        monkeypatch.setattr("bybit_edge._legacy_v1.multi_runner.PERSIST_ENABLED", False)
+        monkeypatch.setattr("bybit_edge._legacy_v1.live_runner.EXECUTION_ENABLED", True)
         m = MultiSymbolRunner(["BTCUSDT", "ETHUSDT"], execution_symbol="BTCUSDT")
         runners_by_sym = {r.symbol: r for r in m.runners}
         assert runners_by_sym["BTCUSDT"]._execution_active() is True
@@ -123,8 +123,8 @@ class TestExecutionAssignment:
     def test_execution_symbol_not_in_list_logs_warning_and_no_execution(
         self, monkeypatch, caplog
     ):
-        monkeypatch.setattr("bybit_edge.multi_runner.PERSIST_ENABLED", False)
-        with caplog.at_level("WARNING", logger="bybit_edge.multi_runner"):
+        monkeypatch.setattr("bybit_edge._legacy_v1.multi_runner.PERSIST_ENABLED", False)
+        with caplog.at_level("WARNING", logger="bybit_edge._legacy_v1.multi_runner"):
             m = MultiSymbolRunner(
                 ["BTCUSDT", "ETHUSDT"], execution_symbol="DOGEUSDT"
             )
@@ -134,14 +134,14 @@ class TestExecutionAssignment:
         assert any("DOGEUSDT" in rec.message for rec in caplog.records)
 
     def test_default_execution_falls_back_to_primary(self, monkeypatch):
-        monkeypatch.setattr("bybit_edge.multi_runner.PERSIST_ENABLED", False)
-        monkeypatch.setattr("bybit_edge.multi_runner.PRIMARY_SYMBOL", "BTCUSDT")
+        monkeypatch.setattr("bybit_edge._legacy_v1.multi_runner.PERSIST_ENABLED", False)
+        monkeypatch.setattr("bybit_edge._legacy_v1.multi_runner.PRIMARY_SYMBOL", "BTCUSDT")
         m = MultiSymbolRunner(["BTCUSDT", "ETHUSDT"])
         assert m.execution_symbol == "BTCUSDT"
 
     def test_default_execution_none_if_primary_missing(self, monkeypatch):
-        monkeypatch.setattr("bybit_edge.multi_runner.PERSIST_ENABLED", False)
-        monkeypatch.setattr("bybit_edge.multi_runner.PRIMARY_SYMBOL", "BTCUSDT")
+        monkeypatch.setattr("bybit_edge._legacy_v1.multi_runner.PERSIST_ENABLED", False)
+        monkeypatch.setattr("bybit_edge._legacy_v1.multi_runner.PRIMARY_SYMBOL", "BTCUSDT")
         m = MultiSymbolRunner(["ETHUSDT", "SOLUSDT"])
         assert m.execution_symbol is None
         for r in m.runners:
@@ -156,10 +156,10 @@ class TestExecutionAssignment:
 class TestLifecycle:
     def test_stop_closes_shared_persist_only_once(self, monkeypatch):
         """Geteilte DuckDB-Connection darf in stop() genau einmal geschlossen werden."""
-        monkeypatch.setattr("bybit_edge.multi_runner.PERSIST_ENABLED", True)
+        monkeypatch.setattr("bybit_edge._legacy_v1.multi_runner.PERSIST_ENABLED", True)
 
         with patch(
-            "bybit_edge.multi_runner.PersistenceLayer",
+            "bybit_edge._legacy_v1.multi_runner.PersistenceLayer",
             lambda: PersistenceLayer(db_path=pathlib.Path(":memory:")),
         ):
             m = MultiSymbolRunner(["BTCUSDT", "ETHUSDT"])
@@ -188,7 +188,7 @@ class TestLifecycle:
             assert m.persist is None
 
     def test_run_dispatches_to_all_runners(self, monkeypatch):
-        monkeypatch.setattr("bybit_edge.multi_runner.PERSIST_ENABLED", False)
+        monkeypatch.setattr("bybit_edge._legacy_v1.multi_runner.PERSIST_ENABLED", False)
         m = MultiSymbolRunner(["BTCUSDT", "ETHUSDT"])
 
         # Jeder LiveRunner.run wird durch einen sofort-fertigen Coroutine ersetzt,

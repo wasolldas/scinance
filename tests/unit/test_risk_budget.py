@@ -1,4 +1,4 @@
-"""Tests für die Live-Risiko-Budget-Schicht (``bybit_edge.risk.budget``).
+"""Tests für die Live-Risiko-Budget-Schicht (``bybit_edge._legacy_v1.risk.budget``).
 
 Alle Tests sind netzwerkfrei und schreiben in ``tmp_path``.
 """
@@ -10,7 +10,7 @@ from datetime import datetime, timedelta, timezone
 import numpy as np
 import pytest
 
-from bybit_edge.risk.budget import RiskBudget, RiskState
+from bybit_edge._legacy_v1.risk.budget import RiskBudget, RiskState
 
 
 def _make_budget(

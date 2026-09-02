@@ -18,7 +18,7 @@ from bybit_edge.config import (
     BASIS_LONG_THRESHOLD,
     BASIS_SHORT_THRESHOLD,
 )
-from bybit_edge.layers.l5_risk.m23_basis_convergence import M23BasisConvergence
+from bybit_edge._legacy_v1.layers.l5_risk.m23_basis_convergence import M23BasisConvergence
 
 
 def _make_ticker(mark_price: float, index_price: float) -> dict:

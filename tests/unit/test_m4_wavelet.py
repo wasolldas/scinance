@@ -18,7 +18,7 @@ import math
 import numpy as np
 import pytest
 
-from bybit_edge.layers.l2_denoising.m4_wavelet import M4WaveletDenoiser
+from bybit_edge._legacy_v1.layers.l2_denoising.m4_wavelet import M4WaveletDenoiser
 
 
 class TestSoftThreshold:

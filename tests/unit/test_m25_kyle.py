@@ -19,7 +19,7 @@ from __future__ import annotations
 import numpy as np
 import pytest
 
-from bybit_edge.layers.l5_risk.m25_kyle_lambda import M25KyleLambda
+from bybit_edge._legacy_v1.layers.l5_risk.m25_kyle_lambda import M25KyleLambda
 
 
 def _make_trades(

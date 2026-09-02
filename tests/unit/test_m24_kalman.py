@@ -14,7 +14,7 @@ import numpy as np
 import pytest
 
 from bybit_edge.config import KALMAN_SENTIMENT_ZSCORE
-from bybit_edge.layers.l5_risk.m24_kalman_premium import (
+from bybit_edge._legacy_v1.layers.l5_risk.m24_kalman_premium import (
     M24KalmanPremium,
     _MAX_DT_SECONDS,
     _MIN_DT_SECONDS,
@@ -241,7 +241,7 @@ class TestPredictTimeScaling:
 
         times = iter([1_000.0, 1_005.0])
         monkeypatch.setattr(
-            "bybit_edge.layers.l5_risk.m24_kalman_premium.time.time",
+            "bybit_edge._legacy_v1.layers.l5_risk.m24_kalman_premium.time.time",
             lambda: next(times),
         )
 
@@ -267,7 +267,7 @@ class TestPredictTimeScaling:
         monkeypatch.setattr(mod, "_predict", spy_predict)
         times = iter([2_000.0, 2_000.0 + 1e-9])
         monkeypatch.setattr(
-            "bybit_edge.layers.l5_risk.m24_kalman_premium.time.time",
+            "bybit_edge._legacy_v1.layers.l5_risk.m24_kalman_premium.time.time",
             lambda: next(times),
         )
 
@@ -293,7 +293,7 @@ class TestPredictTimeScaling:
         monkeypatch.setattr(mod, "_predict", spy_predict)
         times = iter([3_000.0, 3_000.0 + 10 * _MAX_DT_SECONDS])
         monkeypatch.setattr(
-            "bybit_edge.layers.l5_risk.m24_kalman_premium.time.time",
+            "bybit_edge._legacy_v1.layers.l5_risk.m24_kalman_premium.time.time",
             lambda: next(times),
         )
 
@@ -325,7 +325,7 @@ class TestPredictTimeScaling:
 
         monkeypatch.setattr(mod, "_predict", spy_predict)
         monkeypatch.setattr(
-            "bybit_edge.layers.l5_risk.m24_kalman_premium.time.time",
+            "bybit_edge._legacy_v1.layers.l5_risk.m24_kalman_premium.time.time",
             lambda: 999_999.0,
         )
 

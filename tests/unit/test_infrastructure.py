@@ -16,13 +16,13 @@ import numpy as np
 import pytest
 
 # ── State imports ─────────────────────────────────────────────────────
-from bybit_edge.state.orderbook_state import OrderbookState
-from bybit_edge.state.ticker_state import TickerSnapshot, TickerStateManager
-from bybit_edge.state.liquidation_buffer import LiquidationEvent, LiquidationBuffer
-from bybit_edge.state.trade_buffer import TradeEvent, TradeBuffer
+from bybit_edge._legacy_v1.state.orderbook_state import OrderbookState
+from bybit_edge._legacy_v1.state.ticker_state import TickerSnapshot, TickerStateManager
+from bybit_edge._legacy_v1.state.liquidation_buffer import LiquidationEvent, LiquidationBuffer
+from bybit_edge._legacy_v1.state.trade_buffer import TradeEvent, TradeBuffer
 
 # ── Backtester imports ────────────────────────────────────────────────
-from bybit_edge.backtester.engine import (
+from bybit_edge._legacy_v1.backtester.engine import (
     Trade,
     BacktestResult,
     WalkForwardSplitter,
@@ -30,7 +30,7 @@ from bybit_edge.backtester.engine import (
 )
 
 # ── Scheduler imports ─────────────────────────────────────────────────
-from bybit_edge.scheduler import FundingScheduler
+from bybit_edge._legacy_v1.scheduler import FundingScheduler
 
 # ── Persistence imports ───────────────────────────────────────────────
 from bybit_edge.persistence.db import PersistenceLayer

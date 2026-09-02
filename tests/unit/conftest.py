@@ -25,14 +25,14 @@ def _redirect_dashboard_snapshots(tmp_path_factory: pytest.TempPathFactory,
     target = tmp_path_factory.mktemp("dashboard_snapshots")
     # live_runner importiert das Symbol direkt — wir patchen das Modul.
     try:
-        import bybit_edge.live_runner as lr_mod
+        import bybit_edge._legacy_v1.live_runner as lr_mod
         monkeypatch.setattr(lr_mod, "DASHBOARD_SNAPSHOT_DIR", target)
     except Exception:  # pragma: no cover — Modul-Import sollte funktionieren
         pass
     # Außerdem den Default in dashboard.data umlenken, damit Loader-Tests
     # nicht versehentlich auf echte Snapshots im Repo-Workspace zugreifen.
     try:
-        import bybit_edge.dashboard.data as data_mod
+        import bybit_edge._legacy_v1.dashboard.data as data_mod
         monkeypatch.setattr(data_mod, "_DEFAULT_SNAPSHOT_DIR", target)
     except Exception:  # pragma: no cover
         pass

@@ -14,7 +14,7 @@ from __future__ import annotations
 
 import pytest
 
-from bybit_edge.layers.l1_ingestion.m2_ofi import M2OFI, _MIN_QUANTILE_SAMPLES
+from bybit_edge._legacy_v1.layers.l1_ingestion.m2_ofi import M2OFI, _MIN_QUANTILE_SAMPLES
 
 
 class TestEnCalculation:

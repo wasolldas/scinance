@@ -14,9 +14,9 @@ import duckdb
 import numpy as np
 import pytest
 
-from bybit_edge.collector.ws_collector import BybitWSCollector, WSMessage
-from bybit_edge.execution.bybit_executor import BybitExecutor
-from bybit_edge.live_runner import LiveRunner
+from bybit_edge._legacy_v1.collector.ws_collector import BybitWSCollector, WSMessage
+from bybit_edge._legacy_v1.execution.bybit_executor import BybitExecutor
+from bybit_edge._legacy_v1.live_runner import LiveRunner
 
 
 # ──────────────────────────────────────────────────────────────────
@@ -59,22 +59,22 @@ class TestExecutorRounding:
 
 class TestExecutorSafety:
     def test_live_mode_blocks_without_allow(self, monkeypatch):
-        monkeypatch.setattr("bybit_edge.execution.bybit_executor.BYBIT_DEMO", False)
-        monkeypatch.setattr("bybit_edge.execution.bybit_executor.BYBIT_TESTNET", False)
+        monkeypatch.setattr("bybit_edge._legacy_v1.execution.bybit_executor.BYBIT_DEMO", False)
+        monkeypatch.setattr("bybit_edge._legacy_v1.execution.bybit_executor.BYBIT_TESTNET", False)
         ex = BybitExecutor("BTCUSDT", api_key="k", api_secret="s", allow_live=False)
         assert ex.is_live is True
         with pytest.raises(RuntimeError):
             ex._safety_check()
 
     def test_demo_mode_allows(self, monkeypatch):
-        monkeypatch.setattr("bybit_edge.execution.bybit_executor.BYBIT_DEMO", True)
-        monkeypatch.setattr("bybit_edge.execution.bybit_executor.BYBIT_TESTNET", False)
+        monkeypatch.setattr("bybit_edge._legacy_v1.execution.bybit_executor.BYBIT_DEMO", True)
+        monkeypatch.setattr("bybit_edge._legacy_v1.execution.bybit_executor.BYBIT_TESTNET", False)
         ex = BybitExecutor("BTCUSDT", api_key="k", api_secret="s")
         assert ex.is_live is False
         ex._safety_check()  # darf nicht werfen
 
     def test_missing_keys_blocks(self, monkeypatch):
-        monkeypatch.setattr("bybit_edge.execution.bybit_executor.BYBIT_DEMO", True)
+        monkeypatch.setattr("bybit_edge._legacy_v1.execution.bybit_executor.BYBIT_DEMO", True)
         ex = BybitExecutor("BTCUSDT", api_key="", api_secret="")
         with pytest.raises(RuntimeError):
             ex._safety_check()
@@ -230,7 +230,7 @@ class TestLiveRunnerPersistence:
 
     def test_orderbook_persistence_optin_off_no_buffer(self, monkeypatch):
         """PERSIST_ORDERBOOK=false → kein OB-Puffer trotz aktiver Persistenz."""
-        monkeypatch.setattr("bybit_edge.live_runner.PERSIST_ORDERBOOK", False)
+        monkeypatch.setattr("bybit_edge._legacy_v1.live_runner.PERSIST_ORDERBOOK", False)
         r = LiveRunner("BTCUSDT")
         # Persistenz aktiv simulieren (Buffer-Pfad sonst nicht erreichbar).
         r.persist = object()  # truthy
@@ -259,10 +259,10 @@ class TestLiveRunnerPersistence:
         from bybit_edge.persistence.db import PersistenceLayer
         import pathlib
 
-        monkeypatch.setattr("bybit_edge.live_runner.PERSIST_ORDERBOOK", True)
-        monkeypatch.setattr("bybit_edge.live_runner.PERSIST_ORDERBOOK_DEPTH", 20)
+        monkeypatch.setattr("bybit_edge._legacy_v1.live_runner.PERSIST_ORDERBOOK", True)
+        monkeypatch.setattr("bybit_edge._legacy_v1.live_runner.PERSIST_ORDERBOOK_DEPTH", 20)
         monkeypatch.setattr(
-            "bybit_edge.live_runner.PERSIST_ORDERBOOK_SNAPSHOT_SECONDS", 1.0
+            "bybit_edge._legacy_v1.live_runner.PERSIST_ORDERBOOK_SNAPSHOT_SECONDS", 1.0
         )
 
         r = LiveRunner("BTCUSDT")
@@ -358,8 +358,8 @@ class TestLiveRunnerDecision:
 
     @pytest.mark.asyncio
     async def test_act_long_places_order_when_enabled(self, monkeypatch):
-        monkeypatch.setattr("bybit_edge.live_runner.EXECUTION_ENABLED", True)
-        monkeypatch.setattr("bybit_edge.live_runner.EXECUTION_ORDER_USD", 100.0)
+        monkeypatch.setattr("bybit_edge._legacy_v1.live_runner.EXECUTION_ENABLED", True)
+        monkeypatch.setattr("bybit_edge._legacy_v1.live_runner.EXECUTION_ORDER_USD", 100.0)
         r = LiveRunner("BTCUSDT")
         r._on_ticker(_ticker_msg())
         # Executor mocken
@@ -377,7 +377,7 @@ class TestLiveRunnerDecision:
 
     @pytest.mark.asyncio
     async def test_act_exit_closes_position(self, monkeypatch):
-        monkeypatch.setattr("bybit_edge.live_runner.EXECUTION_ENABLED", True)
+        monkeypatch.setattr("bybit_edge._legacy_v1.live_runner.EXECUTION_ENABLED", True)
         r = LiveRunner("BTCUSDT")
         r._on_ticker(_ticker_msg())
         r._position_side = "Buy"
@@ -393,8 +393,8 @@ class TestLiveRunnerDecision:
 
     @pytest.mark.asyncio
     async def test_long_writes_journal(self, monkeypatch, tmp_path):
-        monkeypatch.setattr("bybit_edge.live_runner.EXECUTION_ENABLED", True)
-        monkeypatch.setattr("bybit_edge.live_runner.EXECUTION_ORDER_USD", 100.0)
+        monkeypatch.setattr("bybit_edge._legacy_v1.live_runner.EXECUTION_ENABLED", True)
+        monkeypatch.setattr("bybit_edge._legacy_v1.live_runner.EXECUTION_ORDER_USD", 100.0)
         r = LiveRunner("BTCUSDT")
         r._journal_path = tmp_path / "journal.csv"
         r._on_ticker(_ticker_msg())
@@ -417,7 +417,7 @@ class TestLiveRunnerDecision:
 
     @pytest.mark.asyncio
     async def test_act_hold_same_side(self, monkeypatch):
-        monkeypatch.setattr("bybit_edge.live_runner.EXECUTION_ENABLED", True)
+        monkeypatch.setattr("bybit_edge._legacy_v1.live_runner.EXECUTION_ENABLED", True)
         r = LiveRunner("BTCUSDT")
         r._on_ticker(_ticker_msg())
         r._position_side = "Buy"
@@ -434,9 +434,9 @@ class TestLiveRunnerDecision:
     async def test_risk_block_skips_order(self, monkeypatch, tmp_path):
         """Wenn das Risiko-Budget ``check_entry_allowed`` → False meldet,
         wird keine Order gesendet und ein risk_block-Journaleintrag geschrieben."""
-        from bybit_edge.risk import RiskBudget
-        monkeypatch.setattr("bybit_edge.live_runner.EXECUTION_ENABLED", True)
-        monkeypatch.setattr("bybit_edge.live_runner.EXECUTION_ORDER_USD", 100.0)
+        from bybit_edge._legacy_v1.risk import RiskBudget
+        monkeypatch.setattr("bybit_edge._legacy_v1.live_runner.EXECUTION_ENABLED", True)
+        monkeypatch.setattr("bybit_edge._legacy_v1.live_runner.EXECUTION_ORDER_USD", 100.0)
         r = LiveRunner("BTCUSDT")
         r._journal_path = tmp_path / "journal.csv"
         r._on_ticker(_ticker_msg())
@@ -474,9 +474,9 @@ class TestLiveRunnerDecision:
     async def test_force_close_triggers_close_position(self, monkeypatch, tmp_path):
         """should_force_close() → True ⇒ offene Position wird geschlossen,
         kein neuer Entry."""
-        from bybit_edge.risk import RiskBudget
-        monkeypatch.setattr("bybit_edge.live_runner.EXECUTION_ENABLED", True)
-        monkeypatch.setattr("bybit_edge.live_runner.EXECUTION_ORDER_USD", 100.0)
+        from bybit_edge._legacy_v1.risk import RiskBudget
+        monkeypatch.setattr("bybit_edge._legacy_v1.live_runner.EXECUTION_ENABLED", True)
+        monkeypatch.setattr("bybit_edge._legacy_v1.live_runner.EXECUTION_ORDER_USD", 100.0)
         r = LiveRunner("BTCUSDT")
         r._journal_path = tmp_path / "journal.csv"
         r._on_ticker(_ticker_msg())
@@ -513,9 +513,9 @@ class TestLiveRunnerDecision:
     async def test_vol_scaling_changes_qty(self, monkeypatch, tmp_path):
         """``adjust_qty`` wird VOR ``round_qty`` aufgerufen und beeinflusst die
         finale Order-Größe."""
-        from bybit_edge.risk import RiskBudget
-        monkeypatch.setattr("bybit_edge.live_runner.EXECUTION_ENABLED", True)
-        monkeypatch.setattr("bybit_edge.live_runner.EXECUTION_ORDER_USD", 100.0)
+        from bybit_edge._legacy_v1.risk import RiskBudget
+        monkeypatch.setattr("bybit_edge._legacy_v1.live_runner.EXECUTION_ENABLED", True)
+        monkeypatch.setattr("bybit_edge._legacy_v1.live_runner.EXECUTION_ORDER_USD", 100.0)
         r = LiveRunner("BTCUSDT")
         r._journal_path = tmp_path / "journal.csv"
         r._on_ticker(_ticker_msg())
@@ -563,7 +563,7 @@ class TestLiveRunnerDecision:
         """Ein fehlgeschlagenes Close (retCode != 0) darf ``_position_side``
         NICHT auf 'flat' zurücksetzen — sonst desynchronisiert der interne
         Status lautlos von der echten Exchange-Position."""
-        monkeypatch.setattr("bybit_edge.live_runner.EXECUTION_ENABLED", True)
+        monkeypatch.setattr("bybit_edge._legacy_v1.live_runner.EXECUTION_ENABLED", True)
         r = LiveRunner("BTCUSDT")
         r._on_ticker(_ticker_msg())
         r._position_side = "Buy"
@@ -583,9 +583,9 @@ class TestLiveRunnerDecision:
     async def test_force_close_failure_keeps_position_side(self, monkeypatch, tmp_path):
         """Risk-Force-Close: schlägt close_position() fehl, bleibt
         ``_position_side`` unverändert (kein lautloses "flat")."""
-        from bybit_edge.risk import RiskBudget
-        monkeypatch.setattr("bybit_edge.live_runner.EXECUTION_ENABLED", True)
-        monkeypatch.setattr("bybit_edge.live_runner.EXECUTION_ORDER_USD", 100.0)
+        from bybit_edge._legacy_v1.risk import RiskBudget
+        monkeypatch.setattr("bybit_edge._legacy_v1.live_runner.EXECUTION_ENABLED", True)
+        monkeypatch.setattr("bybit_edge._legacy_v1.live_runner.EXECUTION_ORDER_USD", 100.0)
         r = LiveRunner("BTCUSDT")
         r._journal_path = tmp_path / "journal.csv"
         r._on_ticker(_ticker_msg())
@@ -623,8 +623,8 @@ class TestLiveRunnerDecision:
     async def test_opposite_close_failure_blocks_entry_and_keeps_side(self, monkeypatch):
         """Schlägt das Schließen der Gegenposition fehl, wird KEIN neuer
         Entry gesendet und ``_position_side`` bleibt auf der alten Seite."""
-        monkeypatch.setattr("bybit_edge.live_runner.EXECUTION_ENABLED", True)
-        monkeypatch.setattr("bybit_edge.live_runner.EXECUTION_ORDER_USD", 100.0)
+        monkeypatch.setattr("bybit_edge._legacy_v1.live_runner.EXECUTION_ENABLED", True)
+        monkeypatch.setattr("bybit_edge._legacy_v1.live_runner.EXECUTION_ORDER_USD", 100.0)
         r = LiveRunner("BTCUSDT")
         r._on_ticker(_ticker_msg())
         r._position_side = "Sell"
@@ -656,7 +656,7 @@ class TestRiskLoopRobustness:
     def _make_runner_with_mocked_executor(
         self, side_effect=None, return_value=None
     ) -> LiveRunner:
-        from bybit_edge.risk import RiskBudget
+        from bybit_edge._legacy_v1.risk import RiskBudget
         import pathlib
         import tempfile
 
@@ -685,7 +685,7 @@ class TestRiskLoopRobustness:
         r = self._make_runner_with_mocked_executor(
             side_effect=asyncio.TimeoutError()
         )
-        caplog.set_level(logging.WARNING, logger="bybit_edge.live_runner")
+        caplog.set_level(logging.WARNING, logger="bybit_edge._legacy_v1.live_runner")
 
         ok = await r._risk_loop_tick()
         # Counter wird vom Loop hochgezählt; der Tick selbst gibt nur False zurück.
@@ -704,7 +704,7 @@ class TestRiskLoopRobustness:
         r = self._make_runner_with_mocked_executor(
             side_effect=asyncio.TimeoutError()
         )
-        caplog.set_level(logging.WARNING, logger="bybit_edge.live_runner")
+        caplog.set_level(logging.WARNING, logger="bybit_edge._legacy_v1.live_runner")
 
         # Simuliere 4 vorausgegangene Fehler — der nächste (5.) Tick muss als
         # ERROR geloggt werden (Eskalations-Schwelle = 5).
@@ -739,7 +739,7 @@ class TestRiskLoopRobustness:
 
         r = self._make_runner_with_mocked_executor(return_value=0.0)
         r.executor.get_equity = fake_get_equity
-        caplog.set_level(logging.WARNING, logger="bybit_edge.live_runner")
+        caplog.set_level(logging.WARNING, logger="bybit_edge._legacy_v1.live_runner")
 
         # Drei Failures: Counter manuell hochzählen wie der Loop es täte.
         for _ in range(3):
@@ -769,7 +769,7 @@ class TestRiskLoopRobustness:
         r = self._make_runner_with_mocked_executor(
             side_effect=ValueError("totally unexpected")
         )
-        caplog.set_level(logging.WARNING, logger="bybit_edge.live_runner")
+        caplog.set_level(logging.WARNING, logger="bybit_edge._legacy_v1.live_runner")
 
         ok = await r._risk_loop_tick()
         # Unbekannte Exception → Tick returnt True (kein Backoff-Spin).
@@ -794,7 +794,7 @@ class TestSnapshotExportRetry:
 
     def test_export_retries_on_permission_denied(self, caplog):
         r = LiveRunner("BTCUSDT")
-        caplog.set_level(logging.WARNING, logger="bybit_edge.live_runner")
+        caplog.set_level(logging.WARNING, logger="bybit_edge._legacy_v1.live_runner")
 
         conn = MagicMock()
         # 1. Aufruf wirft (lock), 2. klappt.
@@ -811,7 +811,7 @@ class TestSnapshotExportRetry:
 
     def test_export_gives_up_after_3_retries(self, caplog):
         r = LiveRunner("BTCUSDT")
-        caplog.set_level(logging.WARNING, logger="bybit_edge.live_runner")
+        caplog.set_level(logging.WARNING, logger="bybit_edge._legacy_v1.live_runner")
 
         conn = MagicMock()
         conn.execute = MagicMock(side_effect=duckdb.IOException(
@@ -833,7 +833,7 @@ class TestSnapshotExportRetry:
         Probleme und werden sofort mit Stacktrace als ERROR geloggt –
         keine Retries."""
         r = LiveRunner("BTCUSDT")
-        caplog.set_level(logging.WARNING, logger="bybit_edge.live_runner")
+        caplog.set_level(logging.WARNING, logger="bybit_edge._legacy_v1.live_runner")
 
         conn = MagicMock()
         conn.execute = MagicMock(side_effect=duckdb.IOException(
@@ -852,7 +852,7 @@ class TestSnapshotExportRetry:
     def test_export_permission_denied_english_marker(self, caplog):
         """Auch die englische Fehlervariante 'Permission denied' triggert Retries."""
         r = LiveRunner("BTCUSDT")
-        caplog.set_level(logging.WARNING, logger="bybit_edge.live_runner")
+        caplog.set_level(logging.WARNING, logger="bybit_edge._legacy_v1.live_runner")
 
         conn = MagicMock()
         conn.execute = MagicMock(side_effect=[

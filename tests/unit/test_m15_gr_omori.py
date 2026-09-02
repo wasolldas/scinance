@@ -26,7 +26,7 @@ from bybit_edge.config import (
     GR_MIN_EVENTS,
     OMORI_FORECAST_MINUTES,
 )
-from bybit_edge.layers.l4_pattern.m15_gr_omori import M15GROmori
+from bybit_edge._legacy_v1.layers.l4_pattern.m15_gr_omori import M15GROmori
 
 
 def _make_liq_event(timestamp_ms: int, usd_value: float, side: str = "Buy") -> dict:

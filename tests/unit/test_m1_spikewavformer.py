@@ -17,7 +17,7 @@ from __future__ import annotations
 import numpy as np
 import pytest
 
-from bybit_edge.layers.l1_ingestion.m1_spikewavformer import M1SpikeWavformer
+from bybit_edge._legacy_v1.layers.l1_ingestion.m1_spikewavformer import M1SpikeWavformer
 
 
 class TestM1SpikeWavformer:
@@ -135,7 +135,7 @@ class TestSurrogateGradientBackward:
     """Surrogate-Gradient erlaubt Backprop durch die Spike-Funktion."""
 
     def test_surrogate_gradient_backward(self) -> None:
-        from bybit_edge.layers.l1_ingestion.m1_spikewavformer import _SurrogateSpike
+        from bybit_edge._legacy_v1.layers.l1_ingestion.m1_spikewavformer import _SurrogateSpike
 
         v = torch.tensor([0.5, 1.5, 2.0], requires_grad=True)
         spike = _SurrogateSpike.apply(v, 1.0)

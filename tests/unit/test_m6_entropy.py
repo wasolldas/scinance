@@ -15,7 +15,7 @@ import math
 import numpy as np
 import pytest
 
-from bybit_edge.layers.l3_regime.m6_entropy import (
+from bybit_edge._legacy_v1.layers.l3_regime.m6_entropy import (
     M6ShannonEntropy,
     _ENTROPY_HISTORY_MAXLEN,
     _MIN_SAMPLES_FOR_QUANTILE,

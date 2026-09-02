@@ -17,8 +17,8 @@ from urllib.parse import parse_qs, urlparse
 
 import pytest
 
-from bybit_edge.persistence import backfill as backfill_mod
-from bybit_edge.persistence.backfill import BackfillManager
+from bybit_edge._legacy_v1.persistence import backfill as backfill_mod
+from bybit_edge._legacy_v1.persistence.backfill import BackfillManager
 from bybit_edge.persistence.db import PersistenceLayer
 
 
@@ -449,7 +449,7 @@ class TestBackfillCLIResilience:
         import sys
         from types import SimpleNamespace
 
-        import scripts.backfill as backfill_cli
+        import archive.v1_scripts.backfill as backfill_cli
 
         attempted: list[str] = []
 
@@ -493,7 +493,7 @@ class TestBackfillCLIResilience:
         import sys
         from types import SimpleNamespace
 
-        import scripts.backfill as backfill_cli
+        import archive.v1_scripts.backfill as backfill_cli
 
         class _FakeMgr:
             def __init__(self) -> None:

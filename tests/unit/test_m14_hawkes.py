@@ -19,7 +19,7 @@ from __future__ import annotations
 import numpy as np
 import pytest
 
-from bybit_edge.layers.l4_pattern.m14_hawkes import M14HawkesSingleChannel
+from bybit_edge._legacy_v1.layers.l4_pattern.m14_hawkes import M14HawkesSingleChannel
 
 
 class TestIntensityNoEvents:

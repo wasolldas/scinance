@@ -12,11 +12,11 @@ from typing import Any
 
 import pytest
 
-import scripts.replay_all as replay_all
-from bybit_edge.backtester.engine import BacktestResult, Trade
+import archive.v1_scripts.replay_all as replay_all
+from bybit_edge._legacy_v1.backtester.engine import BacktestResult, Trade
 from bybit_edge.persistence.db import PersistenceLayer
-from bybit_edge.replay_backtester import ReplayBacktester
-from bybit_edge.state.ticker_state import TickerSnapshot
+from bybit_edge._legacy_v1.replay_backtester import ReplayBacktester
+from bybit_edge._legacy_v1.state.ticker_state import TickerSnapshot
 
 _BASE_TS = 1_700_000_000_000
 

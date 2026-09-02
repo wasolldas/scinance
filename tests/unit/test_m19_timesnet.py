@@ -17,7 +17,7 @@ from __future__ import annotations
 import numpy as np
 import pytest
 
-from bybit_edge.layers.l4_pattern.m19_timesnet import M19TimesNet
+from bybit_edge._legacy_v1.layers.l4_pattern.m19_timesnet import M19TimesNet
 
 
 class TestFFTDetectsKnownPeriod:

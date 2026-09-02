@@ -11,8 +11,8 @@ import time
 import numpy as np
 import polars as pl
 
-from bybit_edge.backtester.engine import BacktestEngine
-from scripts.backtest import (
+from bybit_edge._legacy_v1.backtester.engine import BacktestEngine
+from archive.v1_scripts.backtest import (
     STRATEGIES,
     _seconds_to_settlement,
     build_features,

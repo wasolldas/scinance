@@ -20,7 +20,7 @@ import numpy as np
 import pytest
 from scipy.integrate import odeint
 
-from bybit_edge.layers.l5_risk.m26_sir import M26SIR
+from bybit_edge._legacy_v1.layers.l5_risk.m26_sir import M26SIR
 
 
 def _make_liq_events(n: int, volume: float = 100.0) -> list[dict]:

@@ -14,24 +14,24 @@ from unittest.mock import patch
 import numpy as np
 import pytest
 
-from bybit_edge.strategies.strategy1_cascade import (
+from bybit_edge._legacy_v1.strategies.strategy1_cascade import (
     Strategy1CascadeDetector,
     _B_HISTORY_MAXLEN,
     _MIN_B_SAMPLES,
 )
-from bybit_edge.strategies.strategy2_entropy_momentum import (
+from bybit_edge._legacy_v1.strategies.strategy2_entropy_momentum import (
     Strategy2EntropyMomentum,
     _MIN_ENTROPY_SAMPLES,
 )
 from bybit_edge.config import S1_B_ZSCORE, S2_ENTROPY_ZSCORE
-from bybit_edge.strategies.strategy4_pattern_ensemble import (
+from bybit_edge._legacy_v1.strategies.strategy4_pattern_ensemble import (
     Strategy4PatternEnsemble,
 )
-from bybit_edge.strategies.strategy5_cross_sectional import (
+from bybit_edge._legacy_v1.strategies.strategy5_cross_sectional import (
     Strategy5CrossSectional,
     _TIME_STOP_SECONDS,
 )
-from bybit_edge.decision_aggregator import DecisionAggregator
+from bybit_edge._legacy_v1.decision_aggregator import DecisionAggregator
 
 
 # ═══════════════════════════════════════════════════════════════════
@@ -972,7 +972,7 @@ class TestS1S5DiagnosticsNoUnknown:
         """The neutral wait dicts built by ReplayBacktester._eval_strategy
         (the actual source of the diagnose-mode 'unknown' buckets analyst
         flagged on S1-on-BNB and S5-everywhere) must carry named reasons."""
-        from bybit_edge.replay_backtester import ReplayBacktester
+        from bybit_edge._legacy_v1.replay_backtester import ReplayBacktester
 
         bt = ReplayBacktester(symbol="BTCUSDT", db_path=None)
         ticker_data: dict[str, Any] = {

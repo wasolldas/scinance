@@ -22,7 +22,7 @@ from bybit_edge.config import (
     PRESSURE_ENTRY_WINDOW_MINUTES,
     PRESSURE_ZSCORE_THRESHOLD,
 )
-from bybit_edge.layers.l5_risk.m22_funding_pressure import (
+from bybit_edge._legacy_v1.layers.l5_risk.m22_funding_pressure import (
     M22FundingPressure,
     _MIN_SAMPLES_FOR_SIGMA,
 )
@@ -358,7 +358,7 @@ class TestSigmaExcludesCurrentTickAndUsesTimeWindow:
         time.time() is monkeypatched to a constant so any use of it (instead
         of ticker_data["ts"]) would make this assertion fail."""
         monkeypatch.setattr(
-            "bybit_edge.layers.l5_risk.m22_funding_pressure.time.time",
+            "bybit_edge._legacy_v1.layers.l5_risk.m22_funding_pressure.time.time",
             lambda: 999_999.0,
         )
         mod = M22FundingPressure()

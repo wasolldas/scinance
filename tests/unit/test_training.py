@@ -13,7 +13,7 @@ from __future__ import annotations
 import numpy as np
 import pytest
 
-from bybit_edge.training.dataset import (
+from bybit_edge._legacy_v1.training.dataset import (
     build_windows,
     chronological_split,
     revin_denormalize_sample,
@@ -94,7 +94,7 @@ class TestKlineDatasetFromCached:
     """KlineDataset can be constructed from a cached numpy series (no REST)."""
 
     def test_kline_dataset_from_cached_series(self) -> None:
-        from bybit_edge.training.dataset import KlineDataset
+        from bybit_edge._legacy_v1.training.dataset import KlineDataset
 
         series = np.linspace(100, 120, 200).astype(np.float64)
         ds = KlineDataset(

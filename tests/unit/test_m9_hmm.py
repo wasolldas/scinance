@@ -19,7 +19,7 @@ from __future__ import annotations
 import numpy as np
 import pytest
 
-from bybit_edge.layers.l3_regime.m9_hmm import M9HMM, _STATE_LABELS, _STATE_SIGNALS
+from bybit_edge._legacy_v1.layers.l3_regime.m9_hmm import M9HMM, _STATE_LABELS, _STATE_SIGNALS
 
 
 class TestInitialStateUniform:

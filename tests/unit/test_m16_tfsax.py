@@ -17,7 +17,7 @@ from __future__ import annotations
 import pytest
 import numpy as np
 
-from bybit_edge.layers.l4_pattern.m16_tfsax_sw import M16TFSAXSW
+from bybit_edge._legacy_v1.layers.l4_pattern.m16_tfsax_sw import M16TFSAXSW
 
 
 class TestM16TFSAXSW:

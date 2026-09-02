@@ -16,7 +16,7 @@ from __future__ import annotations
 
 import pytest
 
-from bybit_edge.layers.l3_regime.m13_cross_sectional_z import (
+from bybit_edge._legacy_v1.layers.l3_regime.m13_cross_sectional_z import (
     M13CrossSectionalZ,
     _MIN_HISTORY,
 )

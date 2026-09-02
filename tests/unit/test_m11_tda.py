@@ -17,7 +17,7 @@ from __future__ import annotations
 import numpy as np
 import pytest
 
-from bybit_edge.layers.l3_regime.m11_tda import M11TDA
+from bybit_edge._legacy_v1.layers.l3_regime.m11_tda import M11TDA
 
 
 class TestDistanceMatrixSymmetric:

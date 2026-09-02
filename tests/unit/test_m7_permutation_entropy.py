@@ -17,7 +17,7 @@ import numpy as np
 import pytest
 
 from bybit_edge.config import PE_DELAY, PE_ORDER, PE_WINDOW_TICKS
-from bybit_edge.layers.l3_regime.m7_permutation_entropy import (
+from bybit_edge._legacy_v1.layers.l3_regime.m7_permutation_entropy import (
     M7PermutationEntropy,
     _permutation_entropy,
 )

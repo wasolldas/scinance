@@ -17,7 +17,7 @@ from __future__ import annotations
 import numpy as np
 import pytest
 
-from bybit_edge.layers.l3_regime.m8_bocpd import M8BOCPD
+from bybit_edge._legacy_v1.layers.l3_regime.m8_bocpd import M8BOCPD
 
 
 class TestNoChangepointConstantData:
