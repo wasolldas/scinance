@@ -1,18 +1,22 @@
-# scinance3-impl/
+# scinance3-impl/ - die Scinance-3.0-Akte
 
-Die Scinance-3.0-Umbau-Akte -- analog zu `scinance2-impl/` fuer 2.0, aber
-fuer den aktuellen Aufraeum-/Restrukturierungs-Umbau des bestehenden Repos.
+Fortsetzung von `../scinance2-impl/` (2.0, append-only abgeschlossen).
+Nummerierungen laufen weiter: DEC-51+, H-27+, GL-032+.
 
 | Datei/Ordner | Inhalt |
 |---|---|
-| `UMBAU_SPEZIFIKATION.md` | Die Spezifikation fuer Phase 2 (Repo aufraeumen): Grundsatz, Verschiebungen, Schutzgueter, neue Dateien, Abnahme-Kriterien. Grundlage dieses Umbaus. |
-| `survey/CODE_MAP.md` | Phase-1-Kartierung: alle Top-Level-Pfade, `src/bybit_edge/`-Subpakete mit Import-Evidenz-Verdikten (LIVE-INFRA / RESEARCH-V2 / LEGACY-V1), `scripts/`-Inventar, Test-Gruppen, Entry-Points, Dependency-Footprint, Kandidaten-Archiv-Liste. |
-| `survey/INFRA_OPS_MAP.md` | Phase-1-Kartierung: Datenerfassung, abgeleitete Stores, Replay-Harness/Testsuite, lokale Maschinenkopplungen, Umgebung, Schliess-Checkliste fuer Restrukturierungen. |
-| `survey/ERKENNTNIS_KOMPENDIUM.md` | Phase-1-Kartierung: gesammelte Erkenntnisse/Befunde der drei unabhaengigen Kartierungs-Agenten. |
-| `state/` | Fuer kommende Phasen (3/4) vorgesehen -- analog zu `scinance2-impl/state/` (Decisions, Gate-Log, Wave-Reports). Noch leer; wird gefuellt, sobald Phase 3 beginnt. |
+| `CLAUDE.md` | Verfassung und Orchestrierungs-Protokoll 3.0 (Autonomie, Schutzgueter, die vier regierenden Zahlen, Regeln, Modellpolitik, Testpyramide T0-T7) |
+| `PRD_SCINANCE3.md` | Das PRD 3.0 (Orchestrator-Fassung v2): Lehren, Verfassungstext mit Registrierungs-Template, Welle 1 (WP-7/9/10, V-1..V-5), Kandidaten-Entwuerfe A1-A5, Tradability 3.0, Daten-/Rechenplan, offene Nutzer-Entscheidungen, Anhang |
+| `PROGRAMMENTWURF_3.0.md` | Orchestrator-Synthese nach Phase 3 (Entscheidungsgrundlage des PRD) |
+| `UMBAU_SPEZIFIKATION.md` | Phase 2: Repo-Umbau (DEC-54) |
+| `WP7_SPEZIFIKATION.md`, `WP9_SPEZIFIKATION.md`, `WP10_SPEZIFIKATION.md` | Bauanleitungen der Zensus-Welle |
+| `state/decisions.md`, `state/hypothesis_registry.md`, `state/gate_log.md` | die drei append-only-Akten (DEC-51..57 beschlossen; noch keine H-/GL-Eintraege) |
+| `state/RETROCHECK_DEC52.md` | veroeffentlichter Retro-Check der Ein-Fenster-Regel (kein Verdikt kippt) |
+| `survey/` | Phase 1: CODE_MAP, INFRA_OPS_MAP, ERKENNTNIS_KOMPENDIUM, UMBAU_REPORT, Test-Baseline |
+| `research/` | Phase 3: R1-R4 (Risikopraemien, Tages-/Wochen-Horizont, Ereignis/Struktur, Methodik/Infra) + adversarischer Review |
+| `prd/` | PRD-Entwurf v1, dessen Review (8 Blocker) und die Verifikation von v2 |
+| `handoff_local/` | Ein-Befehl-Runner fuer die Nutzer-Maschine (Vorfragen V-1..V-5a, WP-9, ...) |
 
-Die eigentliche Verfassung (das "FINAL_PRD" fuer 3.0) und der detaillierte
-Ausfuehrungsplan fuer die naechsten Phasen folgen hier in Phase 3/4 -- diese
-Akte enthaelt bislang nur die Phase-1-Kartierung und die Phase-2-
-Umbau-Spezifikation (Repo-Struktur-Bereinigung, in diesem Umbau
-umgesetzt).
+Reihenfolge (bindend, PRD 9.3): Zensus (WP-7, WP-9, WP-10, V-1..V-5) ->
+Feasibility-Befunde -> erst dann Registrierung eines Alpha-Kandidaten durch
+den Orchestrator. Kein Agent registriert eine Hypothese.
