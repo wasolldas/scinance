@@ -75,3 +75,17 @@
 - **Entscheidung:** Der Stress-Kanon ist eine deterministisch erzeugte Tagesliste aus dem WP-0-Bar-Cache: alle UTC-Tage, deren realisierte Tagesvol (BTC oder ETH) ueber dem 97,5-Perzentil der juengsten 24 Monate liegt, plus der 2026-08-19 als Referenz-Ereignis; zusammenhaengende Tage mit hoechstens einem Nicht-Stress-Tag Luecke bilden EINE Episode. Die Liste wird als Fixture mit SHA-256 gepinnt und je Kalendermonat fortgeschrieben (append-only; alte Eintraege aendern sich nicht).
 - **Etikett (bindend):** 97,5 %, 24 Monate und die Luecken-Regel sind DESIGN-PARAMETER, keine Gate-Schwellen. Keine Hypothese darf sie variieren oder eine eigene Stress-Definition einfuehren; wer eine andere braucht, registriert sie als neue DEC vor dem Lauf.
 - **Rueckbauweg:** Fixture-Datei + Generator-Skript; Entfernen stellt den Vorzustand her.
+
+---
+
+### DEC-56 · Stress-Kanon praezisiert: rollierende Liste ist Abdeckungs-Nachweis, absolute Zweitliste STRESS_ABS fuer Liquiditaets-Fragen
+- **Anlass:** Offener Punkt V2-1 des PRD-Entwurfs (Review PRD3 W-10): ein rollierender 97,5-Perzentil-Schnitt erzeugt per Konstruktion ~2,5 % Stress-Tage in JEDEM Fenster; die Klausel ">= 1 Stress-Episode je urteilstragendem Fenster" kann damit nie binden. Zweitens misst ein relativer Vol-Schnitt Vol-Regime, nicht Liquiditaets-Crashs, die WP-10(A) braucht.
+- **Entscheidung:** (1) Die DEC-55-Liste (`STRESS_REL`) wird ausdruecklich als **Abdeckungs-Nachweis** gefuehrt (das Fenster enthaelt nachweislich seine Regime-Extreme), nie als Filter oder Gate. (2) Eine zweite, absolute Liste **`STRESS_ABS`** wird als Fixture eingefuehrt: alle UTC-Tage, deren realisierte Tagesvol (BTC oder ETH) ueber dem 99-Perzentil der GESAMTEN WP-0-Historie liegt, plus namentlich **2025-10-10** und **2026-08-19**. `STRESS_ABS` ist die Stress-Definition fuer WP-10(A) (Praemien-Kohaerenz) und fuer jede Liquiditaets-/Fill-Frage. (3) 99 % und die zwei benannten Tage sind DESIGN-PARAMETER (kein Gate, nicht variierbar); Ergaenzungen der Namensliste nur per neuer DEC.
+- **Rueckbauweg:** Fixture + Generator; Entfernen stellt DEC-55 allein wieder her.
+
+---
+
+### DEC-57 · GPU-Standardbudget je Hypothese = 0; 24-h-Grenze ist Meldegrenze, keine Schwelle
+- **Anlass:** ~350 GPU-Stunden in 2.0 (H-14..H-18) mit 2 kapitalfreien WEITER und 0 registrierten Tradability-Folgen (R4 K-0.7, 6.1a); keine der drei 3.0-Klassen braucht GPU (R4 4.2).
+- **Entscheidung:** GPU-Budget je Hypothese ist standardmaessig 0. Ein GPU-Lauf braucht (a) eine registrierte Begruendung, warum die CPU-Fassung die Frage nicht beantworten kann, und (b) eine Entscheidungsrelevanz-Zeile mit Tradability-Pfad. Die aus R4 vorgeschlagene 24-h-Wall-Clock-Kappe wird NICHT als Schwelle uebernommen (unhergeleitet; H-15 lief 180 h checkpointet und lieferte ein gueltiges WEITER), sondern als Meldegrenze: Laeufe > 24 h werden vor dem Start gemeldet und begruendet. Wirksames Instrument bleibt die Positivkontroll-Vorschaltung (Pflichtzeile 3.3.8).
+- **Rueckbauweg:** Dokumentation.
