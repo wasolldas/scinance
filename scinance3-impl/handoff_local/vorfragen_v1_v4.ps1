@@ -111,5 +111,24 @@ Write-Host "   (a) Optionen: Delivery Fee bei Verfall (in % des Index) und Decke
 Write-Host "   (b) Datierte Futures (USDC/Inverse): Delivery/Settlement Fee bei Verfall"
 Write-Host " Ohne diese zwei Zahlen bleiben R1-K-03 und der Options-Block gesperrt (RAISE statt Default)."
 Write-Host ""
+Write-Host "=============================================================="
+Write-Host " V-5a  Deribit-Verfallskalender: gibt es woechentliche Verfaelle?"
+Write-Host "       (oeffentlich, keine Keys; Frage (b) Effektgroesse bleibt Literatur)"
+Write-Host "=============================================================="
+foreach ($cur in @("BTC","ETH")) {
+    $ins = Get-Json "https://www.deribit.com/api/v2/public/get_instruments?currency=$cur&kind=option&expired=false"
+    if ($null -eq $ins -or -not $ins.result) { Write-Host "$cur : keine Antwort"; continue }
+    $exp = $ins.result | ForEach-Object { [int64]$_.expiration_timestamp } | Sort-Object -Unique
+    Write-Host ("{0}: {1} Optionsserien, {2} verschiedene Verfallstermine (naechste 12):" -f $cur, $ins.result.Count, $exp.Count)
+    $prev = $null
+    foreach ($e in ($exp | Select-Object -First 12)) {
+        $d = ToDate $e
+        $gap = if ($prev) { [Math]::Round(($e - $prev) / 86400000.0, 1) } else { "-" }
+        Write-Host ("   {0:yyyy-MM-dd ddd HH:mm} UTC   Abstand zum vorigen: {1} Tage" -f $d, $gap)
+        $prev = $e
+    }
+}
+Write-Host " Lesart: Abstaende von 1 Tag = Tages-, 7 Tage = Wochen-, ~30 = Monats-, ~90 = Quartalsverfaelle."
+Write-Host ""
 Write-Host "Ausgabe gespeichert: $outFile"
 Stop-Transcript | Out-Null
