@@ -1,0 +1,60 @@
+# WP-10 - Praemien-Kohaerenz (deskriptiv) und Maker-Fill-Schattenmessung
+
+> Orchestrator 2026-09-02. Massgeblich: PRD 3.0 Abschnitt 4.3. Kein
+> Alpha-Gate. Teil A ist rein deskriptiv (Review R1-R4: erfundene
+> rho-Schwellen gestrichen); Teil B misst eine Kostenkonstante.
+
+## Teil A - Praemien-Kohaerenz im Stress (deskriptiv, kein PASS/FAIL)
+- Eingang: Tagesserien der heute messbaren Praemien-Proxys aus dem Bestand:
+  (1) Funding-Cashflow BTC/ETH/SOL/XRP/BNB aus `bybit/rest.fundingRate`
+  (113 Tage) bzw. nach V-1 aus dem Funding-Backfill; (2) IV-RV-Differenz
+  aus `deribit/dvol` minus WP-0-RV (BTC/ETH); (3) Perp-Basis-Proxy aus
+  `bybit/tickers` (markPrice vs indexPrice) soweit vorhanden. Jede Serie
+  mit Herkunft und Abdeckung.
+- Stress-Definition: **STRESS_ABS (DEC-56)**; Ruhe = alle anderen Tage.
+- Ausgabe: Spearman-Korrelationsmatrix der Serien getrennt fuer STRESS_ABS
+  und Ruhe, mit Bootstrap-CI (Cluster = Kalendertag; Spearman-SE nach
+  Bonett/Wright 1,06/sqrt(n-3) als Plausibilitaetsanker); effektives N je
+  Regime (Anzahl Cluster, bei Episoden: Episodenzahl) ausgewiesen.
+- **Portfolio-Nulleffekt als Konstante:** erwarteter Sharpe einer
+  Gleichgewichtung von k Rauschsignalen auf diesem Bestand (k = 2..5, je
+  1.000 Ziehungen, blockweise permutiert) - das ist die Groesse, gegen die
+  ein spaeteres Portfolio-Gate kalibriert wird (R4 6.2a). Keine Schwelle.
+- DEC-53: Cluster-Serien, Ziehungs-Seeds und Replikate als Artefakte.
+
+## Teil B - Maker-Fill-Schattenmessung (kapitalfrei, Bybit-Perp BTC/ETH)
+- Frage: mit welcher Wahrscheinlichkeit waere eine hypothetische eigene
+  passive Quote am Touch innerhalb von 10 s bzw. 60 s (Design-Parameter,
+  so etikettiert) gefuellt worden, rekonstruiert aus oeffentlichem L2
+  (`orderbook.1000`, rezenz-konformes Fenster ab ~2026-06-20) und
+  `publicTrade`: Warteschlangen-Position = sichtbare Tiefe am Touch zum
+  Zeitpunkt der Quote; Fill, wenn kumuliertes gegenlaeufiges Handelsvolumen
+  am Touch die Position uebersteigt, bevor der Touch wegwandert.
+- Maschinerie: WP-2/WP-4-Replay in `research/c22_l2tilt/extract.py`
+  wiederverwenden (Snapshot+Delta-Rekonstruktion, deterministisch); eigener
+  Store `fillshadow_1min` (WP-2-/WP-4-Stores nachweislich unberuehrt, per
+  Test gepinnt wie bei WP-4).
+- Ausgabe: Fill-Rate-KURVE p_fill(t) fuer t in {10 s, 60 s} je Symbol,
+  getrennt STRESS_ABS vs Ruhe, je Stunde des Tages; adverse Selektion
+  `adv_sel` = mittlere Mid-Bewegung gegen die Quote nach Fill (bp). Keine
+  Schwelle fuer p_fill; `adv_sel <= 1,75 bp` (Faktor 2 unter dem Maker-
+  Vorteil 3,5 bp) ist Etikett "Maker-Vorteil traegt" / "traegt nicht".
+- **Positivkontroll-Vorschaltung (PRD 3.3.8):** vor dem 86-min-Fenster-Lauf
+  laeuft eine 1-Stunden-Probe, in der eine synthetisch eingesetzte Quote
+  mit bekannter Position bekannte Fills liefern muss.
+- Ergebnis wird als DEC (Kostenkonstante `P_FILL_*`, `ADV_SEL_*`) registriert,
+  BEVOR ein Kandidat davon profitiert; H-04b/H-05c bleiben unberuehrt.
+
+## Deliverables
+`src/bybit_edge/research/wp10_coherence/` (A) und `wp10_fillshadow/` (B),
+`scripts/wp10_coherence.py`, `scripts/wp10_fillshadow.py`,
+`scinance3-impl/handoff_local/run_wp10.ps1`, Tests mit DEC-39-Trio je Teil
+(A: Serien mit bekannter Stress-Korrelation vs. unabhaengig vs. Serien mit
+gemeinsamem Trend ohne Korrelation der Innovationen; B: synthetisches Buch
+mit bekannter Warteschlange -> bekannte Fills; Buch ohne Trades -> p_fill 0;
+Adversarial: Quote genau im Moment eines Touch-Wegzugs), Determinismus,
+Store-Unberuehrtheit, DEC-53-Artefakte.
+
+## Reihenfolge
+Nach WP-7 und WP-9 (Builder-Kapazitaet); Teil A zuerst (Bestand, Minuten),
+Teil B danach (Replay, Stunden auf dem Nutzer-PC).
