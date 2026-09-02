@@ -1,0 +1,114 @@
+# vorfragen_v1_v4.ps1 -- Scinance 3.0, Welle 1: die vier 10-Minuten-Vorfragen
+# Oeffentliche Bybit-v5-Endpunkte, KEINE Keys, KEINE Orders, read-only.
+#
+#   V-1  Tiefe der Funding-Historie je Symbol (/v5/market/funding/history)
+#   V-2  Liquiditaet der datierten Bybit-Futures (turnover24h)
+#   V-3  Median(Ist-Funding - Zinsanker I) auf den letzten 43 Tagen
+#   V-4  Delivery-/Settlement-Gebuehr: NICHT automatisierbar -> Anleitung am Ende
+#
+# Aufruf:  powershell -ExecutionPolicy Bypass -File .\scinance3-impl\handoff_local\vorfragen_v1_v4.ps1
+# Ausgabe: Konsole + scinance3-impl\handoff_local\results\vorfragen_<datum>.txt
+
+$ErrorActionPreference = "Continue"
+[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
+$base = "https://api.bybit.com"
+$outDir = Join-Path $PSScriptRoot "results"
+if (-not (Test-Path $outDir)) { New-Item -ItemType Directory -Path $outDir | Out-Null }
+$outFile = Join-Path $outDir ("vorfragen_{0}.txt" -f (Get-Date -Format yyyyMMdd_HHmm))
+Start-Transcript -Path $outFile | Out-Null
+
+function Get-Json($url) {
+    try { return Invoke-RestMethod -Uri $url -TimeoutSec 30 }
+    catch { Write-Warning "FEHLER $url : $($_.Exception.Message)"; return $null }
+}
+function ToDate($ms) { return [DateTimeOffset]::FromUnixTimeMilliseconds([int64]$ms).UtcDateTime }
+
+Write-Host "=============================================================="
+Write-Host " V-1  Funding-Historie: wie weit zurueck?"
+Write-Host "=============================================================="
+$symbols = @("BTCUSDT","ETHUSDT","SOLUSDT","XRPUSDT","BNBUSDT","DOGEUSDT","AVAXUSDT")
+$v3 = @{}
+foreach ($s in $symbols) {
+    $endTime = $null; $n = 0; $earliest = $null; $latest = $null; $rates = @()
+    for ($page = 0; $page -lt 400; $page++) {   # 400 x 200 = 80.000 Records max
+        $url = "$base/v5/market/funding/history?category=linear&symbol=$s&limit=200"
+        if ($endTime) { $url += "&endTime=$endTime" }
+        $r = Get-Json $url
+        if ($null -eq $r -or $r.retCode -ne 0) { break }
+        $list = $r.result.list
+        if (-not $list -or $list.Count -eq 0) { break }
+        $n += $list.Count
+        $ts = $list | ForEach-Object { [int64]$_.fundingRateTimestamp }
+        $minTs = ($ts | Measure-Object -Minimum).Minimum
+        $maxTs = ($ts | Measure-Object -Maximum).Maximum
+        if ($null -eq $earliest -or $minTs -lt $earliest) { $earliest = $minTs }
+        if ($null -eq $latest -or $maxTs -gt $latest) { $latest = $maxTs }
+        if ($page -eq 0) { $rates = $list }   # neueste 200 Records fuer V-3 merken
+        $endTime = $minTs - 1
+        Start-Sleep -Milliseconds 120
+    }
+    if ($n -gt 0) {
+        $days = [Math]::Round(($latest - $earliest) / 86400000.0, 1)
+        Write-Host ("{0,-10} Records={1,6}  von {2:yyyy-MM-dd}  bis {3:yyyy-MM-dd}  = {4} Tage" -f $s, $n, (ToDate $earliest), (ToDate $latest), $days)
+        $v3[$s] = $rates
+    } else {
+        Write-Host ("{0,-10} KEINE Daten" -f $s)
+    }
+}
+
+Write-Host ""
+Write-Host "=============================================================="
+Write-Host " V-2  Datierte Futures auf Bybit: gibt es sie, sind sie liquide?"
+Write-Host "=============================================================="
+foreach ($cat in @("linear","inverse")) {
+    $info = Get-Json "$base/v5/market/instruments-info?category=$cat&limit=1000"
+    if ($null -eq $info) { continue }
+    $dated = $info.result.list | Where-Object { $_.contractType -match "Futures" }
+    Write-Host ("category={0}: {1} Instrumente gesamt, davon {2} datierte (contractType~Futures)" -f $cat, $info.result.list.Count, $dated.Count)
+    if ($dated.Count -gt 0) {
+        $tick = Get-Json "$base/v5/market/tickers?category=$cat"
+        $tmap = @{}
+        foreach ($t in $tick.result.list) { $tmap[$t.symbol] = $t }
+        foreach ($d in $dated | Sort-Object deliveryTime) {
+            $t = $tmap[$d.symbol]
+            $turn = if ($t) { [double]$t.turnover24h } else { 0 }
+            $oi   = if ($t) { $t.openInterest } else { "-" }
+            Write-Host ("  {0,-22} Verfall {1:yyyy-MM-dd}  turnover24h={2,14:N0} USD  OI={3}" -f $d.symbol, (ToDate $d.deliveryTime), $turn, $oi)
+        }
+    }
+}
+
+Write-Host ""
+Write-Host "=============================================================="
+Write-Host " V-3  Median(Ist-Funding - Zinsanker I) auf den neuesten ~43 Tagen"
+Write-Host "      I = 0,01 % je 8 h (Bybit-Zinsterm). Ausgabe annualisiert."
+Write-Host "=============================================================="
+foreach ($s in $symbols) {
+    if (-not $v3.ContainsKey($s)) { continue }
+    $recs = $v3[$s]
+    # Funding-Intervall aus den Zeitstempeln ableiten (1h- vs 8h-Symbole!)
+    $tsSorted = $recs | ForEach-Object { [int64]$_.fundingRateTimestamp } | Sort-Object
+    $gaps = @(); for ($i = 1; $i -lt $tsSorted.Count; $i++) { $gaps += ($tsSorted[$i] - $tsSorted[$i-1]) }
+    $gapH = [Math]::Round((($gaps | Measure-Object -Median -ErrorAction SilentlyContinue).Median / 3600000.0), 2)
+    if (-not $gapH) { $gapH = [Math]::Round((($gaps | Sort-Object)[[int]($gaps.Count/2)]) / 3600000.0, 2) }
+    $perYear = 8760.0 / $gapH
+    $I = 0.0001 * ($gapH / 8.0)
+    $cut = [int64]((Get-Date).ToUniversalTime().AddDays(-43) - (Get-Date "1970-01-01")).TotalMilliseconds
+    $vals = $recs | Where-Object { [int64]$_.fundingRateTimestamp -ge $cut } | ForEach-Object { [double]$_.fundingRate - $I } | Sort-Object
+    if ($vals.Count -eq 0) { Write-Host ("{0,-10} keine Records in 43 Tagen" -f $s); continue }
+    $med = $vals[[int]($vals.Count/2)]
+    $mean = ($vals | Measure-Object -Average).Average
+    Write-Host ("{0,-10} Intervall={1,4}h  n={2,4}  Median(F-I)={3,8:P4} je Intervall = {4,7:N2}% p.a.   Mean = {5,7:N2}% p.a." -f $s, $gapH, $vals.Count, $med, ($med*$perYear*100), ($mean*$perYear*100))
+}
+
+Write-Host ""
+Write-Host "=============================================================="
+Write-Host " V-4  Delivery-/Settlement-Gebuehr (manuell, Primaerquelle)"
+Write-Host "=============================================================="
+Write-Host " Bitte im Bybit-Konto unter Gebuehren / Fee Rate ablesen und hier eintragen:"
+Write-Host "   (a) Optionen: Delivery Fee bei Verfall (in % des Index) und Deckelung (in % der Praemie/Intrinsic)"
+Write-Host "   (b) Datierte Futures (USDC/Inverse): Delivery/Settlement Fee bei Verfall"
+Write-Host " Ohne diese zwei Zahlen bleiben R1-K-03 und der Options-Block gesperrt (RAISE statt Default)."
+Write-Host ""
+Write-Host "Ausgabe gespeichert: $outFile"
+Stop-Transcript | Out-Null
