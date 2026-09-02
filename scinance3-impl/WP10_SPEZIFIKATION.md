@@ -58,3 +58,19 @@ Store-Unberuehrtheit, DEC-53-Artefakte.
 ## Reihenfolge
 Nach WP-7 und WP-9 (Builder-Kapazitaet); Teil A zuerst (Bestand, Minuten),
 Teil B danach (Replay, Stunden auf dem Nutzer-PC).
+
+## Nachtrag 2026-09-02 (Orchestrator): Praezisierung des Portfolio-Nulleffekts
+Die Bau-Vorgabe "Sanity-Check: waechst mit sqrt(k)" war FALSCH und hat den
+ersten Bau in eine Summe von k Einzel-Sharpes gezwungen - eine Groesse, die
+kein Portfolio-Gate je vergleicht. Richtig (R4 6.2a): der Portfolio-
+Nulleffekt ist die NULLVERTEILUNG des annualisierten Sample-Sharpe einer
+GLEICHGEWICHTUNG von k reinen Rauschsignalen auf dem realen Panel (Block-
+permutierte Vorzeichen, 1.000 Ziehungen je k), berichtet als Mittel, SD,
+p95 und p99. Unter der Null ist die Erwartung ~0 und die SD ~1/sqrt(T)
+(nach Autokorrelations-Anpassung), im Wesentlichen UNABHAENGIG von k -
+das ist der Sanity-Check. Getrennt davon wird die SELEKTIONS-Decke
+berichtet: E[max Sharpe ueber K unabhaengige Varianten] fuer K in
+{5,10,20,50,100} (Bailey/Lopez de Prado, empirisch aus denselben Ziehungen
+durch Maximum ueber K Draws), die mit log K waechst. sqrt(k)-Wachstum gilt
+nur fuer ECHTE IC (Fundamentalgesetz IR ~ IC*sqrt(Breite)) und ist kein
+Null-Merkmal. Beide Groessen sind Konstanten, keine Schwellen.
