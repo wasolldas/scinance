@@ -31,3 +31,27 @@
   (v) Retro-Check auf H-06, H-20, H-22 wird veroeffentlicht; kippt er ein Verdikt, wird die Regel als "Lockerung" etikettiert, die alten Verdikte bleiben unveraendert.
 - **Sequenz-Zwang:** Die Regel wird NIE kandidatenspezifisch beschlossen. Sie muss VOR der Registrierung des ersten Kandidaten stehen, der sie braucht (Review 4.1 Auflage 1) - sonst waere sie eine Torpfosten-Verschiebung.
 - **Rueckbauweg:** Streichen des Eintrags vor Beschluss; nach Beschluss nur durch neue DEC.
+
+> **Nachtrag zu DEC-52 (2026-09-02): Retro-Check liegt vor, Regel BESCHLOSSEN.**
+> `state/RETROCHECK_DEC52.md`: kein Verdikt kippt. H-06 verfehlt den
+> 0,5x-Screen in beiden Fenstern und beiden Metriken (7-62 % der halben
+> Schwelle); H-22 faellt am Vorzeichenwechsel in BTC W-L2-2 (IC +0,067 ->
+> -0,011); H-20 ist der einzige knappe Fall (OOS-1 +4,83 bp gegen 5-bp-Screen,
+> Abstand 0,17 bp), waere aber auch bei bestandenem Screen an der gepoolten
+> Signifikanz gescheitert (Proxy-Obergrenzen p ~0,20-0,34 gegen alpha 0,01).
+> **Einschraenkung, offen benannt:** Auflage (iii) - gepoolter, fenster-
+> geclusterter Bootstrap - war fuer die 2.0-Laeufe NICHT nachrechenbar, weil
+> keiner der drei Ergebnis-JSONs Roh-Serien je Cluster oder Bootstrap-
+> Replikate speichert; der Retro-Check nutzt Stouffer/Fisher-Kombinationen der
+> Fenster-p als OBERGRENZE der Evidenz. Da selbst diese Obergrenzen alpha 0,01
+> um Faktor >20 verfehlen, ist der Schluss robust. Etikett: **Verbesserung**,
+> nicht Lockerung.
+> **Daraus folgt eine neue Pflicht (DEC-53).**
+
+---
+
+### DEC-53 · Ergebnis-Artefakt-Pflicht: jeder 3.0-Lauf speichert die Cluster-Serie und die Bootstrap-Replikate
+- **Anlass:** Der DEC-52-Retro-Check konnte den gepoolten Bootstrap nicht nachrechnen, weil 2.0-Ergebnis-JSONs nur Aggregate speichern (Review-Lehre: Checkpoint-Round-Trip C.15 auf Ergebnisse ausgeweitet).
+- **Entscheidung:** Jeder 3.0-Treiber schreibt neben dem Summary (a) die urteilstragende Serie auf Cluster-Ebene (je Kalendertag/Woche/Ereignis, gemaess DEC-51 Cluster-Einheit) als Parquet/CSV mit SHA-256, (b) die Bootstrap-Replikate des Gate-Schaetzers (mindestens die 1.000 Ziehungen) oder den Seed + Generator-Fingerprint, aus dem sie bit-identisch reproduzierbar sind. Ein Lauf ohne (a)+(b) ist KEIN VERDIKT (loud fail im Treiber, Test gepinnt).
+- **Begruendung:** Ohne Cluster-Serien sind Regel-Retro-Checks, Meta-Analysen ueber Kohorten und die Portfolio-Sicht (R4 6.2a) unmoeglich; die Kosten sind Megabytes.
+- **Rueckbauweg:** Treiber-Konvention; alte 2.0-Laeufe bleiben, wie sie sind.
