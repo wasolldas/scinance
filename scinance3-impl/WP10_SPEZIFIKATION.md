@@ -74,3 +74,11 @@ berichtet: E[max Sharpe ueber K unabhaengige Varianten] fuer K in
 durch Maximum ueber K Draws), die mit log K waechst. sqrt(k)-Wachstum gilt
 nur fuer ECHTE IC (Fundamentalgesetz IR ~ IC*sqrt(Breite)) und ist kein
 Null-Merkmal. Beide Groessen sind Konstanten, keine Schwellen.
+
+## Nachtrag 2026-09-03 (DEC-58): Teil B - Competing-Risk-Schaetzer und Gebuehren-Fussnote
+Time-to-Fill wird als Competing Risk geschaetzt (Fill vs. Touch-Wegzug vs.
+Zensierung durch L2-Abdeckungsluecken 74 %/41 %); der naive Anteil "Fills /
+Quotes" ist wegen informativer Zensierung bis Faktor 2,0 verzerrt (S1 X-SURV-3,
+Nulleffekt exakt herleitbar). `adv_sel_max = 1,75 bp` haengt an
+FEE_TAKER-FEE_MAKER = 3,5 bp; nach einer Gebuehrenaenderung (V-4-Pruefung)
+wird die Formel, nicht die Zahl, registriert.

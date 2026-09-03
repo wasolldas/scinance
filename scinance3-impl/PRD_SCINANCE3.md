@@ -1011,3 +1011,43 @@ Jede Zeile nennt die Review-Referenz bzw. die Orchestrator-Entscheidung, die sie
 | Bel-5 | Gesetzte Skalare, die bleiben, tragen jetzt ausdruecklich **"Design-Parameter (keine Schwelle)"** mit vorab fixierter Konsequenz: Listing-Ausschluss 8 Wochen (mit Sensitivitaet 4/12 Wochen als Bericht), Funding-Autokorrelation 0,30, V-2-Liquiditaetsmarke 1 %, WP-10(B)-Stuetzstellen 10 s/60 s, die DEC-55-Parameter (97,5 %, 24 Monate, Luecken-Regel) und die DEC-56-Parameter (99 %, die zwei benannten Tage). | Review PRD3 3, 6.7 |
 
 *Ende PRD_SCINANCE3_v2.md - prd-architect, 2026-09-02. Kein Abschnitt dieses Dokuments ist eine Registrierung; alle Kandidaten-Abschnitte sind Entwuerfe und ersetzen keine Vorregistrierung durch den Orchestrator.*
+
+---
+
+## 11. Nachtrag Phase 3b - Wissenschafts-Exkurs (2026-09-03, DEC-58)
+
+Bindend zusaetzlich zu den Abschnitten 1-10; bei Widerspruch gilt DEC-58.
+Quelle: `exkurs/WISSENSCHAFTS_EXKURS_SYNTHESE.md`, `exkurs/REVIEW_S1_S5.md`.
+
+**11.1 Verfassungszeile (Null-Zensus-Klausel), neu in 3.3:** Ein Nulleffekt-
+oder Erreichbarkeits-Zensus darf niemals einen Kandidaten promoten; zulaessige
+Ausgaenge sind ein D-Eintrag oder "nicht ausgeschlossen".
+
+**11.2 Vorfragen, erweitert:** V-1 zusaetzlich: Zins-Term I je Kontraktklasse
+inkl. 1h-Symbole, Clamp-Grenze, Cap-Formel, Ausnahmeliste, Auto-Switch- und
+Rueckwechsel-Regel (Primaerquelle). Neue Zaehl-Vorfrage V-6: Totzonen-/
+Bindungsanteil (F exakt = I), Intervallwechsel je Tag/Dezil/Fenster, Verteilung
+der Historienlaengen w_i - erste Naeherung auf den 113 Harvest-Tagen. V-5
+zusaetzlich (c): Zeitlage der Umkehr relativ zu 08:00 UTC; ohne Beleg ist A2s
+Richtung nicht registrierbar. V-4-Nachbarschaft: Gebuehren-Konstantenpruefung
+nach der [sek]-Aenderung 01.09.2026; bis dahin RAISE fuer Altcoin-Maker.
+
+**11.3 Nachtraege zu Welle 1:** WP-7 fuehrt Totzonen-Anteil, Intervallklasse je
+Symbol-Woche und Delisting-Hazard/IPCW (deskriptiv, wenn < 32 Chargen) als
+Pflichtzeilen; WP-10(B) verwendet fuer Time-to-Fill einen Competing-Risk-
+Schaetzer (Zensierung durch L2-Abdeckung; Nulleffekt exakt, Faktor bis 2,0);
+neues kleines Paket WP-11 "Relaxationsrate nach Schockstunden" (Bar-Cache,
+Ereignis-Definition aus H-20, deskriptiv, N = 403/362 Ereignistage) liefert die
+Erholungszeit als Konstante fuer Fill-/Slippage-Modelle auf STRESS_ABS.
+
+**11.4 Nachtraege zu Kandidaten:** A1 (5.1): die vier Auflagen aus DEC-58
+Entscheidung 3 - insbesondere die schriftliche W1/W2-Inhomogenitaet und der
+look-ahead-freie Symbol-Wochen-Ausschluss; der Kill-4-Parameter 0,30 wird durch
+`k <= 2,333*w` (Buehlmann-Straub) ersetzt. A2 (5.2): analytische Formretention
+von `r_pre` (Rechteck gegen Rampe: 13,4 % SNR-Verlust; V-Umkehr mit Wendepunkt
+innerhalb [07:30, 08:00) annulliert `r_pre`) als Sensitivitaet, Richtung nur mit
+V-5(c). 3.6: Ruin-Kapital `u(eps) = (sigma^2/2mu)*ln(1/eps)` als zweite
+Berichtszeile neben dem driftlosen MaxDD-Boden.
+
+**11.5 Nicht aufgenommen:** siehe Synthese Abschnitt 3. Kein neuer Alpha-Kandidat;
+keine Aenderung an DEC-51..57; Sequenz-Zwang (9.3) unveraendert.

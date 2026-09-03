@@ -74,3 +74,12 @@ Survivorship nicht herstellbar; B4 nur Etikett `unter_wand`; B5 Spread als DEC).
 ## 4. Nicht-Ziele
 Kein 1h-Panel, kein Alpha-Gate, keine Kandidaten-Registrierung, keine
 Aenderung an bestehenden Stores.
+
+## Nachtrag 2026-09-03 (DEC-58): drei Pflichtzeilen aus dem Wissenschafts-Exkurs
+1. **Totzonen-/Bindungs-Zensus:** Anteil der Symbol-Intervalle mit Funding-Rate
+   exakt = I (0,01 %/8h bzw. intervall-normiert) je Woche und Dezil; bei
+   breiter Bindung ist die Dezil-Sortierung degeneriert (A1-Feasibility).
+2. **Intervallklasse je Symbol-Woche** (aus `funding_n`) und Zaehlung der
+   Wechsel je Tag/Dezil/Fenster; Materialitaetsgrenze vorab im Report.
+3. **Delisting-Hazard/IPCW** (deskriptiv, wenn < 32 Delisting-Chargen):
+   Zahl statt Haekchen fuer die Survivorship-Verzerrung.

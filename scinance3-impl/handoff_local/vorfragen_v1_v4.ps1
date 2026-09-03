@@ -4,6 +4,7 @@
 #   V-1  Tiefe der Funding-Historie je Symbol (/v5/market/funding/history)
 #   V-2  Liquiditaet der datierten Bybit-Futures (turnover24h)
 #   V-3  Median(Ist-Funding - Zinsanker I) auf den letzten 43 Tagen
+#   V-1b Zins-Term/Intervall/Cap je Kontrakt, V-6 Totzonen-Zensus, V-5a Deribit-Verfaelle
 #   V-4  Delivery-/Settlement-Gebuehr: NICHT automatisierbar -> Anleitung am Ende
 #
 # Aufruf:  powershell -ExecutionPolicy Bypass -File .\scinance3-impl\handoff_local\vorfragen_v1_v4.ps1
@@ -101,6 +102,47 @@ foreach ($s in $symbols) {
     $mean = ($vals | Measure-Object -Average).Average
     Write-Host ("{0,-10} Intervall={1,4}h  n={2,4}  Median(F-I)={3,8:P4} je Intervall = {4,7:N2}% p.a.   Mean = {5,7:N2}% p.a." -f $s, $gapH, $vals.Count, $med, ($med*$perYear*100), ($mean*$perYear*100))
 }
+
+Write-Host ""
+Write-Host "=============================================================="
+Write-Host " V-1b Zins-Term / Funding-Intervall / Cap je Kontrakt (instruments-info)"
+Write-Host "      und V-6 Totzonen-Zensus (Anteil Funding exakt = I) auf V-1-Daten"
+Write-Host "=============================================================="
+$info = Get-Json "$base/v5/market/instruments-info?category=linear&limit=1000"
+if ($info) {
+    $lst = $info.result.list
+    Write-Host ("linear: {0} Instrumente; Feldnamen des ersten: {1}" -f $lst.Count, (($lst[0].PSObject.Properties.Name) -join ","))
+    $grp = $lst | Group-Object fundingInterval | Sort-Object Name
+    foreach ($g in $grp) { Write-Host ("  fundingInterval={0,5} min : {1,4} Symbole" -f $g.Name, $g.Count) }
+    $caps = $lst | Group-Object upperFundingRate | Sort-Object Name
+    foreach ($g in $caps) { Write-Host ("  upperFundingRate={0,-10} : {1,4} Symbole" -f $g.Name, $g.Count) }
+    foreach ($s in @("BTCUSDT","ETHUSDT","SOLUSDT","DOGEUSDT")) {
+        $x = $lst | Where-Object { $_.symbol -eq $s }
+        if ($x) { Write-Host ("  {0,-9} interval={1} upper={2} lower={3} launch={4}" -f $s, $x.fundingInterval, $x.upperFundingRate, $x.lowerFundingRate, $x.launchTime) }
+    }
+}
+foreach ($s in $symbols) {
+    if (-not $v3.ContainsKey($s)) { continue }
+    $recs = $v3[$s]
+    $rates = $recs | ForEach-Object { [double]$_.fundingRate }
+    $n = $rates.Count
+    $exact = ($rates | Where-Object { [Math]::Abs($_ - 0.0001) -lt 1e-9 }).Count
+    $near  = ($rates | Where-Object { [Math]::Abs($_ - 0.0001) -lt 1e-6 }).Count
+    Write-Host ("  {0,-9} Totzone: exakt I in {1,3} von {2,3} Records ({3,5:P1}); |F-I|<1e-6: {4,5:P1}" -f $s, $exact, $n, ($exact/[double]$n), ($near/[double]$n))
+}
+
+Write-Host ""
+Write-Host "=============================================================="
+Write-Host " V-5a Deribit-Verfallskalender (oeffentlich): Wochentag/Abstand der Verfaelle"
+Write-Host "=============================================================="
+foreach ($cur in @("BTC","ETH")) {
+    $d = Get-Json "https://www.deribit.com/api/v2/public/get_instruments?currency=$cur&kind=option&expired=false"
+    if ($null -eq $d) { continue }
+    $exps = $d.result | ForEach-Object { [int64]$_.expiration_timestamp } | Sort-Object -Unique
+    Write-Host ("{0}: {1} Verfalltermine offen" -f $cur, $exps.Count)
+    foreach ($e in $exps) { $dt = ToDate $e; Write-Host ("  {0:yyyy-MM-dd ddd HH:mm} UTC" -f $dt) }
+}
+Write-Host " Ohne Primaerbeleg zur Zeitlage der Umkehr um 08:00 UTC (V-5c, Literatur) bleibt A2 gesperrt."
 
 Write-Host ""
 Write-Host "=============================================================="
