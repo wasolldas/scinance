@@ -186,6 +186,50 @@ def test_unwrap_dvol_payload_rejects_garbage():
     assert hc.unwrap_dvol_payload(json.dumps([1, 2])) is None
 
 
+def test_unwrap_dvol_payload_tolerates_value_and_close_aliases():
+    # A real harvest tree may not use "volatility" at all -- "value"/"close"
+    # must resolve too, across the same wrapper shapes.
+    for field in ("value", "close"):
+        tick = hc.unwrap_dvol_payload(json.dumps({field: 41.0}))
+        assert tick is not None and hc.extract_volatility(tick) == 41.0
+        tick = hc.unwrap_dvol_payload(json.dumps({"data": {field: 41.0}}))
+        assert tick is not None and hc.extract_volatility(tick) == 41.0
+
+
+# =================================================== dvol symbol discovery
+
+def _mk_dvol_symbol_dir(base: Path, symbol: str) -> None:
+    (base / "raw" / "deribit" / "dvol" / f"symbol={symbol}").mkdir(parents=True, exist_ok=True)
+
+
+def test_discover_dvol_symbol_finds_unique_match(tmp_path):
+    _mk_dvol_symbol_dir(tmp_path, "btc_usd")
+    _mk_dvol_symbol_dir(tmp_path, "eth_usd")
+    assert hc.discover_dvol_symbol(tmp_path, "BTC") == "btc_usd"
+    assert hc.discover_dvol_symbol(tmp_path, "eth") == "eth_usd"
+    assert hc.list_dvol_symbol_dirs(tmp_path) == ["btc_usd", "eth_usd"]
+
+
+def test_discover_dvol_symbol_refuses_on_zero_match_with_dir_list(tmp_path):
+    _mk_dvol_symbol_dir(tmp_path, "eth_usd")
+    with pytest.raises(ValueError, match=r"found 0.*eth_usd"):
+        hc.discover_dvol_symbol(tmp_path, "BTC")
+
+
+def test_discover_dvol_symbol_refuses_on_zero_match_when_root_absent(tmp_path):
+    with pytest.raises(ValueError, match=r"found 0"):
+        hc.discover_dvol_symbol(tmp_path, "BTC")
+    assert hc.list_dvol_symbol_dirs(tmp_path) == []
+
+
+def test_discover_dvol_symbol_refuses_on_ambiguous_match_with_dir_list(tmp_path):
+    _mk_dvol_symbol_dir(tmp_path, "btc_usd")
+    _mk_dvol_symbol_dir(tmp_path, "deribit_volatility_index.btc_usd")
+    with pytest.raises(ValueError,
+                       match=r"found 2.*btc_usd.*deribit_volatility_index\.btc_usd"):
+        hc.discover_dvol_symbol(tmp_path, "BTC")
+
+
 @pytest.mark.filterwarnings("ignore")
 def test_daily_close_two_days_wrapper_variants(tmp_path):
     pytest.importorskip("duckdb")
@@ -227,6 +271,33 @@ def test_daily_close_raises_on_field_missing(tmp_path):
             hc.daily_close(con, base, "BTC_DVOL", ["2026-01-01"])
     finally:
         con.close()
+
+
+@pytest.mark.filterwarnings("ignore")
+def test_probe_day_field_missing_reports_payload_keys(tmp_path):
+    # A loud fail must be diagnosable from the payload keys alone -- the
+    # probe (and the DvolFieldLayoutError message it feeds) must list the
+    # keys actually seen on the frame, not just an opaque status.
+    pytest.importorskip("duckdb")
+    import duckdb
+    base = tmp_path / "harvest"
+    ms0 = (date(2026, 1, 1) - date(1970, 1, 1)).days * 86_400_000
+    _write_dvol_day(base, "BTC_DVOL", "2026-01-01", [
+        (ms0, json.dumps({"markIv": 41.0, "timestamp": ms0})),
+    ])
+    con = duckdb.connect()
+    try:
+        p = hc.probe_day(con, base, "BTC_DVOL", "2026-01-01")
+    finally:
+        con.close()
+    assert p["status"] == "FIELD_MISSING"
+    assert p["keys"] == ["markIv", "timestamp"]
+    with pytest.raises(hc.DvolFieldLayoutError, match=r"markIv"):
+        duckdb_con = duckdb.connect()
+        try:
+            hc.daily_close(duckdb_con, base, "BTC_DVOL", ["2026-01-01"])
+        finally:
+            duckdb_con.close()
 
 
 @pytest.mark.filterwarnings("ignore")

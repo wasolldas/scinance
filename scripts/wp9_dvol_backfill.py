@@ -66,6 +66,9 @@ def _load_fixture_fetchers(path: str) -> dict[str, object]:
 # ---------------------------------------------------------------- --probe
 
 def cmd_probe(a: argparse.Namespace) -> int:
+    print("=== Deribit-DVOL Harvest-Verzeichnisse (raw/deribit/dvol/symbol=*) ===")
+    dvol_dirs = hc.list_dvol_symbol_dirs(a.base)
+    print(f"  gefunden unter {a.base}: {dvol_dirs}")
     fetchers = _load_fixture_fetchers(a.fixture) if a.fixture else {}
     today = _now_utc_date()
     anchors = [
@@ -146,14 +149,27 @@ def cmd_fetch(a: argparse.Namespace) -> int:
 
 # ------------------------------------------------------------- --crossval
 
-def _read_manifest_first_date(rest_dir: Path, cur: str) -> str | None:
+def _read_manifest(rest_dir: Path, cur: str) -> dict | None:
     p = rest_dir / f"{cur}_1D.manifest.json"
     if not p.is_file():
         return None
     try:
-        return json.loads(p.read_text(encoding="utf-8")).get("first_date")
+        return json.loads(p.read_text(encoding="utf-8"))
     except (ValueError, OSError):
         return None
+
+
+def _f1_from_manifest(rest_dir: Path, cur: str) -> dict | None:
+    """F1 (REST depth, from the ``--fetch`` manifest): first/last date,
+    n_days, fingerprint. Independent of whether crossval (F2) can run at
+    all -- the report must show F1 even when F2 is not executable."""
+    m = _read_manifest(rest_dir, cur)
+    if m is None:
+        return None
+    return {
+        "first_date": m.get("first_date"), "last_date": m.get("last_date"),
+        "n_days": m.get("n_rows"), "fingerprint": m.get("sha256_parquet"),
+    }
 
 
 def cmd_crossval(a: argparse.Namespace) -> int:
@@ -167,28 +183,47 @@ def cmd_crossval(a: argparse.Namespace) -> int:
     results: dict[str, dict] = {}
     try:
         for cur in a.currencies.split(","):
+            f1 = _f1_from_manifest(rest_dir, cur)
+
+            def _not_executable(status: str, detail: str) -> dict:
+                r: dict = {"status": status, "f1": f1,
+                           "f2": f"nicht ausfuehrbar: {detail}"}
+                return r
+
             rest_path = rest_dir / f"{cur}_1D.parquet"
             if not rest_path.is_file():
-                print(f"{cur}: REST-Parquet fehlt ({rest_path}) -- erst --fetch "
-                      "ausfuehren.", file=sys.stderr)
-                results[cur] = {"status": "REST_MISSING"}
+                detail = f"REST-Parquet fehlt ({rest_path}) -- erst --fetch ausfuehren."
+                print(f"{cur}: {detail}", file=sys.stderr)
+                results[cur] = _not_executable("REST_MISSING", detail)
                 continue
             rest_rows = rc.read_rest_parquet(rest_path)
             rest_daily = rc.rows_to_daily(rest_rows)
-            symbol = a.symbol_template.format(cur=cur)
+
+            if a.symbol_template:
+                symbol = a.symbol_template.format(cur=cur)
+            else:
+                try:
+                    symbol = hc.discover_dvol_symbol(base, cur)
+                except ValueError as exc:
+                    print(f"{cur}: {exc}", file=sys.stderr)
+                    results[cur] = _not_executable("DVOL_SYMBOL_NOT_FOUND", str(exc))
+                    continue
+
             days = hc.discover_harvest_days(base, symbol)
             if not days:
-                print(f"{cur}: keine Harvest-Tage unter symbol={symbol} "
-                      "gefunden.", file=sys.stderr)
-                results[cur] = {"status": "NO_HARVEST_DAYS", "symbol": symbol}
+                detail = (f"keine Harvest-Tage unter symbol={symbol} gefunden -- "
+                          f"vorhandene symbol=* Verzeichnisse: {hc.list_dvol_symbol_dirs(base)}")
+                print(f"{cur}: {detail}", file=sys.stderr)
+                results[cur] = _not_executable("NO_HARVEST_DAYS", detail)
+                results[cur]["symbol"] = symbol
                 continue
             try:
                 harvest_rows = hc.daily_close(con, base, symbol, days)
             except hc.DvolFieldLayoutError as exc:
                 print(f"{cur}: LAUT GESCHEITERT (Harvest-Feldlayout) -- {exc}",
                       file=sys.stderr)
-                results[cur] = {"status": "HARVEST_FIELD_LAYOUT_ERROR",
-                                "symbol": symbol, "detail": str(exc)}
+                results[cur] = _not_executable("HARVEST_FIELD_LAYOUT_ERROR", str(exc))
+                results[cur]["symbol"] = symbol
                 continue
             harvest_ok = [r for r in harvest_rows if "close" in r]
             verdict = cv.evaluate(rest_daily, harvest_ok, seed=a.seed)
@@ -212,7 +247,7 @@ def cmd_crossval(a: argparse.Namespace) -> int:
                 "verdict": verdict["verdict"], "reason": verdict["reason"],
                 "materiality_band_volpts": verdict["materiality_band_volpts"],
                 "diff_series_csv": str(diff_csv),
-                "f1_first_rest_date": _read_manifest_first_date(rest_dir, cur),
+                "f1": f1,
             }
             print(f"{cur}: n_overlap={verdict['n_overlap_days']} "
                   f"verdict={verdict['verdict']!r} -> {diff_csv}")
@@ -236,16 +271,22 @@ def cmd_crossval(a: argparse.Namespace) -> int:
     return 1 if bad else 0
 
 
+def _render_f1_line(f1: dict | None) -> str:
+    if f1 is None:
+        return "F1 (Tiefe, aus --fetch-Manifest): kein --fetch-Manifest gefunden."
+    return (f"F1 (Tiefe, aus --fetch-Manifest): {f1.get('first_date')}..{f1.get('last_date')} "
+            f"(n_days={f1.get('n_days')}, fingerprint={f1.get('fingerprint')})")
+
+
 def _render_markdown(results: dict[str, dict], seed: int) -> str:
     lines = ["# WP-9 DVOL: F1-Tiefe / F2-Austauschbarkeit", ""]
     for cur, r in results.items():
         lines.append(f"## {cur}")
+        lines.append(_render_f1_line(r.get("f1")))
         if r.get("status") != "OK":
-            lines.append(f"Status: {r.get('status')} -- {r.get('detail', '')}")
+            lines.append(f"F2 (Austauschbarkeit): {r.get('f2', r.get('status'))}")
             lines.append("")
             continue
-        lines.append(f"F1 (Tiefe, aus --fetch-Manifest): erster REST-Tag = "
-                      f"{r.get('f1_first_rest_date')}")
         lines.append(f"F2 (Austauschbarkeit): Ueberlappungstage n = "
                       f"{r['n_overlap_days']}, Befund = **{r['verdict']}** "
                       f"({r['reason']})")
@@ -273,9 +314,12 @@ def main() -> int:
     ap.add_argument("--base", default="data/harvest",
                     help="Harvest-Wurzel (read-only, NIE beschrieben)")
     ap.add_argument("--rest-dir", default="data/dvol_rest")
-    ap.add_argument("--symbol-template", default="{cur}_DVOL",
-                    help="[sek] Harvest-Partitions-Symbolname je Waehrung "
-                         "-- am Bestand verifizieren")
+    ap.add_argument("--symbol-template", default=None,
+                    help="Expliziter Override fuer den Harvest-Partitions-"
+                         "Symbolnamen je Waehrung (z.B. '{cur}_DVOL'). "
+                         "OHNE diese Option wird der Symbolname automatisch "
+                         "unter raw/deribit/dvol/symbol=* entdeckt "
+                         "(discover_dvol_symbol) -- kein Rateversuch mehr.")
     ap.add_argument("--out", help="Zielverzeichnis fuer --crossval "
                                    "(Default scinance3-impl/state/wp9_<heute>)")
     ap.add_argument("--start", default="2019-01-01",

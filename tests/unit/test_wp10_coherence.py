@@ -317,7 +317,9 @@ def test_perp_basis_probe_first_skips_loudly_when_fields_absent(tmp_path):
 
 
 @pytest.mark.filterwarnings("ignore")
-def test_perp_basis_computes_daily_mean_relative_basis(tmp_path):
+def test_perp_basis_uses_last_known_value_per_field_not_average(tmp_path):
+    # Both fields present together in every frame -> the LAST frame decides
+    # (not an average over ticks): mark=99.0, index=100.0 at ts0+60_000.
     pytest.importorskip("duckdb")
     import duckdb
     base = tmp_path / "harvest"
@@ -330,7 +332,94 @@ def test_perp_basis_computes_daily_mean_relative_basis(tmp_path):
     finally:
         con.close()
     assert out["status"] == "OK"
-    assert out["values"][0] == pytest.approx(0.0, abs=1e-9)  # (0.01 + -0.01)/2
+    assert out["values"][0] == pytest.approx(99.0 / 100.0 - 1.0)
+
+
+def _write_tickers_delta_day(base: Path, symbol: str, day: str,
+                             mark_events: list[tuple[int, float]],
+                             index_events: list[tuple[int, float]]) -> None:
+    """A ``bybit/tickers`` WS-DELTA day, mirroring the real harvested
+    shape: each frame carries ONLY the field(s) that changed, nested under
+    ``data`` -- e.g. ``{"topic":"tickers.BTCUSDT","type":"delta",
+    "data":{"symbol":"BTCUSDT","markPrice":"78196.70"}}``. markPrice and
+    indexPrice land in SEPARATE frames here, exactly the real-world case
+    that a first-frame/single-payload field check misses."""
+    import pyarrow as pa
+    import pyarrow.parquet as pq
+
+    d = base / "raw" / "bybit" / "tickers" / f"symbol={symbol}" / f"date={day}"
+    d.mkdir(parents=True, exist_ok=True)
+    ts_list: list[int] = []
+    payloads: list[str] = []
+    for ts, val in mark_events:
+        ts_list.append(ts)
+        payloads.append(json.dumps({"topic": f"tickers.{symbol}", "type": "delta",
+                                    "data": {"symbol": symbol, "markPrice": str(val)}}))
+    for ts, val in index_events:
+        ts_list.append(ts)
+        payloads.append(json.dumps({"topic": f"tickers.{symbol}", "type": "delta",
+                                    "data": {"symbol": symbol, "indexPrice": str(val)}}))
+    pq.write_table(pa.table({
+        "ts_local_ns": pa.array([t * 1_000_000 for t in ts_list], pa.int64()),
+        "ts_exchange_ms": pa.array(ts_list, pa.int64()),
+        "topic": pa.array([f"tickers.{symbol}"] * len(ts_list)),
+        "stream": pa.array(["tickers"] * len(ts_list)),
+        "symbol": pa.array([symbol] * len(ts_list)),
+        "payload_json": pa.array(payloads),
+    }), d / "part-0.parquet")
+
+
+@pytest.mark.filterwarnings("ignore")
+def test_perp_basis_delta_stream_last_value_across_separate_frames(tmp_path):
+    # Real bybit/tickers harvest shape: markPrice and indexPrice NEVER
+    # share a frame on this day -- the daily basis must still be built
+    # from each field's own last-known value (stateful delta semantics).
+    pytest.importorskip("duckdb")
+    import duckdb
+    base = tmp_path / "harvest"
+    ts0 = (date(2026, 1, 1) - EPOCH).days * 86_400_000
+    _write_tickers_delta_day(
+        base, "BTCUSDT", "2026-01-01",
+        mark_events=[(ts0, 100.0), (ts0 + 1_000, 102.0)],   # last mark = 102.0
+        index_events=[(ts0 + 500, 99.0), (ts0 + 2_000, 100.0)])  # last index = 100.0
+    con = duckdb.connect()
+    try:
+        out = sr.perp_basis_proxy_series(con, base, "BTCUSDT")
+        probe = sr.probe_perp_basis(con, base, "BTCUSDT")
+    finally:
+        con.close()
+    assert probe["status"] == "OK"
+    assert probe["n_days_both_fields"] == 1 and probe["n_total_days"] == 1
+    assert out["status"] == "OK"
+    assert out["days"] == ["2026-01-01"]
+    assert out["values"][0] == pytest.approx(102.0 / 100.0 - 1.0)
+
+
+@pytest.mark.filterwarnings("ignore")
+def test_perp_basis_sparse_coverage_is_skipped_not_raised(tmp_path):
+    # 1 of 3 harvested days carries BOTH fields' last-known value (1/3 <
+    # the 50% threshold) -> optional series is skipped, never raised, and
+    # the measured occurrence fraction is reported.
+    pytest.importorskip("duckdb")
+    import duckdb
+    base = tmp_path / "harvest"
+    ts0 = (date(2026, 1, 1) - EPOCH).days * 86_400_000
+    _write_tickers_delta_day(base, "BTCUSDT", "2026-01-01",
+                             mark_events=[(ts0, 100.0)], index_events=[(ts0, 100.0)])
+    _write_tickers_delta_day(base, "BTCUSDT", "2026-01-02",
+                             mark_events=[(ts0, 100.0)], index_events=[])
+    _write_tickers_delta_day(base, "BTCUSDT", "2026-01-03",
+                             mark_events=[], index_events=[(ts0, 100.0)])
+    con = duckdb.connect()
+    try:
+        out = sr.perp_basis_proxy_series(con, base, "BTCUSDT")
+    finally:
+        con.close()
+    assert out["status"] == "SKIPPED_FIELDS_SPARSE"
+    assert out["days"] == []
+    probe = out["provenance"]["probe"]
+    assert probe["status"] == "FIELDS_SPARSE"
+    assert probe["occurrence_fraction"] == pytest.approx(1 / 3)
 
 
 # ========================================================== stress_canon (c)
@@ -716,3 +805,50 @@ def test_e2e_probe_reports_missing_sources_rc1(tmp_path):
         capture_output=True, text=True, cwd=ROOT)
     assert p.returncode == 1
     assert "PROBE FEHLGESCHLAGEN" in p.stdout
+
+
+@pytest.mark.filterwarnings("ignore")
+def test_e2e_probe_optional_basis_failure_never_flips_rc(tmp_path):
+    # Pflicht series (funding, IV-RV/dvol) satisfied; the optional basis
+    # stream has NO partitions at all -- rc must stay 0 regardless.
+    pytest.importorskip("duckdb")
+    pytest.importorskip("pyarrow")
+    harvest_base = tmp_path / "harvest"
+    cache_dir = tmp_path / "barcache"
+    days = [_iso(i) for i in range(5)]
+    for d in days:
+        _write_rv_day(cache_dir, "bybit", "BTCUSDT", d, rv_target=0.01)
+        _write_dvol_day(harvest_base, "btc_usd", d, close=50.0)
+    ts0 = (date.fromisoformat(days[0]) - EPOCH).days * 86_400_000
+    for i, d in enumerate(days):
+        _write_funding_day(harvest_base, "BTCUSDT", d, [(ts0 + i * 86_400_000 + 1_000, 0.0001)])
+    p = subprocess.run(
+        [sys.executable, str(SCRIPT), "--probe", "--base", str(harvest_base),
+         "--cache-dir", str(cache_dir), "--funding-symbols", "BTCUSDT",
+         "--ivrv-currencies", "BTC", "--basis-symbols", "BTCUSDT"],
+        capture_output=True, text=True, cwd=ROOT)
+    assert p.returncode == 0, p.stdout + p.stderr
+    assert "NO_PARTITIONS" in p.stdout
+    assert "optionale Serie uebersprungen" in p.stdout
+    assert "PROBE FEHLGESCHLAGEN" not in p.stdout
+
+
+@pytest.mark.filterwarnings("ignore")
+def test_e2e_probe_prints_dvol_symbol_dirs_and_fails_loud_on_ambiguous(tmp_path):
+    # A real harvest tree with NO '{cur}_DVOL' partition, but two symbol=*
+    # dirs that both match 'btc' -- discovery must refuse (ambiguous), rc=1,
+    # and the printed directory list must show the user what actually
+    # exists instead of leaving them to guess.
+    pytest.importorskip("duckdb")
+    pytest.importorskip("pyarrow")
+    harvest_base = tmp_path / "harvest"
+    cache_dir = tmp_path / "barcache"
+    for name in ("btc_usd", "deribit_volatility_index.btc_usd"):
+        (harvest_base / "raw" / "deribit" / "dvol" / f"symbol={name}").mkdir(parents=True, exist_ok=True)
+    p = subprocess.run(
+        [sys.executable, str(SCRIPT), "--probe", "--base", str(harvest_base),
+         "--cache-dir", str(cache_dir), "--funding-symbols", "BTCUSDT",
+         "--ivrv-currencies", "BTC", "--basis-symbols", "BTCUSDT"],
+        capture_output=True, text=True, cwd=ROOT)
+    assert p.returncode == 1
+    assert "btc_usd" in p.stdout and "deribit_volatility_index.btc_usd" in p.stdout

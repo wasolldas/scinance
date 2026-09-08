@@ -12,12 +12,24 @@ FIELD LAYOUT [sek]: the volatility value is expected under a
 under ``data``/``params.data`` (JSON-RPC subscription envelope) --
 wrapper-tolerant the same way as ``wp6_optstress.extract.unwrap_payload``,
 extended with the ``params.data`` shape the WS subscription API for
-Deribit uses. This has NOT been confirmed against a live frame in this
-sandbox (read-only harvest tree access here is also fixture-only in
-tests): ``daily_close`` raises ``DvolFieldLayoutError`` loudly -- never
-silently returns ``None`` -- the moment a resolved arg_max frame does not
-carry the field under any known shape, naming the raw payload head (300
-chars) and the keys actually seen.
+Deribit uses. ALSO tolerant of ``value``/``close`` as the value-field
+name (some Deribit-index-style feeds use those instead of
+``volatility``) -- ``VOLATILITY_FIELD_ALIASES`` covers all three, tried
+across the same wrapper shapes. ``daily_close`` raises
+``DvolFieldLayoutError`` loudly -- never silently returns ``None`` -- the
+moment a resolved arg_max frame does not carry any alias under any known
+shape, naming the raw payload head (300 chars) AND the keys actually
+seen (of the payload's own top level, or of its ``data``/``params.data``
+object when the top level is a thin envelope) so a real [sek] drift is
+diagnosable from the loud-fail message alone.
+
+SYMBOL LAYOUT [sek]: the harvest partition symbol name for a currency is
+NOT assumed (``{cur}_DVOL`` turned out wrong against a real harvest tree
+-- zero partitions found). ``discover_dvol_symbol`` lists
+``raw/deribit/dvol/symbol=*`` on disk and picks the ONE directory whose
+name contains the currency case-insensitively; a CLI ``--symbol-template``
+stays available as an explicit override for when the caller already
+knows the exact name.
 
 Manifest-DONE days are PREFERRED (``bar_cache.resolve_manifest_path`` /
 ``manifest_done_days``) but not required to read: a live stream may be
@@ -37,10 +49,15 @@ __all__ = [
     "VOLATILITY_FIELD_ALIASES", "DvolFieldLayoutError",
     "unwrap_dvol_payload", "extract_volatility", "day_glob",
     "discover_harvest_days", "probe_day", "daily_close",
+    "list_dvol_symbol_dirs", "discover_dvol_symbol",
 ]
 
-#: [sek] -- expected volatility field name(s), unverified in this sandbox.
-VOLATILITY_FIELD_ALIASES: tuple[str, ...] = ("volatility",)
+#: [sek] -- accepted volatility-value field names, in preference order.
+#: ``volatility`` was the original (REST-response-shaped) assumption;
+#: ``value``/``close`` are tried too because a real harvest tree may carry
+#: the DVOL index under a plainer name. Tried across each wrapper shape
+#: (bare payload, ``data``, ``params.data``) by ``unwrap_dvol_payload``.
+VOLATILITY_FIELD_ALIASES: tuple[str, ...] = ("volatility", "value", "close")
 
 
 class DvolFieldLayoutError(RuntimeError):
@@ -93,6 +110,69 @@ def extract_volatility(tick: dict[str, Any]) -> float | None:
     return None
 
 
+def _top_level_keys(payload_json: str) -> list[str] | None:
+    """Best-effort key list for a loud-fail diagnostic: the parsed
+    payload's own keys, or -- when the top level is a thin envelope with
+    no keys of its own -- its ``data``/``params.data`` object's keys
+    instead. ``None`` only when the payload isn't parseable JSON, or
+    parses to something other than a dict (nothing key-shaped to show).
+    """
+    try:
+        obj = json.loads(payload_json)
+    except (TypeError, ValueError):
+        return None
+    if not isinstance(obj, dict):
+        return None
+    data = obj.get("data")
+    if isinstance(data, list) and len(data) == 1 and isinstance(data[0], dict):
+        data = data[0]
+    if isinstance(data, dict) and data:
+        return sorted(data.keys())
+    params = obj.get("params")
+    if isinstance(params, dict):
+        pdata = params.get("data")
+        if isinstance(pdata, dict) and pdata:
+            return sorted(pdata.keys())
+    return sorted(obj.keys())
+
+
+def list_dvol_symbol_dirs(base: Path | str) -> list[str]:
+    """Every ``raw/deribit/dvol/symbol=*`` directory name on disk, sorted
+    -- the ground truth ``discover_dvol_symbol`` picks from, and what
+    ``--probe`` prints verbatim so a mismatch is visible at a glance
+    instead of guessed at."""
+    root = Path(base) / "raw" / "deribit" / "dvol"
+    if not root.is_dir():
+        return []
+    return sorted(p.name[len("symbol="):] for p in root.iterdir()
+                  if p.is_dir() and p.name.startswith("symbol="))
+
+
+def discover_dvol_symbol(base: Path | str, currency: str) -> str:
+    """The ONE ``raw/deribit/dvol/symbol=*`` directory whose name contains
+    ``currency`` case-insensitively (e.g. ``'btc'`` matches ``btc_usd``,
+    ``BTC_DVOL``, ``deribit_volatility_index.btc_usd``, ...).
+
+    Loud ``ValueError`` -- listing every ``symbol=*`` directory actually
+    found -- when zero or more than one match: a harvest-tree symbol name
+    must never be guessed from a naming convention (``{cur}_DVOL`` was
+    exactly such a guess, and it was wrong against a real harvest tree).
+    A CLI ``--symbol-template`` stays available as an explicit override
+    for callers who already know the exact partition name.
+    """
+    found = list_dvol_symbol_dirs(base)
+    cur = currency.lower()
+    matches = [s for s in found if cur in s.lower()]
+    if len(matches) != 1:
+        root = Path(base) / "raw" / "deribit" / "dvol"
+        raise ValueError(
+            f"discover_dvol_symbol({currency!r}): expected exactly ONE "
+            f"symbol=* directory under {root} whose name contains "
+            f"{cur!r} case-insensitively, found {len(matches)} "
+            f"({matches!r}). All symbol=* directories present: {found!r}")
+    return matches[0]
+
+
 def day_glob(base: Path | str, symbol: str, day: str) -> str:
     return str(Path(base) / "raw" / "deribit" / "dvol" / f"symbol={symbol}"
                / f"date={day}" / "*.parquet")
@@ -138,8 +218,16 @@ def probe_day(con: Any, base: Path | str, symbol: str, day: str) -> dict[str, An
         return {"symbol": symbol, "date": day, "status": "NO_FRAMES"}
     tick = unwrap_dvol_payload(pj)
     if tick is None:
-        return {"symbol": symbol, "date": day, "status": "UNPARSEABLE",
-                "raw_head": pj[:300]}
+        # Distinguish "not even JSON" (truly UNPARSEABLE, nothing key-shaped
+        # to show) from "valid JSON dict, just none of the [sek] aliases" --
+        # the latter ALWAYS carries the payload's own keys so a real field
+        # drift is diagnosable from the loud-fail message alone.
+        keys = _top_level_keys(pj)
+        if keys is None:
+            return {"symbol": symbol, "date": day, "status": "UNPARSEABLE",
+                    "raw_head": pj[:300]}
+        return {"symbol": symbol, "date": day, "status": "FIELD_MISSING",
+                "keys": keys, "raw_head": pj[:300]}
     vol = extract_volatility(tick)
     if vol is None:
         return {"symbol": symbol, "date": day, "status": "FIELD_MISSING",

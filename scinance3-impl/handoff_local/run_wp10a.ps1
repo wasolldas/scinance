@@ -17,6 +17,7 @@ param(
     [string]$CacheDir = "",
     [string]$FundingSymbols = "BTCUSDT,ETHUSDT,SOLUSDT,XRPUSDT,BNBUSDT",
     [string]$IvrvCurrencies = "BTC,ETH",
+    [string]$DvolSymbolTemplate = "",
     [string]$BasisSymbols = "BTCUSDT,ETHUSDT",
     [string]$Start = "",
     [string]$End = "",
@@ -42,9 +43,16 @@ $rangeArgs = @()
 if ($Start -ne "") { $rangeArgs += @("--start", $Start) }
 if ($End -ne "") { $rangeArgs += @("--end", $End) }
 
+$dvolSymbolTemplateArgs = @()
+if ($DvolSymbolTemplate -ne "") {
+    $dvolSymbolTemplateArgs = @("--dvol-symbol-template", $DvolSymbolTemplate)
+}
+
 Write-Host "=== WP-10(A) Schritt 1: Probe (Serien/Felder, Abdeckung) ==="
+Write-Host "(ohne -DvolSymbolTemplate: dvol-Symbolname wird automatisch unter raw/deribit/dvol/symbol=* entdeckt)"
 python scripts\wp10_coherence.py --probe --base $HarvestBase --cache-dir $CacheDir `
-    --funding-symbols $FundingSymbols --ivrv-currencies $IvrvCurrencies --basis-symbols $BasisSymbols
+    --funding-symbols $FundingSymbols --ivrv-currencies $IvrvCurrencies --basis-symbols $BasisSymbols `
+    @dvolSymbolTemplateArgs
 if ($LASTEXITCODE -ne 0) {
     Write-Error "Probe fehlgeschlagen (rc=$LASTEXITCODE). Ausgabe oben pruefen; KEIN Stress-Kanon, KEIN Run."
     exit $LASTEXITCODE
@@ -63,7 +71,7 @@ Write-Host ""
 Write-Host "=== WP-10(A) Schritt 3: Run (Kohaerenz + Portfolio-Nulleffekt) ==="
 python scripts\wp10_coherence.py --run --base $HarvestBase --cache-dir $CacheDir `
     --funding-symbols $FundingSymbols --ivrv-currencies $IvrvCurrencies --basis-symbols $BasisSymbols `
-    --stress-canon-out $StressCanonOut --out $OutDir --seed $Seed @rangeArgs
+    --stress-canon-out $StressCanonOut --out $OutDir --seed $Seed @rangeArgs @dvolSymbolTemplateArgs
 $rc = $LASTEXITCODE
 
 Write-Host ""

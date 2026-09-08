@@ -21,13 +21,25 @@ can treat them uniformly:
   * ``perp_basis_proxy_series``  -- ``bybit/tickers`` markPrice vs.
     indexPrice, PROBE-FIRST: ``probe_perp_basis`` is always run before any
     aggregate query, and the series is SKIPPED (loud, status field, never
-    raised) when the fields are simply absent from this stream -- spec:
-    "soweit vorhanden".
+    raised) when the fields don't clear the coverage threshold -- spec:
+    "soweit vorhanden". DELTA-STREAM LAYOUT [sek]: harvested
+    ``bybit/tickers`` frames are WS DELTAS -- each payload carries only the
+    fields that CHANGED, so ``markPrice`` and ``indexPrice`` typically show
+    up in DIFFERENT frames, never both in the frame with the highest
+    ``ts_exchange_ms``. The daily basis therefore uses STATEFUL
+    last-known-value semantics: per UTC day, the LAST frame containing
+    ``markPrice`` and (separately) the LAST frame containing ``indexPrice``
+    -- exactly how a live ticker consumer would reconstruct current state
+    from a delta stream. A day counts toward coverage only when BOTH
+    last-known values are present; the series is OK when that holds for
+    >=50% of the symbol's harvested days, else SKIPPED with the measured
+    fraction (still optional -- see ``probe_perp_basis``).
 
 KAPITALFREI: pure data loading. No cost quantity, no PASS/FAIL.
 """
 from __future__ import annotations
 
+import json
 from pathlib import Path
 from typing import Any
 
@@ -53,10 +65,17 @@ FUNDING_FIELD_RATE = "fundingRate"
 FUNDING_FIELD_TS = "fundingRateTimestamp"
 
 PERP_BASIS_STREAM = "tickers"
-#: [sek] -- unverified against a live bybit/tickers frame in this sandbox
-#: (probe-first is exactly the point: never assumed present).
+#: [sek] -- confirmed against a real harvest tree: bybit/tickers frames are
+#: WS deltas, e.g. ``{"topic":"tickers.BTCUSDT","type":"delta",
+#: "data":{"symbol":"BTCUSDT","ask1Price":"...","markPrice":"..."},...}``
+#: -- markPrice/indexPrice appear NESTED under ``data`` on real frames, but
+#: ``_extract_field`` also accepts a bare top-level field for tolerance.
 PERP_BASIS_FIELD_MARK = "markPrice"
 PERP_BASIS_FIELD_INDEX = "indexPrice"
+#: Minimum fraction of a symbol's harvested days that must carry a
+#: last-known value for BOTH fields for the series to be reported OK
+#: instead of skipped (spec: "soweit vorhanden" -- optional, never fatal).
+PERP_BASIS_MIN_DAY_COVERAGE = 0.5
 
 
 class SeriesError(RuntimeError):
@@ -209,70 +228,154 @@ def _basis_partition_root(base: Path, symbol: str) -> Path:
     return base / "raw" / "bybit" / PERP_BASIS_STREAM / f"symbol={symbol}"
 
 
+def _basis_glob(base: Path, symbol: str) -> str:
+    return str(_basis_partition_root(base, symbol) / "date=*" / "*.parquet")
+
+
+def _basis_partition_days(base: Path, symbol: str) -> list[str]:
+    """Every ``date=`` partition directory on disk for this symbol -- a
+    directory listing only, used as the denominator for the coverage
+    fraction (cheap: no parquet I/O)."""
+    root = _basis_partition_root(base, symbol)
+    if not root.is_dir():
+        return []
+    return sorted(p.name[len("date="):] for p in root.iterdir()
+                  if p.is_dir() and p.name.startswith("date="))
+
+
+def _extract_field(payload_json: str | None, field: str) -> float | None:
+    """The numeric value of ``field`` from a raw frame -- bare top level
+    OR nested under ``data`` (the real bybit/tickers delta shape). ``None``
+    for a missing frame, unparseable JSON, or a non-numeric value."""
+    if payload_json is None:
+        return None
+    try:
+        obj = json.loads(payload_json)
+    except (TypeError, ValueError):
+        return None
+    if not isinstance(obj, dict):
+        return None
+    val = obj.get(field)
+    if val is None:
+        data = obj.get("data")
+        if isinstance(data, dict):
+            val = data.get(field)
+    if val is None:
+        return None
+    try:
+        return float(val)
+    except (TypeError, ValueError):
+        return None
+
+
+def _basis_last_values_per_day(con: Any, base: Path, symbol: str) -> list[tuple[str, str | None, str | None]]:
+    """Per UTC day (the harvest partition's own ``date=`` column), the LAST
+    frame (by ``ts_exchange_ms``) containing ``markPrice``, and SEPARATELY
+    the LAST frame containing ``indexPrice`` -- delta-stream stateful
+    last-known-value semantics (a WS ``tickers`` delta only carries
+    CHANGED fields, so mark/index routinely land in different frames, and
+    the frame with the highest ``ts_exchange_ms`` overall need carry
+    neither).
+
+    Efficiency for the ~30M-row scan: the ``LIKE`` substring filter is
+    pushed into the read_parquet scan (DuckDB can skip rows before any
+    JSON parsing), and only ``ts_exchange_ms``/``payload_json`` are read
+    per row (``date`` is a free hive-partition column, no extra I/O).
+    Returns ``[]`` when no frame in the whole symbol matches either LIKE
+    filter (distinct from "no partitions at all" -- see
+    ``probe_perp_basis``).
+    """
+    glob = _basis_glob(base, symbol)
+    mark_like = f'%"{PERP_BASIS_FIELD_MARK}"%'
+    index_like = f'%"{PERP_BASIS_FIELD_INDEX}"%'
+    rows = con.execute(f"""
+        WITH filtered AS (
+            SELECT CAST(date AS VARCHAR) AS d, ts_exchange_ms, payload_json
+            FROM read_parquet(?, hive_partitioning=1, union_by_name=1)
+            WHERE payload_json LIKE '{mark_like}' OR payload_json LIKE '{index_like}'
+        )
+        SELECT d,
+               arg_max(payload_json, ts_exchange_ms)
+                   FILTER (WHERE payload_json LIKE '{mark_like}') AS mark_payload,
+               arg_max(payload_json, ts_exchange_ms)
+                   FILTER (WHERE payload_json LIKE '{index_like}') AS idx_payload
+        FROM filtered
+        GROUP BY d
+        ORDER BY d
+    """, [glob]).fetchall()
+    return rows
+
+
 def probe_perp_basis(con: Any, base_dir: Path | str, symbol: str) -> dict[str, Any]:
-    """Probe-first (spec: "soweit vorhanden") -- markPrice/indexPrice on
-    ``bybit/tickers``. Never raises; reports FIELDS_ABSENT distinctly from
-    NO_PARTITIONS/NO_FRAMES/UNREADABLE so the caller can label the skip.
+    """Probe-first (spec: "soweit vorhanden") -- last-known markPrice/
+    indexPrice coverage on the ``bybit/tickers`` delta stream. Never
+    raises; reports FIELDS_ABSENT (neither field ever seen) and
+    FIELDS_SPARSE (seen, but below ``PERP_BASIS_MIN_DAY_COVERAGE`` of
+    harvested days) distinctly from NO_PARTITIONS/UNREADABLE so the caller
+    can label the skip.
     """
     base = Path(base_dir)
     root = _basis_partition_root(base, symbol)
     if not root.is_dir() or not any(root.glob("date=*/*.parquet")):
         return {"symbol": symbol, "status": "NO_PARTITIONS"}
-    glob = str(root / "date=*" / "*.parquet")
     try:
-        row = con.execute(f"""
-            SELECT count(*) AS n,
-                   count(*) FILTER (
-                       WHERE json_extract_string(payload_json,'$.{PERP_BASIS_FIELD_MARK}') IS NOT NULL
-                         AND json_extract_string(payload_json,'$.{PERP_BASIS_FIELD_INDEX}') IS NOT NULL
-                   ) AS n_both,
-                   arg_max(payload_json, ts_exchange_ms) AS sample
-            FROM read_parquet(?, hive_partitioning=1, union_by_name=1)
-        """, [glob]).fetchone()
+        rows = _basis_last_values_per_day(con, base, symbol)
     except Exception as exc:  # noqa: BLE001 -- glob may match nothing readable
         return {"symbol": symbol, "status": "UNREADABLE", "detail": str(exc)}
-    n, n_both, sample = row
-    if not n:
-        return {"symbol": symbol, "status": "NO_FRAMES"}
-    if not n_both:
-        return {"symbol": symbol, "status": "FIELDS_ABSENT", "n_rows": int(n),
-                "sample_head": sample[:300] if sample else None}
-    return {"symbol": symbol, "status": "OK", "n_rows": int(n),
-            "n_with_both_fields": int(n_both), "sample_head": sample[:300] if sample else None}
+
+    n_total_days = len(_basis_partition_days(base, symbol)) or len(rows)
+    n_covered = 0
+    sample = None
+    for _d, mark_pj, idx_pj in rows:
+        if sample is None:
+            sample = mark_pj or idx_pj
+        if (_extract_field(mark_pj, PERP_BASIS_FIELD_MARK) is not None
+                and _extract_field(idx_pj, PERP_BASIS_FIELD_INDEX) is not None):
+            n_covered += 1
+
+    if not rows or n_covered == 0:
+        return {"symbol": symbol, "status": "FIELDS_ABSENT", "n_total_days": n_total_days,
+                "occurrence_fraction": 0.0, "sample_head": sample[:300] if sample else None}
+    fraction = n_covered / n_total_days if n_total_days else 0.0
+    status = "OK" if fraction >= PERP_BASIS_MIN_DAY_COVERAGE else "FIELDS_SPARSE"
+    return {"symbol": symbol, "status": status, "n_total_days": n_total_days,
+            "n_days_both_fields": n_covered, "occurrence_fraction": fraction,
+            "sample_head": sample[:300] if sample else None}
 
 
 def perp_basis_proxy_series(con: Any, base_dir: Path | str, symbol: str, *,
                             start: str | None = None, end: str | None = None) -> dict[str, Any]:
-    """Daily mean relative basis ``(markPrice - indexPrice) / indexPrice``.
+    """Daily relative basis ``markPrice/indexPrice - 1``, built from the
+    LAST-known value of each field per UTC day (delta-stream stateful
+    semantics -- see ``_basis_last_values_per_day``).
 
     Probe-first: skips LOUDLY (status field, never raised) the moment the
-    probe reports anything other than OK -- an absent field on this
-    stream is an EXPECTED outcome for an optional proxy (spec: "soweit
+    probe reports anything other than OK -- sparse/absent fields on this
+    optional proxy stream are an EXPECTED outcome (spec: "soweit
     vorhanden"), not a layout drift.
     """
     base = Path(base_dir)
     p = probe_perp_basis(con, base, symbol)
     provenance = {"exchange": "bybit", "stream": PERP_BASIS_STREAM,
                   "field_mark": PERP_BASIS_FIELD_MARK, "field_index": PERP_BASIS_FIELD_INDEX,
-                  "probe": p}
+                  "min_day_coverage": PERP_BASIS_MIN_DAY_COVERAGE, "probe": p}
     if p["status"] != "OK":
+        frac = p.get("occurrence_fraction")
+        reason = p.get("detail") or (
+            f"probe-first: markPrice+indexPrice last-known coverage "
+            f"{frac if frac is not None else 0.0:.2f} < "
+            f"{PERP_BASIS_MIN_DAY_COVERAGE} threshold ({p['status']})")
         return _series(f"basis_{symbol}", "perp_basis_proxy", symbol, provenance, {},
-                       status=f"SKIPPED_{p['status']}",
-                       reason=p.get("detail") or "probe-first: no usable markPrice/indexPrice data")
+                       status=f"SKIPPED_{p['status']}", reason=reason)
 
-    glob = str(_basis_partition_root(base, symbol) / "date=*" / "*.parquet")
-    rows = con.execute(f"""
-        SELECT date AS d,
-               AVG((CAST(json_extract_string(payload_json,'$.{PERP_BASIS_FIELD_MARK}') AS DOUBLE)
-                    - CAST(json_extract_string(payload_json,'$.{PERP_BASIS_FIELD_INDEX}') AS DOUBLE))
-                   / NULLIF(CAST(json_extract_string(payload_json,'$.{PERP_BASIS_FIELD_INDEX}') AS DOUBLE), 0)) AS basis
-        FROM read_parquet(?, hive_partitioning=1, union_by_name=1)
-        WHERE json_extract_string(payload_json,'$.{PERP_BASIS_FIELD_MARK}') IS NOT NULL
-          AND json_extract_string(payload_json,'$.{PERP_BASIS_FIELD_INDEX}') IS NOT NULL
-        GROUP BY date
-        ORDER BY date
-    """, [glob]).fetchall()
-    days_values = {d: float(v) for d, v in rows if v is not None}
+    rows = _basis_last_values_per_day(con, base, symbol)
+    days_values: dict[str, float] = {}
+    for d, mark_pj, idx_pj in rows:
+        mark_val = _extract_field(mark_pj, PERP_BASIS_FIELD_MARK)
+        idx_val = _extract_field(idx_pj, PERP_BASIS_FIELD_INDEX)
+        if mark_val is None or idx_val is None or idx_val == 0:
+            continue
+        days_values[d] = mark_val / idx_val - 1.0
     if start:
         days_values = {d: v for d, v in days_values.items() if d >= start}
     if end:

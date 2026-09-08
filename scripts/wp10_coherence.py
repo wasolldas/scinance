@@ -32,7 +32,8 @@ import numpy as np
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
-from bybit_edge.research.wp9_dvol.harvest_close import discover_harvest_days  # noqa: E402
+from bybit_edge.research.wp9_dvol.harvest_close import (  # noqa: E402
+    discover_dvol_symbol, discover_harvest_days, list_dvol_symbol_dirs)
 from bybit_edge.research.wp10_coherence import coherence as co  # noqa: E402
 from bybit_edge.research.wp10_coherence import portfolio_null as pn  # noqa: E402
 from bybit_edge.research.wp10_coherence import report as rp  # noqa: E402
@@ -83,30 +84,46 @@ def _resolve_range(a: argparse.Namespace) -> tuple[str, str] | None:
     return a.start or start, a.end or end
 
 
-def _dvol_symbol_for_currency(cur: str) -> str:
-    return f"{cur}_DVOL"
+def _dvol_symbol_for_currency(a: argparse.Namespace, cur: str) -> str:
+    """The dvol harvest partition symbol for ``cur``: an explicit
+    ``--dvol-symbol-template`` override when given, else auto-discovered
+    from ``raw/deribit/dvol/symbol=*`` on disk (``{cur}_DVOL`` was a
+    [sek] guess that turned out wrong against a real harvest tree --
+    never assumed any more). Raises ``ValueError`` (caller decides how to
+    react) when discovery finds zero or more than one match."""
+    if a.dvol_symbol_template:
+        return a.dvol_symbol_template.format(cur=cur)
+    return discover_dvol_symbol(a.base, cur)
 
 
 # ---------------------------------------------------------------- --probe
 
 def cmd_probe(a: argparse.Namespace) -> int:
     con = connect_duckdb()
-    ok = True
+    ok = True  # Pflicht series only (funding, dvol/IV-RV) -- basis is optional, see below.
     try:
-        print("=== Funding (rest.fundingRate) ===")
+        print("=== Funding (rest.fundingRate) [Pflicht] ===")
         for sym in a.funding_symbols.split(","):
             p = sr.probe_funding(con, a.base, sym)
             print(f"  {sym}: {p}")
             if p["status"] == "UNREADABLE" or p.get("n_missing_fields", 0) > 0:
                 ok = False
 
-        print("=== IV-RV (deribit/dvol + WP-0 bar cache) ===")
+        print("=== IV-RV (deribit/dvol + WP-0 bar cache) [Pflicht] ===")
+        dvol_dirs = list_dvol_symbol_dirs(a.base)
+        print(f"  raw/deribit/dvol/symbol=* gefunden unter {a.base}: {dvol_dirs}")
         for cur in a.ivrv_currencies.split(","):
-            dvol_symbol = _dvol_symbol_for_currency(cur)
+            try:
+                dvol_symbol = _dvol_symbol_for_currency(a, cur)
+            except ValueError as exc:
+                print(f"  {cur}: {exc}")
+                ok = False
+                continue
             days = discover_harvest_days(a.base, dvol_symbol)
             print(f"  {cur}: dvol_symbol={dvol_symbol}, harvest_days={len(days)}")
             if not days:
-                print(f"    -> keine Harvest-Tage fuer {dvol_symbol}")
+                print(f"    -> keine Harvest-Tage fuer {dvol_symbol} "
+                      f"(gefundene symbol=* Verzeichnisse: {dvol_dirs})")
                 ok = False
             bar_symbol = _bar_symbol_for_currency(cur)
             bars_probe = Path(a.cache_dir) / "bars_1min" / f"exchange={BAR_EXCHANGE}" / f"symbol={bar_symbol}"
@@ -120,15 +137,17 @@ def cmd_probe(a: argparse.Namespace) -> int:
         for sym in a.basis_symbols.split(","):
             p = sr.probe_perp_basis(con, a.base, sym)
             print(f"  {sym}: {p}")
-            if p["status"] == "UNREADABLE":
-                ok = False
-            elif p["status"] != "OK":
+            if p["status"] != "OK":
+                # Optional series: NEVER flips rc, even on UNREADABLE -- a
+                # broken/absent OPTIONAL proxy stream must not block
+                # --stress-canon/--run, only the two Pflicht series above do.
                 print(f"    -> optionale Serie uebersprungen (soweit vorhanden): {p['status']}")
     finally:
         con.close()
 
     if not ok:
-        print("PROBE FEHLGESCHLAGEN -- kein --stress-canon/--run ohne bestandene Pflichtserien-Probe.")
+        print("PROBE FEHLGESCHLAGEN -- kein --stress-canon/--run ohne bestandene Pflichtserien-Probe "
+              "(Funding, IV-RV/dvol). Die optionale Perp-Basis-Probe wirkt sich NIE auf den rc aus.")
     return 0 if ok else 1
 
 
@@ -184,7 +203,13 @@ def cmd_run(a: argparse.Namespace) -> int:
 
         # day list for IV-RV: whatever dvol harvest days are on disk, bounded by --start/--end.
         for cur in a.ivrv_currencies.split(","):
-            dvol_symbol = _dvol_symbol_for_currency(cur)
+            try:
+                dvol_symbol = _dvol_symbol_for_currency(a, cur)
+            except ValueError as exc:
+                print(f"{cur}: {exc}", file=sys.stderr)
+                print(f"  raw/deribit/dvol/symbol=* gefunden unter {a.base}: "
+                      f"{list_dvol_symbol_dirs(a.base)}", file=sys.stderr)
+                continue
             days = [d for d in discover_harvest_days(a.base, dvol_symbol)
                     if (not a.start or d >= a.start) and (not a.end or d <= a.end)]
             s = sr.iv_rv_diff_series(con, a.base, a.cache_dir, dvol_symbol=dvol_symbol,
@@ -256,6 +281,11 @@ def main() -> int:
     ap.add_argument("--cache-dir", default="data/barcache", help="WP-0-Bar-Cache-Wurzel")
     ap.add_argument("--funding-symbols", default=",".join(FUNDING_SYMBOLS))
     ap.add_argument("--ivrv-currencies", default=",".join(IVRV_CURRENCIES))
+    ap.add_argument("--dvol-symbol-template", default=None,
+                    help="Expliziter Override fuer den dvol-Harvest-Symbolnamen "
+                         "je Waehrung (z.B. '{cur}_DVOL'). OHNE diese Option "
+                         "wird der Symbolname automatisch unter "
+                         "raw/deribit/dvol/symbol=* entdeckt (discover_dvol_symbol).")
     ap.add_argument("--basis-symbols", default=",".join(BASIS_SYMBOLS))
     ap.add_argument("--start", default=None)
     ap.add_argument("--end", default=None)

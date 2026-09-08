@@ -15,7 +15,7 @@ param(
     [string]$HarvestBase = "E:\Claude\Projects\scinance\data\harvest",
     [string]$RestDir = "",
     [string]$Currencies = "BTC,ETH",
-    [string]$SymbolTemplate = "{cur}_DVOL",
+    [string]$SymbolTemplate = "",
     [string]$OutDir = "",
     [string]$Fixture = ""
 )
@@ -50,10 +50,16 @@ if ($LASTEXITCODE -ne 0) {
     exit $LASTEXITCODE
 }
 
+$symbolTemplateArgs = @()
+if ($SymbolTemplate -ne "") {
+    $symbolTemplateArgs = @("--symbol-template", $SymbolTemplate)
+}
+
 Write-Host ""
 Write-Host "=== WP-9 Schritt 3: Crossval (F2, gegen den Harvest-Baum) ==="
+Write-Host "(ohne -SymbolTemplate: Symbolname wird automatisch unter raw/deribit/dvol/symbol=* entdeckt)"
 python scripts\wp9_dvol_backfill.py --crossval --currencies $Currencies `
-    --base $HarvestBase --rest-dir $RestDir --symbol-template $SymbolTemplate --out $OutDir
+    --base $HarvestBase --rest-dir $RestDir --out $OutDir @symbolTemplateArgs
 $rc = $LASTEXITCODE
 
 Write-Host ""
