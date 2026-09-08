@@ -1,0 +1,201 @@
+﻿**********************
+nStart der Windows PowerShell-Aufzeichnung
+Startzeit: 20260908144354
+Benutzername: PC2022\wguen
+RunAs-Benutzer: PC2022\wguen
+Konfigurationsname: 
+Computer: PC2022 (Microsoft Windows NT 10.0.26200.0)
+Hostanwendung: C:\WINDOWS\System32\WindowsPowerShell\v1.0\powershell.exe -ExecutionPolicy Bypass -File .\scinance3-impl\handoff_local\vorfragen_v1_v4.ps1
+Prozess-ID: 9108
+PSVersion: 5.1.26100.9278
+PSEdition: Desktop
+PSCompatibleVersions: 1.0, 2.0, 3.0, 4.0, 5.0, 5.1.26100.9278
+BuildVersion: 10.0.26100.9278
+CLRVersion: 4.0.30319.42000
+WSManStackVersion: 3.0
+PSRemotingProtocolVersion: 2.3
+SerializationVersion: 1.1.0.1
+**********************
+==============================================================
+ V-1  Funding-Historie: wie weit zurueck?
+==============================================================
+BTCUSDT    Records=  7074  von 2020-03-25  bis 2026-09-08  = 2357,7 Tage
+ETHUSDT    Records=  6445  von 2020-10-21  bis 2026-09-08  = 2148 Tage
+SOLUSDT    Records=  6052  von 2021-06-29  bis 2026-09-08  = 1897 Tage
+XRPUSDT    Records=  5832  von 2021-05-13  bis 2026-09-08  = 1943,7 Tage
+BNBUSDT    Records=  5692  von 2021-06-29  bis 2026-09-08  = 1897 Tage
+DOGEUSDT   Records=  5772  von 2021-06-02  bis 2026-09-08  = 1923,7 Tage
+AVAXUSDT   Records=  5457  von 2021-09-15  bis 2026-09-08  = 1818,7 Tage
+
+==============================================================
+ V-2  Datierte Futures auf Bybit: gibt es sie, sind sie liquide?
+==============================================================
+category=linear: 862 Instrumente gesamt, davon 40 datierte (contractType~Futures)
+  XRPUSDT-11SEP26        Verfall 2026-09-11  turnover24h=     1.480.246 USD  OI=418730.8
+  HYPEUSDT-11SEP26       Verfall 2026-09-11  turnover24h=       391.565 USD  OI=1804.9
+  DOGEUSDT-11SEP26       Verfall 2026-09-11  turnover24h=     1.336.114 USD  OI=624482
+  ETHUSDT-11SEP26        Verfall 2026-09-11  turnover24h=       520.053 USD  OI=2692.14
+  XAUTUSDT-11SEP26       Verfall 2026-09-11  turnover24h=        20.042 USD  OI=14.574
+  BTCUSDT-11SEP26        Verfall 2026-09-11  turnover24h=        73.043 USD  OI=153.314
+  SOLUSDT-11SEP26        Verfall 2026-09-11  turnover24h=     1.170.611 USD  OI=2179.12
+  MNTUSDT-11SEP26        Verfall 2026-09-11  turnover24h=         1.659 USD  OI=129529.8
+  ETHUSDT-18SEP26        Verfall 2026-09-18  turnover24h=       143.895 USD  OI=1572.56
+  HYPEUSDT-18SEP26       Verfall 2026-09-18  turnover24h=       548.477 USD  OI=1268.72
+  XAUTUSDT-18SEP26       Verfall 2026-09-18  turnover24h=             9 USD  OI=0.17
+  SOLUSDT-18SEP26        Verfall 2026-09-18  turnover24h=       631.906 USD  OI=1875.8
+  MNTUSDT-18SEP26        Verfall 2026-09-18  turnover24h=           349 USD  OI=79268
+  DOGEUSDT-18SEP26       Verfall 2026-09-18  turnover24h=       705.093 USD  OI=157392
+  XRPUSDT-18SEP26        Verfall 2026-09-18  turnover24h=       880.215 USD  OI=336166
+  BTCUSDT-18SEP26        Verfall 2026-09-18  turnover24h=        45.421 USD  OI=35.516
+  XRPUSDT-25SEP26        Verfall 2026-09-25  turnover24h=         3.443 USD  OI=268310
+  BTCUSDT-25SEP26        Verfall 2026-09-25  turnover24h=       526.839 USD  OI=355.036
+  HYPEUSDT-25SEP26       Verfall 2026-09-25  turnover24h=         8.620 USD  OI=5518.64
+  MNTUSDT-25SEP26        Verfall 2026-09-25  turnover24h=           149 USD  OI=91908.2
+  DOGEUSDT-25SEP26       Verfall 2026-09-25  turnover24h=       494.096 USD  OI=1289740
+  XAUTUSDT-25SEP26       Verfall 2026-09-25  turnover24h=           239 USD  OI=2.432
+  ETHUSDT-25SEP26        Verfall 2026-09-25  turnover24h=       342.498 USD  OI=11999.59
+  SOLUSDT-25SEP26        Verfall 2026-09-25  turnover24h=       429.033 USD  OI=6895.68
+  XAUTUSDT-30OCT26       Verfall 2026-10-30  turnover24h=             0 USD  OI=0
+  SOLUSDT-30OCT26        Verfall 2026-10-30  turnover24h=        46.594 USD  OI=803.84
+  XRPUSDT-30OCT26        Verfall 2026-10-30  turnover24h=       148.582 USD  OI=70069.2
+  MNTUSDT-30OCT26        Verfall 2026-10-30  turnover24h=         8.456 USD  OI=62531.6
+  DOGEUSDT-30OCT26       Verfall 2026-10-30  turnover24h=         1.441 USD  OI=921932
+  BTCUSDT-30OCT26        Verfall 2026-10-30  turnover24h=        63.655 USD  OI=44.84
+  ETHUSDT-30OCT26        Verfall 2026-10-30  turnover24h=        89.653 USD  OI=3103.76
+  HYPEUSDT-30OCT26       Verfall 2026-10-30  turnover24h=        38.695 USD  OI=967.48
+  BTCUSDT-27NOV26        Verfall 2026-11-27  turnover24h=       379.333 USD  OI=12.65
+  ETHUSDT-27NOV26        Verfall 2026-11-27  turnover24h=       142.592 USD  OI=1171.7
+  BTCUSDT-25DEC26        Verfall 2026-12-25  turnover24h=       329.039 USD  OI=241.948
+  ETHUSDT-25DEC26        Verfall 2026-12-25  turnover24h=       217.013 USD  OI=7020.64
+  ETHUSDT-26MAR27        Verfall 2027-03-26  turnover24h=       161.358 USD  OI=3568.22
+  BTCUSDT-26MAR27        Verfall 2027-03-26  turnover24h=       115.317 USD  OI=56.442
+  ETHUSDT-25JUN27        Verfall 2027-06-25  turnover24h=       177.624 USD  OI=2897.38
+  BTCUSDT-25JUN27        Verfall 2027-06-25  turnover24h=           897 USD  OI=86.61
+category=inverse: 26 Instrumente gesamt, davon 4 datierte (contractType~Futures)
+  ETHUSDU26              Verfall 2026-09-25  turnover24h=            48 USD  OI=6877610
+  BTCUSDU26              Verfall 2026-09-25  turnover24h=             2 USD  OI=9914684
+  ETHUSDZ26              Verfall 2026-12-25  turnover24h=            77 USD  OI=4660950
+  BTCUSDZ26              Verfall 2026-12-25  turnover24h=             2 USD  OI=5124130
+
+==============================================================
+ V-3  Median(Ist-Funding - Zinsanker I) auf den neuesten ~43 Tagen
+      I = 0,01 % je 8 h (Bybit-Zinsterm). Ausgabe annualisiert.
+==============================================================
+BTCUSDT    Intervall=   8h  n= 129  Median(F-I)=-0,0059 % je Intervall =   -6,41% p.a.   Mean =   -5,99% p.a.
+ETHUSDT    Intervall=   8h  n= 129  Median(F-I)=-0,0059 % je Intervall =   -6,51% p.a.   Mean =   -6,17% p.a.
+SOLUSDT    Intervall=   8h  n= 129  Median(F-I)=-0,0062 % je Intervall =   -6,81% p.a.   Mean =   -7,92% p.a.
+XRPUSDT    Intervall=   8h  n= 129  Median(F-I)=-0,0051 % je Intervall =   -5,55% p.a.   Mean =   -6,88% p.a.
+BNBUSDT    Intervall=   8h  n= 129  Median(F-I)=0,0000 % je Intervall =    0,00% p.a.   Mean =   -5,19% p.a.
+DOGEUSDT   Intervall=   8h  n= 129  Median(F-I)=-0,0043 % je Intervall =   -4,74% p.a.   Mean =   -5,76% p.a.
+AVAXUSDT   Intervall=   8h  n= 129  Median(F-I)=-0,0045 % je Intervall =   -4,94% p.a.   Mean =   -6,49% p.a.
+
+==============================================================
+ V-1b Zins-Term / Funding-Intervall / Cap je Kontrakt (instruments-info)
+      und V-6 Totzonen-Zensus (Anteil Funding exakt = I) auf V-1-Daten
+==============================================================
+linear: 862 Instrumente; Feldnamen des ersten: symbol,contractType,status,baseCoin,quoteCoin,launchTime,deliveryTime,deliveryFeeRate,priceScale,leverageFilter,priceFilter,lotSizeFilter,unifiedMarginTrade,fundingInterval,settleCoin,copyTrading,upperFundingRate,lowerFundingRate,isPreListing,preListingInfo,riskParameters,displayName,symbolType,forbidUplWithdrawal,symbolId,fullName,marketRegion,underlyingTicker
+  fundingInterval=    0 min :   40 Symbole
+  fundingInterval=  240 min :  412 Symbole
+  fundingInterval=  480 min :  409 Symbole
+  fundingInterval=   60 min :    1 Symbole
+  upperFundingRate=0          :   40 Symbole
+  upperFundingRate=0.0025     :    1 Symbole
+  upperFundingRate=0.0033     :   42 Symbole
+  upperFundingRate=0.00333    :    2 Symbole
+  upperFundingRate=0.005      :   65 Symbole
+  upperFundingRate=0.0053     :    2 Symbole
+  upperFundingRate=0.0058     :    6 Symbole
+  upperFundingRate=0.0063     :    3 Symbole
+  upperFundingRate=0.0066     :   11 Symbole
+  upperFundingRate=0.008      :   19 Symbole
+  upperFundingRate=0.01       :   49 Symbole
+  upperFundingRate=0.0125     :    2 Symbole
+  upperFundingRate=0.015      :    2 Symbole
+  upperFundingRate=0.02       :  411 Symbole
+  upperFundingRate=0.025      :  169 Symbole
+  upperFundingRate=0.04       :   25 Symbole
+  upperFundingRate=0.05       :   13 Symbole
+  BTCUSDT   interval=480 upper=0.00333 lower=-0.00333 launch=1584230400000
+  ETHUSDT   interval=480 upper=0.00333 lower=-0.00333 launch=1615766400000
+  SOLUSDT   interval=480 upper=0.005 lower=-0.005 launch=1634256000000
+  DOGEUSDT  interval=480 upper=0.0058 lower=-0.0058 launch=1622630640000
+  BTCUSDT   Totzone: exakt I in  26 von 200 Records (13,0 %); |F-I|<1e-6: 13,0 %
+  ETHUSDT   Totzone: exakt I in  22 von 200 Records (11,0 %); |F-I|<1e-6: 11,0 %
+  SOLUSDT   Totzone: exakt I in  38 von 200 Records (19,0 %); |F-I|<1e-6: 19,5 %
+  XRPUSDT   Totzone: exakt I in  41 von 200 Records (20,5 %); |F-I|<1e-6: 20,5 %
+  BNBUSDT   Totzone: exakt I in  92 von 200 Records (46,0 %); |F-I|<1e-6: 46,0 %
+  DOGEUSDT  Totzone: exakt I in  53 von 200 Records (26,5 %); |F-I|<1e-6: 27,0 %
+  AVAXUSDT  Totzone: exakt I in  56 von 200 Records (28,0 %); |F-I|<1e-6: 28,5 %
+
+==============================================================
+ V-5a Deribit-Verfallskalender (oeffentlich): Wochentag/Abstand der Verfaelle
+==============================================================
+BTC: 11 Verfalltermine offen
+  2026-09-09 Mi 08:00 UTC
+  2026-09-10 Do 08:00 UTC
+  2026-09-11 Fr 08:00 UTC
+  2026-09-12 Sa 08:00 UTC
+  2026-09-18 Fr 08:00 UTC
+  2026-09-25 Fr 08:00 UTC
+  2026-10-30 Fr 08:00 UTC
+  2026-11-27 Fr 08:00 UTC
+  2026-12-25 Fr 08:00 UTC
+  2027-03-26 Fr 08:00 UTC
+  2027-06-25 Fr 08:00 UTC
+ETH: 11 Verfalltermine offen
+  2026-09-09 Mi 08:00 UTC
+  2026-09-10 Do 08:00 UTC
+  2026-09-11 Fr 08:00 UTC
+  2026-09-12 Sa 08:00 UTC
+  2026-09-18 Fr 08:00 UTC
+  2026-09-25 Fr 08:00 UTC
+  2026-10-30 Fr 08:00 UTC
+  2026-11-27 Fr 08:00 UTC
+  2026-12-25 Fr 08:00 UTC
+  2027-03-26 Fr 08:00 UTC
+  2027-06-25 Fr 08:00 UTC
+ Ohne Primaerbeleg zur Zeitlage der Umkehr um 08:00 UTC (V-5c, Literatur) bleibt A2 gesperrt.
+
+==============================================================
+ V-4  Delivery-/Settlement-Gebuehr (manuell, Primaerquelle)
+==============================================================
+ Bitte im Bybit-Konto unter Gebuehren / Fee Rate ablesen und hier eintragen:
+   (a) Optionen: Delivery Fee bei Verfall (in % des Index) und Deckelung (in % der Praemie/Intrinsic)
+   (b) Datierte Futures (USDC/Inverse): Delivery/Settlement Fee bei Verfall
+ Ohne diese zwei Zahlen bleiben R1-K-03 und der Options-Block gesperrt (RAISE statt Default).
+
+==============================================================
+ V-5a  Deribit-Verfallskalender: gibt es woechentliche Verfaelle?
+       (oeffentlich, keine Keys; Frage (b) Effektgroesse bleibt Literatur)
+==============================================================
+BTC: 908 Optionsserien, 11 verschiedene Verfallstermine (naechste 12):
+   2026-09-09 Mi 08:00 UTC   Abstand zum vorigen: - Tage
+   2026-09-10 Do 08:00 UTC   Abstand zum vorigen: 1 Tage
+   2026-09-11 Fr 08:00 UTC   Abstand zum vorigen: 1 Tage
+   2026-09-12 Sa 08:00 UTC   Abstand zum vorigen: 1 Tage
+   2026-09-18 Fr 08:00 UTC   Abstand zum vorigen: 6 Tage
+   2026-09-25 Fr 08:00 UTC   Abstand zum vorigen: 7 Tage
+   2026-10-30 Fr 08:00 UTC   Abstand zum vorigen: 35 Tage
+   2026-11-27 Fr 08:00 UTC   Abstand zum vorigen: 28 Tage
+   2026-12-25 Fr 08:00 UTC   Abstand zum vorigen: 28 Tage
+   2027-03-26 Fr 08:00 UTC   Abstand zum vorigen: 91 Tage
+   2027-06-25 Fr 08:00 UTC   Abstand zum vorigen: 91 Tage
+ETH: 790 Optionsserien, 11 verschiedene Verfallstermine (naechste 12):
+   2026-09-09 Mi 08:00 UTC   Abstand zum vorigen: - Tage
+   2026-09-10 Do 08:00 UTC   Abstand zum vorigen: 1 Tage
+   2026-09-11 Fr 08:00 UTC   Abstand zum vorigen: 1 Tage
+   2026-09-12 Sa 08:00 UTC   Abstand zum vorigen: 1 Tage
+   2026-09-18 Fr 08:00 UTC   Abstand zum vorigen: 6 Tage
+   2026-09-25 Fr 08:00 UTC   Abstand zum vorigen: 7 Tage
+   2026-10-30 Fr 08:00 UTC   Abstand zum vorigen: 35 Tage
+   2026-11-27 Fr 08:00 UTC   Abstand zum vorigen: 28 Tage
+   2026-12-25 Fr 08:00 UTC   Abstand zum vorigen: 28 Tage
+   2027-03-26 Fr 08:00 UTC   Abstand zum vorigen: 91 Tage
+   2027-06-25 Fr 08:00 UTC   Abstand zum vorigen: 91 Tage
+ Lesart: Abstaende von 1 Tag = Tages-, 7 Tage = Wochen-, ~30 = Monats-, ~90 = Quartalsverfaelle.
+
+Ausgabe gespeichert: E:\Claude\Projects\scinance\scinance3-impl\handoff_local\results\vorfragen_20260908_1443.txt
+**********************
+Ende der Windows PowerShell-Aufzeichnung
+Endzeit: 20260908144534
+**********************
