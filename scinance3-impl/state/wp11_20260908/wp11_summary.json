@@ -1,0 +1,4009 @@
+{
+ "artifacts": {
+  "bootstrap_fingerprint": {
+   "path": "E:\\Claude\\Projects\\scinance\\scinance3-impl\\state\\wp11_20260908\\wp11_bootstrap_fingerprint.json",
+   "sha256": "d040da7a970f3c51ca02128b15ebc10f42e8f31f919446c4ed16dbd0588eb1f5"
+  },
+  "cluster_series": {
+   "pseudo_null": {
+    "n_rows": 10710,
+    "path": "E:\\Claude\\Projects\\scinance\\scinance3-impl\\state\\wp11_20260908\\wp11_pseudo_null_events.csv",
+    "sha256": "989879d59aac69d6a5f95289d35edd5d62ecc0ff942dfec4ada77ae465d9106e"
+   },
+   "real": {
+    "n_rows": 10710,
+    "path": "E:\\Claude\\Projects\\scinance\\scinance3-impl\\state\\wp11_20260908\\wp11_real_events.csv",
+    "sha256": "76344208fda31b302834f27f2f044cfd2fe56446e4a990b184bfcc0debf2c956"
+   }
+  }
+ },
+ "cache_fingerprints": {
+  "BNBUSDT": {
+   "matches": true,
+   "observed": "6f7b36259332de0b126e9d968c6ba9d0a5ffa9676bb400e627ee5358c117230a",
+   "registered": "6f7b36259332de0b126e9d968c6ba9d0a5ffa9676bb400e627ee5358c117230a"
+  },
+  "BTCUSDT": {
+   "matches": true,
+   "observed": "3be122e350df98118b26eaa16471cc070375e7593c17524753069441681dd8b6",
+   "registered": "3be122e350df98118b26eaa16471cc070375e7593c17524753069441681dd8b6"
+  },
+  "ETHUSDT": {
+   "matches": true,
+   "observed": "848ff87d3903cc59132e1653c915d79150288f424aa8d0eafe00c299ac54b098",
+   "registered": "848ff87d3903cc59132e1653c915d79150288f424aa8d0eafe00c299ac54b098"
+  },
+  "SOLUSDT": {
+   "matches": true,
+   "observed": "30d3705a316a262c0ad5e69b1ec946739a551863f7dbf4deb84c17b9d09726b6",
+   "registered": "30d3705a316a262c0ad5e69b1ec946739a551863f7dbf4deb84c17b9d09726b6"
+  },
+  "XRPUSDT": {
+   "matches": true,
+   "observed": "101284bf547ca534e02f901af54415e8185c525825c13b90d691667fd5ee47c3",
+   "registered": "101284bf547ca534e02f901af54415e8185c525825c13b90d691667fd5ee47c3"
+  }
+ },
+ "capital_free": true,
+ "cells": [
+  {
+   "era": "L",
+   "kein_befund": true,
+   "min_clusters": 30,
+   "n_clusters": 9,
+   "n_events": 9,
+   "reason": "nur 9 Ereignistage (< 30) -- KEIN BEFUND (builder-Vorgabe, loud fail)",
+   "stress_abs": true,
+   "symbol": "BTCUSDT",
+   "variable": "activity_volume"
+  },
+  {
+   "era": "L",
+   "kein_befund": true,
+   "min_clusters": 30,
+   "n_clusters": 9,
+   "n_events": 9,
+   "reason": "nur 9 Ereignistage (< 30) -- KEIN BEFUND (builder-Vorgabe, loud fail)",
+   "stress_abs": true,
+   "symbol": "BTCUSDT",
+   "variable": "activity_ntrades"
+  },
+  {
+   "era": "L",
+   "kein_befund": true,
+   "min_clusters": 30,
+   "n_clusters": 9,
+   "n_events": 9,
+   "reason": "nur 9 Ereignistage (< 30) -- KEIN BEFUND (builder-Vorgabe, loud fail)",
+   "stress_abs": true,
+   "symbol": "BTCUSDT",
+   "variable": "realized_vol"
+  },
+  {
+   "era": "L",
+   "half_life_h": {
+    "ci_hi": 0.15976771803312007,
+    "ci_lo": 0.14124782861986732,
+    "point": 0.1498970064218656
+   },
+   "kein_befund": false,
+   "lambda_per_h": {
+    "ci_hi": 4.907312114690096,
+    "ci_lo": 4.338468303191606,
+    "n_bootstrap": 1000,
+    "n_finite_reps": 1000,
+    "point": 4.624156259726581,
+    "seed": 42
+   },
+   "median_r2": 0.4663834925003711,
+   "min_clusters": 30,
+   "n_censored": 30,
+   "n_clusters": 198,
+   "n_events": 198,
+   "n_return_defined": 198,
+   "n_return_undefined": 0,
+   "p90_time_to_return_h": {
+    "censored_at_p90": true,
+    "ci_hi": 24.0,
+    "ci_lo": 21.0,
+    "n_bootstrap": 1000,
+    "n_finite_reps": 45,
+    "point": NaN,
+    "seed": 42
+   },
+   "stress_abs": false,
+   "symbol": "BTCUSDT",
+   "variable": "activity_volume"
+  },
+  {
+   "era": "L",
+   "half_life_h": {
+    "ci_hi": 0.19632811430088745,
+    "ci_lo": 0.1748365669758113,
+    "point": 0.18841413756269162
+   },
+   "kein_befund": false,
+   "lambda_per_h": {
+    "ci_hi": 3.964543530849828,
+    "ci_lo": 3.5305548725316314,
+    "n_bootstrap": 1000,
+    "n_finite_reps": 1000,
+    "point": 3.6788491008500475,
+    "seed": 42
+   },
+   "median_r2": 0.5467641391319868,
+   "min_clusters": 30,
+   "n_censored": 28,
+   "n_clusters": 198,
+   "n_events": 198,
+   "n_return_defined": 198,
+   "n_return_undefined": 0,
+   "p90_time_to_return_h": {
+    "censored_at_p90": true,
+    "ci_hi": 24.0,
+    "ci_lo": 22.0,
+    "n_bootstrap": 1000,
+    "n_finite_reps": 84,
+    "point": NaN,
+    "seed": 42
+   },
+   "stress_abs": false,
+   "symbol": "BTCUSDT",
+   "variable": "activity_ntrades"
+  },
+  {
+   "era": "L",
+   "half_life_h": {
+    "ci_hi": 0.07675544111720817,
+    "ci_lo": 0.06880049864675437,
+    "point": 0.07165947042682892
+   },
+   "kein_befund": false,
+   "lambda_per_h": {
+    "ci_hi": 10.074740651500266,
+    "ci_lo": 9.030593407723186,
+    "n_bootstrap": 1000,
+    "n_finite_reps": 1000,
+    "point": 9.672792394798869,
+    "seed": 42
+   },
+   "median_r2": 0.19967561821846308,
+   "min_clusters": 30,
+   "n_censored": 55,
+   "n_clusters": 198,
+   "n_events": 198,
+   "n_return_defined": 198,
+   "n_return_undefined": 0,
+   "p90_time_to_return_h": {
+    "censored_at_p90": true,
+    "ci_hi": NaN,
+    "ci_lo": NaN,
+    "n_bootstrap": 1000,
+    "n_finite_reps": 0,
+    "point": NaN,
+    "seed": 42
+   },
+   "stress_abs": false,
+   "symbol": "BTCUSDT",
+   "variable": "realized_vol"
+  },
+  {
+   "era": "OOS1",
+   "kein_befund": true,
+   "min_clusters": 30,
+   "n_clusters": 1,
+   "n_events": 1,
+   "reason": "nur 1 Ereignistage (< 30) -- KEIN BEFUND (builder-Vorgabe, loud fail)",
+   "stress_abs": true,
+   "symbol": "BTCUSDT",
+   "variable": "activity_volume"
+  },
+  {
+   "era": "OOS1",
+   "kein_befund": true,
+   "min_clusters": 30,
+   "n_clusters": 1,
+   "n_events": 1,
+   "reason": "nur 1 Ereignistage (< 30) -- KEIN BEFUND (builder-Vorgabe, loud fail)",
+   "stress_abs": true,
+   "symbol": "BTCUSDT",
+   "variable": "activity_ntrades"
+  },
+  {
+   "era": "OOS1",
+   "kein_befund": true,
+   "min_clusters": 30,
+   "n_clusters": 1,
+   "n_events": 1,
+   "reason": "nur 1 Ereignistage (< 30) -- KEIN BEFUND (builder-Vorgabe, loud fail)",
+   "stress_abs": true,
+   "symbol": "BTCUSDT",
+   "variable": "realized_vol"
+  },
+  {
+   "era": "OOS1",
+   "half_life_h": {
+    "ci_hi": 0.20240610286148858,
+    "ci_lo": 0.17789127791693096,
+    "point": 0.18849119646263754
+   },
+   "kein_befund": false,
+   "lambda_per_h": {
+    "ci_hi": 3.896465238074353,
+    "ci_lo": 3.4245369618834207,
+    "n_bootstrap": 1000,
+    "n_finite_reps": 1000,
+    "point": 3.677345115146213,
+    "seed": 42
+   },
+   "median_r2": 0.5514005716827607,
+   "min_clusters": 30,
+   "n_censored": 44,
+   "n_clusters": 243,
+   "n_events": 243,
+   "n_return_defined": 243,
+   "n_return_undefined": 0,
+   "p90_time_to_return_h": {
+    "censored_at_p90": true,
+    "ci_hi": NaN,
+    "ci_lo": NaN,
+    "n_bootstrap": 1000,
+    "n_finite_reps": 0,
+    "point": NaN,
+    "seed": 42
+   },
+   "stress_abs": false,
+   "symbol": "BTCUSDT",
+   "variable": "activity_volume"
+  },
+  {
+   "era": "OOS1",
+   "half_life_h": {
+    "ci_hi": 0.23984946998777784,
+    "ci_lo": 0.21189513933838852,
+    "point": 0.22852438406317285
+   },
+   "kein_befund": false,
+   "lambda_per_h": {
+    "ci_hi": 3.271180182443994,
+    "ci_lo": 2.889925838048616,
+    "n_bootstrap": 1000,
+    "n_finite_reps": 1000,
+    "point": 3.033143195643984,
+    "seed": 42
+   },
+   "median_r2": 0.6117426273190536,
+   "min_clusters": 30,
+   "n_censored": 52,
+   "n_clusters": 243,
+   "n_events": 243,
+   "n_return_defined": 243,
+   "n_return_undefined": 0,
+   "p90_time_to_return_h": {
+    "censored_at_p90": true,
+    "ci_hi": 24.0,
+    "ci_lo": 24.0,
+    "n_bootstrap": 1000,
+    "n_finite_reps": 30,
+    "point": NaN,
+    "seed": 42
+   },
+   "stress_abs": false,
+   "symbol": "BTCUSDT",
+   "variable": "activity_ntrades"
+  },
+  {
+   "era": "OOS1",
+   "half_life_h": {
+    "ci_hi": 0.10006130825845509,
+    "ci_lo": 0.08861166887510832,
+    "point": 0.0937244272457503
+   },
+   "kein_befund": false,
+   "lambda_per_h": {
+    "ci_hi": 7.822301389412783,
+    "ci_lo": 6.927224844687906,
+    "n_bootstrap": 1000,
+    "n_finite_reps": 1000,
+    "point": 7.395587265019796,
+    "seed": 42
+   },
+   "median_r2": 0.2937734913024892,
+   "min_clusters": 30,
+   "n_censored": 46,
+   "n_clusters": 243,
+   "n_events": 243,
+   "n_return_defined": 243,
+   "n_return_undefined": 0,
+   "p90_time_to_return_h": {
+    "censored_at_p90": true,
+    "ci_hi": 24.0,
+    "ci_lo": 24.0,
+    "n_bootstrap": 1000,
+    "n_finite_reps": 68,
+    "point": NaN,
+    "seed": 42
+   },
+   "stress_abs": false,
+   "symbol": "BTCUSDT",
+   "variable": "realized_vol"
+  },
+  {
+   "era": "OOS2",
+   "kein_befund": true,
+   "min_clusters": 30,
+   "n_clusters": 3,
+   "n_events": 3,
+   "reason": "nur 3 Ereignistage (< 30) -- KEIN BEFUND (builder-Vorgabe, loud fail)",
+   "stress_abs": true,
+   "symbol": "BTCUSDT",
+   "variable": "activity_volume"
+  },
+  {
+   "era": "OOS2",
+   "kein_befund": true,
+   "min_clusters": 30,
+   "n_clusters": 3,
+   "n_events": 3,
+   "reason": "nur 3 Ereignistage (< 30) -- KEIN BEFUND (builder-Vorgabe, loud fail)",
+   "stress_abs": true,
+   "symbol": "BTCUSDT",
+   "variable": "activity_ntrades"
+  },
+  {
+   "era": "OOS2",
+   "kein_befund": true,
+   "min_clusters": 30,
+   "n_clusters": 3,
+   "n_events": 3,
+   "reason": "nur 3 Ereignistage (< 30) -- KEIN BEFUND (builder-Vorgabe, loud fail)",
+   "stress_abs": true,
+   "symbol": "BTCUSDT",
+   "variable": "realized_vol"
+  },
+  {
+   "era": "OOS2",
+   "half_life_h": {
+    "ci_hi": 0.21613529182174357,
+    "ci_lo": 0.19194467095197848,
+    "point": 0.19799830406133814
+   },
+   "kein_befund": false,
+   "lambda_per_h": {
+    "ci_hi": 3.6111822074672744,
+    "ci_lo": 3.207006013305845,
+    "n_bootstrap": 1000,
+    "n_finite_reps": 1000,
+    "point": 3.5007733214988264,
+    "seed": 42
+   },
+   "median_r2": 0.5633029011067512,
+   "min_clusters": 30,
+   "n_censored": 51,
+   "n_clusters": 222,
+   "n_events": 222,
+   "n_return_defined": 222,
+   "n_return_undefined": 0,
+   "p90_time_to_return_h": {
+    "censored_at_p90": true,
+    "ci_hi": 24.0,
+    "ci_lo": 24.0,
+    "n_bootstrap": 1000,
+    "n_finite_reps": 18,
+    "point": NaN,
+    "seed": 42
+   },
+   "stress_abs": false,
+   "symbol": "BTCUSDT",
+   "variable": "activity_volume"
+  },
+  {
+   "era": "OOS2",
+   "half_life_h": {
+    "ci_hi": 0.2735797163183865,
+    "ci_lo": 0.22876270779899574,
+    "point": 0.24204233870280628
+   },
+   "kein_befund": false,
+   "lambda_per_h": {
+    "ci_hi": 3.0299832836783205,
+    "ci_lo": 2.5336205106422245,
+    "n_bootstrap": 1000,
+    "n_finite_reps": 1000,
+    "point": 2.8637435263383066,
+    "seed": 42
+   },
+   "median_r2": 0.6275742917225023,
+   "min_clusters": 30,
+   "n_censored": 57,
+   "n_clusters": 222,
+   "n_events": 222,
+   "n_return_defined": 222,
+   "n_return_undefined": 0,
+   "p90_time_to_return_h": {
+    "censored_at_p90": true,
+    "ci_hi": NaN,
+    "ci_lo": NaN,
+    "n_bootstrap": 1000,
+    "n_finite_reps": 0,
+    "point": NaN,
+    "seed": 42
+   },
+   "stress_abs": false,
+   "symbol": "BTCUSDT",
+   "variable": "activity_ntrades"
+  },
+  {
+   "era": "OOS2",
+   "half_life_h": {
+    "ci_hi": 0.09156615501150228,
+    "ci_lo": 0.08217680502722877,
+    "point": 0.08722689369493825
+   },
+   "kein_befund": false,
+   "lambda_per_h": {
+    "ci_hi": 8.434827568804547,
+    "ci_lo": 7.569905938202539,
+    "n_bootstrap": 1000,
+    "n_finite_reps": 1000,
+    "point": 7.9464847502665155,
+    "seed": 42
+   },
+   "median_r2": 0.2662649953050328,
+   "min_clusters": 30,
+   "n_censored": 58,
+   "n_clusters": 222,
+   "n_events": 222,
+   "n_return_defined": 222,
+   "n_return_undefined": 0,
+   "p90_time_to_return_h": {
+    "censored_at_p90": true,
+    "ci_hi": 24.0,
+    "ci_lo": 24.0,
+    "n_bootstrap": 1000,
+    "n_finite_reps": 8,
+    "point": NaN,
+    "seed": 42
+   },
+   "stress_abs": false,
+   "symbol": "BTCUSDT",
+   "variable": "realized_vol"
+  },
+  {
+   "era": "OTHER",
+   "kein_befund": true,
+   "min_clusters": 30,
+   "n_clusters": 13,
+   "n_events": 13,
+   "reason": "nur 13 Ereignistage (< 30) -- KEIN BEFUND (builder-Vorgabe, loud fail)",
+   "stress_abs": true,
+   "symbol": "BTCUSDT",
+   "variable": "activity_volume"
+  },
+  {
+   "era": "OTHER",
+   "kein_befund": true,
+   "min_clusters": 30,
+   "n_clusters": 13,
+   "n_events": 13,
+   "reason": "nur 13 Ereignistage (< 30) -- KEIN BEFUND (builder-Vorgabe, loud fail)",
+   "stress_abs": true,
+   "symbol": "BTCUSDT",
+   "variable": "activity_ntrades"
+  },
+  {
+   "era": "OTHER",
+   "kein_befund": true,
+   "min_clusters": 30,
+   "n_clusters": 13,
+   "n_events": 13,
+   "reason": "nur 13 Ereignistage (< 30) -- KEIN BEFUND (builder-Vorgabe, loud fail)",
+   "stress_abs": true,
+   "symbol": "BTCUSDT",
+   "variable": "realized_vol"
+  },
+  {
+   "era": "OTHER",
+   "half_life_h": {
+    "ci_hi": 0.1218265202076649,
+    "ci_lo": 0.10396071111038993,
+    "point": 0.11173171243076484
+   },
+   "kein_befund": false,
+   "lambda_per_h": {
+    "ci_hi": 6.667395530066469,
+    "ci_lo": 5.689624717002586,
+    "n_bootstrap": 1000,
+    "n_finite_reps": 1000,
+    "point": 6.20367454754135,
+    "seed": 42
+   },
+   "median_r2": 0.35961277201469666,
+   "min_clusters": 30,
+   "n_censored": 45,
+   "n_clusters": 238,
+   "n_events": 238,
+   "n_return_defined": 238,
+   "n_return_undefined": 0,
+   "p90_time_to_return_h": {
+    "censored_at_p90": true,
+    "ci_hi": 24.0,
+    "ci_lo": 24.0,
+    "n_bootstrap": 1000,
+    "n_finite_reps": 80,
+    "point": NaN,
+    "seed": 42
+   },
+   "stress_abs": false,
+   "symbol": "BTCUSDT",
+   "variable": "activity_volume"
+  },
+  {
+   "era": "OTHER",
+   "half_life_h": {
+    "ci_hi": 0.1589197205009653,
+    "ci_lo": 0.12882294541625866,
+    "point": 0.13796238419149812
+   },
+   "kein_befund": false,
+   "lambda_per_h": {
+    "ci_hi": 5.380618944243325,
+    "ci_lo": 4.361618422024188,
+    "n_bootstrap": 1000,
+    "n_finite_reps": 1000,
+    "point": 5.02417513746229,
+    "seed": 42
+   },
+   "median_r2": 0.43535324898576994,
+   "min_clusters": 30,
+   "n_censored": 48,
+   "n_clusters": 238,
+   "n_events": 238,
+   "n_return_defined": 238,
+   "n_return_undefined": 0,
+   "p90_time_to_return_h": {
+    "censored_at_p90": true,
+    "ci_hi": 24.0,
+    "ci_lo": 24.0,
+    "n_bootstrap": 1000,
+    "n_finite_reps": 62,
+    "point": NaN,
+    "seed": 42
+   },
+   "stress_abs": false,
+   "symbol": "BTCUSDT",
+   "variable": "activity_ntrades"
+  },
+  {
+   "era": "OTHER",
+   "half_life_h": {
+    "ci_hi": 0.06946356754932627,
+    "ci_lo": 0.06064930949919543,
+    "point": 0.06504684553268361
+   },
+   "kein_befund": false,
+   "lambda_per_h": {
+    "ci_hi": 11.428772829955145,
+    "ci_lo": 9.97857157376404,
+    "n_bootstrap": 1000,
+    "n_finite_reps": 1000,
+    "point": 10.656122904709726,
+    "seed": 42
+   },
+   "median_r2": 0.16942105509199235,
+   "min_clusters": 30,
+   "n_censored": 57,
+   "n_clusters": 238,
+   "n_events": 238,
+   "n_return_defined": 238,
+   "n_return_undefined": 0,
+   "p90_time_to_return_h": {
+    "censored_at_p90": true,
+    "ci_hi": 24.0,
+    "ci_lo": 24.0,
+    "n_bootstrap": 1000,
+    "n_finite_reps": 43,
+    "point": NaN,
+    "seed": 42
+   },
+   "stress_abs": false,
+   "symbol": "BTCUSDT",
+   "variable": "realized_vol"
+  },
+  {
+   "era": "L",
+   "kein_befund": true,
+   "min_clusters": 30,
+   "n_clusters": 8,
+   "n_events": 8,
+   "reason": "nur 8 Ereignistage (< 30) -- KEIN BEFUND (builder-Vorgabe, loud fail)",
+   "stress_abs": true,
+   "symbol": "ETHUSDT",
+   "variable": "activity_volume"
+  },
+  {
+   "era": "L",
+   "kein_befund": true,
+   "min_clusters": 30,
+   "n_clusters": 8,
+   "n_events": 8,
+   "reason": "nur 8 Ereignistage (< 30) -- KEIN BEFUND (builder-Vorgabe, loud fail)",
+   "stress_abs": true,
+   "symbol": "ETHUSDT",
+   "variable": "activity_ntrades"
+  },
+  {
+   "era": "L",
+   "kein_befund": true,
+   "min_clusters": 30,
+   "n_clusters": 8,
+   "n_events": 8,
+   "reason": "nur 8 Ereignistage (< 30) -- KEIN BEFUND (builder-Vorgabe, loud fail)",
+   "stress_abs": true,
+   "symbol": "ETHUSDT",
+   "variable": "realized_vol"
+  },
+  {
+   "era": "L",
+   "half_life_h": {
+    "ci_hi": 0.12759979810928046,
+    "ci_lo": 0.11054446425987816,
+    "point": 0.1209415773274518
+   },
+   "kein_befund": false,
+   "lambda_per_h": {
+    "ci_hi": 6.270302047241649,
+    "ci_lo": 5.432196530329244,
+    "n_bootstrap": 1000,
+    "n_finite_reps": 1000,
+    "point": 5.731256329518798,
+    "seed": 42
+   },
+   "median_r2": 0.38558560348830356,
+   "min_clusters": 30,
+   "n_censored": 43,
+   "n_clusters": 182,
+   "n_events": 182,
+   "n_return_defined": 182,
+   "n_return_undefined": 0,
+   "p90_time_to_return_h": {
+    "censored_at_p90": true,
+    "ci_hi": 24.0,
+    "ci_lo": 24.0,
+    "n_bootstrap": 1000,
+    "n_finite_reps": 27,
+    "point": NaN,
+    "seed": 42
+   },
+   "stress_abs": false,
+   "symbol": "ETHUSDT",
+   "variable": "activity_volume"
+  },
+  {
+   "era": "L",
+   "half_life_h": {
+    "ci_hi": 0.1827516024107133,
+    "ci_lo": 0.1488677312616223,
+    "point": 0.16481483488907114
+   },
+   "kein_befund": false,
+   "lambda_per_h": {
+    "ci_hi": 4.656127789989614,
+    "ci_lo": 3.792837772235651,
+    "n_bootstrap": 1000,
+    "n_finite_reps": 1000,
+    "point": 4.205611594529516,
+    "seed": 42
+   },
+   "median_r2": 0.4979615278640325,
+   "min_clusters": 30,
+   "n_censored": 35,
+   "n_clusters": 182,
+   "n_events": 182,
+   "n_return_defined": 182,
+   "n_return_undefined": 0,
+   "p90_time_to_return_h": {
+    "censored_at_p90": true,
+    "ci_hi": 24.0,
+    "ci_lo": 24.0,
+    "n_bootstrap": 1000,
+    "n_finite_reps": 68,
+    "point": NaN,
+    "seed": 42
+   },
+   "stress_abs": false,
+   "symbol": "ETHUSDT",
+   "variable": "activity_ntrades"
+  },
+  {
+   "era": "L",
+   "half_life_h": {
+    "ci_hi": 0.07249798662156133,
+    "ci_lo": 0.06084743728977256,
+    "point": 0.06542428684903873
+   },
+   "kein_befund": false,
+   "lambda_per_h": {
+    "ci_hi": 11.391559142564773,
+    "ci_lo": 9.560916280036379,
+    "n_bootstrap": 1000,
+    "n_finite_reps": 1000,
+    "point": 10.594646330029192,
+    "seed": 42
+   },
+   "median_r2": 0.17181690640951713,
+   "min_clusters": 30,
+   "n_censored": 60,
+   "n_clusters": 182,
+   "n_events": 182,
+   "n_return_defined": 182,
+   "n_return_undefined": 0,
+   "p90_time_to_return_h": {
+    "censored_at_p90": true,
+    "ci_hi": NaN,
+    "ci_lo": NaN,
+    "n_bootstrap": 1000,
+    "n_finite_reps": 0,
+    "point": NaN,
+    "seed": 42
+   },
+   "stress_abs": false,
+   "symbol": "ETHUSDT",
+   "variable": "realized_vol"
+  },
+  {
+   "era": "OOS1",
+   "kein_befund": true,
+   "min_clusters": 30,
+   "n_clusters": 1,
+   "n_events": 1,
+   "reason": "nur 1 Ereignistage (< 30) -- KEIN BEFUND (builder-Vorgabe, loud fail)",
+   "stress_abs": true,
+   "symbol": "ETHUSDT",
+   "variable": "activity_volume"
+  },
+  {
+   "era": "OOS1",
+   "kein_befund": true,
+   "min_clusters": 30,
+   "n_clusters": 1,
+   "n_events": 1,
+   "reason": "nur 1 Ereignistage (< 30) -- KEIN BEFUND (builder-Vorgabe, loud fail)",
+   "stress_abs": true,
+   "symbol": "ETHUSDT",
+   "variable": "activity_ntrades"
+  },
+  {
+   "era": "OOS1",
+   "kein_befund": true,
+   "min_clusters": 30,
+   "n_clusters": 1,
+   "n_events": 1,
+   "reason": "nur 1 Ereignistage (< 30) -- KEIN BEFUND (builder-Vorgabe, loud fail)",
+   "stress_abs": true,
+   "symbol": "ETHUSDT",
+   "variable": "realized_vol"
+  },
+  {
+   "era": "OOS1",
+   "half_life_h": {
+    "ci_hi": 0.15607268286119413,
+    "ci_lo": 0.1433327518032765,
+    "point": 0.14771452964064524
+   },
+   "kein_befund": false,
+   "lambda_per_h": {
+    "ci_hi": 4.835930182316504,
+    "ci_lo": 4.441181940701355,
+    "n_bootstrap": 1000,
+    "n_finite_reps": 1000,
+    "point": 4.692477999599698,
+    "seed": 42
+   },
+   "median_r2": 0.4633886366259954,
+   "min_clusters": 30,
+   "n_censored": 47,
+   "n_clusters": 235,
+   "n_events": 235,
+   "n_return_defined": 235,
+   "n_return_undefined": 0,
+   "p90_time_to_return_h": {
+    "censored_at_p90": true,
+    "ci_hi": NaN,
+    "ci_lo": NaN,
+    "n_bootstrap": 1000,
+    "n_finite_reps": 0,
+    "point": NaN,
+    "seed": 42
+   },
+   "stress_abs": false,
+   "symbol": "ETHUSDT",
+   "variable": "activity_volume"
+  },
+  {
+   "era": "OOS1",
+   "half_life_h": {
+    "ci_hi": 0.20105742546624988,
+    "ci_lo": 0.1870502889627784,
+    "point": 0.19325048699230882
+   },
+   "kein_befund": false,
+   "lambda_per_h": {
+    "ci_hi": 3.7056728669255166,
+    "ci_lo": 3.447508486456269,
+    "n_bootstrap": 1000,
+    "n_finite_reps": 1000,
+    "point": 3.5867810288495257,
+    "seed": 42
+   },
+   "median_r2": 0.5572682821524952,
+   "min_clusters": 30,
+   "n_censored": 48,
+   "n_clusters": 235,
+   "n_events": 235,
+   "n_return_defined": 235,
+   "n_return_undefined": 0,
+   "p90_time_to_return_h": {
+    "censored_at_p90": true,
+    "ci_hi": 24.0,
+    "ci_lo": 24.0,
+    "n_bootstrap": 1000,
+    "n_finite_reps": 37,
+    "point": NaN,
+    "seed": 42
+   },
+   "stress_abs": false,
+   "symbol": "ETHUSDT",
+   "variable": "activity_ntrades"
+  },
+  {
+   "era": "OOS1",
+   "half_life_h": {
+    "ci_hi": 0.08175297567461547,
+    "ci_lo": 0.07211509269016451,
+    "point": 0.07628154471962706
+   },
+   "kein_befund": false,
+   "lambda_per_h": {
+    "ci_hi": 9.6116798121301,
+    "ci_lo": 8.478555977200589,
+    "n_bootstrap": 1000,
+    "n_finite_reps": 1000,
+    "point": 9.08669564974869,
+    "seed": 42
+   },
+   "median_r2": 0.21813377292450953,
+   "min_clusters": 30,
+   "n_censored": 45,
+   "n_clusters": 235,
+   "n_events": 235,
+   "n_return_defined": 235,
+   "n_return_undefined": 0,
+   "p90_time_to_return_h": {
+    "censored_at_p90": true,
+    "ci_hi": 24.0,
+    "ci_lo": 24.0,
+    "n_bootstrap": 1000,
+    "n_finite_reps": 53,
+    "point": NaN,
+    "seed": 42
+   },
+   "stress_abs": false,
+   "symbol": "ETHUSDT",
+   "variable": "realized_vol"
+  },
+  {
+   "era": "OOS2",
+   "kein_befund": true,
+   "min_clusters": 30,
+   "n_clusters": 3,
+   "n_events": 3,
+   "reason": "nur 3 Ereignistage (< 30) -- KEIN BEFUND (builder-Vorgabe, loud fail)",
+   "stress_abs": true,
+   "symbol": "ETHUSDT",
+   "variable": "activity_volume"
+  },
+  {
+   "era": "OOS2",
+   "kein_befund": true,
+   "min_clusters": 30,
+   "n_clusters": 3,
+   "n_events": 3,
+   "reason": "nur 3 Ereignistage (< 30) -- KEIN BEFUND (builder-Vorgabe, loud fail)",
+   "stress_abs": true,
+   "symbol": "ETHUSDT",
+   "variable": "activity_ntrades"
+  },
+  {
+   "era": "OOS2",
+   "kein_befund": true,
+   "min_clusters": 30,
+   "n_clusters": 3,
+   "n_events": 3,
+   "reason": "nur 3 Ereignistage (< 30) -- KEIN BEFUND (builder-Vorgabe, loud fail)",
+   "stress_abs": true,
+   "symbol": "ETHUSDT",
+   "variable": "realized_vol"
+  },
+  {
+   "era": "OOS2",
+   "half_life_h": {
+    "ci_hi": 0.17456230645210447,
+    "ci_lo": 0.16120482512404546,
+    "point": 0.16708813082497775
+   },
+   "kein_befund": false,
+   "lambda_per_h": {
+    "ci_hi": 4.299791771285851,
+    "ci_lo": 3.970772354283297,
+    "n_bootstrap": 1000,
+    "n_finite_reps": 1000,
+    "point": 4.148392690358158,
+    "seed": 42
+   },
+   "median_r2": 0.5028869384475769,
+   "min_clusters": 30,
+   "n_censored": 45,
+   "n_clusters": 223,
+   "n_events": 223,
+   "n_return_defined": 223,
+   "n_return_undefined": 0,
+   "p90_time_to_return_h": {
+    "censored_at_p90": true,
+    "ci_hi": 24.0,
+    "ci_lo": 24.0,
+    "n_bootstrap": 1000,
+    "n_finite_reps": 43,
+    "point": NaN,
+    "seed": 42
+   },
+   "stress_abs": false,
+   "symbol": "ETHUSDT",
+   "variable": "activity_volume"
+  },
+  {
+   "era": "OOS2",
+   "half_life_h": {
+    "ci_hi": 0.27343531769481927,
+    "ci_lo": 0.23582524379059192,
+    "point": 0.2526934465964099
+   },
+   "kein_befund": false,
+   "lambda_per_h": {
+    "ci_hi": 2.9392408099255314,
+    "ci_lo": 2.53495849184181,
+    "n_bootstrap": 1000,
+    "n_finite_reps": 1000,
+    "point": 2.743035840050919,
+    "seed": 42
+   },
+   "median_r2": 0.6412811229701153,
+   "min_clusters": 30,
+   "n_censored": 48,
+   "n_clusters": 223,
+   "n_events": 223,
+   "n_return_defined": 223,
+   "n_return_undefined": 0,
+   "p90_time_to_return_h": {
+    "censored_at_p90": true,
+    "ci_hi": 22.0,
+    "ci_lo": 22.0,
+    "n_bootstrap": 1000,
+    "n_finite_reps": 1,
+    "point": NaN,
+    "seed": 42
+   },
+   "stress_abs": false,
+   "symbol": "ETHUSDT",
+   "variable": "activity_ntrades"
+  },
+  {
+   "era": "OOS2",
+   "half_life_h": {
+    "ci_hi": 0.07831685021829099,
+    "ci_lo": 0.06948803362231948,
+    "point": 0.07327010867562962
+   },
+   "kein_befund": false,
+   "lambda_per_h": {
+    "ci_hi": 9.97505821401323,
+    "ci_lo": 8.850549768382539,
+    "n_bootstrap": 1000,
+    "n_finite_reps": 1000,
+    "point": 9.46016312912189,
+    "seed": 42
+   },
+   "median_r2": 0.20717441668816472,
+   "min_clusters": 30,
+   "n_censored": 59,
+   "n_clusters": 223,
+   "n_events": 223,
+   "n_return_defined": 223,
+   "n_return_undefined": 0,
+   "p90_time_to_return_h": {
+    "censored_at_p90": true,
+    "ci_hi": 24.0,
+    "ci_lo": 24.0,
+    "n_bootstrap": 1000,
+    "n_finite_reps": 32,
+    "point": NaN,
+    "seed": 42
+   },
+   "stress_abs": false,
+   "symbol": "ETHUSDT",
+   "variable": "realized_vol"
+  },
+  {
+   "era": "OTHER",
+   "kein_befund": true,
+   "min_clusters": 30,
+   "n_clusters": 8,
+   "n_events": 8,
+   "reason": "nur 8 Ereignistage (< 30) -- KEIN BEFUND (builder-Vorgabe, loud fail)",
+   "stress_abs": true,
+   "symbol": "ETHUSDT",
+   "variable": "activity_volume"
+  },
+  {
+   "era": "OTHER",
+   "kein_befund": true,
+   "min_clusters": 30,
+   "n_clusters": 8,
+   "n_events": 8,
+   "reason": "nur 8 Ereignistage (< 30) -- KEIN BEFUND (builder-Vorgabe, loud fail)",
+   "stress_abs": true,
+   "symbol": "ETHUSDT",
+   "variable": "activity_ntrades"
+  },
+  {
+   "era": "OTHER",
+   "kein_befund": true,
+   "min_clusters": 30,
+   "n_clusters": 8,
+   "n_events": 8,
+   "reason": "nur 8 Ereignistage (< 30) -- KEIN BEFUND (builder-Vorgabe, loud fail)",
+   "stress_abs": true,
+   "symbol": "ETHUSDT",
+   "variable": "realized_vol"
+  },
+  {
+   "era": "OTHER",
+   "half_life_h": {
+    "ci_hi": 0.13488597379899125,
+    "ci_lo": 0.11548834228351189,
+    "point": 0.12388488879790491
+   },
+   "kein_befund": false,
+   "lambda_per_h": {
+    "ci_hi": 6.001880075984993,
+    "ci_lo": 5.138763957717959,
+    "n_bootstrap": 1000,
+    "n_finite_reps": 1000,
+    "point": 5.595090630389035,
+    "seed": 42
+   },
+   "median_r2": 0.39822985466302296,
+   "min_clusters": 30,
+   "n_censored": 44,
+   "n_clusters": 169,
+   "n_events": 169,
+   "n_return_defined": 169,
+   "n_return_undefined": 0,
+   "p90_time_to_return_h": {
+    "censored_at_p90": true,
+    "ci_hi": 24.0,
+    "ci_lo": 24.0,
+    "n_bootstrap": 1000,
+    "n_finite_reps": 19,
+    "point": NaN,
+    "seed": 42
+   },
+   "stress_abs": false,
+   "symbol": "ETHUSDT",
+   "variable": "activity_volume"
+  },
+  {
+   "era": "OTHER",
+   "half_life_h": {
+    "ci_hi": 0.22049980954492837,
+    "ci_lo": 0.18629895177748979,
+    "point": 0.203901132393772
+   },
+   "kein_befund": false,
+   "lambda_per_h": {
+    "ci_hi": 3.7206177165603203,
+    "ci_lo": 3.143527343585808,
+    "n_bootstrap": 1000,
+    "n_finite_reps": 1000,
+    "point": 3.399427812991964,
+    "seed": 42
+   },
+   "median_r2": 0.5713206252127434,
+   "min_clusters": 30,
+   "n_censored": 47,
+   "n_clusters": 169,
+   "n_events": 169,
+   "n_return_defined": 169,
+   "n_return_undefined": 0,
+   "p90_time_to_return_h": {
+    "censored_at_p90": true,
+    "ci_hi": 24.0,
+    "ci_lo": 24.0,
+    "n_bootstrap": 1000,
+    "n_finite_reps": 17,
+    "point": NaN,
+    "seed": 42
+   },
+   "stress_abs": false,
+   "symbol": "ETHUSDT",
+   "variable": "activity_ntrades"
+  },
+  {
+   "era": "OTHER",
+   "half_life_h": {
+    "ci_hi": 0.0663307232021857,
+    "ci_lo": 0.0616468911121432,
+    "point": 0.06456812791061077
+   },
+   "kein_befund": false,
+   "lambda_per_h": {
+    "ci_hi": 11.243830273598489,
+    "ci_lo": 10.44986617207733,
+    "n_bootstrap": 1000,
+    "n_finite_reps": 1000,
+    "point": 10.735128971364173,
+    "seed": 42
+   },
+   "median_r2": 0.16757095787818455,
+   "min_clusters": 30,
+   "n_censored": 50,
+   "n_clusters": 169,
+   "n_events": 169,
+   "n_return_defined": 169,
+   "n_return_undefined": 0,
+   "p90_time_to_return_h": {
+    "censored_at_p90": true,
+    "ci_hi": 24.0,
+    "ci_lo": 24.0,
+    "n_bootstrap": 1000,
+    "n_finite_reps": 20,
+    "point": NaN,
+    "seed": 42
+   },
+   "stress_abs": false,
+   "symbol": "ETHUSDT",
+   "variable": "realized_vol"
+  },
+  {
+   "era": "L",
+   "kein_befund": true,
+   "min_clusters": 30,
+   "n_clusters": 9,
+   "n_events": 9,
+   "reason": "nur 9 Ereignistage (< 30) -- KEIN BEFUND (builder-Vorgabe, loud fail)",
+   "stress_abs": true,
+   "symbol": "XRPUSDT",
+   "variable": "activity_volume"
+  },
+  {
+   "era": "L",
+   "kein_befund": true,
+   "min_clusters": 30,
+   "n_clusters": 9,
+   "n_events": 9,
+   "reason": "nur 9 Ereignistage (< 30) -- KEIN BEFUND (builder-Vorgabe, loud fail)",
+   "stress_abs": true,
+   "symbol": "XRPUSDT",
+   "variable": "activity_ntrades"
+  },
+  {
+   "era": "L",
+   "kein_befund": true,
+   "min_clusters": 30,
+   "n_clusters": 9,
+   "n_events": 9,
+   "reason": "nur 9 Ereignistage (< 30) -- KEIN BEFUND (builder-Vorgabe, loud fail)",
+   "stress_abs": true,
+   "symbol": "XRPUSDT",
+   "variable": "realized_vol"
+  },
+  {
+   "era": "L",
+   "half_life_h": {
+    "ci_hi": 0.12602419932785047,
+    "ci_lo": 0.10280577121925934,
+    "point": 0.11362019745292416
+   },
+   "kein_befund": false,
+   "lambda_per_h": {
+    "ci_hi": 6.742298339279353,
+    "ci_lo": 5.500111758351514,
+    "n_bootstrap": 1000,
+    "n_finite_reps": 1000,
+    "point": 6.100563069758213,
+    "seed": 42
+   },
+   "median_r2": 0.3657468509417207,
+   "min_clusters": 30,
+   "n_censored": 49,
+   "n_clusters": 176,
+   "n_events": 176,
+   "n_return_defined": 176,
+   "n_return_undefined": 0,
+   "p90_time_to_return_h": {
+    "censored_at_p90": true,
+    "ci_hi": 24.0,
+    "ci_lo": 24.0,
+    "n_bootstrap": 1000,
+    "n_finite_reps": 43,
+    "point": NaN,
+    "seed": 42
+   },
+   "stress_abs": false,
+   "symbol": "XRPUSDT",
+   "variable": "activity_volume"
+  },
+  {
+   "era": "L",
+   "half_life_h": {
+    "ci_hi": 0.1635795876317017,
+    "ci_lo": 0.14116581761673627,
+    "point": 0.1515099639925653
+   },
+   "kein_befund": false,
+   "lambda_per_h": {
+    "ci_hi": 4.910163042740507,
+    "ci_lo": 4.237369653483669,
+    "n_bootstrap": 1000,
+    "n_finite_reps": 1000,
+    "point": 4.574928026475925,
+    "seed": 42
+   },
+   "median_r2": 0.47323468642205074,
+   "min_clusters": 30,
+   "n_censored": 46,
+   "n_clusters": 176,
+   "n_events": 176,
+   "n_return_defined": 176,
+   "n_return_undefined": 0,
+   "p90_time_to_return_h": {
+    "censored_at_p90": true,
+    "ci_hi": 24.0,
+    "ci_lo": 24.0,
+    "n_bootstrap": 1000,
+    "n_finite_reps": 43,
+    "point": NaN,
+    "seed": 42
+   },
+   "stress_abs": false,
+   "symbol": "XRPUSDT",
+   "variable": "activity_ntrades"
+  },
+  {
+   "era": "L",
+   "half_life_h": {
+    "ci_hi": 0.07148080190598141,
+    "ci_lo": 0.060020018393069946,
+    "point": 0.06395391121910528
+   },
+   "kein_befund": false,
+   "lambda_per_h": {
+    "ci_hi": 11.54859993578372,
+    "ci_lo": 9.696969844737342,
+    "n_bootstrap": 1000,
+    "n_finite_reps": 1000,
+    "point": 10.838229708660538,
+    "seed": 42
+   },
+   "median_r2": 0.1648091392001615,
+   "min_clusters": 30,
+   "n_censored": 46,
+   "n_clusters": 176,
+   "n_events": 176,
+   "n_return_defined": 176,
+   "n_return_undefined": 0,
+   "p90_time_to_return_h": {
+    "censored_at_p90": false,
+    "ci_hi": 24.0,
+    "ci_lo": 24.0,
+    "n_bootstrap": 1000,
+    "n_finite_reps": 17,
+    "point": 24.0,
+    "seed": 42
+   },
+   "stress_abs": false,
+   "symbol": "XRPUSDT",
+   "variable": "realized_vol"
+  },
+  {
+   "era": "OOS1",
+   "kein_befund": true,
+   "min_clusters": 30,
+   "n_clusters": 1,
+   "n_events": 1,
+   "reason": "nur 1 Ereignistage (< 30) -- KEIN BEFUND (builder-Vorgabe, loud fail)",
+   "stress_abs": true,
+   "symbol": "XRPUSDT",
+   "variable": "activity_volume"
+  },
+  {
+   "era": "OOS1",
+   "kein_befund": true,
+   "min_clusters": 30,
+   "n_clusters": 1,
+   "n_events": 1,
+   "reason": "nur 1 Ereignistage (< 30) -- KEIN BEFUND (builder-Vorgabe, loud fail)",
+   "stress_abs": true,
+   "symbol": "XRPUSDT",
+   "variable": "activity_ntrades"
+  },
+  {
+   "era": "OOS1",
+   "kein_befund": true,
+   "min_clusters": 30,
+   "n_clusters": 1,
+   "n_events": 1,
+   "reason": "nur 1 Ereignistage (< 30) -- KEIN BEFUND (builder-Vorgabe, loud fail)",
+   "stress_abs": true,
+   "symbol": "XRPUSDT",
+   "variable": "realized_vol"
+  },
+  {
+   "era": "OOS1",
+   "half_life_h": {
+    "ci_hi": 0.13763198134076504,
+    "ci_lo": 0.12330555038607802,
+    "point": 0.13055194258009864
+   },
+   "kein_befund": false,
+   "lambda_per_h": {
+    "ci_hi": 5.62137858668693,
+    "ci_lo": 5.036236300658725,
+    "n_bootstrap": 1000,
+    "n_finite_reps": 1000,
+    "point": 5.309359377281367,
+    "seed": 42
+   },
+   "median_r2": 0.417843409535538,
+   "min_clusters": 30,
+   "n_censored": 49,
+   "n_clusters": 189,
+   "n_events": 189,
+   "n_return_defined": 189,
+   "n_return_undefined": 0,
+   "p90_time_to_return_h": {
+    "censored_at_p90": true,
+    "ci_hi": 24.0,
+    "ci_lo": 24.0,
+    "n_bootstrap": 1000,
+    "n_finite_reps": 48,
+    "point": NaN,
+    "seed": 42
+   },
+   "stress_abs": false,
+   "symbol": "XRPUSDT",
+   "variable": "activity_volume"
+  },
+  {
+   "era": "OOS1",
+   "half_life_h": {
+    "ci_hi": 0.16812659043465575,
+    "ci_lo": 0.15317995298375714,
+    "point": 0.1599460243719343
+   },
+   "kein_befund": false,
+   "lambda_per_h": {
+    "ci_hi": 4.525051529643994,
+    "ci_lo": 4.122769508189989,
+    "n_bootstrap": 1000,
+    "n_finite_reps": 1000,
+    "point": 4.3336318191199235,
+    "seed": 42
+   },
+   "median_r2": 0.4884208191171281,
+   "min_clusters": 30,
+   "n_censored": 46,
+   "n_clusters": 189,
+   "n_events": 189,
+   "n_return_defined": 189,
+   "n_return_undefined": 0,
+   "p90_time_to_return_h": {
+    "censored_at_p90": true,
+    "ci_hi": 24.0,
+    "ci_lo": 24.0,
+    "n_bootstrap": 1000,
+    "n_finite_reps": 49,
+    "point": NaN,
+    "seed": 42
+   },
+   "stress_abs": false,
+   "symbol": "XRPUSDT",
+   "variable": "activity_ntrades"
+  },
+  {
+   "era": "OOS1",
+   "half_life_h": {
+    "ci_hi": 0.08209538555354011,
+    "ci_lo": 0.06966410651129712,
+    "point": 0.0766333919698447
+   },
+   "kein_befund": false,
+   "lambda_per_h": {
+    "ci_hi": 9.94984670402025,
+    "ci_lo": 8.443192950326006,
+    "n_bootstrap": 1000,
+    "n_finite_reps": 1000,
+    "point": 9.044975861602202,
+    "seed": 42
+   },
+   "median_r2": 0.22361053775828987,
+   "min_clusters": 30,
+   "n_censored": 51,
+   "n_clusters": 189,
+   "n_events": 189,
+   "n_return_defined": 189,
+   "n_return_undefined": 0,
+   "p90_time_to_return_h": {
+    "censored_at_p90": true,
+    "ci_hi": 24.0,
+    "ci_lo": 24.0,
+    "n_bootstrap": 1000,
+    "n_finite_reps": 50,
+    "point": NaN,
+    "seed": 42
+   },
+   "stress_abs": false,
+   "symbol": "XRPUSDT",
+   "variable": "realized_vol"
+  },
+  {
+   "era": "OOS2",
+   "kein_befund": true,
+   "min_clusters": 30,
+   "n_clusters": 3,
+   "n_events": 3,
+   "reason": "nur 3 Ereignistage (< 30) -- KEIN BEFUND (builder-Vorgabe, loud fail)",
+   "stress_abs": true,
+   "symbol": "XRPUSDT",
+   "variable": "activity_volume"
+  },
+  {
+   "era": "OOS2",
+   "kein_befund": true,
+   "min_clusters": 30,
+   "n_clusters": 3,
+   "n_events": 3,
+   "reason": "nur 3 Ereignistage (< 30) -- KEIN BEFUND (builder-Vorgabe, loud fail)",
+   "stress_abs": true,
+   "symbol": "XRPUSDT",
+   "variable": "activity_ntrades"
+  },
+  {
+   "era": "OOS2",
+   "kein_befund": true,
+   "min_clusters": 30,
+   "n_clusters": 3,
+   "n_events": 3,
+   "reason": "nur 3 Ereignistage (< 30) -- KEIN BEFUND (builder-Vorgabe, loud fail)",
+   "stress_abs": true,
+   "symbol": "XRPUSDT",
+   "variable": "realized_vol"
+  },
+  {
+   "era": "OOS2",
+   "half_life_h": {
+    "ci_hi": 0.19823012728696401,
+    "ci_lo": 0.15819279858457225,
+    "point": 0.18199078086247583
+   },
+   "kein_befund": false,
+   "lambda_per_h": {
+    "ci_hi": 4.381660775723481,
+    "ci_lo": 3.4966792890998053,
+    "n_bootstrap": 1000,
+    "n_finite_reps": 1000,
+    "point": 3.808693919961433,
+    "seed": 42
+   },
+   "median_r2": 0.5310757775101268,
+   "min_clusters": 30,
+   "n_censored": 56,
+   "n_clusters": 183,
+   "n_events": 183,
+   "n_return_defined": 183,
+   "n_return_undefined": 0,
+   "p90_time_to_return_h": {
+    "censored_at_p90": true,
+    "ci_hi": 24.0,
+    "ci_lo": 24.0,
+    "n_bootstrap": 1000,
+    "n_finite_reps": 14,
+    "point": NaN,
+    "seed": 42
+   },
+   "stress_abs": false,
+   "symbol": "XRPUSDT",
+   "variable": "activity_volume"
+  },
+  {
+   "era": "OOS2",
+   "half_life_h": {
+    "ci_hi": 0.23734286627754303,
+    "ci_lo": 0.19709715191369687,
+    "point": 0.21196221731947162
+   },
+   "kein_befund": false,
+   "lambda_per_h": {
+    "ci_hi": 3.516779282855667,
+    "ci_lo": 2.9204466577453214,
+    "n_bootstrap": 1000,
+    "n_finite_reps": 1000,
+    "point": 3.2701449783157663,
+    "seed": 42
+   },
+   "median_r2": 0.5880057424142489,
+   "min_clusters": 30,
+   "n_censored": 52,
+   "n_clusters": 183,
+   "n_events": 183,
+   "n_return_defined": 183,
+   "n_return_undefined": 0,
+   "p90_time_to_return_h": {
+    "censored_at_p90": true,
+    "ci_hi": 24.0,
+    "ci_lo": 24.0,
+    "n_bootstrap": 1000,
+    "n_finite_reps": 22,
+    "point": NaN,
+    "seed": 42
+   },
+   "stress_abs": false,
+   "symbol": "XRPUSDT",
+   "variable": "activity_ntrades"
+  },
+  {
+   "era": "OOS2",
+   "half_life_h": {
+    "ci_hi": 0.08401060016786618,
+    "ci_lo": 0.07147853675614982,
+    "point": 0.07716525293577586
+   },
+   "kein_befund": false,
+   "lambda_per_h": {
+    "ci_hi": 9.697277141033652,
+    "ci_lo": 8.250710971888427,
+    "n_bootstrap": 1000,
+    "n_finite_reps": 1000,
+    "point": 8.982633428764203,
+    "seed": 42
+   },
+   "median_r2": 0.228483677044507,
+   "min_clusters": 30,
+   "n_censored": 58,
+   "n_clusters": 183,
+   "n_events": 183,
+   "n_return_defined": 183,
+   "n_return_undefined": 0,
+   "p90_time_to_return_h": {
+    "censored_at_p90": true,
+    "ci_hi": 24.0,
+    "ci_lo": 24.0,
+    "n_bootstrap": 1000,
+    "n_finite_reps": 59,
+    "point": NaN,
+    "seed": 42
+   },
+   "stress_abs": false,
+   "symbol": "XRPUSDT",
+   "variable": "realized_vol"
+  },
+  {
+   "era": "OTHER",
+   "kein_befund": true,
+   "min_clusters": 30,
+   "n_clusters": 0,
+   "n_events": 0,
+   "reason": "nur 0 Ereignistage (< 30) -- KEIN BEFUND (builder-Vorgabe, loud fail)",
+   "stress_abs": true,
+   "symbol": "XRPUSDT",
+   "variable": "activity_volume"
+  },
+  {
+   "era": "OTHER",
+   "kein_befund": true,
+   "min_clusters": 30,
+   "n_clusters": 0,
+   "n_events": 0,
+   "reason": "nur 0 Ereignistage (< 30) -- KEIN BEFUND (builder-Vorgabe, loud fail)",
+   "stress_abs": true,
+   "symbol": "XRPUSDT",
+   "variable": "activity_ntrades"
+  },
+  {
+   "era": "OTHER",
+   "kein_befund": true,
+   "min_clusters": 30,
+   "n_clusters": 0,
+   "n_events": 0,
+   "reason": "nur 0 Ereignistage (< 30) -- KEIN BEFUND (builder-Vorgabe, loud fail)",
+   "stress_abs": true,
+   "symbol": "XRPUSDT",
+   "variable": "realized_vol"
+  },
+  {
+   "era": "OTHER",
+   "half_life_h": {
+    "ci_hi": 0.1438334268323939,
+    "ci_lo": 0.10650624372845521,
+    "point": 0.12815515301996622
+   },
+   "kein_befund": false,
+   "lambda_per_h": {
+    "ci_hi": 6.508042686466066,
+    "ci_lo": 4.819096616307802,
+    "n_bootstrap": 1000,
+    "n_finite_reps": 1000,
+    "point": 5.408656337462723,
+    "seed": 42
+   },
+   "median_r2": 0.40935786685016007,
+   "min_clusters": 30,
+   "n_censored": 17,
+   "n_clusters": 83,
+   "n_events": 83,
+   "n_return_defined": 83,
+   "n_return_undefined": 0,
+   "p90_time_to_return_h": {
+    "censored_at_p90": true,
+    "ci_hi": 24.0,
+    "ci_lo": 22.3,
+    "n_bootstrap": 1000,
+    "n_finite_reps": 64,
+    "point": NaN,
+    "seed": 42
+   },
+   "stress_abs": false,
+   "symbol": "XRPUSDT",
+   "variable": "activity_volume"
+  },
+  {
+   "era": "OTHER",
+   "half_life_h": {
+    "ci_hi": 0.2546086260068208,
+    "ci_lo": 0.16710971331319338,
+    "point": 0.2124795816256768
+   },
+   "kein_befund": false,
+   "lambda_per_h": {
+    "ci_hi": 4.147856918770867,
+    "ci_lo": 2.7224025808983243,
+    "n_bootstrap": 1000,
+    "n_finite_reps": 1000,
+    "point": 3.262182536583943,
+    "seed": 42
+   },
+   "median_r2": 0.5857085709399168,
+   "min_clusters": 30,
+   "n_censored": 21,
+   "n_clusters": 83,
+   "n_events": 83,
+   "n_return_defined": 83,
+   "n_return_undefined": 0,
+   "p90_time_to_return_h": {
+    "censored_at_p90": true,
+    "ci_hi": 24.0,
+    "ci_lo": 24.0,
+    "n_bootstrap": 1000,
+    "n_finite_reps": 51,
+    "point": NaN,
+    "seed": 42
+   },
+   "stress_abs": false,
+   "symbol": "XRPUSDT",
+   "variable": "activity_ntrades"
+  },
+  {
+   "era": "OTHER",
+   "half_life_h": {
+    "ci_hi": 0.07624649717084829,
+    "ci_lo": 0.06010554248678841,
+    "point": 0.06757373640274587
+   },
+   "kein_befund": false,
+   "lambda_per_h": {
+    "ci_hi": 11.53216744882227,
+    "ci_lo": 9.090872450268572,
+    "n_bootstrap": 1000,
+    "n_finite_reps": 1000,
+    "point": 10.257641762307214,
+    "seed": 42
+   },
+   "median_r2": 0.18192330485761132,
+   "min_clusters": 30,
+   "n_censored": 32,
+   "n_clusters": 83,
+   "n_events": 83,
+   "n_return_defined": 83,
+   "n_return_undefined": 0,
+   "p90_time_to_return_h": {
+    "censored_at_p90": true,
+    "ci_hi": NaN,
+    "ci_lo": NaN,
+    "n_bootstrap": 1000,
+    "n_finite_reps": 0,
+    "point": NaN,
+    "seed": 42
+   },
+   "stress_abs": false,
+   "symbol": "XRPUSDT",
+   "variable": "realized_vol"
+  },
+  {
+   "era": "L",
+   "kein_befund": true,
+   "min_clusters": 30,
+   "n_clusters": 9,
+   "n_events": 9,
+   "reason": "nur 9 Ereignistage (< 30) -- KEIN BEFUND (builder-Vorgabe, loud fail)",
+   "stress_abs": true,
+   "symbol": "SOLUSDT",
+   "variable": "activity_volume"
+  },
+  {
+   "era": "L",
+   "kein_befund": true,
+   "min_clusters": 30,
+   "n_clusters": 9,
+   "n_events": 9,
+   "reason": "nur 9 Ereignistage (< 30) -- KEIN BEFUND (builder-Vorgabe, loud fail)",
+   "stress_abs": true,
+   "symbol": "SOLUSDT",
+   "variable": "activity_ntrades"
+  },
+  {
+   "era": "L",
+   "kein_befund": true,
+   "min_clusters": 30,
+   "n_clusters": 9,
+   "n_events": 9,
+   "reason": "nur 9 Ereignistage (< 30) -- KEIN BEFUND (builder-Vorgabe, loud fail)",
+   "stress_abs": true,
+   "symbol": "SOLUSDT",
+   "variable": "realized_vol"
+  },
+  {
+   "era": "L",
+   "half_life_h": {
+    "ci_hi": 0.13836190192357678,
+    "ci_lo": 0.12023790241050025,
+    "point": 0.12715125101287808
+   },
+   "kein_befund": false,
+   "lambda_per_h": {
+    "ci_hi": 5.7647976774702405,
+    "ci_lo": 5.009667913807663,
+    "n_bootstrap": 1000,
+    "n_finite_reps": 1000,
+    "point": 5.451359503256026,
+    "seed": 42
+   },
+   "median_r2": 0.40636166562738596,
+   "min_clusters": 30,
+   "n_censored": 22,
+   "n_clusters": 137,
+   "n_events": 137,
+   "n_return_defined": 137,
+   "n_return_undefined": 0,
+   "p90_time_to_return_h": {
+    "censored_at_p90": true,
+    "ci_hi": 24.0,
+    "ci_lo": 22.0,
+    "n_bootstrap": 1000,
+    "n_finite_reps": 59,
+    "point": NaN,
+    "seed": 42
+   },
+   "stress_abs": false,
+   "symbol": "SOLUSDT",
+   "variable": "activity_volume"
+  },
+  {
+   "era": "L",
+   "half_life_h": {
+    "ci_hi": 0.18083903925814526,
+    "ci_lo": 0.15568425192394283,
+    "point": 0.16707968657523617
+   },
+   "kein_befund": false,
+   "lambda_per_h": {
+    "ci_hi": 4.452262653377246,
+    "ci_lo": 3.832951023205156,
+    "n_bootstrap": 1000,
+    "n_finite_reps": 1000,
+    "point": 4.148602351177026,
+    "seed": 42
+   },
+   "median_r2": 0.5115379426845783,
+   "min_clusters": 30,
+   "n_censored": 27,
+   "n_clusters": 137,
+   "n_events": 137,
+   "n_return_defined": 137,
+   "n_return_undefined": 0,
+   "p90_time_to_return_h": {
+    "censored_at_p90": true,
+    "ci_hi": NaN,
+    "ci_lo": NaN,
+    "n_bootstrap": 1000,
+    "n_finite_reps": 0,
+    "point": NaN,
+    "seed": 42
+   },
+   "stress_abs": false,
+   "symbol": "SOLUSDT",
+   "variable": "activity_ntrades"
+  },
+  {
+   "era": "L",
+   "half_life_h": {
+    "ci_hi": 0.0649897010433571,
+    "ci_lo": 0.05786858496798484,
+    "point": 0.062103421604564134
+   },
+   "kein_befund": false,
+   "lambda_per_h": {
+    "ci_hi": 11.97795282092039,
+    "ci_lo": 10.665492677024632,
+    "n_bootstrap": 1000,
+    "n_finite_reps": 1000,
+    "point": 11.16117538536724,
+    "seed": 42
+   },
+   "median_r2": 0.15815835592789584,
+   "min_clusters": 30,
+   "n_censored": 41,
+   "n_clusters": 137,
+   "n_events": 137,
+   "n_return_defined": 137,
+   "n_return_undefined": 0,
+   "p90_time_to_return_h": {
+    "censored_at_p90": true,
+    "ci_hi": 24.0,
+    "ci_lo": 24.0,
+    "n_bootstrap": 1000,
+    "n_finite_reps": 71,
+    "point": NaN,
+    "seed": 42
+   },
+   "stress_abs": false,
+   "symbol": "SOLUSDT",
+   "variable": "realized_vol"
+  },
+  {
+   "era": "OOS1",
+   "kein_befund": true,
+   "min_clusters": 30,
+   "n_clusters": 1,
+   "n_events": 1,
+   "reason": "nur 1 Ereignistage (< 30) -- KEIN BEFUND (builder-Vorgabe, loud fail)",
+   "stress_abs": true,
+   "symbol": "SOLUSDT",
+   "variable": "activity_volume"
+  },
+  {
+   "era": "OOS1",
+   "kein_befund": true,
+   "min_clusters": 30,
+   "n_clusters": 1,
+   "n_events": 1,
+   "reason": "nur 1 Ereignistage (< 30) -- KEIN BEFUND (builder-Vorgabe, loud fail)",
+   "stress_abs": true,
+   "symbol": "SOLUSDT",
+   "variable": "activity_ntrades"
+  },
+  {
+   "era": "OOS1",
+   "kein_befund": true,
+   "min_clusters": 30,
+   "n_clusters": 1,
+   "n_events": 1,
+   "reason": "nur 1 Ereignistage (< 30) -- KEIN BEFUND (builder-Vorgabe, loud fail)",
+   "stress_abs": true,
+   "symbol": "SOLUSDT",
+   "variable": "realized_vol"
+  },
+  {
+   "era": "OOS1",
+   "half_life_h": {
+    "ci_hi": 0.14420878068727266,
+    "ci_lo": 0.12809907602359438,
+    "point": 0.13676868150760155
+   },
+   "kein_befund": false,
+   "lambda_per_h": {
+    "ci_hi": 5.411024045421495,
+    "ci_lo": 4.806553229675285,
+    "n_bootstrap": 1000,
+    "n_finite_reps": 1000,
+    "point": 5.068025610244846,
+    "seed": 42
+   },
+   "median_r2": 0.43203431408933546,
+   "min_clusters": 30,
+   "n_censored": 48,
+   "n_clusters": 175,
+   "n_events": 175,
+   "n_return_defined": 175,
+   "n_return_undefined": 0,
+   "p90_time_to_return_h": {
+    "censored_at_p90": true,
+    "ci_hi": 24.0,
+    "ci_lo": 24.0,
+    "n_bootstrap": 1000,
+    "n_finite_reps": 42,
+    "point": NaN,
+    "seed": 42
+   },
+   "stress_abs": false,
+   "symbol": "SOLUSDT",
+   "variable": "activity_volume"
+  },
+  {
+   "era": "OOS1",
+   "half_life_h": {
+    "ci_hi": 0.18858535325239142,
+    "ci_lo": 0.1643210210663428,
+    "point": 0.17851785498770983
+   },
+   "kein_befund": false,
+   "lambda_per_h": {
+    "ci_hi": 4.218250203545746,
+    "ci_lo": 3.6755090923327343,
+    "n_bootstrap": 1000,
+    "n_finite_reps": 1000,
+    "point": 3.882789094724813,
+    "seed": 42
+   },
+   "median_r2": 0.5270068965109516,
+   "min_clusters": 30,
+   "n_censored": 42,
+   "n_clusters": 175,
+   "n_events": 175,
+   "n_return_defined": 175,
+   "n_return_undefined": 0,
+   "p90_time_to_return_h": {
+    "censored_at_p90": true,
+    "ci_hi": 24.0,
+    "ci_lo": 24.0,
+    "n_bootstrap": 1000,
+    "n_finite_reps": 23,
+    "point": NaN,
+    "seed": 42
+   },
+   "stress_abs": false,
+   "symbol": "SOLUSDT",
+   "variable": "activity_ntrades"
+  },
+  {
+   "era": "OOS1",
+   "half_life_h": {
+    "ci_hi": 0.06612104797425768,
+    "ci_lo": 0.058214043990984676,
+    "point": 0.06264949562888836
+   },
+   "kein_befund": false,
+   "lambda_per_h": {
+    "ci_hi": 11.90687217447545,
+    "ci_lo": 10.483003548730839,
+    "n_bootstrap": 1000,
+    "n_finite_reps": 1000,
+    "point": 11.06389083586377,
+    "seed": 42
+   },
+   "median_r2": 0.15921829783658403,
+   "min_clusters": 30,
+   "n_censored": 49,
+   "n_clusters": 175,
+   "n_events": 175,
+   "n_return_defined": 175,
+   "n_return_undefined": 0,
+   "p90_time_to_return_h": {
+    "censored_at_p90": true,
+    "ci_hi": 24.0,
+    "ci_lo": 24.0,
+    "n_bootstrap": 1000,
+    "n_finite_reps": 66,
+    "point": NaN,
+    "seed": 42
+   },
+   "stress_abs": false,
+   "symbol": "SOLUSDT",
+   "variable": "realized_vol"
+  },
+  {
+   "era": "OOS2",
+   "kein_befund": true,
+   "min_clusters": 30,
+   "n_clusters": 3,
+   "n_events": 3,
+   "reason": "nur 3 Ereignistage (< 30) -- KEIN BEFUND (builder-Vorgabe, loud fail)",
+   "stress_abs": true,
+   "symbol": "SOLUSDT",
+   "variable": "activity_volume"
+  },
+  {
+   "era": "OOS2",
+   "kein_befund": true,
+   "min_clusters": 30,
+   "n_clusters": 3,
+   "n_events": 3,
+   "reason": "nur 3 Ereignistage (< 30) -- KEIN BEFUND (builder-Vorgabe, loud fail)",
+   "stress_abs": true,
+   "symbol": "SOLUSDT",
+   "variable": "activity_ntrades"
+  },
+  {
+   "era": "OOS2",
+   "kein_befund": true,
+   "min_clusters": 30,
+   "n_clusters": 3,
+   "n_events": 3,
+   "reason": "nur 3 Ereignistage (< 30) -- KEIN BEFUND (builder-Vorgabe, loud fail)",
+   "stress_abs": true,
+   "symbol": "SOLUSDT",
+   "variable": "realized_vol"
+  },
+  {
+   "era": "OOS2",
+   "half_life_h": {
+    "ci_hi": 0.1729747828789198,
+    "ci_lo": 0.15454165292268487,
+    "point": 0.16456409766287247
+   },
+   "kein_befund": false,
+   "lambda_per_h": {
+    "ci_hi": 4.485180321623178,
+    "ci_lo": 4.007215208040699,
+    "n_bootstrap": 1000,
+    "n_finite_reps": 1000,
+    "point": 4.212019452626496,
+    "seed": 42
+   },
+   "median_r2": 0.4971877090033848,
+   "min_clusters": 30,
+   "n_censored": 28,
+   "n_clusters": 151,
+   "n_events": 151,
+   "n_return_defined": 151,
+   "n_return_undefined": 0,
+   "p90_time_to_return_h": {
+    "censored_at_p90": true,
+    "ci_hi": 24.0,
+    "ci_lo": 24.0,
+    "n_bootstrap": 1000,
+    "n_finite_reps": 38,
+    "point": NaN,
+    "seed": 42
+   },
+   "stress_abs": false,
+   "symbol": "SOLUSDT",
+   "variable": "activity_volume"
+  },
+  {
+   "era": "OOS2",
+   "half_life_h": {
+    "ci_hi": 0.24546092561570693,
+    "ci_lo": 0.21635614495304728,
+    "point": 0.2270481571695469
+   },
+   "kein_befund": false,
+   "lambda_per_h": {
+    "ci_hi": 3.2037323493186163,
+    "ci_lo": 2.8238595565517217,
+    "n_bootstrap": 1000,
+    "n_finite_reps": 1000,
+    "point": 3.0528641553445492,
+    "seed": 42
+   },
+   "median_r2": 0.6121791912954494,
+   "min_clusters": 30,
+   "n_censored": 29,
+   "n_clusters": 151,
+   "n_events": 151,
+   "n_return_defined": 151,
+   "n_return_undefined": 0,
+   "p90_time_to_return_h": {
+    "censored_at_p90": true,
+    "ci_hi": 23.0,
+    "ci_lo": 23.0,
+    "n_bootstrap": 1000,
+    "n_finite_reps": 2,
+    "point": NaN,
+    "seed": 42
+   },
+   "stress_abs": false,
+   "symbol": "SOLUSDT",
+   "variable": "activity_ntrades"
+  },
+  {
+   "era": "OOS2",
+   "half_life_h": {
+    "ci_hi": 0.07493811961672657,
+    "ci_lo": 0.06498904991635765,
+    "point": 0.06888353424841835
+   },
+   "kein_befund": false,
+   "lambda_per_h": {
+    "ci_hi": 10.665599534876124,
+    "ci_lo": 9.249593986412641,
+    "n_bootstrap": 1000,
+    "n_finite_reps": 1000,
+    "point": 10.062596063381587,
+    "seed": 42
+   },
+   "median_r2": 0.18784304851248768,
+   "min_clusters": 30,
+   "n_censored": 30,
+   "n_clusters": 151,
+   "n_events": 151,
+   "n_return_defined": 151,
+   "n_return_undefined": 0,
+   "p90_time_to_return_h": {
+    "censored_at_p90": true,
+    "ci_hi": 23.0,
+    "ci_lo": 23.0,
+    "n_bootstrap": 1000,
+    "n_finite_reps": 1,
+    "point": NaN,
+    "seed": 42
+   },
+   "stress_abs": false,
+   "symbol": "SOLUSDT",
+   "variable": "realized_vol"
+  },
+  {
+   "era": "OTHER",
+   "kein_befund": true,
+   "min_clusters": 30,
+   "n_clusters": 0,
+   "n_events": 0,
+   "reason": "nur 0 Ereignistage (< 30) -- KEIN BEFUND (builder-Vorgabe, loud fail)",
+   "stress_abs": true,
+   "symbol": "SOLUSDT",
+   "variable": "activity_volume"
+  },
+  {
+   "era": "OTHER",
+   "kein_befund": true,
+   "min_clusters": 30,
+   "n_clusters": 0,
+   "n_events": 0,
+   "reason": "nur 0 Ereignistage (< 30) -- KEIN BEFUND (builder-Vorgabe, loud fail)",
+   "stress_abs": true,
+   "symbol": "SOLUSDT",
+   "variable": "activity_ntrades"
+  },
+  {
+   "era": "OTHER",
+   "kein_befund": true,
+   "min_clusters": 30,
+   "n_clusters": 0,
+   "n_events": 0,
+   "reason": "nur 0 Ereignistage (< 30) -- KEIN BEFUND (builder-Vorgabe, loud fail)",
+   "stress_abs": true,
+   "symbol": "SOLUSDT",
+   "variable": "realized_vol"
+  },
+  {
+   "era": "OTHER",
+   "half_life_h": {
+    "ci_hi": 0.1269013558741494,
+    "ci_lo": 0.11010799401020428,
+    "point": 0.12206661149196978
+   },
+   "kein_befund": false,
+   "lambda_per_h": {
+    "ci_hi": 6.295157647642801,
+    "ci_lo": 5.462094362863649,
+    "n_bootstrap": 1000,
+    "n_finite_reps": 1000,
+    "point": 5.678433865640191,
+    "seed": 42
+   },
+   "median_r2": 0.38941355774038755,
+   "min_clusters": 30,
+   "n_censored": 19,
+   "n_clusters": 89,
+   "n_events": 89,
+   "n_return_defined": 89,
+   "n_return_undefined": 0,
+   "p90_time_to_return_h": {
+    "censored_at_p90": false,
+    "ci_hi": 24.0,
+    "ci_lo": 24.0,
+    "n_bootstrap": 1000,
+    "n_finite_reps": 102,
+    "point": 24.0,
+    "seed": 42
+   },
+   "stress_abs": false,
+   "symbol": "SOLUSDT",
+   "variable": "activity_volume"
+  },
+  {
+   "era": "OTHER",
+   "half_life_h": {
+    "ci_hi": 0.1978289307584544,
+    "ci_lo": 0.15191810783129472,
+    "point": 0.16486318085811785
+   },
+   "kein_befund": false,
+   "lambda_per_h": {
+    "ci_hi": 4.56263700525869,
+    "ci_lo": 3.5037705450992185,
+    "n_bootstrap": 1000,
+    "n_finite_reps": 1000,
+    "point": 4.204378302978829,
+    "seed": 42
+   },
+   "median_r2": 0.5012722082339626,
+   "min_clusters": 30,
+   "n_censored": 23,
+   "n_clusters": 89,
+   "n_events": 89,
+   "n_return_defined": 89,
+   "n_return_undefined": 0,
+   "p90_time_to_return_h": {
+    "censored_at_p90": true,
+    "ci_hi": 24.0,
+    "ci_lo": 24.0,
+    "n_bootstrap": 1000,
+    "n_finite_reps": 36,
+    "point": NaN,
+    "seed": 42
+   },
+   "stress_abs": false,
+   "symbol": "SOLUSDT",
+   "variable": "activity_ntrades"
+  },
+  {
+   "era": "OTHER",
+   "half_life_h": {
+    "ci_hi": 0.06238038548569687,
+    "ci_lo": 0.05589158111624942,
+    "point": 0.05857692713043345
+   },
+   "kein_befund": false,
+   "lambda_per_h": {
+    "ci_hi": 12.401638434923893,
+    "ci_lo": 11.111620666705823,
+    "n_bootstrap": 1000,
+    "n_finite_reps": 1000,
+    "point": 11.83310928920037,
+    "seed": 42
+   },
+   "median_r2": 0.14054986297967342,
+   "min_clusters": 30,
+   "n_censored": 18,
+   "n_clusters": 89,
+   "n_events": 89,
+   "n_return_defined": 89,
+   "n_return_undefined": 0,
+   "p90_time_to_return_h": {
+    "censored_at_p90": true,
+    "ci_hi": 23.0,
+    "ci_lo": 20.5,
+    "n_bootstrap": 1000,
+    "n_finite_reps": 6,
+    "point": NaN,
+    "seed": 42
+   },
+   "stress_abs": false,
+   "symbol": "SOLUSDT",
+   "variable": "realized_vol"
+  },
+  {
+   "era": "L",
+   "kein_befund": true,
+   "min_clusters": 30,
+   "n_clusters": 8,
+   "n_events": 8,
+   "reason": "nur 8 Ereignistage (< 30) -- KEIN BEFUND (builder-Vorgabe, loud fail)",
+   "stress_abs": true,
+   "symbol": "BNBUSDT",
+   "variable": "activity_volume"
+  },
+  {
+   "era": "L",
+   "kein_befund": true,
+   "min_clusters": 30,
+   "n_clusters": 8,
+   "n_events": 8,
+   "reason": "nur 8 Ereignistage (< 30) -- KEIN BEFUND (builder-Vorgabe, loud fail)",
+   "stress_abs": true,
+   "symbol": "BNBUSDT",
+   "variable": "activity_ntrades"
+  },
+  {
+   "era": "L",
+   "kein_befund": true,
+   "min_clusters": 30,
+   "n_clusters": 8,
+   "n_events": 8,
+   "reason": "nur 8 Ereignistage (< 30) -- KEIN BEFUND (builder-Vorgabe, loud fail)",
+   "stress_abs": true,
+   "symbol": "BNBUSDT",
+   "variable": "realized_vol"
+  },
+  {
+   "era": "L",
+   "half_life_h": {
+    "ci_hi": 0.08702244839104428,
+    "ci_lo": 0.07710472286362813,
+    "point": 0.08069163898054303
+   },
+   "kein_befund": false,
+   "lambda_per_h": {
+    "ci_hi": 8.989685129740826,
+    "ci_lo": 7.96515374337915,
+    "n_bootstrap": 1000,
+    "n_finite_reps": 1000,
+    "point": 8.590074378425776,
+    "seed": 42
+   },
+   "median_r2": 0.24247104571884126,
+   "min_clusters": 30,
+   "n_censored": 37,
+   "n_clusters": 153,
+   "n_events": 153,
+   "n_return_defined": 153,
+   "n_return_undefined": 0,
+   "p90_time_to_return_h": {
+    "censored_at_p90": true,
+    "ci_hi": NaN,
+    "ci_lo": NaN,
+    "n_bootstrap": 1000,
+    "n_finite_reps": 0,
+    "point": NaN,
+    "seed": 42
+   },
+   "stress_abs": false,
+   "symbol": "BNBUSDT",
+   "variable": "activity_volume"
+  },
+  {
+   "era": "L",
+   "half_life_h": {
+    "ci_hi": 0.11924827554769131,
+    "ci_lo": 0.10411165287584082,
+    "point": 0.11019204895742611
+   },
+   "kein_befund": false,
+   "lambda_per_h": {
+    "ci_hi": 6.657729095767633,
+    "ci_lo": 5.81263902875252,
+    "n_bootstrap": 1000,
+    "n_finite_reps": 1000,
+    "point": 6.290355675551057,
+    "seed": 42
+   },
+   "median_r2": 0.35219704090542614,
+   "min_clusters": 30,
+   "n_censored": 36,
+   "n_clusters": 153,
+   "n_events": 153,
+   "n_return_defined": 153,
+   "n_return_undefined": 0,
+   "p90_time_to_return_h": {
+    "censored_at_p90": true,
+    "ci_hi": 24.0,
+    "ci_lo": 24.0,
+    "n_bootstrap": 1000,
+    "n_finite_reps": 85,
+    "point": NaN,
+    "seed": 42
+   },
+   "stress_abs": false,
+   "symbol": "BNBUSDT",
+   "variable": "activity_ntrades"
+  },
+  {
+   "era": "L",
+   "half_life_h": {
+    "ci_hi": 0.06725494780234055,
+    "ci_lo": 0.061281013225941955,
+    "point": 0.06375478363541984
+   },
+   "kein_befund": false,
+   "lambda_per_h": {
+    "ci_hi": 11.31096148825615,
+    "ci_lo": 10.306263006806214,
+    "n_bootstrap": 1000,
+    "n_finite_reps": 1000,
+    "point": 10.872081137059304,
+    "seed": 42
+   },
+   "median_r2": 0.1634829674113346,
+   "min_clusters": 30,
+   "n_censored": 46,
+   "n_clusters": 153,
+   "n_events": 153,
+   "n_return_defined": 153,
+   "n_return_undefined": 0,
+   "p90_time_to_return_h": {
+    "censored_at_p90": true,
+    "ci_hi": 24.0,
+    "ci_lo": 24.0,
+    "n_bootstrap": 1000,
+    "n_finite_reps": 23,
+    "point": NaN,
+    "seed": 42
+   },
+   "stress_abs": false,
+   "symbol": "BNBUSDT",
+   "variable": "realized_vol"
+  },
+  {
+   "era": "OOS1",
+   "kein_befund": true,
+   "min_clusters": 30,
+   "n_clusters": 1,
+   "n_events": 1,
+   "reason": "nur 1 Ereignistage (< 30) -- KEIN BEFUND (builder-Vorgabe, loud fail)",
+   "stress_abs": true,
+   "symbol": "BNBUSDT",
+   "variable": "activity_volume"
+  },
+  {
+   "era": "OOS1",
+   "kein_befund": true,
+   "min_clusters": 30,
+   "n_clusters": 1,
+   "n_events": 1,
+   "reason": "nur 1 Ereignistage (< 30) -- KEIN BEFUND (builder-Vorgabe, loud fail)",
+   "stress_abs": true,
+   "symbol": "BNBUSDT",
+   "variable": "activity_ntrades"
+  },
+  {
+   "era": "OOS1",
+   "kein_befund": true,
+   "min_clusters": 30,
+   "n_clusters": 1,
+   "n_events": 1,
+   "reason": "nur 1 Ereignistage (< 30) -- KEIN BEFUND (builder-Vorgabe, loud fail)",
+   "stress_abs": true,
+   "symbol": "BNBUSDT",
+   "variable": "realized_vol"
+  },
+  {
+   "era": "OOS1",
+   "half_life_h": {
+    "ci_hi": 0.12109252847082566,
+    "ci_lo": 0.10512219482543211,
+    "point": 0.1113779995445885
+   },
+   "kein_befund": false,
+   "lambda_per_h": {
+    "ci_hi": 6.5937282008903875,
+    "ci_lo": 5.724111878025096,
+    "n_bootstrap": 1000,
+    "n_finite_reps": 1000,
+    "point": 6.223376101152313,
+    "seed": 42
+   },
+   "median_r2": 0.3543195477355148,
+   "min_clusters": 30,
+   "n_censored": 56,
+   "n_clusters": 197,
+   "n_events": 197,
+   "n_return_defined": 197,
+   "n_return_undefined": 0,
+   "p90_time_to_return_h": {
+    "censored_at_p90": true,
+    "ci_hi": NaN,
+    "ci_lo": NaN,
+    "n_bootstrap": 1000,
+    "n_finite_reps": 0,
+    "point": NaN,
+    "seed": 42
+   },
+   "stress_abs": false,
+   "symbol": "BNBUSDT",
+   "variable": "activity_volume"
+  },
+  {
+   "era": "OOS1",
+   "half_life_h": {
+    "ci_hi": 0.17213776403446718,
+    "ci_lo": 0.1506474926930382,
+    "point": 0.15741556518585734
+   },
+   "kein_befund": false,
+   "lambda_per_h": {
+    "ci_hi": 4.6011199268501155,
+    "ci_lo": 4.026700267938628,
+    "n_bootstrap": 1000,
+    "n_finite_reps": 1000,
+    "point": 4.403295060063219,
+    "seed": 42
+   },
+   "median_r2": 0.48882317802945696,
+   "min_clusters": 30,
+   "n_censored": 60,
+   "n_clusters": 197,
+   "n_events": 197,
+   "n_return_defined": 197,
+   "n_return_undefined": 0,
+   "p90_time_to_return_h": {
+    "censored_at_p90": true,
+    "ci_hi": 24.0,
+    "ci_lo": 24.0,
+    "n_bootstrap": 1000,
+    "n_finite_reps": 28,
+    "point": NaN,
+    "seed": 42
+   },
+   "stress_abs": false,
+   "symbol": "BNBUSDT",
+   "variable": "activity_ntrades"
+  },
+  {
+   "era": "OOS1",
+   "half_life_h": {
+    "ci_hi": 0.07582727780885506,
+    "ci_lo": 0.06550214928856046,
+    "point": 0.07266964110954496
+   },
+   "kein_befund": false,
+   "lambda_per_h": {
+    "ci_hi": 10.582052468330213,
+    "ci_lo": 9.141132328490368,
+    "n_bootstrap": 1000,
+    "n_finite_reps": 1000,
+    "point": 9.53833223856258,
+    "seed": 42
+   },
+   "median_r2": 0.20525586794626005,
+   "min_clusters": 30,
+   "n_censored": 69,
+   "n_clusters": 197,
+   "n_events": 197,
+   "n_return_defined": 197,
+   "n_return_undefined": 0,
+   "p90_time_to_return_h": {
+    "censored_at_p90": true,
+    "ci_hi": 24.0,
+    "ci_lo": 24.0,
+    "n_bootstrap": 1000,
+    "n_finite_reps": 16,
+    "point": NaN,
+    "seed": 42
+   },
+   "stress_abs": false,
+   "symbol": "BNBUSDT",
+   "variable": "realized_vol"
+  },
+  {
+   "era": "OOS2",
+   "kein_befund": true,
+   "min_clusters": 30,
+   "n_clusters": 3,
+   "n_events": 3,
+   "reason": "nur 3 Ereignistage (< 30) -- KEIN BEFUND (builder-Vorgabe, loud fail)",
+   "stress_abs": true,
+   "symbol": "BNBUSDT",
+   "variable": "activity_volume"
+  },
+  {
+   "era": "OOS2",
+   "kein_befund": true,
+   "min_clusters": 30,
+   "n_clusters": 3,
+   "n_events": 3,
+   "reason": "nur 3 Ereignistage (< 30) -- KEIN BEFUND (builder-Vorgabe, loud fail)",
+   "stress_abs": true,
+   "symbol": "BNBUSDT",
+   "variable": "activity_ntrades"
+  },
+  {
+   "era": "OOS2",
+   "kein_befund": true,
+   "min_clusters": 30,
+   "n_clusters": 3,
+   "n_events": 3,
+   "reason": "nur 3 Ereignistage (< 30) -- KEIN BEFUND (builder-Vorgabe, loud fail)",
+   "stress_abs": true,
+   "symbol": "BNBUSDT",
+   "variable": "realized_vol"
+  },
+  {
+   "era": "OOS2",
+   "half_life_h": {
+    "ci_hi": 0.1279495159655882,
+    "ci_lo": 0.11265192933558368,
+    "point": 0.1207764299772636
+   },
+   "kein_befund": false,
+   "lambda_per_h": {
+    "ci_hi": 6.152998751535797,
+    "ci_lo": 5.417348985879446,
+    "n_bootstrap": 1000,
+    "n_finite_reps": 1000,
+    "point": 5.739093138375026,
+    "seed": 42
+   },
+   "median_r2": 0.38502779687550026,
+   "min_clusters": 30,
+   "n_censored": 47,
+   "n_clusters": 168,
+   "n_events": 168,
+   "n_return_defined": 168,
+   "n_return_undefined": 0,
+   "p90_time_to_return_h": {
+    "censored_at_p90": true,
+    "ci_hi": NaN,
+    "ci_lo": NaN,
+    "n_bootstrap": 1000,
+    "n_finite_reps": 0,
+    "point": NaN,
+    "seed": 42
+   },
+   "stress_abs": false,
+   "symbol": "BNBUSDT",
+   "variable": "activity_volume"
+  },
+  {
+   "era": "OOS2",
+   "half_life_h": {
+    "ci_hi": 0.21576189040271182,
+    "ci_lo": 0.1886763189752281,
+    "point": 0.19914508495267796
+   },
+   "kein_befund": false,
+   "lambda_per_h": {
+    "ci_hi": 3.673737034539829,
+    "ci_lo": 3.2125561157543205,
+    "n_bootstrap": 1000,
+    "n_finite_reps": 1000,
+    "point": 3.4806140494235898,
+    "seed": 42
+   },
+   "median_r2": 0.5712729487910078,
+   "min_clusters": 30,
+   "n_censored": 47,
+   "n_clusters": 168,
+   "n_events": 168,
+   "n_return_defined": 168,
+   "n_return_undefined": 0,
+   "p90_time_to_return_h": {
+    "censored_at_p90": true,
+    "ci_hi": 24.0,
+    "ci_lo": 24.0,
+    "n_bootstrap": 1000,
+    "n_finite_reps": 20,
+    "point": NaN,
+    "seed": 42
+   },
+   "stress_abs": false,
+   "symbol": "BNBUSDT",
+   "variable": "activity_ntrades"
+  },
+  {
+   "era": "OOS2",
+   "half_life_h": {
+    "ci_hi": 0.08123318776463374,
+    "ci_lo": 0.06802024414727528,
+    "point": 0.07354584618713803
+   },
+   "kein_befund": false,
+   "lambda_per_h": {
+    "ci_hi": 10.190307154134361,
+    "ci_lo": 8.532807829335471,
+    "n_bootstrap": 1000,
+    "n_finite_reps": 1000,
+    "point": 9.424695159482242,
+    "seed": 42
+   },
+   "median_r2": 0.20870397459454032,
+   "min_clusters": 30,
+   "n_censored": 55,
+   "n_clusters": 168,
+   "n_events": 168,
+   "n_return_defined": 168,
+   "n_return_undefined": 0,
+   "p90_time_to_return_h": {
+    "censored_at_p90": true,
+    "ci_hi": 24.0,
+    "ci_lo": 24.0,
+    "n_bootstrap": 1000,
+    "n_finite_reps": 28,
+    "point": NaN,
+    "seed": 42
+   },
+   "stress_abs": false,
+   "symbol": "BNBUSDT",
+   "variable": "realized_vol"
+  },
+  {
+   "era": "OTHER",
+   "kein_befund": true,
+   "min_clusters": 30,
+   "n_clusters": 0,
+   "n_events": 0,
+   "reason": "nur 0 Ereignistage (< 30) -- KEIN BEFUND (builder-Vorgabe, loud fail)",
+   "stress_abs": true,
+   "symbol": "BNBUSDT",
+   "variable": "activity_volume"
+  },
+  {
+   "era": "OTHER",
+   "kein_befund": true,
+   "min_clusters": 30,
+   "n_clusters": 0,
+   "n_events": 0,
+   "reason": "nur 0 Ereignistage (< 30) -- KEIN BEFUND (builder-Vorgabe, loud fail)",
+   "stress_abs": true,
+   "symbol": "BNBUSDT",
+   "variable": "activity_ntrades"
+  },
+  {
+   "era": "OTHER",
+   "kein_befund": true,
+   "min_clusters": 30,
+   "n_clusters": 0,
+   "n_events": 0,
+   "reason": "nur 0 Ereignistage (< 30) -- KEIN BEFUND (builder-Vorgabe, loud fail)",
+   "stress_abs": true,
+   "symbol": "BNBUSDT",
+   "variable": "realized_vol"
+  },
+  {
+   "era": "OTHER",
+   "half_life_h": {
+    "ci_hi": 0.1032118943031174,
+    "ci_lo": 0.08229711121618834,
+    "point": 0.09148187935977474
+   },
+   "kein_befund": false,
+   "lambda_per_h": {
+    "ci_hi": 8.422497100039145,
+    "ci_lo": 6.715768422235126,
+    "n_bootstrap": 1000,
+    "n_finite_reps": 1000,
+    "point": 7.576879546100878,
+    "seed": 42
+   },
+   "median_r2": 0.2845468925420521,
+   "min_clusters": 30,
+   "n_censored": 13,
+   "n_clusters": 74,
+   "n_events": 74,
+   "n_return_defined": 74,
+   "n_return_undefined": 0,
+   "p90_time_to_return_h": {
+    "censored_at_p90": true,
+    "ci_hi": 22.0,
+    "ci_lo": 19.0,
+    "n_bootstrap": 1000,
+    "n_finite_reps": 39,
+    "point": NaN,
+    "seed": 42
+   },
+   "stress_abs": false,
+   "symbol": "BNBUSDT",
+   "variable": "activity_volume"
+  },
+  {
+   "era": "OTHER",
+   "half_life_h": {
+    "ci_hi": 0.16193538164522406,
+    "ci_lo": 0.1300594770885584,
+    "point": 0.14001000568493568
+   },
+   "kein_befund": false,
+   "lambda_per_h": {
+    "ci_hi": 5.3294630739440585,
+    "ci_lo": 4.2803936577524855,
+    "n_bootstrap": 1000,
+    "n_finite_reps": 1000,
+    "point": 4.950697467434816,
+    "seed": 42
+   },
+   "median_r2": 0.44442446436661803,
+   "min_clusters": 30,
+   "n_censored": 15,
+   "n_clusters": 74,
+   "n_events": 74,
+   "n_return_defined": 74,
+   "n_return_undefined": 0,
+   "p90_time_to_return_h": {
+    "censored_at_p90": true,
+    "ci_hi": 24.0,
+    "ci_lo": 21.3,
+    "n_bootstrap": 1000,
+    "n_finite_reps": 67,
+    "point": NaN,
+    "seed": 42
+   },
+   "stress_abs": false,
+   "symbol": "BNBUSDT",
+   "variable": "activity_ntrades"
+  },
+  {
+   "era": "OTHER",
+   "half_life_h": {
+    "ci_hi": 0.05959886657550679,
+    "ci_lo": 0.05007322783551026,
+    "point": 0.054950731291288524
+   },
+   "kein_befund": false,
+   "lambda_per_h": {
+    "ci_hi": 13.842670235618172,
+    "ci_lo": 11.630207424864123,
+    "n_bootstrap": 1000,
+    "n_finite_reps": 1000,
+    "point": 12.613975542666374,
+    "seed": 42
+   },
+   "median_r2": 0.12208922535163386,
+   "min_clusters": 30,
+   "n_censored": 22,
+   "n_clusters": 74,
+   "n_events": 74,
+   "n_return_defined": 74,
+   "n_return_undefined": 0,
+   "p90_time_to_return_h": {
+    "censored_at_p90": true,
+    "ci_hi": NaN,
+    "ci_lo": NaN,
+    "n_bootstrap": 1000,
+    "n_finite_reps": 0,
+    "point": NaN,
+    "seed": 42
+   },
+   "stress_abs": false,
+   "symbol": "BNBUSDT",
+   "variable": "realized_vol"
+  }
+ ],
+ "exchange": "bybit",
+ "gate_valid": true,
+ "generated_at": "2026-09-08T13:53:27+00:00",
+ "judgment_windows": [
+  "OOS1",
+  "OOS2"
+ ],
+ "kein_befund_overall": false,
+ "method": {
+  "baseline": "Median ueber 24h vor der Schockstunde (exklusive)",
+  "cluster": "Kalendertag (DEC-51 Punkt 3); Bootstrap 1000 Reps",
+  "event": "WOERTLICH aus H-20 geerbt (c20_tail.driver), kein neuer Parameter",
+  "fit": "AR(1)-aequivalenter Zerfall der Ueberschussreihe (5-Min-Buckets, 24h post-shock), lambda = -ln(phi)/dt_h, half_life = ln2/lambda",
+  "min_event_clusters": 30,
+  "seed": 42,
+  "time_to_return": "erste Stunde mit |excess| <= 10% des Schock-Excess; rechts-zensiert bei 24h"
+ },
+ "n_event_clusters_total": 1468,
+ "n_events_pseudo_null": 3570,
+ "n_events_real": 3570,
+ "package": "WP-11",
+ "prd_ref": "PRD_SCINANCE3.md 11.3 (DEC-58); Exkurs X-OEKO-1 Arm (a)",
+ "pre_fixed": {
+  "era_invariance_descriptive": [
+   {
+    "era": "L",
+    "half_life_h": {
+     "ci_hi": 0.13073644115000124,
+     "ci_lo": 0.11878529441058547,
+     "point": 0.12523277886739576
+    },
+    "kein_befund": false,
+    "lambda_per_h": {
+     "ci_hi": 5.835294545502056,
+     "ci_lo": 5.301866675142692,
+     "n_bootstrap": 1000,
+     "n_finite_reps": 1000,
+     "point": 5.534870237878316,
+     "seed": 42
+    },
+    "median_r2": 0.4011372726870498,
+    "min_clusters": 30,
+    "n_censored": 195,
+    "n_clusters": 365,
+    "n_events": 889,
+    "n_return_defined": 889,
+    "n_return_undefined": 0,
+    "p90_time_to_return_h": {
+     "censored_at_p90": false,
+     "ci_hi": 24.0,
+     "ci_lo": 24.0,
+     "n_bootstrap": 1000,
+     "n_finite_reps": 26,
+     "point": 24.0,
+     "seed": 42
+    },
+    "variable": "activity_volume"
+   },
+   {
+    "era": "L",
+    "half_life_h": {
+     "ci_hi": 0.1701627550145869,
+     "ci_lo": 0.15496402598085585,
+     "point": 0.16302853196484582
+    },
+    "kein_befund": false,
+    "lambda_per_h": {
+     "ci_hi": 4.472955424154869,
+     "ci_lo": 4.073436519645715,
+     "n_bootstrap": 1000,
+     "n_finite_reps": 1000,
+     "point": 4.251692462699781,
+     "seed": 42
+    },
+    "median_r2": 0.4979047502453823,
+    "min_clusters": 30,
+    "n_censored": 187,
+    "n_clusters": 365,
+    "n_events": 889,
+    "n_return_defined": 889,
+    "n_return_undefined": 0,
+    "p90_time_to_return_h": {
+     "censored_at_p90": true,
+     "ci_hi": 24.0,
+     "ci_lo": 24.0,
+     "n_bootstrap": 1000,
+     "n_finite_reps": 44,
+     "point": NaN,
+     "seed": 42
+    },
+    "variable": "activity_ntrades"
+   },
+   {
+    "era": "L",
+    "half_life_h": {
+     "ci_hi": 0.07016700424829697,
+     "ci_lo": 0.06454752840276044,
+     "point": 0.06747857364128368
+    },
+    "kein_befund": false,
+    "lambda_per_h": {
+     "ci_hi": 10.738554948763959,
+     "ci_lo": 9.878534618738104,
+     "n_bootstrap": 1000,
+     "n_finite_reps": 1000,
+     "point": 10.27210776927085,
+     "seed": 42
+    },
+    "median_r2": 0.18336767753647254,
+    "min_clusters": 30,
+    "n_censored": 270,
+    "n_clusters": 365,
+    "n_events": 889,
+    "n_return_defined": 889,
+    "n_return_undefined": 0,
+    "p90_time_to_return_h": {
+     "censored_at_p90": false,
+     "ci_hi": 24.0,
+     "ci_lo": 24.0,
+     "n_bootstrap": 1000,
+     "n_finite_reps": 14,
+     "point": 24.0,
+     "seed": 42
+    },
+    "variable": "realized_vol"
+   },
+   {
+    "era": "OOS1",
+    "half_life_h": {
+     "ci_hi": 0.15127382695417474,
+     "ci_lo": 0.14205978515712647,
+     "point": 0.14598992949274966
+    },
+    "kein_befund": false,
+    "lambda_per_h": {
+     "ci_hi": 4.8792638943757645,
+     "ci_lo": 4.582069446619605,
+     "n_bootstrap": 1000,
+     "n_finite_reps": 1000,
+     "point": 4.7479109207623065,
+     "seed": 42
+    },
+    "median_r2": 0.4581242888059168,
+    "min_clusters": 30,
+    "n_censored": 244,
+    "n_clusters": 403,
+    "n_events": 1044,
+    "n_return_defined": 1044,
+    "n_return_undefined": 0,
+    "p90_time_to_return_h": {
+     "censored_at_p90": true,
+     "ci_hi": 24.0,
+     "ci_lo": 24.0,
+     "n_bootstrap": 1000,
+     "n_finite_reps": 22,
+     "point": NaN,
+     "seed": 42
+    },
+    "variable": "activity_volume"
+   },
+   {
+    "era": "OOS1",
+    "half_life_h": {
+     "ci_hi": 0.19195560774372283,
+     "ci_lo": 0.18026191223110427,
+     "point": 0.1862132747527004
+    },
+    "kein_befund": false,
+    "lambda_per_h": {
+     "ci_hi": 3.845222609595409,
+     "ci_lo": 3.610976458084809,
+     "n_bootstrap": 1000,
+     "n_finite_reps": 1000,
+     "point": 3.722329578707404,
+     "seed": 42
+    },
+    "median_r2": 0.5440174148044998,
+    "min_clusters": 30,
+    "n_censored": 250,
+    "n_clusters": 403,
+    "n_events": 1044,
+    "n_return_defined": 1044,
+    "n_return_undefined": 0,
+    "p90_time_to_return_h": {
+     "censored_at_p90": true,
+     "ci_hi": 24.0,
+     "ci_lo": 24.0,
+     "n_bootstrap": 1000,
+     "n_finite_reps": 33,
+     "point": NaN,
+     "seed": 42
+    },
+    "variable": "activity_ntrades"
+   },
+   {
+    "era": "OOS1",
+    "half_life_h": {
+     "ci_hi": 0.08077075069362423,
+     "ci_lo": 0.07388315541596058,
+     "point": 0.07723607736682242
+    },
+    "kein_befund": false,
+    "lambda_per_h": {
+     "ci_hi": 9.381667264446701,
+     "ci_lo": 8.581660744855006,
+     "n_bootstrap": 1000,
+     "n_finite_reps": 1000,
+     "point": 8.974396476246916,
+     "seed": 42
+    },
+    "median_r2": 0.22454029343972937,
+    "min_clusters": 30,
+    "n_censored": 261,
+    "n_clusters": 403,
+    "n_events": 1044,
+    "n_return_defined": 1044,
+    "n_return_undefined": 0,
+    "p90_time_to_return_h": {
+     "censored_at_p90": true,
+     "ci_hi": 24.0,
+     "ci_lo": 24.0,
+     "n_bootstrap": 1000,
+     "n_finite_reps": 31,
+     "point": NaN,
+     "seed": 42
+    },
+    "variable": "realized_vol"
+   },
+   {
+    "era": "OOS2",
+    "half_life_h": {
+     "ci_hi": 0.17797427077871705,
+     "ci_lo": 0.16301880565967314,
+     "point": 0.16904160221372974
+    },
+    "kein_befund": false,
+    "lambda_per_h": {
+     "ci_hi": 4.251946134404866,
+     "ci_lo": 3.8946482405974545,
+     "n_bootstrap": 1000,
+     "n_finite_reps": 1000,
+     "point": 4.100453210822957,
+     "seed": 42
+    },
+    "median_r2": 0.5092618258158732,
+    "min_clusters": 30,
+    "n_censored": 235,
+    "n_clusters": 362,
+    "n_events": 962,
+    "n_return_defined": 962,
+    "n_return_undefined": 0,
+    "p90_time_to_return_h": {
+     "censored_at_p90": true,
+     "ci_hi": 24.0,
+     "ci_lo": 24.0,
+     "n_bootstrap": 1000,
+     "n_finite_reps": 27,
+     "point": NaN,
+     "seed": 42
+    },
+    "variable": "activity_volume"
+   },
+   {
+    "era": "OOS2",
+    "half_life_h": {
+     "ci_hi": 0.2447749842675413,
+     "ci_lo": 0.21977757458169433,
+     "point": 0.2317602441278602
+    },
+    "kein_befund": false,
+    "lambda_per_h": {
+     "ci_hi": 3.1538576302847177,
+     "ci_lo": 2.8317729552066035,
+     "n_bootstrap": 1000,
+     "n_finite_reps": 1000,
+     "point": 2.990794142318653,
+     "seed": 42
+    },
+    "median_r2": 0.6147854039289529,
+    "min_clusters": 30,
+    "n_censored": 238,
+    "n_clusters": 362,
+    "n_events": 962,
+    "n_return_defined": 962,
+    "n_return_undefined": 0,
+    "p90_time_to_return_h": {
+     "censored_at_p90": true,
+     "ci_hi": 24.0,
+     "ci_lo": 24.0,
+     "n_bootstrap": 1000,
+     "n_finite_reps": 3,
+     "point": NaN,
+     "seed": 42
+    },
+    "variable": "activity_ntrades"
+   },
+   {
+    "era": "OOS2",
+    "half_life_h": {
+     "ci_hi": 0.08122706829975147,
+     "ci_lo": 0.07317837745840057,
+     "point": 0.07736309515612882
+    },
+    "kein_befund": false,
+    "lambda_per_h": {
+     "ci_hi": 9.472021717808325,
+     "ci_lo": 8.533450671911867,
+     "n_bootstrap": 1000,
+     "n_finite_reps": 1000,
+     "point": 8.959661957178469,
+     "seed": 42
+    },
+    "median_r2": 0.22655095419160498,
+    "min_clusters": 30,
+    "n_censored": 271,
+    "n_clusters": 362,
+    "n_events": 962,
+    "n_return_defined": 962,
+    "n_return_undefined": 0,
+    "p90_time_to_return_h": {
+     "censored_at_p90": true,
+     "ci_hi": 24.0,
+     "ci_lo": 24.0,
+     "n_bootstrap": 1000,
+     "n_finite_reps": 34,
+     "point": NaN,
+     "seed": 42
+    },
+    "variable": "realized_vol"
+   },
+   {
+    "era": "OTHER",
+    "half_life_h": {
+     "ci_hi": 0.12368472500886903,
+     "ci_lo": 0.11072023057090428,
+     "point": 0.1179139545675421
+    },
+    "kein_befund": false,
+    "lambda_per_h": {
+     "ci_hi": 6.260348059120594,
+     "ci_lo": 5.604145382627014,
+     "n_bootstrap": 1000,
+     "n_finite_reps": 1000,
+     "point": 5.878415180816489,
+     "seed": 42
+    },
+    "median_r2": 0.3788552876733386,
+    "min_clusters": 30,
+    "n_censored": 143,
+    "n_clusters": 337,
+    "n_events": 674,
+    "n_return_defined": 674,
+    "n_return_undefined": 0,
+    "p90_time_to_return_h": {
+     "censored_at_p90": true,
+     "ci_hi": 24.0,
+     "ci_lo": 24.0,
+     "n_bootstrap": 1000,
+     "n_finite_reps": 50,
+     "point": NaN,
+     "seed": 42
+    },
+    "variable": "activity_volume"
+   },
+   {
+    "era": "OTHER",
+    "half_life_h": {
+     "ci_hi": 0.18629895177748979,
+     "ci_lo": 0.15914013484215944,
+     "point": 0.17093715755919378
+    },
+    "kein_befund": false,
+    "lambda_per_h": {
+     "ci_hi": 4.355577436499171,
+     "ci_lo": 3.7206177165603203,
+     "n_bootstrap": 1000,
+     "n_finite_reps": 1000,
+     "point": 4.0549824886371795,
+     "seed": 42
+    },
+    "median_r2": 0.5163254607759256,
+    "min_clusters": 30,
+    "n_censored": 156,
+    "n_clusters": 337,
+    "n_events": 674,
+    "n_return_defined": 674,
+    "n_return_undefined": 0,
+    "p90_time_to_return_h": {
+     "censored_at_p90": true,
+     "ci_hi": 24.0,
+     "ci_lo": 24.0,
+     "n_bootstrap": 1000,
+     "n_finite_reps": 35,
+     "point": NaN,
+     "seed": 42
+    },
+    "variable": "activity_ntrades"
+   },
+   {
+    "era": "OTHER",
+    "half_life_h": {
+     "ci_hi": 0.06657942527253179,
+     "ci_lo": 0.06064315184589294,
+     "point": 0.06361169130476899
+    },
+    "kein_befund": false,
+    "lambda_per_h": {
+     "ci_hi": 11.4299332976851,
+     "ci_lo": 10.41083154026432,
+     "n_bootstrap": 1000,
+     "n_finite_reps": 1000,
+     "point": 10.896537512876659,
+     "seed": 42
+    },
+    "median_r2": 0.1635127930733582,
+    "min_clusters": 30,
+    "n_censored": 187,
+    "n_clusters": 337,
+    "n_events": 674,
+    "n_return_defined": 674,
+    "n_return_undefined": 0,
+    "p90_time_to_return_h": {
+     "censored_at_p90": true,
+     "ci_hi": 24.0,
+     "ci_lo": 24.0,
+     "n_bootstrap": 1000,
+     "n_finite_reps": 17,
+     "point": NaN,
+     "seed": 42
+    },
+    "variable": "realized_vol"
+   }
+  ],
+  "median_half_life_per_symbol": [
+   {
+    "half_life_h": {
+     "ci_hi": 0.17049482759823034,
+     "ci_lo": 0.1602838942514884,
+     "point": 0.1650665308167281
+    },
+    "kein_befund": false,
+    "lambda_per_h": {
+     "ci_hi": 4.324496754941483,
+     "ci_lo": 4.0655026919253,
+     "n_bootstrap": 1000,
+     "n_finite_reps": 1000,
+     "point": 4.199198814746646,
+     "seed": 42
+    },
+    "median_r2": 0.500197637842802,
+    "min_clusters": 30,
+    "n_censored": 178,
+    "n_clusters": 927,
+    "n_events": 927,
+    "n_return_defined": 927,
+    "n_return_undefined": 0,
+    "p90_time_to_return_h": {
+     "censored_at_p90": true,
+     "ci_hi": 24.0,
+     "ci_lo": 24.0,
+     "n_bootstrap": 1000,
+     "n_finite_reps": 31,
+     "point": NaN,
+     "seed": 42
+    },
+    "symbol": "BTCUSDT",
+    "variable": "activity_volume"
+   },
+   {
+    "half_life_h": {
+     "ci_hi": 0.21064154737011534,
+     "ci_lo": 0.19589411152250785,
+     "point": 0.20385491492139834
+    },
+    "kein_befund": false,
+    "lambda_per_h": {
+     "ci_hi": 3.5383768055749036,
+     "ci_lo": 3.2906479714660755,
+     "n_bootstrap": 1000,
+     "n_finite_reps": 1000,
+     "point": 3.40019852269545,
+     "seed": 42
+    },
+    "median_r2": 0.5731196534412307,
+    "min_clusters": 30,
+    "n_censored": 192,
+    "n_clusters": 927,
+    "n_events": 927,
+    "n_return_defined": 927,
+    "n_return_undefined": 0,
+    "p90_time_to_return_h": {
+     "censored_at_p90": true,
+     "ci_hi": 24.0,
+     "ci_lo": 24.0,
+     "n_bootstrap": 1000,
+     "n_finite_reps": 34,
+     "point": NaN,
+     "seed": 42
+    },
+    "symbol": "BTCUSDT",
+    "variable": "activity_ntrades"
+   },
+   {
+    "half_life_h": {
+     "ci_hi": 0.08272266327535033,
+     "ci_lo": 0.07773356387369475,
+     "point": 0.08096397632471551
+    },
+    "kein_befund": false,
+    "lambda_per_h": {
+     "ci_hi": 8.916961297261558,
+     "ci_lo": 8.379169058577554,
+     "n_bootstrap": 1000,
+     "n_finite_reps": 1000,
+     "point": 8.561180070751433,
+     "seed": 42
+    },
+    "median_r2": 0.240336801094701,
+    "min_clusters": 30,
+    "n_censored": 227,
+    "n_clusters": 927,
+    "n_events": 927,
+    "n_return_defined": 927,
+    "n_return_undefined": 0,
+    "p90_time_to_return_h": {
+     "censored_at_p90": true,
+     "ci_hi": 24.0,
+     "ci_lo": 24.0,
+     "n_bootstrap": 1000,
+     "n_finite_reps": 24,
+     "point": NaN,
+     "seed": 42
+    },
+    "symbol": "BTCUSDT",
+    "variable": "realized_vol"
+   },
+   {
+    "half_life_h": {
+     "ci_hi": 0.14943984783483796,
+     "ci_lo": 0.1413233104821004,
+     "point": 0.14503524107064944
+    },
+    "kein_befund": false,
+    "lambda_per_h": {
+     "ci_hi": 4.9046910817146285,
+     "ci_lo": 4.638302237339111,
+     "n_bootstrap": 1000,
+     "n_finite_reps": 1000,
+     "point": 4.7791638462703006,
+     "seed": 42
+    },
+    "median_r2": 0.4562715145082953,
+    "min_clusters": 30,
+    "n_censored": 185,
+    "n_clusters": 829,
+    "n_events": 829,
+    "n_return_defined": 829,
+    "n_return_undefined": 0,
+    "p90_time_to_return_h": {
+     "censored_at_p90": true,
+     "ci_hi": 24.0,
+     "ci_lo": 24.0,
+     "n_bootstrap": 1000,
+     "n_finite_reps": 29,
+     "point": NaN,
+     "seed": 42
+    },
+    "symbol": "ETHUSDT",
+    "variable": "activity_volume"
+   },
+   {
+    "half_life_h": {
+     "ci_hi": 0.21307707286472594,
+     "ci_lo": 0.19911577787158005,
+     "point": 0.20622612009810648
+    },
+    "kein_befund": false,
+    "lambda_per_h": {
+     "ci_hi": 3.481126347541335,
+     "ci_lo": 3.253035022684006,
+     "n_bootstrap": 1000,
+     "n_finite_reps": 1000,
+     "point": 3.361102755704269,
+     "seed": 42
+    },
+    "median_r2": 0.5789527389975886,
+    "min_clusters": 30,
+    "n_censored": 184,
+    "n_clusters": 829,
+    "n_events": 829,
+    "n_return_defined": 829,
+    "n_return_undefined": 0,
+    "p90_time_to_return_h": {
+     "censored_at_p90": true,
+     "ci_hi": 24.0,
+     "ci_lo": 24.0,
+     "n_bootstrap": 1000,
+     "n_finite_reps": 24,
+     "point": NaN,
+     "seed": 42
+    },
+    "symbol": "ETHUSDT",
+    "variable": "activity_ntrades"
+   },
+   {
+    "half_life_h": {
+     "ci_hi": 0.07370457116587065,
+     "ci_lo": 0.06962689061153908,
+     "point": 0.07163647591217032
+    },
+    "kein_befund": false,
+    "lambda_per_h": {
+     "ci_hi": 9.95516494377349,
+     "ci_lo": 9.404398799092549,
+     "n_bootstrap": 1000,
+     "n_finite_reps": 1000,
+     "point": 9.675897253932149,
+     "seed": 42
+    },
+    "median_r2": 0.2008740222952189,
+    "min_clusters": 30,
+    "n_censored": 223,
+    "n_clusters": 829,
+    "n_events": 829,
+    "n_return_defined": 829,
+    "n_return_undefined": 0,
+    "p90_time_to_return_h": {
+     "censored_at_p90": true,
+     "ci_hi": 24.0,
+     "ci_lo": 24.0,
+     "n_bootstrap": 1000,
+     "n_finite_reps": 27,
+     "point": NaN,
+     "seed": 42
+    },
+    "symbol": "ETHUSDT",
+    "variable": "realized_vol"
+   },
+   {
+    "half_life_h": {
+     "ci_hi": 0.1447655955683366,
+     "ci_lo": 0.13312370074975116,
+     "point": 0.1385674273321274
+    },
+    "kein_befund": false,
+    "lambda_per_h": {
+     "ci_hi": 5.206790200814343,
+     "ci_lo": 4.788065685349563,
+     "n_bootstrap": 1000,
+     "n_finite_reps": 1000,
+     "point": 5.002237494808684,
+     "seed": 42
+    },
+    "median_r2": 0.4391574618989904,
+    "min_clusters": 30,
+    "n_censored": 175,
+    "n_clusters": 644,
+    "n_events": 644,
+    "n_return_defined": 644,
+    "n_return_undefined": 0,
+    "p90_time_to_return_h": {
+     "censored_at_p90": true,
+     "ci_hi": 24.0,
+     "ci_lo": 24.0,
+     "n_bootstrap": 1000,
+     "n_finite_reps": 32,
+     "point": NaN,
+     "seed": 42
+    },
+    "symbol": "XRPUSDT",
+    "variable": "activity_volume"
+   },
+   {
+    "half_life_h": {
+     "ci_hi": 0.18847946927537376,
+     "ci_lo": 0.16847950207271117,
+     "point": 0.17889786931030374
+    },
+    "kein_befund": false,
+    "lambda_per_h": {
+     "ci_hi": 4.114133601016946,
+     "ci_lo": 3.6775739194555874,
+     "n_bootstrap": 1000,
+     "n_finite_reps": 1000,
+     "point": 3.874541285663166,
+     "seed": 42
+    },
+    "median_r2": 0.5286479103989953,
+    "min_clusters": 30,
+    "n_censored": 170,
+    "n_clusters": 644,
+    "n_events": 644,
+    "n_return_defined": 644,
+    "n_return_undefined": 0,
+    "p90_time_to_return_h": {
+     "censored_at_p90": true,
+     "ci_hi": 24.0,
+     "ci_lo": 24.0,
+     "n_bootstrap": 1000,
+     "n_finite_reps": 40,
+     "point": NaN,
+     "seed": 42
+    },
+    "symbol": "XRPUSDT",
+    "variable": "activity_ntrades"
+   },
+   {
+    "half_life_h": {
+     "ci_hi": 0.07571742898235301,
+     "ci_lo": 0.06889119971590371,
+     "point": 0.07202421827899158
+    },
+    "kein_befund": false,
+    "lambda_per_h": {
+     "ci_hi": 10.061476406542104,
+     "ci_lo": 9.154394039468677,
+     "n_bootstrap": 1000,
+     "n_finite_reps": 1000,
+     "point": 9.623807062715823,
+     "seed": 42
+    },
+    "median_r2": 0.20375626100919447,
+    "min_clusters": 30,
+    "n_censored": 197,
+    "n_clusters": 644,
+    "n_events": 644,
+    "n_return_defined": 644,
+    "n_return_undefined": 0,
+    "p90_time_to_return_h": {
+     "censored_at_p90": true,
+     "ci_hi": 24.0,
+     "ci_lo": 24.0,
+     "n_bootstrap": 1000,
+     "n_finite_reps": 27,
+     "point": NaN,
+     "seed": 42
+    },
+    "symbol": "XRPUSDT",
+    "variable": "realized_vol"
+   },
+   {
+    "half_life_h": {
+     "ci_hi": 0.1444664234513225,
+     "ci_lo": 0.13436005219736155,
+     "point": 0.14012744382597228
+    },
+    "kein_befund": false,
+    "lambda_per_h": {
+     "ci_hi": 5.158878470378837,
+     "ci_lo": 4.797981177913628,
+     "n_bootstrap": 1000,
+     "n_finite_reps": 1000,
+     "point": 4.946548382205429,
+     "seed": 42
+    },
+    "median_r2": 0.4430075916185223,
+    "min_clusters": 30,
+    "n_censored": 124,
+    "n_clusters": 565,
+    "n_events": 565,
+    "n_return_defined": 565,
+    "n_return_undefined": 0,
+    "p90_time_to_return_h": {
+     "censored_at_p90": true,
+     "ci_hi": 24.0,
+     "ci_lo": 24.0,
+     "n_bootstrap": 1000,
+     "n_finite_reps": 44,
+     "point": NaN,
+     "seed": 42
+    },
+    "symbol": "SOLUSDT",
+    "variable": "activity_volume"
+   },
+   {
+    "half_life_h": {
+     "ci_hi": 0.19894947671216007,
+     "ci_lo": 0.18278332801628777,
+     "point": 0.1895551193552305
+    },
+    "kein_befund": false,
+    "lambda_per_h": {
+     "ci_hi": 3.792179451389457,
+     "ci_lo": 3.4840362086641226,
+     "n_bootstrap": 1000,
+     "n_finite_reps": 1000,
+     "point": 3.656705146860065,
+     "seed": 42
+    },
+    "median_r2": 0.5526494606936809,
+    "min_clusters": 30,
+    "n_censored": 126,
+    "n_clusters": 565,
+    "n_events": 565,
+    "n_return_defined": 565,
+    "n_return_undefined": 0,
+    "p90_time_to_return_h": {
+     "censored_at_p90": true,
+     "ci_hi": 24.0,
+     "ci_lo": 24.0,
+     "n_bootstrap": 1000,
+     "n_finite_reps": 17,
+     "point": NaN,
+     "seed": 42
+    },
+    "symbol": "SOLUSDT",
+    "variable": "activity_ntrades"
+   },
+   {
+    "half_life_h": {
+     "ci_hi": 0.0659945055805893,
+     "ci_lo": 0.061636378386382924,
+     "point": 0.06304645989469876
+    },
+    "kein_befund": false,
+    "lambda_per_h": {
+     "ci_hi": 11.24574802586194,
+     "ci_lo": 10.503104379098765,
+     "n_bootstrap": 1000,
+     "n_finite_reps": 1000,
+     "point": 10.994228410566608,
+     "seed": 42
+    },
+    "median_r2": 0.16161328495406446,
+    "min_clusters": 30,
+    "n_censored": 147,
+    "n_clusters": 565,
+    "n_events": 565,
+    "n_return_defined": 565,
+    "n_return_undefined": 0,
+    "p90_time_to_return_h": {
+     "censored_at_p90": true,
+     "ci_hi": 24.0,
+     "ci_lo": 24.0,
+     "n_bootstrap": 1000,
+     "n_finite_reps": 43,
+     "point": NaN,
+     "seed": 42
+    },
+    "symbol": "SOLUSDT",
+    "variable": "realized_vol"
+   },
+   {
+    "half_life_h": {
+     "ci_hi": 0.10956227419552314,
+     "ci_lo": 0.10203525693688602,
+     "point": 0.10562042774875802
+    },
+    "kein_befund": false,
+    "lambda_per_h": {
+     "ci_hi": 6.793212477415448,
+     "ci_lo": 6.326513260604335,
+     "n_bootstrap": 1000,
+     "n_finite_reps": 1000,
+     "point": 6.562624251141569,
+     "seed": 42
+    },
+    "median_r2": 0.3366562107107339,
+    "min_clusters": 30,
+    "n_censored": 155,
+    "n_clusters": 604,
+    "n_events": 604,
+    "n_return_defined": 604,
+    "n_return_undefined": 0,
+    "p90_time_to_return_h": {
+     "censored_at_p90": true,
+     "ci_hi": 24.0,
+     "ci_lo": 24.0,
+     "n_bootstrap": 1000,
+     "n_finite_reps": 7,
+     "point": NaN,
+     "seed": 42
+    },
+    "symbol": "BNBUSDT",
+    "variable": "activity_volume"
+   },
+   {
+    "half_life_h": {
+     "ci_hi": 0.16617445311613363,
+     "ci_lo": 0.15260418181879312,
+     "point": 0.157488183334462
+    },
+    "kein_befund": false,
+    "lambda_per_h": {
+     "ci_hi": 4.542124418208994,
+     "ci_lo": 4.171201815693827,
+     "n_bootstrap": 1000,
+     "n_finite_reps": 1000,
+     "point": 4.401264691001543,
+     "seed": 42
+    },
+    "median_r2": 0.4865189010525535,
+    "min_clusters": 30,
+    "n_censored": 159,
+    "n_clusters": 604,
+    "n_events": 604,
+    "n_return_defined": 604,
+    "n_return_undefined": 0,
+    "p90_time_to_return_h": {
+     "censored_at_p90": true,
+     "ci_hi": 24.0,
+     "ci_lo": 24.0,
+     "n_bootstrap": 1000,
+     "n_finite_reps": 49,
+     "point": NaN,
+     "seed": 42
+    },
+    "symbol": "BNBUSDT",
+    "variable": "activity_ntrades"
+   },
+   {
+    "half_life_h": {
+     "ci_hi": 0.07059835268505558,
+     "ci_lo": 0.06523510220754607,
+     "point": 0.06747086606848889
+    },
+    "kein_befund": false,
+    "lambda_per_h": {
+     "ci_hi": 10.625371266449331,
+     "ci_lo": 9.81817782140223,
+     "n_bootstrap": 1000,
+     "n_finite_reps": 1000,
+     "point": 10.273281209349525,
+     "seed": 42
+    },
+    "median_r2": 0.18259801397577513,
+    "min_clusters": 30,
+    "n_censored": 195,
+    "n_clusters": 604,
+    "n_events": 604,
+    "n_return_defined": 604,
+    "n_return_undefined": 0,
+    "p90_time_to_return_h": {
+     "censored_at_p90": true,
+     "ci_hi": 24.0,
+     "ci_lo": 24.0,
+     "n_bootstrap": 1000,
+     "n_finite_reps": 16,
+     "point": NaN,
+     "seed": 42
+    },
+    "symbol": "BNBUSDT",
+    "variable": "realized_vol"
+   }
+  ],
+  "recovery_h_p90": [
+   {
+    "kein_befund": true,
+    "min_clusters": 30,
+    "n_clusters": 27,
+    "n_events": 84,
+    "reason": "nur 27 Ereignistage (< 30) -- KEIN BEFUND (builder-Vorgabe, loud fail)",
+    "variable": "activity_volume"
+   },
+   {
+    "kein_befund": true,
+    "min_clusters": 30,
+    "n_clusters": 27,
+    "n_events": 84,
+    "reason": "nur 27 Ereignistage (< 30) -- KEIN BEFUND (builder-Vorgabe, loud fail)",
+    "variable": "activity_ntrades"
+   },
+   {
+    "kein_befund": true,
+    "min_clusters": 30,
+    "n_clusters": 27,
+    "n_events": 84,
+    "reason": "nur 27 Ereignistage (< 30) -- KEIN BEFUND (builder-Vorgabe, loud fail)",
+    "variable": "realized_vol"
+   }
+  ]
+ },
+ "schema_version": 1,
+ "source": "E:\\Claude\\Projects\\scinance\\data\\barcache/bars_1min (WP-0, read-only)",
+ "status": "RUN",
+ "structural_null": [
+  {
+   "n_null": 928,
+   "n_obs": 927,
+   "symbol": "BTCUSDT",
+   "var_null": 7.629608073195563,
+   "var_obs": 6.621634265321327,
+   "var_ratio": 0.8678865548263924,
+   "variable": "activity_volume"
+  },
+  {
+   "n_null": 928,
+   "n_obs": 927,
+   "symbol": "BTCUSDT",
+   "var_null": 6.433093218598544,
+   "var_obs": 5.338330111702713,
+   "var_ratio": 0.8298232172773758,
+   "variable": "activity_ntrades"
+  },
+  {
+   "n_null": 928,
+   "n_obs": 927,
+   "symbol": "BTCUSDT",
+   "var_null": 19.437451211704268,
+   "var_obs": 19.038815444946955,
+   "var_ratio": 0.9794913560211396,
+   "variable": "realized_vol"
+  },
+  {
+   "n_null": 828,
+   "n_obs": 829,
+   "symbol": "ETHUSDT",
+   "var_null": 6.581509644339041,
+   "var_obs": 5.457595515341873,
+   "var_ratio": 0.8292315608830139,
+   "variable": "activity_volume"
+  },
+  {
+   "n_null": 828,
+   "n_obs": 829,
+   "symbol": "ETHUSDT",
+   "var_null": 4.5967870144384095,
+   "var_obs": 3.4950189112170977,
+   "var_ratio": 0.7603177828860285,
+   "variable": "activity_ntrades"
+  },
+  {
+   "n_null": 828,
+   "n_obs": 829,
+   "symbol": "ETHUSDT",
+   "var_null": 17.58307749448967,
+   "var_obs": 17.807972600289773,
+   "var_ratio": 1.0127904290856127,
+   "variable": "realized_vol"
+  },
+  {
+   "n_null": 644,
+   "n_obs": 644,
+   "symbol": "XRPUSDT",
+   "var_null": 9.01499706452373,
+   "var_obs": 7.725470804775298,
+   "var_ratio": 0.8569576617142738,
+   "variable": "activity_volume"
+  },
+  {
+   "n_null": 644,
+   "n_obs": 644,
+   "symbol": "XRPUSDT",
+   "var_null": 6.092651300970453,
+   "var_obs": 5.2259937980256765,
+   "var_ratio": 0.8577536346439631,
+   "variable": "activity_ntrades"
+  },
+  {
+   "n_null": 644,
+   "n_obs": 644,
+   "symbol": "XRPUSDT",
+   "var_null": 22.64999679154757,
+   "var_obs": 23.230523489685247,
+   "var_ratio": 1.0256303214291984,
+   "variable": "realized_vol"
+  },
+  {
+   "n_null": 565,
+   "n_obs": 565,
+   "symbol": "SOLUSDT",
+   "var_null": 5.7076461998427135,
+   "var_obs": 6.11141180812735,
+   "var_ratio": 1.0707411766860677,
+   "variable": "activity_volume"
+  },
+  {
+   "n_null": 565,
+   "n_obs": 565,
+   "symbol": "SOLUSDT",
+   "var_null": 4.605142468423956,
+   "var_obs": 4.438581048200251,
+   "var_ratio": 0.9638314294583141,
+   "variable": "activity_ntrades"
+  },
+  {
+   "n_null": 565,
+   "n_obs": 565,
+   "symbol": "SOLUSDT",
+   "var_null": 23.898140525671945,
+   "var_obs": 23.66962343525049,
+   "var_ratio": 0.9904378715082047,
+   "variable": "realized_vol"
+  },
+  {
+   "n_null": 604,
+   "n_obs": 604,
+   "symbol": "BNBUSDT",
+   "var_null": 12.753954122058971,
+   "var_obs": 11.88075866921161,
+   "var_ratio": 0.9315353148921008,
+   "variable": "activity_volume"
+  },
+  {
+   "n_null": 604,
+   "n_obs": 604,
+   "symbol": "BNBUSDT",
+   "var_null": 8.022173513539409,
+   "var_obs": 6.695181500027037,
+   "var_ratio": 0.834584478723535,
+   "variable": "activity_ntrades"
+  },
+  {
+   "n_null": 604,
+   "n_obs": 603,
+   "symbol": "BNBUSDT",
+   "var_null": 19.409693070081065,
+   "var_obs": 22.691731639897554,
+   "var_ratio": 1.1690927598889014,
+   "variable": "realized_vol"
+  }
+ ],
+ "symbols": [
+  "BTCUSDT",
+  "ETHUSDT",
+  "XRPUSDT",
+  "SOLUSDT",
+  "BNBUSDT"
+ ],
+ "variables": [
+  "activity_volume",
+  "activity_ntrades",
+  "realized_vol"
+ ],
+ "verdict_semantics": "DESKRIPTIV (Arm (a), PRD 11.3): kein PASS/FAIL, keine Schwelle -- Halbwertszeit ist Deskriptor",
+ "windows": {
+  "L": [
+   "2021-06-29",
+   "2022-12-31"
+  ],
+  "OOS1": [
+   "2023-01-01",
+   "2024-06-30"
+  ],
+  "OOS2": [
+   "2024-07-01",
+   "2025-12-31"
+  ]
+ }
+}
