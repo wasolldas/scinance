@@ -297,7 +297,15 @@ def event_record(minute_idx: np.ndarray, px_last: np.ndarray,
                  vol_total: np.ndarray, n_trades: np.ndarray,
                  event_hour: int, symbol: str) -> dict[str, Any]:
     """All per-variable measurements for ONE event hour. Never raises: a
-    data-quality floor miss is reported per variable, not an exception."""
+    data-quality floor miss is reported per variable, not an exception.
+
+    ``variables[var]["excess"]`` (v2, additive) is the RAW 5-min-bucket
+    post-shock excess array (length ``POST_BUCKETS``, NaN where a bucket
+    is missing) -- the per-event AR(1) ``fit``/``return`` fields are kept
+    UNCHANGED (per-event diagnostic, see the module docstring's v2
+    section); ``excess`` feeds the group-level superposed-epoch profile
+    instead (``build_profile_matrix``/``profile_group_summary``).
+    """
     pre_start = (event_hour - BASELINE_HOURS) * MIN_PER_HOUR
     t0 = (event_hour + 1) * MIN_PER_HOUR   # end of the shock hour (H-20 convention)
     pre = bucket_state(minute_idx, px_last, vol_total, n_trades,
@@ -320,6 +328,7 @@ def event_record(minute_idx: np.ndarray, px_last: np.ndarray,
                 "baseline": float("nan"), "fit": ar1_decay_fit(np.empty(0)),
                 "return": {"defined": False, "shock_excess": float("nan"),
                           "t_return_h": None, "censored": None},
+                "excess": np.full(POST_BUCKETS, np.nan),
             }
             continue
         pre_vals = pre[var][pre["n_bars"] > 0]
@@ -328,7 +337,8 @@ def event_record(minute_idx: np.ndarray, px_last: np.ndarray,
         fit = ar1_decay_fit(post_excess)
         hourly_excess = hourly_from_buckets(post_excess)
         ret = time_to_return(hourly_excess)
-        rec["variables"][var] = {"baseline": baseline, "fit": fit, "return": ret}
+        rec["variables"][var] = {"baseline": baseline, "fit": fit, "return": ret,
+                                 "excess": post_excess}
     return rec
 
 
@@ -478,8 +488,26 @@ def p90_time_to_return(t_values: np.ndarray, censored: np.ndarray, days: np.ndar
 
 # ----------------------------------------------------------------------------
 # group summary (symbol x era x regime x variable cells, and the three
-# pre-fixed outputs)
+# pre-fixed outputs) -- v1, PER-EVENT AR(1). Orchestrator Nacharbeit
+# 2026-09-08 (real run, 3570 events): the per-event AR(1) half-life is
+# UNINFORMATIVE for this question -- matched-pseudo-null medians land
+# practically on top of the real-event medians (0.120h vs 0.142h
+# volume, 0.065h vs 0.072h realized-vol) while ~23% of real events never
+# return to 10% of their shock excess within 24h. The estimator measures
+# the 5-min excess series' generic short memory, not the shock's
+# relaxation (documented in ``ar1_decay_fit``'s own "read lambda only
+# together with R^2" caveat above -- this is that failure mode, hit at
+# scale). KEPT UNCHANGED below as a per-event DIAGNOSTIC table (never
+# judgment-bearing) -- v2 (below) adds the superposed-epoch GROUP
+# profile as the actual answer to the relaxation question.
 # ----------------------------------------------------------------------------
+
+_AR1_DIAGNOSTIC_NOTE = (
+    "PER-EVENT AR(1)-Diagnostik, NICHT urteilstragend (Orchestrator-Abnahme "
+    "2026-09-08): misst das generische Kurzgedaechtnis der 5-Min-Excess-Reihe, "
+    "nicht die Schock-Relaxation -- siehe 'profile' fuer die Superposed-Epoch-"
+    "Analyse, die diese Frage tatsaechlich beantwortet.")
+
 
 def summarize_group(rows: list[dict[str, Any]], *,
                     min_clusters: int = MIN_EVENT_CLUSTERS,
@@ -490,6 +518,10 @@ def summarize_group(rows: list[dict[str, Any]], *,
     "r2": float, "t_return_h": float|nan, "censored": bool|None}``).
     Loud "KEIN BEFUND" below ``min_clusters`` DISTINCT event days --
     builder spec, never silently reported as a thin-N point estimate.
+
+    v2 NOTE: this is the PER-EVENT AR(1) DIAGNOSTIC (kept unchanged, never
+    deleted) -- ``_AR1_DIAGNOSTIC_NOTE`` / ``profile_group_summary`` carry
+    the judgment-bearing group-level answer.
     """
     n_events = len(rows)
     days = np.asarray([row["event_day"] for row in rows], dtype=np.int64)
@@ -538,6 +570,357 @@ def summarize_group(rows: list[dict[str, Any]], *,
     return out
 
 
+# ============================================================================
+# v2 -- Superposed-Epoch-Analyse (SEA): group-level excess PROFILE in event
+# time, matched-null bump subtraction, exponential + power-law fit of the
+# DIFFERENCE profile's mean. This is the judgment-bearing group answer;
+# the per-event AR(1) machinery above stays as a diagnostic only.
+# ============================================================================
+
+def build_profile_matrix(records: list[dict[str, Any]], variable: str
+                         ) -> tuple[np.ndarray, np.ndarray]:
+    """Stack the (floor-ok) ``excess`` bucket arrays of ``records`` for
+    ``variable`` into a ``(n_events, POST_BUCKETS)`` matrix, plus the
+    parallel ``event_day`` array (the cluster key for the profile
+    bootstrap)."""
+    rows = [rec for rec in records if rec.get("floor_ok")]
+    if not rows:
+        return np.empty((0, POST_BUCKETS)), np.empty(0, dtype=np.int64)
+    mat = np.vstack([rec["variables"][variable]["excess"] for rec in rows])
+    days = np.asarray([rec["event_day"] for rec in rows], dtype=np.int64)
+    return mat, days
+
+
+def _cluster_bootstrap_profile_reps(matrix: np.ndarray, days: np.ndarray, *,
+                                    n_bootstrap: int, seed: int,
+                                    stat: str = "mean") -> np.ndarray:
+    """Day-cluster bootstrap of a GROUP's mean/median excess PROFILE
+    (superposed-epoch analysis): each of ``n_bootstrap`` reps resamples
+    calendar DAYS with replacement (every event of a resampled day moves
+    together, DEC-51 point 3), then averages/medians the resampled
+    events bucket-by-bucket. Returns ``(n_bootstrap, POST_BUCKETS)``; an
+    empty ``matrix`` returns an all-NaN block (caller decides what that
+    means -- typically "no matched pseudo-null available")."""
+    n_buckets = matrix.shape[1] if matrix.ndim == 2 and matrix.shape[0] else POST_BUCKETS
+    if matrix.shape[0] == 0:
+        return np.full((n_bootstrap, n_buckets), np.nan)
+    fn = np.nanmean if stat == "mean" else np.nanmedian
+    days_u = np.unique(days)
+    by_day = {d: matrix[days == d] for d in days_u}
+    rng = np.random.default_rng(seed)
+    reps = np.full((n_bootstrap, n_buckets), np.nan)
+    for b in range(n_bootstrap):
+        draw = rng.choice(days_u, size=days_u.size, replace=True)
+        sample = np.concatenate([by_day[d] for d in draw], axis=0)
+        with np.errstate(all="ignore"):
+            reps[b] = fn(sample, axis=0)
+    return reps
+
+
+def loglinear_decay_fit(t_hours: np.ndarray, y_point: np.ndarray, y_reps: np.ndarray, *,
+                        kind: str, eps: float = 1e-6, min_points: int = 20,
+                        noise_z: float = 5.0) -> dict[str, Any]:
+    """Closed-form log-linear fit of the DIFFERENCE profile's point
+    estimate: ``kind="exponential"`` fits ``log(y) = log(A) - lambda*t``;
+    ``kind="power"`` fits the Omori-like ``log(y) = log(A) - p*log(t+t0)``
+    (``t0`` = half a bucket, avoids ``log(0)`` at the first bucket).
+
+    **Valid-bucket mask, and why it is NOT a plain ``y_point > eps``.** A
+    naive positivity cutoff right at the noise floor creates a
+    SURVIVORSHIP bias in the tail: once the true signal drops to the
+    scale of the bootstrap noise, roughly half the noisy point estimates
+    there go negative (excluded) while the other half stay positive by
+    chance (kept) -- and the KEPT half sits systematically ABOVE the true
+    (rapidly decaying) curve, which flattens the fitted slope and biases
+    the decay parameter LOW. Measured on the module's own test fixture:
+    a plain ``eps`` cutoff recovered lambda=0.27 against an injected
+    0.6 (2.2x off); requiring the point estimate to exceed
+    ``noise_z`` times the bucket-wise bootstrap noise scale (median of
+    ``std(y_reps, axis=0)``) instead of the raw floor keeps only the
+    region where the mean profile is reliably distinguishable from zero
+    and recovers lambda=0.60 on the same fixture. ``noise_z=5`` was
+    chosen empirically on that fixture (3 still shows a ~3% residual
+    bias, 8+ makes no further difference) -- a DESIGN PARAMETER, not a
+    literature constant.
+
+    Bootstrap CI of the decay parameter (``lambda`` or ``p``) comes from
+    applying the IDENTICAL fixed bucket mask (chosen once from the point
+    estimate) to every row of ``y_reps`` in ONE batched
+    ``numpy.linalg.lstsq`` call -- closed-form, deterministic, no
+    iterative optimizer, and every replicate is fit on the SAME design
+    matrix so the parameter means the same thing across reps. Replicate
+    values are clipped to ``eps`` before the log (never bucket-dropped
+    per replicate)."""
+    if kind == "exponential":
+        pred = t_hours
+    elif kind == "power":
+        t0 = (BUCKET_MINUTES / 60.0) / 2.0
+        pred = np.log(t_hours + t0)
+    else:
+        raise ValueError(f"unknown kind: {kind!r}")
+    with np.errstate(all="ignore"):
+        noise_scale = float(np.nanmedian(np.nanstd(y_reps, axis=0))) if y_reps.shape[0] else float("nan")
+    threshold = max(eps, noise_z * noise_scale) if np.isfinite(noise_scale) and noise_scale > 0.0 else eps
+    mask = np.isfinite(y_point) & np.isfinite(pred) & (y_point > threshold)
+    n_used = int(np.sum(mask))
+    if n_used < min_points:
+        return {"kind": kind, "param": float("nan"), "param_ci": (float("nan"), float("nan")),
+               "log_amplitude": float("nan"), "r2": float("nan"), "n_points": n_used,
+               "mask_threshold": threshold}
+    x = np.column_stack([np.ones(n_used), pred[mask]])
+    logy_point = np.log(np.maximum(y_point[mask], eps))
+    coef_point, *_ = np.linalg.lstsq(x, logy_point, rcond=None)
+    intercept, slope = float(coef_point[0]), float(coef_point[1])
+    fitted = x @ coef_point
+    ss_res = float(np.sum((logy_point - fitted) ** 2))
+    ss_tot = float(np.sum((logy_point - logy_point.mean()) ** 2))
+    r2 = (1.0 - ss_res / ss_tot) if ss_tot > 0.0 else float("nan")
+    param_point = -slope
+    logy_reps = np.log(np.maximum(y_reps[:, mask], eps))
+    coef_reps, *_ = np.linalg.lstsq(x, logy_reps.T, rcond=None)
+    params_reps = -coef_reps[1, :]
+    finite = params_reps[np.isfinite(params_reps)]
+    ci = ((float("nan"), float("nan")) if finite.size == 0
+         else tuple(float(v) for v in np.quantile(finite, [CI_ALPHA / 2, 1 - CI_ALPHA / 2])))
+    return {"kind": kind, "param": param_point, "param_ci": ci,
+           "log_amplitude": intercept, "r2": r2, "n_points": n_used,
+           "mask_threshold": threshold}
+
+
+def mean_profile_return_time(diff_point: np.ndarray, diff_ci_lo: np.ndarray,
+                             diff_ci_hi: np.ndarray, *,
+                             buckets_per_hour: int = BUCKETS_PER_HOUR) -> dict[str, Any]:
+    """First hour (hourly-averaged bucket CI bounds) whose difference
+    profile (real minus matched pseudo-null) CI contains 0 -- the
+    group's mean excess is then statistically indistinguishable from
+    the matched null ("Rueckkehrzeit des Mittels", builder v2
+    instruction). Right-censored at 24h if the CI never covers 0."""
+    n_hours = diff_point.size // buckets_per_hour
+    for h in range(n_hours):
+        sl = slice(h * buckets_per_hour, (h + 1) * buckets_per_hour)
+        lo_h = float(np.nanmean(diff_ci_lo[sl]))
+        hi_h = float(np.nanmean(diff_ci_hi[sl]))
+        if np.isfinite(lo_h) and np.isfinite(hi_h) and lo_h <= 0.0 <= hi_h:
+            return {"t_return_h": h + 1, "censored": False}
+    return {"t_return_h": float(n_hours), "censored": True}
+
+
+def remaining_fraction_at(diff_point: np.ndarray, diff_reps: np.ndarray, *,
+                          hours: tuple[float, ...] = (1.0, 6.0, 24.0),
+                          buckets_per_hour: int = BUCKETS_PER_HOUR,
+                          ref_eps: float = 1e-9) -> dict[str, Any]:
+    """Fraction of the shock excess (difference profile's FIRST post-shock
+    bucket) still present ``hours`` after the shock, with a bootstrap CI
+    from ``diff_reps``."""
+    ref_point = float(diff_point[0])
+    ref_reps = diff_reps[:, 0]
+    out: dict[str, Any] = {}
+    for h in hours:
+        idx = min(max(int(round(h * buckets_per_hour)) - 1, 0), diff_point.size - 1)
+        val_point = float(diff_point[idx])
+        frac_point = (val_point / ref_point) if abs(ref_point) > ref_eps else float("nan")
+        val_reps = diff_reps[:, idx]
+        with np.errstate(divide="ignore", invalid="ignore"):
+            frac_reps = np.where(np.abs(ref_reps) > ref_eps, val_reps / ref_reps, np.nan)
+        finite = frac_reps[np.isfinite(frac_reps)]
+        ci = ((float("nan"), float("nan")) if finite.size == 0
+             else tuple(float(v) for v in np.quantile(finite, [CI_ALPHA / 2, 1 - CI_ALPHA / 2])))
+        key = f"h{int(h)}" if float(h).is_integer() else f"h{h}"
+        out[key] = {"point": frac_point if np.isfinite(frac_point) else float("nan"),
+                   "ci_lo": ci[0], "ci_hi": ci[1]}
+    return out
+
+
+def profile_replicate_recovery_p90(diff_reps: np.ndarray, *,
+                                   frac: float = RETURN_FRACTION) -> dict[str, Any]:
+    """RECOVERY_H_P90, v2: the 90th percentile of time-to-return applied
+    to EACH BOOTSTRAP-REPLICATE PROFILE (not each event, per builder v2
+    instruction -- "auf diese Profilgroessen umstellen"), i.e. the
+    profile-level analogue of the old per-event distribution. A
+    replicate whose shock excess is negligible or that never returns
+    within 24h is right-censored exactly like the old per-event rule
+    (``time_to_return``); if the P90 order statistic itself lands on a
+    censored replicate, the point is reported as censored, never a
+    fabricated finite number.
+    """
+    n_reps = diff_reps.shape[0]
+    t_vals = np.full(n_reps, np.nan)
+    censored = np.ones(n_reps, dtype=bool)
+    for i in range(n_reps):
+        row = diff_reps[i]
+        if np.all(~np.isfinite(row)):
+            continue
+        ret = time_to_return(hourly_from_buckets(row), frac=frac)
+        if ret["defined"]:
+            t_vals[i] = ret["t_return_h"]
+            censored[i] = bool(ret["censored"])
+    finite_mask = np.isfinite(t_vals)
+    t, c = t_vals[finite_mask], censored[finite_mask]
+    n = t.size
+    if n == 0:
+        return {"point": float("nan"), "censored_at_p90": True, "n_reps": int(n_reps),
+               "n_defined_reps": 0, "n_censored_reps": 0}
+    order = np.argsort(t, kind="mergesort")
+    idx = order[int(np.ceil(0.9 * n)) - 1]
+    point = float("nan") if c[idx] else float(t[idx])
+    return {"point": point, "censored_at_p90": not np.isfinite(point),
+           "n_reps": int(n_reps), "n_defined_reps": int(n),
+           "n_censored_reps": int(np.sum(c))}
+
+
+def profile_group_summary(real_records: list[dict[str, Any]],
+                          pseudo_records: list[dict[str, Any]], variable: str, *,
+                          min_clusters: int = MIN_EVENT_CLUSTERS, seed: int = SEED,
+                          n_bootstrap: int = N_BOOTSTRAP) -> dict[str, Any]:
+    """Superposed-epoch group summary (builder v2): mean + median excess
+    PROFILE of ``real_records`` in event time (5-min buckets, 0..24h),
+    day-cluster bootstrap CI of the profile; the SAME profile for the
+    matched ``pseudo_records`` (the structural-null "selection bump");
+    the DIFFERENCE profile (real minus pseudo); exponential + power-law
+    fits of the difference profile's mean with bootstrap parameter CIs;
+    half-life; the mean profile's own return time; the fraction of
+    excess remaining at 1h/6h/24h; and the profile-replicate RECOVERY_H_P90.
+
+    Returns scalars only in every top-level field EXCEPT ``_arrays``
+    (private, leading underscore -- the 288-point profile/CI vectors,
+    consumed by ``report.py`` for the DEC-53 profile-matrix CSV and
+    stripped before JSON).
+    """
+    real_mat, real_days = build_profile_matrix(real_records, variable)
+    n_events = int(real_mat.shape[0])
+    n_clusters = int(np.unique(real_days).size) if n_events else 0
+    out: dict[str, Any] = {"n_events": n_events, "n_clusters": n_clusters,
+                           "min_clusters": min_clusters}
+    if n_clusters < min_clusters:
+        out["kein_befund"] = True
+        out["reason"] = (f"nur {n_clusters} Ereignistage (< {min_clusters}) -- "
+                         "KEIN BEFUND (builder-Vorgabe, loud fail)")
+        return out
+    out["kein_befund"] = False
+
+    pseudo_mat, pseudo_days = build_profile_matrix(pseudo_records, variable)
+    t_hours = np.arange(POST_BUCKETS) * BUCKET_MINUTES / 60.0
+
+    real_mean_reps = _cluster_bootstrap_profile_reps(real_mat, real_days, n_bootstrap=n_bootstrap,
+                                                     seed=seed, stat="mean")
+    real_median_reps = _cluster_bootstrap_profile_reps(real_mat, real_days, n_bootstrap=n_bootstrap,
+                                                       seed=seed, stat="median")
+    pseudo_mean_reps = _cluster_bootstrap_profile_reps(pseudo_mat, pseudo_days, n_bootstrap=n_bootstrap,
+                                                       seed=seed, stat="mean")
+    with np.errstate(all="ignore"):
+        real_mean_point = (np.nanmean(real_mat, axis=0) if real_mat.shape[0]
+                          else np.full(POST_BUCKETS, np.nan))
+        real_median_point = (np.nanmedian(real_mat, axis=0) if real_mat.shape[0]
+                            else np.full(POST_BUCKETS, np.nan))
+        pseudo_mean_point = (np.nanmean(pseudo_mat, axis=0) if pseudo_mat.shape[0]
+                            else np.zeros(POST_BUCKETS))
+
+    def _ci(reps: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
+        with np.errstate(all="ignore"):
+            lo = np.nanquantile(reps, CI_ALPHA / 2, axis=0)
+            hi = np.nanquantile(reps, 1 - CI_ALPHA / 2, axis=0)
+        return lo, hi
+
+    real_mean_ci = _ci(real_mean_reps)
+    real_median_ci = _ci(real_median_reps)
+    pseudo_mean_ci = _ci(pseudo_mean_reps)
+    diff_point = real_mean_point - pseudo_mean_point
+    diff_reps = real_mean_reps - pseudo_mean_reps
+    diff_ci = _ci(diff_reps)
+
+    exp_fit = loglinear_decay_fit(t_hours, diff_point, diff_reps, kind="exponential")
+    pow_fit = loglinear_decay_fit(t_hours, diff_point, diff_reps, kind="power")
+
+    half_life_h: float | None = None
+    half_life_ci: tuple[float | None, float | None] = (None, None)
+    if np.isfinite(exp_fit["param"]) and exp_fit["param"] > 0.0:
+        half_life_h = float(np.log(2.0) / exp_fit["param"])
+        lo_p, hi_p = exp_fit["param_ci"]
+        half_life_ci = (
+            float(np.log(2.0) / hi_p) if np.isfinite(hi_p) and hi_p > 0.0 else None,
+            float(np.log(2.0) / lo_p) if np.isfinite(lo_p) and lo_p > 0.0 else None,
+        )
+
+    out.update({
+        "n_pseudo": int(pseudo_mat.shape[0]),
+        "exponential_fit": {
+            "lambda_per_h": exp_fit["param"], "lambda_ci90": exp_fit["param_ci"],
+            "half_life_h": half_life_h, "half_life_ci90": half_life_ci,
+            "log_amplitude": exp_fit["log_amplitude"], "r2": exp_fit["r2"],
+            "n_points": exp_fit["n_points"],
+        },
+        "power_law_fit": {
+            "exponent_p": pow_fit["param"], "exponent_p_ci90": pow_fit["param_ci"],
+            "log_amplitude": pow_fit["log_amplitude"], "r2": pow_fit["r2"],
+            "n_points": pow_fit["n_points"],
+        },
+        "mean_profile_return_time_h": mean_profile_return_time(diff_point, diff_ci[0], diff_ci[1]),
+        "remaining_fraction": remaining_fraction_at(diff_point, diff_reps),
+        "recovery_p90_from_replicates_h": profile_replicate_recovery_p90(diff_reps),
+        "seed": seed, "n_bootstrap": n_bootstrap,
+        "_arrays": {
+            "t_hours": t_hours, "real_mean": real_mean_point,
+            "real_mean_ci_lo": real_mean_ci[0], "real_mean_ci_hi": real_mean_ci[1],
+            "real_median": real_median_point,
+            "real_median_ci_lo": real_median_ci[0], "real_median_ci_hi": real_median_ci[1],
+            "pseudo_mean": pseudo_mean_point,
+            "pseudo_mean_ci_lo": pseudo_mean_ci[0], "pseudo_mean_ci_hi": pseudo_mean_ci[1],
+            "diff": diff_point, "diff_ci_lo": diff_ci[0], "diff_ci_hi": diff_ci[1],
+        },
+    })
+    return out
+
+
+def strip_profile_arrays(node: Any) -> Any:
+    """Recursively drop every ``_arrays`` key (the 288-point profile/CI
+    vectors) from a payload -- JSON-serializable summary; the arrays
+    themselves are consumed by ``report.py`` for the profile-matrix CSV
+    via ``collect_profile_arrays`` BEFORE this is called."""
+    if isinstance(node, dict):
+        return {k: strip_profile_arrays(v) for k, v in node.items() if k != "_arrays"}
+    if isinstance(node, list):
+        return [strip_profile_arrays(v) for v in node]
+    return node
+
+
+def collect_profile_arrays(payload: dict[str, Any]) -> dict[str, dict[str, np.ndarray]]:
+    """Walk ``payload["pre_fixed"]`` and collect every group's ``_arrays``
+    block, keyed by a stable group-key string -- the input to
+    ``report.write_profile_matrix_csv`` (DEC-53 profile-matrix
+    artefact)."""
+    out: dict[str, dict[str, np.ndarray]] = {}
+    pf = payload.get("pre_fixed", {})
+    for entry in pf.get("median_half_life_per_symbol", []):
+        prof = entry.get("profile", {})
+        if "_arrays" in prof:
+            out[f"symbol={entry['symbol']}|era=ALL|stress_abs=ALL|variable={entry['variable']}"] = prof["_arrays"]
+    for entry in pf.get("recovery_h_p90", []):
+        prof = entry.get("profile", {})
+        if "_arrays" in prof:
+            out[f"symbol=ALL|era=ALL|stress_abs=True|variable={entry['variable']}"] = prof["_arrays"]
+    for entry in pf.get("era_invariance_descriptive", []):
+        prof = entry.get("profile", {})
+        if "_arrays" in prof:
+            out[f"symbol=ALL|era={entry['era']}|stress_abs=ALL|variable={entry['variable']}"] = prof["_arrays"]
+    return out
+
+
+def _filter_records(records: list[dict[str, Any]], *, symbol: str | None = None,
+                    era: str | None = None, regime: Any = "ANY") -> list[dict[str, Any]]:
+    """Filter ANNOTATED records (``_annotate_records`` output, carrying
+    ``era``/``stress_abs``) for one profile group. ``regime="ANY"``
+    (default sentinel, distinct from ``True``/``False``/``None``) skips
+    the STRESS_ABS filter entirely."""
+    out = records
+    if symbol is not None:
+        out = [r for r in out if r["symbol"] == symbol]
+    if era is not None:
+        out = [r for r in out if r["era"] == era]
+    if regime != "ANY":
+        out = [r for r in out if r["stress_abs"] == regime]
+    return out
+
+
 # ----------------------------------------------------------------------------
 # rows: flatten event records into (symbol, era, regime, variable) rows
 # ----------------------------------------------------------------------------
@@ -555,22 +938,38 @@ def _era_of(event_day: int, windows: tuple[tuple[str, tuple[str, str]], ...]) ->
     return "OTHER"
 
 
-def _flatten(records: list[dict[str, Any]], *,
-            stress_abs_days: frozenset[str] | None,
-            windows: tuple[tuple[str, tuple[str, str]], ...]) -> list[dict[str, Any]]:
-    rows: list[dict[str, Any]] = []
+def _annotate_records(records: list[dict[str, Any]], *,
+                      stress_abs_days: frozenset[str] | None,
+                      windows: tuple[tuple[str, tuple[str, str]], ...]
+                      ) -> list[dict[str, Any]]:
+    """Add ``event_date``/``era``/``stress_abs`` to each record (shallow
+    copy; ``variables`` -- and its v2 ``excess`` arrays -- is reused, not
+    copied). Both ``_flatten`` (AR(1) diagnostic rows) and the v2 profile
+    grouping (``_filter_records``/``build_profile_matrix``) consume these
+    ANNOTATED records, so era/STRESS_ABS membership is computed exactly
+    once per event."""
+    out = []
     for rec in records:
         day_iso = _epoch_day_iso(rec["event_day"])
         era = _era_of(rec["event_day"], windows)
         stress = (day_iso in stress_abs_days) if stress_abs_days is not None else None
+        out.append({**rec, "event_date": day_iso, "era": era, "stress_abs": stress})
+    return out
+
+
+def _flatten(records: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Per-event x variable AR(1)-diagnostic rows from ANNOTATED records
+    (``_annotate_records`` output)."""
+    rows: list[dict[str, Any]] = []
+    for rec in records:
         for var in VARIABLES:
             m = rec["variables"][var]
             fit = m["fit"]
             ret = m["return"]
             rows.append({
                 "symbol": rec["symbol"], "event_hour": rec["event_hour"],
-                "event_day": rec["event_day"], "event_date": day_iso,
-                "era": era, "stress_abs": stress, "variable": var,
+                "event_day": rec["event_day"], "event_date": rec["event_date"],
+                "era": rec["era"], "stress_abs": rec["stress_abs"], "variable": var,
                 "floor_ok": rec["floor_ok"], "baseline": m["baseline"],
                 "phi": fit["phi"], "lambda_per_h": fit["lambda_per_h"],
                 "half_life_h": fit["half_life_h"], "r2": fit["r2"],
@@ -598,6 +997,7 @@ def run(
     seed: int = SEED,
     min_clusters: int = MIN_EVENT_CLUSTERS,
     windows: tuple[tuple[str, tuple[str, str]], ...] = WINDOWS,
+    profile_n_bootstrap: int = N_BOOTSTRAP,
     source: str = "",
 ) -> dict[str, Any]:
     """Run the WP-11 measurement (deskriptiv, gate-neutral payload).
@@ -605,6 +1005,9 @@ def run(
     ``stress_abs_days`` -- an ISO-date frozenset from the WP-10 STRESS_ABS
     fixture (``wp10_coherence.stress_canon``); ``None`` skips the
     STRESS_ABS split (regime cells report ``stress_abs: None``/"unknown").
+    ``profile_n_bootstrap`` -- bootstrap reps for the v2 superposed-epoch
+    profile CIs (outputs (i)-(iii)/RECOVERY_H_P90); lower it for a faster
+    sandbox/test run, the registered value is ``N_BOOTSTRAP`` (1000).
     """
     expected = REGISTERED_FINGERPRINTS if expected_fingerprints is None else expected_fingerprints
     fingerprints: dict[str, Any] = {}
@@ -617,20 +1020,26 @@ def run(
         fp_ok &= match
     gate_valid = fp_ok or skip_fingerprint_check
 
-    real_rows: list[dict[str, Any]] = []
-    pseudo_rows: list[dict[str, Any]] = []
+    real_records: list[dict[str, Any]] = []
+    pseudo_records: list[dict[str, Any]] = []
     n_real, n_pseudo = 0, 0
     for sym in symbols:
         collected = collect_symbol_events(cache_dir, exchange, sym,
                                           start=CACHE_RANGE[0], end=CACHE_RANGE[1], seed=seed)
         n_real += len(collected["real"])
         n_pseudo += len(collected["pseudo"])
-        real_rows += _flatten(collected["real"], stress_abs_days=stress_abs_days, windows=windows)
-        pseudo_rows += _flatten(collected["pseudo"], stress_abs_days=stress_abs_days, windows=windows)
+        real_records += _annotate_records(collected["real"], stress_abs_days=stress_abs_days,
+                                          windows=windows)
+        pseudo_records += _annotate_records(collected["pseudo"], stress_abs_days=stress_abs_days,
+                                            windows=windows)
         print(f"[wp11] {sym}: {len(collected['real'])} events "
              f"({len(collected['pseudo'])} matched pseudo-null)", file=sys.stderr, flush=True)
 
-    # (grid) per symbol x era x regime x variable
+    real_rows = _flatten(real_records)      # per-event AR(1) DIAGNOSTIC rows (v1, unchanged)
+    pseudo_rows = _flatten(pseudo_records)
+
+    # (grid) per symbol x era x regime x variable -- AR(1) DIAGNOSTIC table only
+    # (v2: the judgment-bearing group answer is the profile in pre_fixed below).
     cells: list[dict[str, Any]] = []
     regimes: tuple[Any, ...] = (True, False) if stress_abs_days is not None else (None,)
     era_labels = [w[0] for w in windows] + ["OTHER"]
@@ -642,34 +1051,56 @@ def run(
                           and r["variable"] == var and r["floor_ok"]
                           and (regime is None or r["stress_abs"] == regime)]
                     summary = summarize_group(sub, min_clusters=min_clusters, seed=seed)
-                    cells.append({"symbol": sym, "era": era,
-                                 "stress_abs": regime, "variable": var, **summary})
+                    cells.append({"symbol": sym, "era": era, "stress_abs": regime,
+                                 "variable": var, "diagnostic_ar1_note": _AR1_DIAGNOSTIC_NOTE,
+                                 **summary})
 
-    # (i) median half-life per symbol (pooled over era + regime)
+    # (i) median half-life per symbol (pooled over era + regime) -- v2: PROFILE-based
+    # (exponential/power-law fit of the mean superposed-epoch excess profile),
+    # old per-event AR(1) summary kept alongside, unchanged, as a diagnostic.
     per_symbol: list[dict[str, Any]] = []
     for sym in symbols:
         for var in VARIABLES:
             sub = [r for r in real_rows if r["symbol"] == sym and r["variable"] == var and r["floor_ok"]]
-            per_symbol.append({"symbol": sym, "variable": var,
-                              **summarize_group(sub, min_clusters=min_clusters, seed=seed)})
+            entry = {"symbol": sym, "variable": var,
+                    "diagnostic_ar1_note": _AR1_DIAGNOSTIC_NOTE,
+                    **summarize_group(sub, min_clusters=min_clusters, seed=seed)}
+            entry["profile"] = profile_group_summary(
+                _filter_records(real_records, symbol=sym), _filter_records(pseudo_records, symbol=sym),
+                var, min_clusters=min_clusters, seed=seed, n_bootstrap=profile_n_bootstrap)
+            per_symbol.append(entry)
 
-    # (ii) RECOVERY_H_P90 -- STRESS_ABS days only, pooled across symbols
+    # (ii) RECOVERY_H_P90 -- STRESS_ABS days only, pooled across symbols -- v2: PROFILE-based
+    # (profile_replicate_recovery_p90 inside profile_group_summary is the primary number).
     recovery_h_p90: list[dict[str, Any]] = []
     if stress_abs_days is not None:
         for var in VARIABLES:
             sub = [r for r in real_rows if r["variable"] == var and r["floor_ok"] and r["stress_abs"] is True]
-            recovery_h_p90.append({"variable": var, **summarize_group(sub, min_clusters=min_clusters, seed=seed)})
+            entry = {"variable": var, "diagnostic_ar1_note": _AR1_DIAGNOSTIC_NOTE,
+                    **summarize_group(sub, min_clusters=min_clusters, seed=seed)}
+            entry["profile"] = profile_group_summary(
+                _filter_records(real_records, regime=True), _filter_records(pseudo_records, regime=True),
+                var, min_clusters=min_clusters, seed=seed, n_bootstrap=profile_n_bootstrap)
+            recovery_h_p90.append(entry)
     else:
         recovery_h_p90 = [{"variable": var, "kein_befund": True,
-                          "reason": "kein STRESS_ABS-Fixture uebergeben"} for var in VARIABLES]
+                          "reason": "kein STRESS_ABS-Fixture uebergeben",
+                          "profile": {"kein_befund": True,
+                                     "reason": "kein STRESS_ABS-Fixture uebergeben"}}
+                         for var in VARIABLES]
 
     # (iii) era comparison -- "ist H-20-Aera-invariant?", pooled over symbol+regime, DESKRIPTIV
+    # -- v2: PROFILE-based half-life by era, still explicitly no PASS/FAIL, no threshold.
     era_invariance: list[dict[str, Any]] = []
     for era in era_labels:
         for var in VARIABLES:
             sub = [r for r in real_rows if r["era"] == era and r["variable"] == var and r["floor_ok"]]
-            era_invariance.append({"era": era, "variable": var,
-                                  **summarize_group(sub, min_clusters=min_clusters, seed=seed)})
+            entry = {"era": era, "variable": var, "diagnostic_ar1_note": _AR1_DIAGNOSTIC_NOTE,
+                    **summarize_group(sub, min_clusters=min_clusters, seed=seed)}
+            entry["profile"] = profile_group_summary(
+                _filter_records(real_records, era=era), _filter_records(pseudo_records, era=era),
+                var, min_clusters=min_clusters, seed=seed, n_bootstrap=profile_n_bootstrap)
+            era_invariance.append(entry)
 
     # structural-null diagnostic: Var(lambda_obs)/Var(lambda_pseudo_null) per symbol/variable
     structural_null: list[dict[str, Any]] = []
@@ -696,7 +1127,7 @@ def run(
         if real_rows else 0
     kein_befund_overall = n_event_clusters_total < min_clusters
 
-    return {
+    payload = {
         "schema_version": SCHEMA_VERSION,
         "package": PACKAGE_ID,
         "prd_ref": PRD_REF,
@@ -717,12 +1148,24 @@ def run(
             "event": "WOERTLICH aus H-20 geerbt (c20_tail.driver), kein neuer Parameter",
             "baseline": f"Median ueber {BASELINE_HOURS}h vor der Schockstunde (exklusive)",
             "fit": ("AR(1)-aequivalenter Zerfall der Ueberschussreihe (5-Min-Buckets, "
-                   "24h post-shock), lambda = -ln(phi)/dt_h, half_life = ln2/lambda"),
+                   "24h post-shock), lambda = -ln(phi)/dt_h, half_life = ln2/lambda -- "
+                   "PER-EVENT DIAGNOSTIC ONLY (v2, Orchestrator-Abnahme 2026-09-08); "
+                   "siehe 'profile_fit' fuer die urteilstragende Groesse"),
+            "profile_fit": ("v2: Superposed-Epoch-Profil (Mittel/Median) je Gruppe in "
+                            "Ereigniszeit, Cluster-Bootstrap (Kalendertag), Differenzprofil "
+                            "real minus gematchte Pseudo-Null (struktureller Selektions-"
+                            "Bump wird gemessen und abgezogen); Exponential- UND Potenz-"
+                            "gesetz-Fit (Omori-artig) auf dem Differenzprofil-Mittel, "
+                            "geschlossene log-lineare Regression mit gebatchtem "
+                            "Bootstrap-Parameter-KI"),
             "time_to_return": (f"erste Stunde mit |excess| <= {RETURN_FRACTION:.0%} des "
-                               "Schock-Excess; rechts-zensiert bei 24h"),
+                               "Schock-Excess; rechts-zensiert bei 24h (per-Ereignis, "
+                               "Diagnostik) bzw. je Bootstrap-Replikat-Profil (v2, "
+                               "RECOVERY_H_P90)"),
             "cluster": "Kalendertag (DEC-51 Punkt 3); Bootstrap 1000 Reps",
             "seed": seed,
             "min_event_clusters": min_clusters,
+            "profile_n_bootstrap": profile_n_bootstrap,
         },
         "n_events_real": n_real,
         "n_events_pseudo_null": n_pseudo,
@@ -738,6 +1181,13 @@ def run(
         "_real_rows": real_rows,       # consumed by report.py for the DEC-53 CSV
         "_pseudo_rows": pseudo_rows,
     }
+    payload["_profile_arrays"] = collect_profile_arrays(payload)  # DEC-53 profile-matrix CSV
+    return payload
 
 
-__all__ += ["hourly_from_buckets", "time_to_return"]
+__all__ += [
+    "build_profile_matrix", "collect_profile_arrays", "hourly_from_buckets",
+    "loglinear_decay_fit", "mean_profile_return_time", "profile_group_summary",
+    "profile_replicate_recovery_p90", "remaining_fraction_at",
+    "strip_profile_arrays", "time_to_return",
+]

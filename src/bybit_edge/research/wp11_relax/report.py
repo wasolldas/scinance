@@ -1,11 +1,20 @@
 """WP-11 -- JSON + Markdown report and DEC-53 artefacts.
 
 DEC-53: every 3.0 run stores (a) the judgment-bearing series on cluster
-level (here: one row per event x variable, event_day = the cluster) as
-CSV with SHA-256, and (b) the bootstrap seed + generator fingerprint the
-replicates are reproducible from. A run without BOTH is "KEIN VERDIKT" --
-loud, even though this package renders no PASS/FAIL (Arm (a) is
-descriptive throughout, PRD 11.3): the artefact CONTRACT still applies.
+level as CSV with SHA-256, and (b) the bootstrap seed + generator
+fingerprint the replicates are reproducible from. A run without BOTH is
+"KEIN VERDIKT" -- loud, even though this package renders no PASS/FAIL
+(Arm (a) is descriptive throughout, PRD 11.3): the artefact CONTRACT
+still applies.
+
+v2 (Orchestrator Nacharbeit 2026-09-08, additive): the per-event AR(1)
+cluster series (``wp11_real_events.csv``/``wp11_pseudo_null_events.csv``)
+are kept as-is -- now a DIAGNOSTIC artefact, never the judgment-bearing
+one. The judgment-bearing cluster-level artefact is the group-level
+superposed-epoch PROFILE MATRIX (``wp11_profile_matrix.csv``, one long-
+format file covering every (i)/(ii)/(iii) group's mean/median/pseudo/
+difference profile with bootstrap CI, bucket by bucket) written by
+``write_profile_matrix_csv``.
 
 NEVER writes under ``data/harvest`` (loud refusal, same convention as
 ``wp10_coherence.stress_canon``/``report``).
@@ -22,7 +31,7 @@ from typing import Any
 
 __all__ = [
     "ReportError", "write_cluster_series_csv", "write_bootstrap_fingerprint",
-    "check_dec53", "build_report", "render_markdown",
+    "write_profile_matrix_csv", "check_dec53", "build_report", "render_markdown",
 ]
 
 
@@ -69,15 +78,63 @@ def write_bootstrap_fingerprint(payload: dict[str, Any], out_dir: Path | str) ->
     path = out_dir / "wp11_bootstrap_fingerprint.json"
     fp = {"generator": "numpy.random.default_rng",
          "seed": payload["method"]["seed"],
-         "n_bootstrap_reps": 1000, "min_event_clusters": payload["method"]["min_event_clusters"]}
+         "n_bootstrap_reps": 1000,
+         "profile_n_bootstrap": payload["method"].get("profile_n_bootstrap", 1000),
+         "min_event_clusters": payload["method"]["min_event_clusters"]}
     path.write_text(json.dumps(fp, indent=2, sort_keys=True), encoding="utf-8")
     return {"path": str(path), "sha256": hashlib.sha256(path.read_bytes()).hexdigest()}
 
 
+_PROFILE_CSV_COLUMNS = (
+    "group", "bucket_index", "t_hours", "real_mean", "real_mean_ci_lo", "real_mean_ci_hi",
+    "real_median", "real_median_ci_lo", "real_median_ci_hi", "pseudo_mean",
+    "pseudo_mean_ci_lo", "pseudo_mean_ci_hi", "diff", "diff_ci_lo", "diff_ci_hi",
+)
+
+
+def write_profile_matrix_csv(profile_arrays: dict[str, dict[str, Any]],
+                             out_dir: Path | str) -> dict[str, Any]:
+    """DEC-53 (a), v2: the JUDGMENT-BEARING cluster-level artefact -- one
+    long-format CSV covering every evaluable (i)/(ii)/(iii) group's
+    superposed-epoch profile (mean/median/pseudo-null/difference, with
+    bootstrap CI) bucket by bucket. ``profile_arrays`` is
+    ``measure.collect_profile_arrays(payload)`` (``{group_key:
+    {"t_hours": ndarray, "real_mean": ndarray, ...}}``, one row per
+    bucket per group). NEVER under data/harvest."""
+    out_dir = Path(out_dir)
+    _refuse_harvest(out_dir)
+    out_dir.mkdir(parents=True, exist_ok=True)
+    path = out_dir / "wp11_profile_matrix.csv"
+    n_rows = 0
+    with path.open("w", newline="", encoding="utf-8") as fh:
+        w = csv.writer(fh)
+        w.writerow(_PROFILE_CSV_COLUMNS)
+        for group, arrays in sorted(profile_arrays.items()):
+            n_buckets = len(arrays["t_hours"])
+            for i in range(n_buckets):
+                w.writerow([group, i] + [float(arrays[c][i]) for c in _PROFILE_CSV_COLUMNS[2:]])
+                n_rows += 1
+    return {"path": str(path), "sha256": hashlib.sha256(path.read_bytes()).hexdigest(),
+           "n_rows": n_rows, "n_groups": len(profile_arrays)}
+
+
 def check_dec53(artifacts: dict[str, Any]) -> None:
-    missing = [k for k in ("cluster_series", "bootstrap_fingerprint") if not artifacts.get(k)]
+    missing = [k for k in ("cluster_series", "bootstrap_fingerprint", "profile_matrix")
+              if not artifacts.get(k)]
     if missing:
         raise ReportError(f"KEIN VERDIKT -- DEC-53-Artefakte fehlen: {missing}")
+
+
+def _strip_profile_arrays(node: Any) -> Any:
+    """Local copy (report.py stays self-contained, repo convention) of
+    ``measure.strip_profile_arrays``: drop every ``_arrays`` key (the
+    288-point profile/CI vectors) so the JSON summary stays scalar-only
+    -- the vectors live in ``wp11_profile_matrix.csv`` instead."""
+    if isinstance(node, dict):
+        return {k: _strip_profile_arrays(v) for k, v in node.items() if k != "_arrays"}
+    if isinstance(node, list):
+        return [_strip_profile_arrays(v) for v in node]
+    return node
 
 
 def build_report(payload: dict[str, Any], out_dir: Path | str) -> dict[str, Any]:
@@ -86,21 +143,24 @@ def build_report(payload: dict[str, Any], out_dir: Path | str) -> dict[str, Any]
     write a summary that claims artefacts it doesn't actually have.
 
     ``payload`` is ``measure.run()``'s return value, INCLUDING the
-    private ``_real_rows``/``_pseudo_rows`` keys (consumed here, stripped
-    from the written JSON summary).
+    private ``_real_rows``/``_pseudo_rows``/``_profile_arrays`` keys
+    (consumed here, stripped from the written JSON summary).
     """
     out_dir = Path(out_dir)
     real_rows = payload.get("_real_rows", [])
     pseudo_rows = payload.get("_pseudo_rows", [])
+    profile_arrays = payload.get("_profile_arrays", {})
     cluster_series = {
         "real": write_cluster_series_csv(real_rows, out_dir, name="real"),
         "pseudo_null": write_cluster_series_csv(pseudo_rows, out_dir, name="pseudo_null"),
     }
+    profile_matrix = write_profile_matrix_csv(profile_arrays, out_dir)
     bootstrap_fp = write_bootstrap_fingerprint(payload, out_dir)
-    artifacts = {"cluster_series": cluster_series, "bootstrap_fingerprint": bootstrap_fp}
+    artifacts = {"cluster_series": cluster_series, "bootstrap_fingerprint": bootstrap_fp,
+                "profile_matrix": profile_matrix}
     check_dec53(artifacts)
 
-    summary = {k: v for k, v in payload.items() if not k.startswith("_")}
+    summary = _strip_profile_arrays({k: v for k, v in payload.items() if not k.startswith("_")})
     summary["artifacts"] = artifacts
     json_path = out_dir / "wp11_summary.json"
     json_path.write_text(json.dumps(summary, indent=1, sort_keys=True, default=str), encoding="utf-8")
@@ -122,6 +182,21 @@ def _fmt(v: Any, digits: int = 3) -> str:
     return f"{fv:.{digits}f}"
 
 
+def _profile_half_life_row(label: str, c: dict[str, Any]) -> str:
+    if c.get("kein_befund"):
+        return (f"| {label} | {c.get('n_events', 0)} | {c.get('n_clusters', 0)} | "
+               f"**JA** | - | - | - | - |")
+    prof = c.get("profile", {})
+    if prof.get("kein_befund", True):
+        return f"| {label} | {c['n_events']} | {c['n_clusters']} | nein | KEIN PROFIL | - | - | - |"
+    exp = prof["exponential_fit"]
+    ci = ("-" if exp["half_life_ci90"][0] is None
+         else f"[{_fmt(exp['half_life_ci90'][0])}, {_fmt(exp['half_life_ci90'][1])}]")
+    return (f"| {label} | {c['n_events']} | {c['n_clusters']} | nein | "
+           f"{_fmt(exp['half_life_h'])} | {ci} | {_fmt(exp['r2'])} | "
+           f"{_fmt(prof['power_law_fit']['exponent_p'])} |")
+
+
 def render_markdown(summary: dict[str, Any]) -> str:
     L: list[str] = ["# WP-11 -- Relaxationsrate nach Schockstunden (deskriptiv, KEIN VERDIKT)", ""]
     L.append(f"- **Paket:** {summary['package']} -- `{summary['prd_ref']}`")
@@ -132,13 +207,61 @@ def render_markdown(summary: dict[str, Any]) -> str:
              f"{summary['n_events_pseudo_null']} gematchter Pseudo-Null, "
              f"{summary['n_event_clusters_total']} Ereignistage gesamt")
     L.append(f"- **Event-Definition:** {summary['method']['event']}")
-    L.append(f"- **Fit:** {summary['method']['fit']}")
+    L.append(f"- **v2 Profil-Fit (urteilstragend):** {summary['method']['profile_fit']}")
+    L.append(f"- **v1 AR(1) (Diagnostik, NICHT urteilstragend):** {summary['method']['fit']}")
     L.append(f"- **Time-to-Return:** {summary['method']['time_to_return']}")
     L.append("")
-
-    L.append("## (i) Median-Halbwertszeit je Symbol (gepoolt ueber Aera/Regime)")
+    L.append("> **Orchestrator-Abnahme 2026-09-08 (Echtlauf, 3.570 Ereignisse):** die "
+             "per-Ereignis-AR(1)-Halbwertszeit war fuer die Frage uninformativ (gematchte "
+             "Pseudo-Null praktisch identisch mit den realen Medianen). v2 ersetzt (i)-(iii) "
+             "und RECOVERY_H_P90 durch die Superposed-Epoch-Profilgroessen unten; die alten "
+             "AR(1)-Tabellen bleiben als Diagnostik erhalten (nicht geloescht).")
     L.append("")
-    L.append("| Symbol | Variable | Events | Tage | KEIN BEFUND | median T_half (h) | KI90 |")
+
+    L.append("## (i) Halbwertszeit des Differenzprofils je Symbol (v2, urteilstragend)")
+    L.append("")
+    L.append("| Symbol | Variable | Events | Tage | KEIN BEFUND | T_half (h) | KI90 | R^2 (exp) | p (Potenzgesetz) |")
+    L.append("|---|---|---:|---:|:---:|---:|---|---:|---:|")
+    for c in summary["pre_fixed"]["median_half_life_per_symbol"]:
+        L.append(_profile_half_life_row(f"{c['symbol']}", c))
+    L.append("")
+
+    L.append("## (ii) RECOVERY_H_P90 (STRESS_ABS, Kostenmodell-Konstante, v2: Profil-Replikate)")
+    L.append("")
+    L.append("| Variable | Events | Tage | KEIN BEFUND | P90 (h) | zensiert | n_Replikate |")
+    L.append("|---|---:|---:|:---:|---:|:---:|---:|")
+    for c in summary["pre_fixed"]["recovery_h_p90"]:
+        if c.get("kein_befund"):
+            L.append(f"| {c['variable']} | {c.get('n_events', 0)} | {c.get('n_clusters', 0)} | "
+                     f"**JA** | - | - | - |")
+            continue
+        prof = c.get("profile", {})
+        if prof.get("kein_befund", True):
+            L.append(f"| {c['variable']} | {c['n_events']} | {c['n_clusters']} | nein | "
+                     f"KEIN PROFIL | - | - |")
+            continue
+        rp90 = prof["recovery_p90_from_replicates_h"]
+        L.append(f"| {c['variable']} | {c['n_events']} | {c['n_clusters']} | nein | "
+                 f"{_fmt(rp90['point'])} | {'ja' if rp90['censored_at_p90'] else 'nein'} | "
+                 f"{rp90['n_reps']} |")
+    L.append("")
+
+    L.append("## (iii) Aera-Vergleich -- \"ist der H-20-Aera-invariant?\" (v2, deskriptiv, KEIN Gate)")
+    L.append("")
+    L.append("| Aera | Variable | Events | Tage | KEIN BEFUND | T_half (h) | KI90 | R^2 (exp) | p (Potenzgesetz) |")
+    L.append("|---|---|---:|---:|:---:|---:|---|---:|---:|")
+    for c in summary["pre_fixed"]["era_invariance_descriptive"]:
+        L.append(_profile_half_life_row(f"{c['era']}", c))
+    L.append("")
+    L.append("*(iii) ist rein deskriptiv: KEIN PASS/FAIL, KEINE Schwelle -- Auflage PRD 11.3.*")
+    L.append("")
+
+    L.append("## Diagnostik: per-Ereignis-AR(1) (v1, NICHT urteilstragend, unveraendert)")
+    L.append("")
+    L.append(f"*{summary['pre_fixed']['median_half_life_per_symbol'][0]['diagnostic_ar1_note']}*"
+            if summary["pre_fixed"]["median_half_life_per_symbol"] else "")
+    L.append("")
+    L.append("| Symbol | Variable | Events | Tage | KEIN BEFUND | median T_half (h, AR1) | KI90 |")
     L.append("|---|---|---:|---:|:---:|---:|---|")
     for c in summary["pre_fixed"]["median_half_life_per_symbol"]:
         if c.get("kein_befund"):
@@ -149,38 +272,6 @@ def render_markdown(summary: dict[str, Any]) -> str:
         ci = "-" if hl["ci_lo"] is None else f"[{_fmt(hl['ci_lo'])}, {_fmt(hl['ci_hi'])}]"
         L.append(f"| {c['symbol']} | {c['variable']} | {c['n_events']} | {c['n_clusters']} | nein | "
                  f"{_fmt(hl['point'])} | {ci} |")
-    L.append("")
-
-    L.append("## (ii) RECOVERY_H_P90 (STRESS_ABS, Kostenmodell-Konstante)")
-    L.append("")
-    L.append("| Variable | Events | Tage | KEIN BEFUND | P90 (h) | zensiert | KI90 |")
-    L.append("|---|---:|---:|:---:|---:|:---:|---|")
-    for c in summary["pre_fixed"]["recovery_h_p90"]:
-        if c.get("kein_befund"):
-            L.append(f"| {c['variable']} | {c.get('n_events', 0)} | {c.get('n_clusters', 0)} | "
-                     f"**JA** | - | - | - |")
-            continue
-        p90 = c["p90_time_to_return_h"]
-        ci = f"[{_fmt(p90['ci_lo'])}, {_fmt(p90['ci_hi'])}]"
-        L.append(f"| {c['variable']} | {c['n_events']} | {c['n_clusters']} | nein | "
-                 f"{_fmt(p90['point'])} | {'ja' if p90['censored_at_p90'] else 'nein'} | {ci} |")
-    L.append("")
-
-    L.append("## (iii) Aera-Vergleich -- \"ist der H-20-Aera-invariant?\" (deskriptiv, KEIN Gate)")
-    L.append("")
-    L.append("| Aera | Variable | Events | Tage | KEIN BEFUND | median T_half (h) | KI90 |")
-    L.append("|---|---|---:|---:|:---:|---:|---|")
-    for c in summary["pre_fixed"]["era_invariance_descriptive"]:
-        if c.get("kein_befund"):
-            L.append(f"| {c['era']} | {c['variable']} | {c.get('n_events', 0)} | "
-                     f"{c.get('n_clusters', 0)} | **JA** | - | - |")
-            continue
-        hl = c["half_life_h"]
-        ci = "-" if hl["ci_lo"] is None else f"[{_fmt(hl['ci_lo'])}, {_fmt(hl['ci_hi'])}]"
-        L.append(f"| {c['era']} | {c['variable']} | {c['n_events']} | {c['n_clusters']} | nein | "
-                 f"{_fmt(hl['point'])} | {ci} |")
-    L.append("")
-    L.append("*(iii) ist rein deskriptiv: KEIN PASS/FAIL, KEINE Schwelle -- Auflage PRD 11.3.*")
     L.append("")
 
     L.append("## Struktureller-Nulleffekt-Diagnostik (gematchter Pseudo-Zufalls-Null)")
@@ -198,8 +289,12 @@ def render_markdown(summary: dict[str, Any]) -> str:
     L.append("")
 
     L.append("## DEC-53-Artefakte")
+    pm = summary["artifacts"]["profile_matrix"]
+    L.append(f"- profile_matrix (v2, urteilstragend): {pm['path']} "
+             f"(n_groups={pm['n_groups']}, n_rows={pm['n_rows']}, sha256={pm['sha256'][:16]}...)")
     for name, a in summary["artifacts"]["cluster_series"].items():
-        L.append(f"- {name}: {a['path']} (n={a['n_rows']}, sha256={a['sha256'][:16]}...)")
+        L.append(f"- {name}_events (v1, Diagnostik): {a['path']} (n={a['n_rows']}, "
+                 f"sha256={a['sha256'][:16]}...)")
     bf = summary["artifacts"]["bootstrap_fingerprint"]
     L.append(f"- Bootstrap-Fingerprint: {bf['path']} (sha256={bf['sha256'][:16]}...)")
     L.append("")
