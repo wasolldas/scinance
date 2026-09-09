@@ -1,6 +1,6 @@
 # Welle 1 - Vorfragen V-1..V-6: Befund (Lauf 2026-09-08 14:43 UTC, Nutzer-PC)
 
-> Rohausgabe: `state/welle1_vorfragen_20260908/vorfragen_20260908_1443.txt`.
+> Rohausgabe: `state/runs/welle1_vorfragen_20260908/vorfragen_20260908_1443.txt`.
 > Jede Konsequenz unten war VORAB fixiert (PRD 3.0 Par. 4.4, Par. 11); hier
 > wird nur festgestellt, welcher Zweig eingetreten ist. V-4 (Delivery-Fee)
 > ist manuell und steht noch aus.
