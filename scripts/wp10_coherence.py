@@ -16,6 +16,16 @@ Three modes -- ALWAYS probe first:
   #    JSON + Markdown + DEC-53 artefacts.
   python scripts/wp10_coherence.py --run --base data/harvest --cache-dir data/barcache
 
+``--source {harvest,backfill}`` (default harvest, DEC-62/WP-10(A2)):
+backfill mode replaces the funding/IV-RV loaders with the nachgeladenen
+Tagesserien (WP-7 panel_1d.funding_sum or direct public REST; REST-DVOL
+minus WP-0 bar-cache RV) so the coherence matrix can reach the STRESS_ABS
+canon start (2020-05) -- basis-proxy stays harvest-only. Every backfill
+series is compared against its harvest-tree counterpart on the shared
+overlap ("Bestand vs. Backfill", DEC-60 lesson) -- see ``--panel-base``/
+``--dvol-rest-dir``. ``--source harvest`` (default) is UNCHANGED from the
+original WP-10(A) driver -- existing runs stay byte-identical.
+
 NEVER writes under data/harvest (every writer in this package refuses,
 loudly). rc != 0 on a probe failure or a missing DEC-53 artefact
 (``report.ReportError`` -> "KEIN VERDIKT").
@@ -27,14 +37,18 @@ import json
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
+from typing import Any
 
 import numpy as np
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
+from bybit_edge.research.wp9_dvol import harvest_close as hc  # noqa: E402
+from bybit_edge.research.wp9_dvol import rest_client as dvrc  # noqa: E402
 from bybit_edge.research.wp9_dvol.harvest_close import (  # noqa: E402
     discover_dvol_symbol, discover_harvest_days, list_dvol_symbol_dirs)
 from bybit_edge.research.wp10_coherence import coherence as co  # noqa: E402
+from bybit_edge.research.wp10_coherence import comparison as cmp  # noqa: E402
 from bybit_edge.research.wp10_coherence import portfolio_null as pn  # noqa: E402
 from bybit_edge.research.wp10_coherence import report as rp  # noqa: E402
 from bybit_edge.research.wp10_coherence import rv as _rv  # noqa: E402
@@ -98,7 +112,58 @@ def _dvol_symbol_for_currency(a: argparse.Namespace, cur: str) -> str:
 
 # ---------------------------------------------------------------- --probe
 
+def cmd_probe_backfill(a: argparse.Namespace) -> int:
+    """``--source backfill`` probe (DEC-62/WP-10(A2)): dvol_rest parquet +
+    WP-0 bar-cache presence (Pflicht, no fallback -- flips rc) and
+    panel_1d presence (informational only -- funding ALWAYS has a working
+    fallback, the direct public REST fetch, so a missing panel_1d never
+    fails the probe, only names which source a later --run will use)."""
+    con = connect_duckdb()
+    ok = True
+    try:
+        print("=== Funding Backfill (panel_1d.funding_sum bevorzugt, sonst direkter REST-Abruf) ===")
+        panel_root = Path(a.panel_base) if a.panel_base else None
+        panel_present = bool(panel_root and panel_root.is_dir())
+        for sym in a.funding_symbols.split(","):
+            src = "panel_1d (falls Partitionen fuer den Jahresbereich vollstaendig sind)" \
+                if panel_present else "direkter oeffentlicher REST-Abruf (funding/history, gedrosselt)"
+            print(f"  {sym}: panel_base={a.panel_base!r} vorhanden={panel_present} -> Quelle: {src}")
+        print("=== IV-RV Backfill (REST-DVOL-Parquet DEC-61 + WP-0-Bar-Cache) [Pflicht] ===")
+        for cur in a.ivrv_currencies.split(","):
+            rest_path = Path(a.dvol_rest_dir) / f"{cur}_1D.parquet"
+            present = rest_path.is_file()
+            print(f"  {cur}: dvol_rest_path={rest_path} vorhanden={present}")
+            if not present:
+                print(f"    -> fehlt; erst scripts/wp9_dvol_backfill.py --fetch ausfuehren")
+                ok = False
+            bar_symbol = _bar_symbol_for_currency(cur)
+            bars_probe = Path(a.cache_dir) / "bars_1min" / f"exchange={BAR_EXCHANGE}" / f"symbol={bar_symbol}"
+            n_bar_days = len(list(bars_probe.glob("date=*"))) if bars_probe.is_dir() else 0
+            print(f"    bar_symbol={bar_symbol}, cached_bar_days={n_bar_days}")
+            if n_bar_days == 0:
+                print(f"    -> kein WP-0-Bar-Cache fuer {bar_symbol} unter {a.cache_dir}")
+                ok = False
+
+        print("=== Perp-Basis-Proxy (bybit/tickers, optional, bleibt Harvest-only) ===")
+        for sym in a.basis_symbols.split(","):
+            p = sr.probe_perp_basis(con, a.base, sym)
+            print(f"  {sym}: {p}")
+            if p["status"] != "OK":
+                print(f"    -> optionale Serie uebersprungen (soweit vorhanden): {p['status']}")
+    finally:
+        con.close()
+
+    if not ok:
+        print("PROBE FEHLGESCHLAGEN -- kein --stress-canon/--run ohne bestandene Pflichtserien-Probe "
+              "(REST-DVOL/DEC-61 + WP-0-Bar-Cache). Fehlendes panel_1d wirkt sich NIE auf den rc aus "
+              "(Funding faellt automatisch auf den direkten REST-Abruf zurueck). Die optionale "
+              "Perp-Basis-Probe wirkt sich ebenfalls NIE auf den rc aus.")
+    return 0 if ok else 1
+
+
 def cmd_probe(a: argparse.Namespace) -> int:
+    if a.source == "backfill":
+        return cmd_probe_backfill(a)
     con = connect_duckdb()
     ok = True  # Pflicht series only (funding, dvol/IV-RV) -- basis is optional, see below.
     try:
@@ -192,36 +257,106 @@ def cmd_stress_canon(a: argparse.Namespace) -> int:
 
 # ---------------------------------------------------------------- --run
 
+def cmd_run_backfill(a: argparse.Namespace, con: Any,
+                     eff_start: str, eff_end: str) -> tuple[list[dict], list[dict]]:
+    """``--source backfill`` (DEC-62/WP-10(A2)): funding + IV-RV loaded
+    from the nachgeladenen Tagesserien, basis-proxy unchanged (harvest-
+    only). Every backfill series also loads its harvest-tree counterpart
+    and produces a "Bestand vs. Backfill" comparison row (DEC-60 lesson)
+    -- absent/short Bestand is reported, never raised."""
+    series_list: list[dict] = []
+    comparison: list[dict] = []
+
+    for sym in a.funding_symbols.split(","):
+        s = sr.funding_daily_cashflow_backfill(sym, eff_start, eff_end, panel_base=a.panel_base)
+        series_list.append(s)
+        print(f"funding_backfill {sym}: status={s['status']} coverage={s['coverage']} "
+              f"source={s['provenance'].get('source')}")
+        hs = sr.funding_daily_cashflow(con, a.base, sym, start=a.start, end=a.end)
+        print(f"  Bestand {sym}: status={hs['status']} coverage={hs['coverage']}")
+        comparison.append(cmp.compare_value_series(f"funding_{sym}", s, hs))
+
+    for cur in a.ivrv_currencies.split(","):
+        rest_path = Path(a.dvol_rest_dir) / f"{cur}_1D.parquet"
+        if not rest_path.is_file():
+            print(f"{cur}: REST-DVOL-Parquet fehlt (DEC-61) -- {rest_path} "
+                  "(erst scripts/wp9_dvol_backfill.py --fetch ausfuehren)", file=sys.stderr)
+            continue
+        rest_rows = dvrc.read_rest_parquet(rest_path)
+        days = [r["date"] for r in rest_rows if eff_start <= r["date"] <= eff_end]
+        s = sr.iv_rv_diff_series_backfill(
+            a.cache_dir, currency=cur, bar_exchange=BAR_EXCHANGE,
+            bar_symbol=_bar_symbol_for_currency(cur), dvol_rest_dir=a.dvol_rest_dir, days=days)
+        series_list.append(s)
+        print(f"iv_rv_backfill {cur}: status={s['status']} coverage={s['coverage']}")
+
+        backfill_dvol_by_day = {r["date"]: r["close"] for r in rest_rows}
+        harvest_dvol_by_day: dict[str, float] = {}
+        try:
+            dvol_symbol = _dvol_symbol_for_currency(a, cur)
+            hdays = [d for d in discover_harvest_days(a.base, dvol_symbol) if d in set(days)]
+            if hdays:
+                harvest_rows = hc.daily_close(con, a.base, dvol_symbol, hdays)
+                harvest_dvol_by_day = {r["date"]: r["close"] for r in harvest_rows if "close" in r}
+        except ValueError as exc:
+            print(f"{cur}: Bestands-DVOL fuer den Vergleich nicht auffindbar -- {exc}",
+                  file=sys.stderr)
+        comparison.append(cmp.compare_dvol_close(f"ivrv_{cur}", backfill_dvol_by_day,
+                                                  harvest_dvol_by_day))
+
+    for sym in a.basis_symbols.split(","):
+        s = sr.perp_basis_proxy_series(con, a.base, sym, start=a.start, end=a.end)
+        series_list.append(s)
+        print(f"basis {sym} (Harvest-only, im Backfill-Modus unveraendert): "
+              f"status={s['status']} coverage={s['coverage']}")
+
+    return series_list, comparison
+
+
 def cmd_run(a: argparse.Namespace) -> int:
+    comparison: list[dict] | None = None
+    if a.source == "backfill":
+        bar_rng_early = _resolve_range(a)
+        eff_start = a.start or (bar_rng_early[0] if bar_rng_early else None)
+        eff_end = a.end or (bar_rng_early[1] if bar_rng_early else None)
+        if eff_start is None or eff_end is None:
+            print("KEIN --start/--end und kein Bar-Cache zum Ableiten des Backfill-Zeitraums -- "
+                  "erst --stress-canon ausfuehren (fuellt den Bar-Cache-Bereich) oder --start/--end "
+                  "explizit angeben.", file=sys.stderr)
+            return 1
+
     con = connect_duckdb()
     try:
-        series_list = []
-        for sym in a.funding_symbols.split(","):
-            s = sr.funding_daily_cashflow(con, a.base, sym, start=a.start, end=a.end)
-            series_list.append(s)
-            print(f"funding {sym}: status={s['status']} coverage={s['coverage']}")
+        if a.source == "backfill":
+            series_list, comparison = cmd_run_backfill(a, con, eff_start, eff_end)
+        else:
+            series_list = []
+            for sym in a.funding_symbols.split(","):
+                s = sr.funding_daily_cashflow(con, a.base, sym, start=a.start, end=a.end)
+                series_list.append(s)
+                print(f"funding {sym}: status={s['status']} coverage={s['coverage']}")
 
-        # day list for IV-RV: whatever dvol harvest days are on disk, bounded by --start/--end.
-        for cur in a.ivrv_currencies.split(","):
-            try:
-                dvol_symbol = _dvol_symbol_for_currency(a, cur)
-            except ValueError as exc:
-                print(f"{cur}: {exc}", file=sys.stderr)
-                print(f"  raw/deribit/dvol/symbol=* gefunden unter {a.base}: "
-                      f"{list_dvol_symbol_dirs(a.base)}", file=sys.stderr)
-                continue
-            days = [d for d in discover_harvest_days(a.base, dvol_symbol)
-                    if (not a.start or d >= a.start) and (not a.end or d <= a.end)]
-            s = sr.iv_rv_diff_series(con, a.base, a.cache_dir, dvol_symbol=dvol_symbol,
-                                     bar_exchange=BAR_EXCHANGE, bar_symbol=_bar_symbol_for_currency(cur),
-                                     days=days)
-            series_list.append(s)
-            print(f"iv_rv {cur}: status={s['status']} coverage={s['coverage']}")
+            # day list for IV-RV: whatever dvol harvest days are on disk, bounded by --start/--end.
+            for cur in a.ivrv_currencies.split(","):
+                try:
+                    dvol_symbol = _dvol_symbol_for_currency(a, cur)
+                except ValueError as exc:
+                    print(f"{cur}: {exc}", file=sys.stderr)
+                    print(f"  raw/deribit/dvol/symbol=* gefunden unter {a.base}: "
+                          f"{list_dvol_symbol_dirs(a.base)}", file=sys.stderr)
+                    continue
+                days = [d for d in discover_harvest_days(a.base, dvol_symbol)
+                        if (not a.start or d >= a.start) and (not a.end or d <= a.end)]
+                s = sr.iv_rv_diff_series(con, a.base, a.cache_dir, dvol_symbol=dvol_symbol,
+                                         bar_exchange=BAR_EXCHANGE, bar_symbol=_bar_symbol_for_currency(cur),
+                                         days=days)
+                series_list.append(s)
+                print(f"iv_rv {cur}: status={s['status']} coverage={s['coverage']}")
 
-        for sym in a.basis_symbols.split(","):
-            s = sr.perp_basis_proxy_series(con, a.base, sym, start=a.start, end=a.end)
-            series_list.append(s)
-            print(f"basis {sym}: status={s['status']} coverage={s['coverage']}")
+            for sym in a.basis_symbols.split(","):
+                s = sr.perp_basis_proxy_series(con, a.base, sym, start=a.start, end=a.end)
+                series_list.append(s)
+                print(f"basis {sym}: status={s['status']} coverage={s['coverage']}")
     finally:
         con.close()
 
@@ -260,12 +395,15 @@ def cmd_run(a: argparse.Namespace) -> int:
         pnull_selection = None
     pnull = {"table": pnull_table, "selection_ceiling": pnull_selection}
 
-    out_dir = Path(a.out) if a.out else Path("scinance3-impl/state") / f"wp10a_{_now_utc_date()}"
+    default_dir_name = f"wp10a2_{_now_utc_date()}" if a.source == "backfill" else f"wp10a_{_now_utc_date()}"
+    out_dir = Path(a.out) if a.out else Path("scinance3-impl/state") / default_dir_name
     try:
         result = rp.build_report(
             series_list=usable, coherence_result=coherence_result,
             stress_canon={"STRESS_ABS": abs_fixture}, portfolio_null=pnull,
-            out_dir=out_dir, seed=a.seed)
+            out_dir=out_dir, seed=a.seed,
+            source=(a.source if a.source == "backfill" else None),
+            comparison=comparison)
     except rp.ReportError as exc:
         print(f"KEIN VERDIKT -- {exc}", file=sys.stderr)
         return 1
@@ -287,6 +425,17 @@ def main() -> int:
                          "wird der Symbolname automatisch unter "
                          "raw/deribit/dvol/symbol=* entdeckt (discover_dvol_symbol).")
     ap.add_argument("--basis-symbols", default=",".join(BASIS_SYMBOLS))
+    ap.add_argument("--source", choices=["harvest", "backfill"], default="harvest",
+                    help="harvest (Default, unveraendert): Serien nur aus dem Harvest-Baum. "
+                         "backfill (DEC-62/WP-10(A2)): Funding aus panel_1d.funding_sum/direktem "
+                         "REST-Abruf, IV-RV aus dem REST-DVOL-Backfill (DEC-61) minus WP-0-Bar-Cache-"
+                         "RV; Basis-Proxy bleibt Harvest-only. Fuegt eine Bestand-vs-Backfill-"
+                         "Vergleichszeile hinzu (DEC-60-Lehre).")
+    ap.add_argument("--panel-base", default="data/panel_1d",
+                    help="WP-7 panel_1d-Wurzel (nur --source backfill; bevorzugte Funding-Quelle, "
+                         "wenn die Jahres-Partitionen vollstaendig sind)")
+    ap.add_argument("--dvol-rest-dir", default="data/dvol_rest",
+                    help="WP-9 REST-DVOL-Parquet-Verzeichnis (nur --source backfill; DEC-61)")
     ap.add_argument("--start", default=None)
     ap.add_argument("--end", default=None)
     ap.add_argument("--seed", type=int, default=pn.DEFAULT_SEED)

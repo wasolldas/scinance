@@ -39,12 +39,18 @@ KAPITALFREI: pure data loading. No cost quantity, no PASS/FAIL.
 """
 from __future__ import annotations
 
+import hashlib
 import json
+import struct
+from datetime import date, datetime, timezone
 from pathlib import Path
 from typing import Any
 
 from bybit_edge.research.bar_cache import load_minute_bars
+from bybit_edge.research.wp7_universe import bybit_rest as _bybit_rest
+from bybit_edge.research.wp7_universe import panel_store as _panel_store
 from bybit_edge.research.wp9_dvol import harvest_close as _dvol
+from bybit_edge.research.wp9_dvol import rest_client as _dvol_rest
 
 from . import rv as _rv
 
@@ -55,6 +61,7 @@ __all__ = [
     "probe_funding", "funding_daily_cashflow",
     "iv_rv_diff_series",
     "probe_perp_basis", "perp_basis_proxy_series",
+    "funding_daily_cashflow_backfill", "iv_rv_diff_series_backfill",
 ]
 
 FUNDING_STREAM = "rest.fundingRate"
@@ -188,6 +195,125 @@ def funding_daily_cashflow(con: Any, base_dir: Path | str, symbol: str, *,
     return _series(f"funding_{symbol}", "funding_cashflow", symbol, provenance, days_values)
 
 
+# ------------------------------------------------- funding (DEC-62 backfill)
+
+def _fingerprint_days_values(days_values: dict[str, float]) -> str:
+    """SHA-256 over the exact bytes of the sorted ``(date, value)`` pairs
+    (repo convention -- see ``panel_store._rows_hash`` / ``bar_cache.
+    _bars_hash``): order-independent by construction, reproducible from
+    the day-values dict alone."""
+    h = hashlib.sha256()
+    for d, v in sorted(days_values.items()):
+        h.update(d.encode("utf-8"))
+        h.update(struct.pack("<d", float(v)))
+    return h.hexdigest()
+
+
+def _day_bounds_ms(day: str) -> tuple[int, int]:
+    """UTC ``[00:00:00.000, 23:59:59.999]`` millisecond bounds of an ISO day."""
+    d = date.fromisoformat(day)
+    start = int(datetime(d.year, d.month, d.day, tzinfo=timezone.utc).timestamp() * 1000)
+    return start, start + 86_400_000 - 1
+
+
+def _panel_years_available(panel_base: Path, symbol: str, years: list[int]) -> bool:
+    """Whether EVERY year in ``years`` has a ``panel_1d`` partition file on
+    disk for ``symbol`` (frozen OR open tree) -- the DEC-62 "Quelle
+    panel_1d.funding_sum ... wenn die Partitionen fuer die benoetigten
+    Jahre vorhanden sind" gate. A single missing year falls the WHOLE
+    range back to direct REST (never a per-year source mix -- one series,
+    one source, named in its provenance)."""
+    for y in years:
+        frozen = _panel_store.partition_path(panel_base, symbol, y, frozen=True)
+        open_ = _panel_store.partition_path(panel_base, symbol, y, frozen=False)
+        if not frozen.is_file() and not open_.is_file():
+            return False
+    return True
+
+
+def _funding_from_panel(panel_base: Path, symbol: str, years: list[int],
+                        start: str, end: str) -> dict[str, float]:
+    """Daily funding cashflow from ``panel_1d.funding_sum`` -- SUM already
+    per UTC day (WP-7 ``merge_funding_daily`` semantics), so this is a
+    plain per-partition read + bound, no re-aggregation. A day with
+    ``funding_n`` None/0 (never populated, or a measured-zero-settlement
+    day) is SKIPPED (spec: "skipping days where funding_n is None/0") --
+    never counted as a real zero cashflow day."""
+    import pyarrow.parquet as pq
+
+    out: dict[str, float] = {}
+    for y in years:
+        frozen = _panel_store.partition_path(panel_base, symbol, y, frozen=True)
+        path = frozen if frozen.is_file() else _panel_store.partition_path(
+            panel_base, symbol, y, frozen=False)
+        if not path.is_file():
+            continue
+        table = pq.read_table(path, columns=["start_ms", "funding_n", "funding_sum"])
+        cols = table.to_pydict()
+        for ms, fn, fs in zip(cols["start_ms"], cols["funding_n"], cols["funding_sum"]):
+            if not fn or fs is None:
+                continue
+            day = datetime.fromtimestamp(ms / 1000.0, tz=timezone.utc).date().isoformat()
+            if day < start or day > end:
+                continue
+            out[day] = float(fs)
+    return out
+
+
+def _funding_from_rest(symbol: str, start: str, end: str, *, category: str) -> dict[str, float]:
+    """Daily funding cashflow via the public, throttled
+    ``bybit_rest.fetch_funding_history`` -- SUM of ``funding_rate`` per
+    UTC day over ``[start, end]``. Any ``BybitFieldLayoutError`` from the
+    client propagates unchanged (loud fail, never a silent partial)."""
+    start_ms, _ = _day_bounds_ms(start)
+    _, end_ms = _day_bounds_ms(end)
+    fetched = _bybit_rest.fetch_funding_history(symbol, start_ms, end_ms, category=category)
+    out: dict[str, float] = {}
+    for r in fetched["rows"]:
+        day = datetime.fromtimestamp(r["ts_ms"] / 1000.0, tz=timezone.utc).date().isoformat()
+        out[day] = out.get(day, 0.0) + r["funding_rate"]
+    return out
+
+
+def funding_daily_cashflow_backfill(symbol: str, start: str, end: str, *,
+                                    panel_base: Path | str | None = None,
+                                    category: str = "linear") -> dict[str, Any]:
+    """Daily SUM of funding rate over ``[start, end]``, reaching back to
+    the STRESS_ABS canon start (DEC-62/WP-10(A2)).
+
+    Preferred source: WP-7's ``panel_1d.funding_sum`` (``panel_base`` given
+    AND a partition file present for every year the ``[start, end]`` range
+    touches) -- else the public, throttled ``funding/history`` REST
+    endpoint directly (``fetch_funding_history``, spec: "ersatzweise
+    direkter Abruf fuer BTC/ETH/SOL/XRP/BNB"). Exactly one source per call
+    (recorded in ``provenance["source"]``, with the fingerprint -- SHA-256
+    over the sorted ``(date, value)`` pairs -- so a later comparison run
+    can prove which numbers came from where without re-fetching).
+    """
+    name = f"funding_backfill_{symbol}"
+    kind = "funding_cashflow_backfill"
+    years = list(range(date.fromisoformat(start).year, date.fromisoformat(end).year + 1))
+
+    source = None
+    days_values: dict[str, float] = {}
+    panel_base_path = Path(panel_base) if panel_base else None
+    if panel_base_path is not None and _panel_years_available(panel_base_path, symbol, years):
+        days_values = _funding_from_panel(panel_base_path, symbol, years, start, end)
+        source = "panel_1d"
+    if source is None:
+        days_values = _funding_from_rest(symbol, start, end, category=category)
+        source = "rest_direct"
+
+    provenance = {
+        "symbol": symbol, "start": start, "end": end, "category": category,
+        "source": source, "panel_base": str(panel_base_path) if panel_base_path else None,
+        "fingerprint_sha256": _fingerprint_days_values(days_values),
+    }
+    status = "OK" if days_values else "SKIPPED_NO_DATA"
+    reason = None if days_values else f"no funding rows from source={source} for {symbol} {start}..{end}"
+    return _series(name, kind, symbol, provenance, days_values, status=status, reason=reason)
+
+
 # --------------------------------------------------------------- iv - rv
 
 def iv_rv_diff_series(con: Any, harvest_base: Path | str, cache_dir: Path | str, *,
@@ -219,6 +345,60 @@ def iv_rv_diff_series(con: Any, harvest_base: Path | str, cache_dir: Path | str,
     status = "OK" if days_values else "SKIPPED_NO_OVERLAP"
     reason = None if days_values else "no overlapping day between dvol harvest and bar cache"
     return _series(f"ivrv_{dvol_symbol}", "iv_rv_diff", dvol_symbol, provenance, days_values,
+                   status=status, reason=reason)
+
+
+def iv_rv_diff_series_backfill(cache_dir: Path | str, *, currency: str, bar_exchange: str,
+                               bar_symbol: str, dvol_rest_dir: Path | str = "data/dvol_rest",
+                               days: list[str]) -> dict[str, Any]:
+    """IV (REST-DVOL daily close, DEC-61/WP-9 B1) minus WP-0 realized vol,
+    both annualized -- the backfill counterpart of ``iv_rv_diff_series``,
+    reaching back to whatever the REST-DVOL parquet covers (2021-03-24 ff.
+    per WP-9). NEVER mixes harvester DVOL into this -- the REST parquet is
+    the ONLY IV source here (DEC-61: "Harvester-DVOL und REST-DVOL werden
+    dabei NICHT gemischt").
+
+    Loud-fail (``SeriesError``) the moment the REST-DVOL parquet is
+    missing or does not carry the expected ``date``/``close`` columns --
+    never a silent empty/None series (constitution: "loud fail instead of
+    silent None").
+    """
+    provenance = {
+        "currency": currency, "bar_exchange": bar_exchange, "bar_symbol": bar_symbol,
+        "dvol_rest_dir": str(dvol_rest_dir),
+        "annualization_days_per_year": _rv.ANNUALIZATION_DAYS_PER_YEAR,
+        "min_bars_per_day": _rv.MIN_BARS_PER_DAY,
+    }
+    name = f"ivrv_backfill_{currency}"
+    if not days:
+        return _series(name, "iv_rv_diff_backfill", currency, provenance, {},
+                       status="SKIPPED_NO_DATA", reason="empty day list")
+
+    rest_path = Path(dvol_rest_dir) / f"{currency}_1D.parquet"
+    if not rest_path.is_file():
+        raise SeriesError(
+            f"iv_rv backfill {currency}: REST-DVOL-Parquet fehlt (DEC-61) -- {rest_path} "
+            "(erst scripts/wp9_dvol_backfill.py --fetch ausfuehren)")
+    try:
+        rows = _dvol_rest.read_rest_parquet(rest_path)
+    except Exception as exc:  # noqa: BLE001 -- any pyarrow read/column-layout failure
+        raise SeriesError(
+            f"iv_rv backfill {currency}: REST-DVOL-Parquet unlesbar oder Spalten "
+            f"date/ts_ms/close fehlen -- {rest_path}: {exc}") from exc
+    if any(k not in rows[0] for k in ("date", "close")) if rows else False:
+        raise SeriesError(
+            f"iv_rv backfill {currency}: REST-DVOL-Parquet-Zeilen ohne date/close -- {rest_path}")
+    provenance["dvol_rest_sha256"] = hashlib.sha256(rest_path.read_bytes()).hexdigest()
+    dvol_by_day = {r["date"]: r["close"] for r in rows}
+
+    bars = load_minute_bars(cache_dir, bar_exchange, bar_symbol, days[0], days[-1])
+    rv_by_day = _rv.annualize_pct(_rv.daily_realized_vol(bars))
+
+    common = sorted(set(dvol_by_day) & set(rv_by_day) & set(days))
+    days_values = {d: dvol_by_day[d] - rv_by_day[d] for d in common}
+    status = "OK" if days_values else "SKIPPED_NO_OVERLAP"
+    reason = None if days_values else "no overlapping day between REST-DVOL parquet and bar cache"
+    return _series(name, "iv_rv_diff_backfill", currency, provenance, days_values,
                    status=status, reason=reason)
 
 

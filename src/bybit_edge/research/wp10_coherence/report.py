@@ -95,7 +95,8 @@ def _bootstrap_entries(coherence_result: dict[str, Any],
 
 def build_report(*, series_list: list[dict[str, Any]], coherence_result: dict[str, Any],
                  stress_canon: dict[str, dict[str, Any]], portfolio_null: dict[str, Any],
-                 out_dir: Path | str, seed: int) -> dict[str, Any]:
+                 out_dir: Path | str, seed: int, source: str | None = None,
+                 comparison: list[dict[str, Any]] | None = None) -> dict[str, Any]:
     """Assemble JSON + Markdown, write DEC-53 artefacts FIRST, then raise
     (``ReportError``, "KEIN VERDIKT") if the contract isn't met -- never
     write a summary that claims artefacts it doesn't actually have.
@@ -104,6 +105,14 @@ def build_report(*, series_list: list[dict[str, Any]], coherence_result: dict[st
     "selection_ceiling": portfolio_null.selection_ceiling(...) | None}`` --
     two independently-seeded constants (see that module's docstring for
     why they are kept separate).
+
+    ``source``/``comparison`` are WP-10(A2)/DEC-62 backfill-mode-only
+    additions: when both stay ``None`` (the ``--source harvest`` default
+    call in ``scripts/wp10_coherence.py`` never passes them), the summary
+    dict and rendered Markdown are IDENTICAL to the pre-DEC-62 shape --
+    "existing runs are byte-identical" (spec). ``comparison`` is the
+    DEC-62/DEC-60-lesson "Bestand vs. Backfill" row list from
+    ``comparison.compare_value_series``/``compare_dvol_close``.
     """
     out_dir = Path(out_dir)
     cluster_series = {s["name"]: write_cluster_series_csv(s, out_dir) for s in series_list}
@@ -120,6 +129,10 @@ def build_report(*, series_list: list[dict[str, Any]], coherence_result: dict[st
         "stress_canon": stress_canon, "coherence": coherence_result,
         "portfolio_null": portfolio_null, "artifacts": artifacts,
     }
+    if source is not None:
+        summary["source"] = source
+    if comparison is not None:
+        summary["comparison"] = comparison
     json_path = out_dir / "wp10a_summary.json"
     json_path.write_text(json.dumps(summary, indent=1, sort_keys=True), encoding="utf-8")
     md_path = out_dir / "wp10a_report.md"
@@ -130,6 +143,12 @@ def build_report(*, series_list: list[dict[str, Any]], coherence_result: dict[st
 
 def render_markdown(summary: dict[str, Any]) -> str:
     lines = ["# WP-10(A) - Praemien-Kohaerenz im Stress (deskriptiv, KEIN VERDIKT)", ""]
+    if summary.get("source") == "backfill":
+        lines.append(
+            "**Modus: backfill (WP-10(A2), DEC-62) -- nachgeladene Tagesserien bis zum "
+            "STRESS_ABS-Kanon-Beginn. KEIN PASS/FAIL, keine rho-Schwelle -- rein "
+            "deskriptiver Vergleich Bestand vs. Backfill.**")
+        lines.append("")
     lines.append("## Serien")
     for s in summary["series"]:
         lines.append(f"- `{s['name']}` ({s['kind']}): status={s['status']}, "
@@ -155,6 +174,27 @@ def render_markdown(summary: dict[str, Any]) -> str:
             else:
                 lines.append(f"  - {regime}: {r.get('status')} (n={r.get('n_days')})")
     lines.append("")
+    if summary.get("comparison") is not None:
+        lines.append("## Bestand vs. Backfill (Ueberlappung)")
+        if not summary["comparison"]:
+            lines.append("- (keine Vergleichszeilen -- keine passende Bestandsserie geladen)")
+        for c in summary["comparison"]:
+            if c["status"] != "OK":
+                lines.append(f"- {c['name']}: {c['status']} -- {c.get('reason')}")
+                continue
+            band = c.get("materiality_band_volpts")
+            if band is not None:
+                lines.append(
+                    f"- {c['name']}: n_overlap={c['n_overlap']}, max|diff|={c['max_abs_diff']:.6g} "
+                    f"vol.pts, Materialitaetsband={band} (within_band={c['within_band']}), "
+                    f"n_Tage_ueber_Band={c['n_days_diff']}"
+                    + (f", Tage={c['diff_days'][:10]}" if c['diff_days'] else ""))
+            else:
+                lines.append(
+                    f"- {c['name']}: n_overlap={c['n_overlap']}, max|diff|={c['max_abs_diff']:.6g}, "
+                    f"n_Tage_diff(>{c['diff_threshold']:g})={c['n_days_diff']}"
+                    + (f", Tage={c['diff_days'][:10]}" if c['diff_days'] else ""))
+        lines.append("")
     pn = summary["portfolio_null"]
     lines.append("## Portfolio-Nulleffekt (Konstanten, keine Schwelle)")
     lines.append("### Gleichgewichtungs-Null (k=2..5, Diversifikation)")
