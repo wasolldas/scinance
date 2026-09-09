@@ -1,0 +1,395 @@
+{
+  "entries": [
+    {
+      "n": 888,
+      "n_bootstrap": 1000,
+      "pair": [
+        "funding_BTCUSDT",
+        "funding_ETHUSDT"
+      ],
+      "regime": "quiet",
+      "seed": 53
+    },
+    {
+      "n": 136,
+      "n_bootstrap": 1000,
+      "pair": [
+        "funding_BTCUSDT",
+        "funding_SOLUSDT"
+      ],
+      "regime": "quiet",
+      "seed": 53
+    },
+    {
+      "n": 136,
+      "n_bootstrap": 1000,
+      "pair": [
+        "funding_BTCUSDT",
+        "funding_XRPUSDT"
+      ],
+      "regime": "quiet",
+      "seed": 53
+    },
+    {
+      "n": 136,
+      "n_bootstrap": 1000,
+      "pair": [
+        "funding_BTCUSDT",
+        "funding_BNBUSDT"
+      ],
+      "regime": "quiet",
+      "seed": 53
+    },
+    {
+      "n": 163,
+      "n_bootstrap": 1000,
+      "pair": [
+        "funding_BTCUSDT",
+        "ivrv_BTC"
+      ],
+      "regime": "quiet",
+      "seed": 53
+    },
+    {
+      "n": 163,
+      "n_bootstrap": 1000,
+      "pair": [
+        "funding_BTCUSDT",
+        "ivrv_ETH"
+      ],
+      "regime": "quiet",
+      "seed": 53
+    },
+    {
+      "n": 42,
+      "n_bootstrap": 1000,
+      "pair": [
+        "funding_BTCUSDT",
+        "basis_BTCUSDT"
+      ],
+      "regime": "quiet",
+      "seed": 53
+    },
+    {
+      "n": 42,
+      "n_bootstrap": 1000,
+      "pair": [
+        "funding_BTCUSDT",
+        "basis_ETHUSDT"
+      ],
+      "regime": "quiet",
+      "seed": 53
+    },
+    {
+      "n": 138,
+      "n_bootstrap": 1000,
+      "pair": [
+        "funding_ETHUSDT",
+        "funding_SOLUSDT"
+      ],
+      "regime": "quiet",
+      "seed": 53
+    },
+    {
+      "n": 138,
+      "n_bootstrap": 1000,
+      "pair": [
+        "funding_ETHUSDT",
+        "funding_XRPUSDT"
+      ],
+      "regime": "quiet",
+      "seed": 53
+    },
+    {
+      "n": 138,
+      "n_bootstrap": 1000,
+      "pair": [
+        "funding_ETHUSDT",
+        "funding_BNBUSDT"
+      ],
+      "regime": "quiet",
+      "seed": 53
+    },
+    {
+      "n": 164,
+      "n_bootstrap": 1000,
+      "pair": [
+        "funding_ETHUSDT",
+        "ivrv_BTC"
+      ],
+      "regime": "quiet",
+      "seed": 53
+    },
+    {
+      "n": 164,
+      "n_bootstrap": 1000,
+      "pair": [
+        "funding_ETHUSDT",
+        "ivrv_ETH"
+      ],
+      "regime": "quiet",
+      "seed": 53
+    },
+    {
+      "n": 43,
+      "n_bootstrap": 1000,
+      "pair": [
+        "funding_ETHUSDT",
+        "basis_BTCUSDT"
+      ],
+      "regime": "quiet",
+      "seed": 53
+    },
+    {
+      "n": 43,
+      "n_bootstrap": 1000,
+      "pair": [
+        "funding_ETHUSDT",
+        "basis_ETHUSDT"
+      ],
+      "regime": "quiet",
+      "seed": 53
+    },
+    {
+      "n": 138,
+      "n_bootstrap": 1000,
+      "pair": [
+        "funding_SOLUSDT",
+        "funding_XRPUSDT"
+      ],
+      "regime": "quiet",
+      "seed": 53
+    },
+    {
+      "n": 138,
+      "n_bootstrap": 1000,
+      "pair": [
+        "funding_SOLUSDT",
+        "funding_BNBUSDT"
+      ],
+      "regime": "quiet",
+      "seed": 53
+    },
+    {
+      "n": 127,
+      "n_bootstrap": 1000,
+      "pair": [
+        "funding_SOLUSDT",
+        "ivrv_BTC"
+      ],
+      "regime": "quiet",
+      "seed": 53
+    },
+    {
+      "n": 127,
+      "n_bootstrap": 1000,
+      "pair": [
+        "funding_SOLUSDT",
+        "ivrv_ETH"
+      ],
+      "regime": "quiet",
+      "seed": 53
+    },
+    {
+      "n": 43,
+      "n_bootstrap": 1000,
+      "pair": [
+        "funding_SOLUSDT",
+        "basis_BTCUSDT"
+      ],
+      "regime": "quiet",
+      "seed": 53
+    },
+    {
+      "n": 43,
+      "n_bootstrap": 1000,
+      "pair": [
+        "funding_SOLUSDT",
+        "basis_ETHUSDT"
+      ],
+      "regime": "quiet",
+      "seed": 53
+    },
+    {
+      "n": 138,
+      "n_bootstrap": 1000,
+      "pair": [
+        "funding_XRPUSDT",
+        "funding_BNBUSDT"
+      ],
+      "regime": "quiet",
+      "seed": 53
+    },
+    {
+      "n": 127,
+      "n_bootstrap": 1000,
+      "pair": [
+        "funding_XRPUSDT",
+        "ivrv_BTC"
+      ],
+      "regime": "quiet",
+      "seed": 53
+    },
+    {
+      "n": 127,
+      "n_bootstrap": 1000,
+      "pair": [
+        "funding_XRPUSDT",
+        "ivrv_ETH"
+      ],
+      "regime": "quiet",
+      "seed": 53
+    },
+    {
+      "n": 43,
+      "n_bootstrap": 1000,
+      "pair": [
+        "funding_XRPUSDT",
+        "basis_BTCUSDT"
+      ],
+      "regime": "quiet",
+      "seed": 53
+    },
+    {
+      "n": 43,
+      "n_bootstrap": 1000,
+      "pair": [
+        "funding_XRPUSDT",
+        "basis_ETHUSDT"
+      ],
+      "regime": "quiet",
+      "seed": 53
+    },
+    {
+      "n": 127,
+      "n_bootstrap": 1000,
+      "pair": [
+        "funding_BNBUSDT",
+        "ivrv_BTC"
+      ],
+      "regime": "quiet",
+      "seed": 53
+    },
+    {
+      "n": 127,
+      "n_bootstrap": 1000,
+      "pair": [
+        "funding_BNBUSDT",
+        "ivrv_ETH"
+      ],
+      "regime": "quiet",
+      "seed": 53
+    },
+    {
+      "n": 43,
+      "n_bootstrap": 1000,
+      "pair": [
+        "funding_BNBUSDT",
+        "basis_BTCUSDT"
+      ],
+      "regime": "quiet",
+      "seed": 53
+    },
+    {
+      "n": 43,
+      "n_bootstrap": 1000,
+      "pair": [
+        "funding_BNBUSDT",
+        "basis_ETHUSDT"
+      ],
+      "regime": "quiet",
+      "seed": 53
+    },
+    {
+      "n": 164,
+      "n_bootstrap": 1000,
+      "pair": [
+        "ivrv_BTC",
+        "ivrv_ETH"
+      ],
+      "regime": "quiet",
+      "seed": 53
+    },
+    {
+      "n": 33,
+      "n_bootstrap": 1000,
+      "pair": [
+        "ivrv_BTC",
+        "basis_BTCUSDT"
+      ],
+      "regime": "quiet",
+      "seed": 53
+    },
+    {
+      "n": 33,
+      "n_bootstrap": 1000,
+      "pair": [
+        "ivrv_BTC",
+        "basis_ETHUSDT"
+      ],
+      "regime": "quiet",
+      "seed": 53
+    },
+    {
+      "n": 33,
+      "n_bootstrap": 1000,
+      "pair": [
+        "ivrv_ETH",
+        "basis_BTCUSDT"
+      ],
+      "regime": "quiet",
+      "seed": 53
+    },
+    {
+      "n": 33,
+      "n_bootstrap": 1000,
+      "pair": [
+        "ivrv_ETH",
+        "basis_ETHUSDT"
+      ],
+      "regime": "quiet",
+      "seed": 53
+    },
+    {
+      "n": 59,
+      "n_bootstrap": 1000,
+      "pair": [
+        "basis_BTCUSDT",
+        "basis_ETHUSDT"
+      ],
+      "regime": "quiet",
+      "seed": 53
+    },
+    {
+      "block_len": 5,
+      "n_bootstrap": 1000,
+      "portfolio_null_table_k": 2,
+      "seed": 53
+    },
+    {
+      "block_len": 5,
+      "n_bootstrap": 1000,
+      "portfolio_null_table_k": 3,
+      "seed": 53
+    },
+    {
+      "block_len": 5,
+      "n_bootstrap": 1000,
+      "portfolio_null_table_k": 4,
+      "seed": 53
+    },
+    {
+      "block_len": 5,
+      "n_bootstrap": 1000,
+      "portfolio_null_table_k": 5,
+      "seed": 53
+    },
+    {
+      "block_len": 5,
+      "pool_size": 5000,
+      "portfolio_null_selection_ceiling": true,
+      "seed": 53
+    }
+  ],
+  "generator": "numpy.random.default_rng"
+}

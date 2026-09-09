@@ -225,6 +225,49 @@ def test_frozen_partition_is_immutable(tmp_path):
         listing_date=date(2023, 1, 1), as_of_date=date(2023, 1, 11), frozen=False)
 
 
+def test_resume_action_skips_frozen_done_rebuilds_partial(tmp_path):
+    """A second --fetch must never trip over its own first run: frozen DONE
+    (and EMPTY) partitions are SKIPped without network; frozen PARTIAL /
+    FAILED ones are REBUILT (the only sanctioned overwrite); everything
+    without a file, and the open current year, is a plain WRITE."""
+    from datetime import date
+    base = tmp_path / "panel_1d"
+    manifest = base / "panel_manifest.sqlite"
+    # nothing on disk yet -> WRITE (frozen or not)
+    assert panel_store.resume_action(base, manifest, "BTCUSDT", 2022, frozen=True) == "WRITE"
+    assert panel_store.resume_action(base, manifest, "BTCUSDT", 2023, frozen=False) == "WRITE"
+    panel_store.write_year_partition(
+        base, manifest, "BTCUSDT", 2022, _rows_for_year(2022, 365),
+        listing_date=date(2022, 1, 1), as_of_date=date(2022, 12, 31), frozen=True)
+    assert panel_store.resume_action(base, manifest, "BTCUSDT", 2022, frozen=True) == "SKIP"
+    # EMPTY frozen year (listed after year end) is complete too -> SKIP
+    panel_store.write_year_partition(
+        base, manifest, "NEWUSDT", 2022, [],
+        listing_date=date(2023, 3, 1), as_of_date=date(2023, 3, 31), frozen=True)
+    assert panel_store.resume_action(base, manifest, "NEWUSDT", 2022, frozen=True) == "SKIP"
+    # PARTIAL frozen year -> REBUILD, and the rebuild itself is accepted
+    panel_store.write_year_partition(
+        base, manifest, "ETHUSDT", 2022, _rows_for_year(2022, 100),
+        listing_date=date(2022, 1, 1), as_of_date=date(2022, 12, 31), frozen=True)
+    assert panel_store.resume_action(base, manifest, "ETHUSDT", 2022, frozen=True) == "REBUILD"
+    res = panel_store.write_year_partition(
+        base, manifest, "ETHUSDT", 2022, _rows_for_year(2022, 365),
+        listing_date=date(2022, 1, 1), as_of_date=date(2022, 12, 31), frozen=True,
+        allow_overwrite=True)
+    assert res["status"] == "DONE"
+    assert panel_store.resume_action(base, manifest, "ETHUSDT", 2022, frozen=True) == "SKIP"
+    # FAILED marker -> REBUILD; open current year -> always WRITE
+    panel_store.mark_failed(manifest, "ETHUSDT", 2022, "kline timeout")
+    assert panel_store.resume_action(base, manifest, "ETHUSDT", 2022, frozen=True) == "REBUILD"
+    panel_store.write_year_partition(
+        base, manifest, "BTCUSDT", 2023, _rows_for_year(2023, 10),
+        listing_date=date(2023, 1, 1), as_of_date=date(2023, 1, 10), frozen=False)
+    assert panel_store.resume_action(base, manifest, "BTCUSDT", 2023, frozen=False) == "WRITE"
+    # file present but manifest gone -> REBUILD (never trust a file alone)
+    manifest.unlink()
+    assert panel_store.resume_action(base, manifest, "BTCUSDT", 2022, frozen=True) == "REBUILD"
+
+
 def test_panel_fingerprint_deterministic_and_range_fingerprint(tmp_path):
     from datetime import date
     base = tmp_path / "panel_1d"

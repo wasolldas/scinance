@@ -121,3 +121,28 @@
 - **Entscheidung:** WP-11 v2 misst das mittlere Excess-Profil in Ereigniszeit (Superposed-Epoch-Analyse; Standard in Klimatologie/Astrophysik), zieht das Pseudo-Null-Profil (Selektions-Bump = struktureller Nulleffekt) ab und fittet exponentiell und als Potenzgesetz auf dem Differenz-Profil mit Cluster-Bootstrap-CI. Die v1-Kennzahlen bleiben als Diagnostik im Report, tragen aber keine Ausgabe (i)-(iii) mehr. Kein PASS/FAIL, keine Schwelle (unveraendert).
 - **Was der Lauf trotzdem geliefert hat:** die Ereignismenge (N gemessen, Aera-Verteilung), die STRESS_ABS-Untergruppe ist mit 27 Ereignistagen unter dem 30-Cluster-Floor - RECOVERY_H_P90 auf STRESS_ABS ist heute KEIN BEFUND (korrekt so ausgewiesen).
 - **Rueckbauweg:** v2 ist additiv; v1-Artefakte bleiben mit Fingerprint erhalten.
+
+---
+
+### DEC-61 · WP-9 Befund B1: DVOL-REST-Backfill (2021-03-24 ff.) ist mit dem Harvester-Strom austauschbar - H-27-Klasse eroeffnet, nicht registriert
+- **Anlass:** Echtlauf WP-9 2026-09-09 (`state/runs/wp9_20260909/`, `state/WELLE1_BEFUND_TEIL2_2026-09-09.md`). F1: 1.996 Tage je BTC/ETH ab 2021-03-24. F2: 176 Ueberlappungstage, Tagesdifferenz REST-Close minus Harvest-Letztframe exakt 0 auf jedem Tag; Materialitaetsband +-0,3 erreichbar; Befund a.
+- **Entscheidung:** Vorab fixierte Konsequenz B1 (PRD 4.2) tritt ein: die H-27-Klasse (VRP auf REST-Backfill-Basis) darf als eigene, vorab zu formulierende Hypothese mit eigenem K vorregistriert werden. Registriert wird nichts vor dem Abschluss von Welle 1 (PRD 9.3 Punkt 7). REST-DVOL darf ab sofort als IV-Quelle in deskriptiven Paketen (WP-10(A2)) benutzt werden; Harvester-DVOL und REST-DVOL werden dabei NICHT gemischt, sondern der REST-Backfill wird durchgehend verwendet.
+- **Unveraendert:** H-26 bleibt gegen `done_days` gesperrt; C-33-Uhr unberuehrt.
+- **Rueckbauweg:** Dokumentation.
+
+---
+
+### DEC-62 · WP-10(A): Stress-Kohaerenz ist mit Harvest-Aera-Serien nicht messbar - Wiederholung als WP-10(A2) auf nachgeladenen Tagesserien; Ruhe-Matrix und Portfolio-Konstanten uebernommen
+- **Anlass:** Echtlauf WP-10(A) 2026-09-09 (`state/runs/wp10a_20260909/`). STRESS_ABS enthaelt 30 Tage/19 Episoden seit 2020-05; die Bestandsserien beginnen 2024-03 (Funding BTC/ETH), 2025-08 (IV-RV), 2026-03 (Funding SOL/XRP/BNB), 2026-06 (Basis): Stress-Ueberlappung 0-3 Tage je Paar, alle Stress-Zellen `TOO_FEW`. Das PRD hatte 6-10 Episoden erwartet; die Erwartung war falsch, weil sie die Aera der Serien nicht gegen die Aera des Kanons gehalten hat.
+- **Entscheidung 1 - WP-10(A2):** dieselbe Messung (Spearman-Matrix Stress/Ruhe, Cluster-Bootstrap, Bonett/Wright, struktureller Nulleffekt) auf Tagesserien, die bis zum Kanon-Beginn zurueckreichen: Funding-Cashflow aus der oeffentlichen `funding/history` (V-1: vollstaendig nachladbar; Quelle `panel_1d.funding_sum` aus WP-7, ersatzweise direkter Abruf fuer BTC/ETH/SOL/XRP/BNB), IV-RV aus REST-DVOL (DEC-61) minus Bar-Cache-RV, Basis-Proxy weiterhin Harvest-only (61 Tage; Backfill ueber `premium-index-price-kline` erst nach Probe). Neuer Treiber-Modus `--source backfill`, alte Bestandsserien bleiben als Vergleichszeile (Pseudo-Null-Vergleichslehre aus DEC-60 sinngemaess: Bestand vs. Backfill nebeneinander auf der gemeinsamen Ueberlappung). DEC-39-Trio unveraendert gueltig; Pflichttest: Backfill- und Bestandsserie muessen auf der Ueberlappung identische Tageswerte liefern (Funding) bzw. innerhalb des WP-9-Bands (IV).
+- **Entscheidung 2 - Uebernommene Konstanten (PRD 9.2, keine Schwellen):** Ruhe-Matrix (Funding untereinander 0,24-0,51; IV-RV BTC/ETH 0,907; Funding x IV-RV ~0); Portfolio-Nulleffekt der Gleichgewichtung k=2..5 (E[SR] ~0, SD ~0,40, p95 ~0,65, p99 ~0,95); Selektions-Obergrenze E[max SR] fuer K=5..100 (0,46..0,97 empirisch; sigma_SR 0,398). Alle mit Seed 53 und Fingerprint reproduzierbar.
+- **Entscheidung 3 - Folgen fuer Registrierungen:** Ledoit-Wolf-`N_eff` (WP-7) wird Pflichtangabe fuer A1 (Funding-Beine sind kohaerent); BTC+ETH zaehlen fuer H-27/A5 als EIN Bein; die abhaengigkeitsrobuste Ueber-Familien-Korrektur bleibt in Kraft, solange die Stress-Zelle leer ist.
+- **Rueckbauweg:** additiver Treiber-Modus; Bestandslauf bleibt mit Fingerprint erhalten.
+
+---
+
+### DEC-63 · WP-11 v2: Nach-Schock-Ueberschuss zerfaellt potenzgesetz-artig auf Tages-Skala - Konstante fuer Kostenmodell und Cluster-Einheit; kein Kandidat
+- **Anlass:** Echtlauf WP-11 v2 2026-09-09 (`state/runs/wp11_20260909/`, Profilmatrix 7.776 Zeilen mit Real-/Pseudo-/Differenz-CI). Differenzprofil bei t=0: 1,22 [1,13; 1,31] z-Einheiten; Halbwertszeiten des Exponentialfits BTC/ETH 22-31 h (R^2 0,24-0,37), Potenzgesetz-Exponent 0,23-0,32; XRP/BNB 7-20 h; SOL-Volumen 2,5 h (R^2 0,83). v1 (0,07-0,2 h) war Rauschgedaechtnis (DEC-60 bestaetigt).
+- **Entscheidung:** (1) Deskriptor "Nach-Schock-Regime = Tages-Skala, langsamer (Omori-artiger) Zerfall" geht als Konstante in PRD 9.2 und in `tradability3` (Stress-Kostenfenster mindestens ein Kalendertag nach Schockstunde). (2) Cluster-Einheit Kalendertag fuer alle Bar-Cache-Pakete bestaetigt; ein Schock-Tag ist EIN Cluster. (3) RECOVERY_H_P90 auf STRESS_ABS bleibt KEIN BEFUND (27 < 30 Ereignistage); der Floor wird nicht bewegt, die Zelle fuellt sich nur durch neue Kanon-Tage. (4) Null-Zensus-Klausel: kein Kandidat; X-OEKO-1 Arm (b) nur als getrennt vorregistrierte Hypothese.
+- **Report-Korrektur:** Tabellen (i)/(iii) trugen im Lauf-Report keine Variablenspalte (Zeilenreihenfolge Volumen/Trades/RV); im Code behoben, Werte unveraendert.
+- **Rueckbauweg:** Dokumentation.

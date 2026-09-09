@@ -1,0 +1,81 @@
+{
+ "wp": "WP-9",
+ "materiality_band_volpts": 0.3,
+ "block_len_days": 5,
+ "n_bootstrap": 1000,
+ "seed": 53,
+ "results": {
+  "BTC": {
+   "status": "OK",
+   "symbol": "BTC",
+   "n_harvest_days_discovered": 176,
+   "n_overlap_days": 176,
+   "distribution": {
+    "n": 176,
+    "p5": 0.0,
+    "p50": 0.0,
+    "p95": 0.0,
+    "sd": 0.0,
+    "autocorr_lag1": null
+   },
+   "bootstrap": {
+    "mean": 0.0,
+    "ci_lo": 0.0,
+    "ci_hi": 0.0,
+    "alpha": 0.05,
+    "block_len": 5,
+    "n_bootstrap": 1000,
+    "seed": 53,
+    "n": 176
+   },
+   "half_width": 0.0,
+   "reachable": true,
+   "verdict": "a",
+   "reason": "austauschbar: |Mittel| und 95%-CI innerhalb des Bands.",
+   "materiality_band_volpts": 0.3,
+   "diff_series_csv": "E:\\Claude\\Projects\\scinance\\scinance3-impl\\state\\wp9_20260909\\wp9_BTC_diff_series.csv",
+   "f1": {
+    "first_date": "2021-03-24",
+    "last_date": "2026-09-09",
+    "n_days": 1996,
+    "fingerprint": "42574a1a995ce7ce9b3e043cd9354329edc0d1e976f4ffe59061db8b7cd0512b"
+   }
+  },
+  "ETH": {
+   "status": "OK",
+   "symbol": "ETH",
+   "n_harvest_days_discovered": 176,
+   "n_overlap_days": 176,
+   "distribution": {
+    "n": 176,
+    "p5": 0.0,
+    "p50": 0.0,
+    "p95": 0.0,
+    "sd": 0.0,
+    "autocorr_lag1": null
+   },
+   "bootstrap": {
+    "mean": 0.0,
+    "ci_lo": 0.0,
+    "ci_hi": 0.0,
+    "alpha": 0.05,
+    "block_len": 5,
+    "n_bootstrap": 1000,
+    "seed": 53,
+    "n": 176
+   },
+   "half_width": 0.0,
+   "reachable": true,
+   "verdict": "a",
+   "reason": "austauschbar: |Mittel| und 95%-CI innerhalb des Bands.",
+   "materiality_band_volpts": 0.3,
+   "diff_series_csv": "E:\\Claude\\Projects\\scinance\\scinance3-impl\\state\\wp9_20260909\\wp9_ETH_diff_series.csv",
+   "f1": {
+    "first_date": "2021-03-24",
+    "last_date": "2026-09-09",
+    "n_days": 1996,
+    "fingerprint": "bbdaf0890bead8e80eb2df3888eb0dbf7ca1046cdc343264814381bb40b3d786"
+   }
+  }
+ }
+}

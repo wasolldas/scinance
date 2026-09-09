@@ -1,0 +1,153 @@
+# WP-10(A) - Praemien-Kohaerenz im Stress (deskriptiv, KEIN VERDIKT)
+
+## Serien
+- `funding_BTCUSDT` (funding_cashflow): status=OK, coverage={'n_days': 892, 'first': '2024-03-01', 'last': '2026-08-13'}
+- `funding_ETHUSDT` (funding_cashflow): status=OK, coverage={'n_days': 894, 'first': '2024-03-01', 'last': '2026-08-13'}
+- `funding_SOLUSDT` (funding_cashflow): status=OK, coverage={'n_days': 139, 'first': '2026-03-26', 'last': '2026-08-13'}
+- `funding_XRPUSDT` (funding_cashflow): status=OK, coverage={'n_days': 139, 'first': '2026-03-26', 'last': '2026-08-13'}
+- `funding_BNBUSDT` (funding_cashflow): status=OK, coverage={'n_days': 139, 'first': '2026-03-26', 'last': '2026-08-13'}
+- `ivrv_BTC` (iv_rv_diff): status=OK, coverage={'n_days': 165, 'first': '2025-08-01', 'last': '2026-07-31'}
+- `ivrv_ETH` (iv_rv_diff): status=OK, coverage={'n_days': 165, 'first': '2025-08-01', 'last': '2026-07-31'}
+- `basis_BTCUSDT` (perp_basis_proxy): status=OK, coverage={'n_days': 61, 'first': '2026-06-16', 'last': '2026-08-29'}
+- `basis_ETHUSDT` (perp_basis_proxy): status=OK, coverage={'n_days': 61, 'first': '2026-06-16', 'last': '2026-08-29'}
+
+## Stress-Kanon
+- STRESS_ABS: n_days=30, n_episodes=19, sha256=b75fb7a08a6d5903...
+
+## Kohaerenz (Spearman, STRESS_ABS vs. Ruhe)
+- funding_BTCUSDT x funding_ETHUSDT (n_overlap=891):
+  - stress: TOO_FEW (n=3)
+  - quiet: rho=0.460, 95%-CI=[0.401, 0.515], n=888 (n_episodes=None), Bonett/Wright-SE=0.036
+- funding_BTCUSDT x funding_SOLUSDT (n_overlap=136):
+  - stress: TOO_FEW (n=0)
+  - quiet: rho=0.391, 95%-CI=[0.229, 0.536], n=136 (n_episodes=None), Bonett/Wright-SE=0.092
+- funding_BTCUSDT x funding_XRPUSDT (n_overlap=136):
+  - stress: TOO_FEW (n=0)
+  - quiet: rho=0.439, 95%-CI=[0.291, 0.578], n=136 (n_episodes=None), Bonett/Wright-SE=0.092
+- funding_BTCUSDT x funding_BNBUSDT (n_overlap=136):
+  - stress: TOO_FEW (n=0)
+  - quiet: rho=0.236, 95%-CI=[0.065, 0.389], n=136 (n_episodes=None), Bonett/Wright-SE=0.092
+- funding_BTCUSDT x ivrv_BTC (n_overlap=163):
+  - stress: TOO_FEW (n=0)
+  - quiet: rho=-0.022, 95%-CI=[-0.169, 0.127], n=163 (n_episodes=None), Bonett/Wright-SE=0.084
+- funding_BTCUSDT x ivrv_ETH (n_overlap=163):
+  - stress: TOO_FEW (n=0)
+  - quiet: rho=0.015, 95%-CI=[-0.141, 0.174], n=163 (n_episodes=None), Bonett/Wright-SE=0.084
+- funding_BTCUSDT x basis_BTCUSDT (n_overlap=42):
+  - stress: TOO_FEW (n=0)
+  - quiet: rho=0.013, 95%-CI=[-0.328, 0.339], n=42 (n_episodes=None), Bonett/Wright-SE=0.170
+- funding_BTCUSDT x basis_ETHUSDT (n_overlap=42):
+  - stress: TOO_FEW (n=0)
+  - quiet: rho=0.187, 95%-CI=[-0.120, 0.486], n=42 (n_episodes=None), Bonett/Wright-SE=0.170
+- funding_ETHUSDT x funding_SOLUSDT (n_overlap=138):
+  - stress: TOO_FEW (n=0)
+  - quiet: rho=0.394, 95%-CI=[0.224, 0.529], n=138 (n_episodes=None), Bonett/Wright-SE=0.091
+- funding_ETHUSDT x funding_XRPUSDT (n_overlap=138):
+  - stress: TOO_FEW (n=0)
+  - quiet: rho=0.465, 95%-CI=[0.308, 0.594], n=138 (n_episodes=None), Bonett/Wright-SE=0.091
+- funding_ETHUSDT x funding_BNBUSDT (n_overlap=138):
+  - stress: TOO_FEW (n=0)
+  - quiet: rho=0.361, 95%-CI=[0.208, 0.495], n=138 (n_episodes=None), Bonett/Wright-SE=0.091
+- funding_ETHUSDT x ivrv_BTC (n_overlap=164):
+  - stress: TOO_FEW (n=0)
+  - quiet: rho=0.075, 95%-CI=[-0.070, 0.217], n=164 (n_episodes=None), Bonett/Wright-SE=0.084
+- funding_ETHUSDT x ivrv_ETH (n_overlap=164):
+  - stress: TOO_FEW (n=0)
+  - quiet: rho=0.065, 95%-CI=[-0.090, 0.209], n=164 (n_episodes=None), Bonett/Wright-SE=0.084
+- funding_ETHUSDT x basis_BTCUSDT (n_overlap=43):
+  - stress: TOO_FEW (n=0)
+  - quiet: rho=0.118, 95%-CI=[-0.204, 0.423], n=43 (n_episodes=None), Bonett/Wright-SE=0.168
+- funding_ETHUSDT x basis_ETHUSDT (n_overlap=43):
+  - stress: TOO_FEW (n=0)
+  - quiet: rho=-0.118, 95%-CI=[-0.402, 0.192], n=43 (n_episodes=None), Bonett/Wright-SE=0.168
+- funding_SOLUSDT x funding_XRPUSDT (n_overlap=138):
+  - stress: TOO_FEW (n=0)
+  - quiet: rho=0.509, 95%-CI=[0.360, 0.624], n=138 (n_episodes=None), Bonett/Wright-SE=0.091
+- funding_SOLUSDT x funding_BNBUSDT (n_overlap=138):
+  - stress: TOO_FEW (n=0)
+  - quiet: rho=0.389, 95%-CI=[0.219, 0.533], n=138 (n_episodes=None), Bonett/Wright-SE=0.091
+- funding_SOLUSDT x ivrv_BTC (n_overlap=127):
+  - stress: TOO_FEW (n=0)
+  - quiet: rho=0.038, 95%-CI=[-0.141, 0.210], n=127 (n_episodes=None), Bonett/Wright-SE=0.095
+- funding_SOLUSDT x ivrv_ETH (n_overlap=127):
+  - stress: TOO_FEW (n=0)
+  - quiet: rho=0.043, 95%-CI=[-0.127, 0.204], n=127 (n_episodes=None), Bonett/Wright-SE=0.095
+- funding_SOLUSDT x basis_BTCUSDT (n_overlap=43):
+  - stress: TOO_FEW (n=0)
+  - quiet: rho=-0.129, 95%-CI=[-0.437, 0.184], n=43 (n_episodes=None), Bonett/Wright-SE=0.168
+- funding_SOLUSDT x basis_ETHUSDT (n_overlap=43):
+  - stress: TOO_FEW (n=0)
+  - quiet: rho=0.039, 95%-CI=[-0.212, 0.303], n=43 (n_episodes=None), Bonett/Wright-SE=0.168
+- funding_XRPUSDT x funding_BNBUSDT (n_overlap=138):
+  - stress: TOO_FEW (n=0)
+  - quiet: rho=0.423, 95%-CI=[0.285, 0.542], n=138 (n_episodes=None), Bonett/Wright-SE=0.091
+- funding_XRPUSDT x ivrv_BTC (n_overlap=127):
+  - stress: TOO_FEW (n=0)
+  - quiet: rho=0.084, 95%-CI=[-0.065, 0.258], n=127 (n_episodes=None), Bonett/Wright-SE=0.095
+- funding_XRPUSDT x ivrv_ETH (n_overlap=127):
+  - stress: TOO_FEW (n=0)
+  - quiet: rho=0.080, 95%-CI=[-0.075, 0.242], n=127 (n_episodes=None), Bonett/Wright-SE=0.095
+- funding_XRPUSDT x basis_BTCUSDT (n_overlap=43):
+  - stress: TOO_FEW (n=0)
+  - quiet: rho=-0.034, 95%-CI=[-0.371, 0.274], n=43 (n_episodes=None), Bonett/Wright-SE=0.168
+- funding_XRPUSDT x basis_ETHUSDT (n_overlap=43):
+  - stress: TOO_FEW (n=0)
+  - quiet: rho=-0.330, 95%-CI=[-0.580, -0.033], n=43 (n_episodes=None), Bonett/Wright-SE=0.168
+- funding_BNBUSDT x ivrv_BTC (n_overlap=127):
+  - stress: TOO_FEW (n=0)
+  - quiet: rho=0.060, 95%-CI=[-0.108, 0.243], n=127 (n_episodes=None), Bonett/Wright-SE=0.095
+- funding_BNBUSDT x ivrv_ETH (n_overlap=127):
+  - stress: TOO_FEW (n=0)
+  - quiet: rho=0.045, 95%-CI=[-0.134, 0.221], n=127 (n_episodes=None), Bonett/Wright-SE=0.095
+- funding_BNBUSDT x basis_BTCUSDT (n_overlap=43):
+  - stress: TOO_FEW (n=0)
+  - quiet: rho=-0.034, 95%-CI=[-0.348, 0.281], n=43 (n_episodes=None), Bonett/Wright-SE=0.168
+- funding_BNBUSDT x basis_ETHUSDT (n_overlap=43):
+  - stress: TOO_FEW (n=0)
+  - quiet: rho=-0.124, 95%-CI=[-0.422, 0.184], n=43 (n_episodes=None), Bonett/Wright-SE=0.168
+- ivrv_BTC x ivrv_ETH (n_overlap=164):
+  - stress: TOO_FEW (n=0)
+  - quiet: rho=0.907, 95%-CI=[0.859, 0.940], n=164 (n_episodes=None), Bonett/Wright-SE=0.084
+- ivrv_BTC x basis_BTCUSDT (n_overlap=33):
+  - stress: TOO_FEW (n=0)
+  - quiet: rho=0.125, 95%-CI=[-0.295, 0.505], n=33 (n_episodes=None), Bonett/Wright-SE=0.194
+- ivrv_BTC x basis_ETHUSDT (n_overlap=33):
+  - stress: TOO_FEW (n=0)
+  - quiet: rho=-0.173, 95%-CI=[-0.547, 0.220], n=33 (n_episodes=None), Bonett/Wright-SE=0.194
+- ivrv_ETH x basis_BTCUSDT (n_overlap=33):
+  - stress: TOO_FEW (n=0)
+  - quiet: rho=0.016, 95%-CI=[-0.364, 0.393], n=33 (n_episodes=None), Bonett/Wright-SE=0.194
+- ivrv_ETH x basis_ETHUSDT (n_overlap=33):
+  - stress: TOO_FEW (n=0)
+  - quiet: rho=-0.125, 95%-CI=[-0.505, 0.302], n=33 (n_episodes=None), Bonett/Wright-SE=0.194
+- basis_BTCUSDT x basis_ETHUSDT (n_overlap=60):
+  - stress: TOO_FEW (n=1)
+  - quiet: rho=0.335, 95%-CI=[0.073, 0.568], n=59 (n_episodes=None), Bonett/Wright-SE=0.142
+
+## Portfolio-Nulleffekt (Konstanten, keine Schwelle)
+### Gleichgewichtungs-Null (k=2..5, Diversifikation)
+- k=2: mean_Sharpe=0.0251, sd=0.4034, p95=0.6645, p99=0.9118, n_bootstrap=1000, seed=53
+- k=3: mean_Sharpe=-0.0311, sd=0.4084, p95=0.6287, p99=0.9701, n_bootstrap=1000, seed=53
+- k=4: mean_Sharpe=-0.0152, sd=0.4100, p95=0.6481, p99=0.9731, n_bootstrap=1000, seed=53
+- k=5: mean_Sharpe=-0.0178, sd=0.4124, p95=0.6618, p99=0.9520, n_bootstrap=1000, seed=53
+### Selektions-Obergrenze (K=5..100, Bailey/Lopez de Prado)
+- sigma_SR=0.3984 (Pool=5000, seed=53)
+- K=5: E[max]_empirisch=0.4637, E[max]_Bailey/LdP=0.4752 (n_groups=1000)
+- K=10: E[max]_empirisch=0.6141, E[max]_Bailey/LdP=0.6274 (n_groups=500)
+- K=20: E[max]_empirisch=0.7384, E[max]_Bailey/LdP=0.7573 (n_groups=250)
+- K=50: E[max]_empirisch=0.8830, E[max]_Bailey/LdP=0.9069 (n_groups=100)
+- K=100: E[max]_empirisch=0.9693, E[max]_Bailey/LdP=1.0083 (n_groups=50)
+
+## DEC-53-Artefakte
+- funding_BTCUSDT: E:\Claude\Projects\scinance\scinance3-impl\state\wp10a_20260909\wp10a_funding_BTCUSDT_daily.csv (n=892, sha256=46a7ad4096ae91d0...)
+- funding_ETHUSDT: E:\Claude\Projects\scinance\scinance3-impl\state\wp10a_20260909\wp10a_funding_ETHUSDT_daily.csv (n=894, sha256=8aadeb75777ef5de...)
+- funding_SOLUSDT: E:\Claude\Projects\scinance\scinance3-impl\state\wp10a_20260909\wp10a_funding_SOLUSDT_daily.csv (n=139, sha256=2b2ece2725f38a31...)
+- funding_XRPUSDT: E:\Claude\Projects\scinance\scinance3-impl\state\wp10a_20260909\wp10a_funding_XRPUSDT_daily.csv (n=139, sha256=5f983962366aec83...)
+- funding_BNBUSDT: E:\Claude\Projects\scinance\scinance3-impl\state\wp10a_20260909\wp10a_funding_BNBUSDT_daily.csv (n=139, sha256=e54b740001b0bc5e...)
+- ivrv_BTC: E:\Claude\Projects\scinance\scinance3-impl\state\wp10a_20260909\wp10a_ivrv_BTC_daily.csv (n=165, sha256=e3abb5f272a9256d...)
+- ivrv_ETH: E:\Claude\Projects\scinance\scinance3-impl\state\wp10a_20260909\wp10a_ivrv_ETH_daily.csv (n=165, sha256=27dbf300a7a0da0b...)
+- basis_BTCUSDT: E:\Claude\Projects\scinance\scinance3-impl\state\wp10a_20260909\wp10a_basis_BTCUSDT_daily.csv (n=61, sha256=1d15006e09c37747...)
+- basis_ETHUSDT: E:\Claude\Projects\scinance\scinance3-impl\state\wp10a_20260909\wp10a_basis_ETHUSDT_daily.csv (n=61, sha256=3b945da43de3df59...)
+- Bootstrap-Fingerprint: E:\Claude\Projects\scinance\scinance3-impl\state\wp10a_20260909\wp10a_coherence_bootstrap_fingerprint.json (41 Eintraege, sha256=afee62e737058231...)
+
+(Seed dieses Laufs: 53. Teil A ist deskriptiv -- kein PASS/FAIL, keine rho-Schwelle.)

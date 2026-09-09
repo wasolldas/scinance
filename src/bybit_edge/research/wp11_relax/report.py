@@ -223,7 +223,7 @@ def render_markdown(summary: dict[str, Any]) -> str:
     L.append("| Symbol | Variable | Events | Tage | KEIN BEFUND | T_half (h) | KI90 | R^2 (exp) | p (Potenzgesetz) |")
     L.append("|---|---|---:|---:|:---:|---:|---|---:|---:|")
     for c in summary["pre_fixed"]["median_half_life_per_symbol"]:
-        L.append(_profile_half_life_row(f"{c['symbol']}", c))
+        L.append(_profile_half_life_row(f"{c['symbol']} | {c['variable']}", c))
     L.append("")
 
     L.append("## (ii) RECOVERY_H_P90 (STRESS_ABS, Kostenmodell-Konstante, v2: Profil-Replikate)")
@@ -251,7 +251,7 @@ def render_markdown(summary: dict[str, Any]) -> str:
     L.append("| Aera | Variable | Events | Tage | KEIN BEFUND | T_half (h) | KI90 | R^2 (exp) | p (Potenzgesetz) |")
     L.append("|---|---|---:|---:|:---:|---:|---|---:|---:|")
     for c in summary["pre_fixed"]["era_invariance_descriptive"]:
-        L.append(_profile_half_life_row(f"{c['era']}", c))
+        L.append(_profile_half_life_row(f"{c['era']} | {c['variable']}", c))
     L.append("")
     L.append("*(iii) ist rein deskriptiv: KEIN PASS/FAIL, KEINE Schwelle -- Auflage PRD 11.3.*")
     L.append("")

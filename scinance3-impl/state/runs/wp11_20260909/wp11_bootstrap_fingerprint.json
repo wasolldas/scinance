@@ -1,0 +1,7 @@
+{
+  "generator": "numpy.random.default_rng",
+  "min_event_clusters": 30,
+  "n_bootstrap_reps": 1000,
+  "profile_n_bootstrap": 1000,
+  "seed": 42
+}

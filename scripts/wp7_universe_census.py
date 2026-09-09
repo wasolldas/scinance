@@ -86,6 +86,7 @@ def cmd_fetch(a: argparse.Namespace) -> int:
     manifest = Path(a.panel_base) / "panel_manifest.sqlite"
     from datetime import datetime, timezone
     as_of = datetime.now(timezone.utc).date()
+    n_skipped = 0
     for symbol in symbols:
         # Nacharbeit #3: listing_date from the real launchTime, not year
         # start -- a symbol with no usable launchTime (pre-launchTime-era
@@ -104,6 +105,19 @@ def cmd_fetch(a: argparse.Namespace) -> int:
                 continue
             start_ms = int(datetime(y0.year, y0.month, y0.day, tzinfo=timezone.utc).timestamp() * 1000)
             end_ms = int(datetime(y1.year, y1.month, y1.day, tzinfo=timezone.utc).timestamp() * 1000) + 86_399_999
+            frozen = year < as_of.year
+            # Resume: a repeated/interrupted --fetch must never fail on its
+            # own frozen DONE partitions (they are immutable AND complete)
+            # -- skip them without network; rebuild only PARTIAL/FAILED
+            # frozen years (the sole sanctioned overwrite of a frozen file).
+            action = panel_store.resume_action(a.panel_base, manifest, symbol, year, frozen=frozen)
+            if action == "SKIP":
+                n_skipped += 1
+                continue
+            allow_overwrite = action == "REBUILD"
+            if allow_overwrite:
+                print(f"{symbol}/{year}: eingefrorene Partition unvollstaendig "
+                      "(PARTIAL/FAILED) -- wird neu gezogen (audited rebuild)")
             try:
                 kl = bybit_rest.fetch_kline_symbol(symbol, start_ms, end_ms, category=a.category)
             except Exception as exc:  # noqa: BLE001
@@ -124,11 +138,14 @@ def cmd_fetch(a: argparse.Namespace) -> int:
                       "funding_n/funding_sum bleiben None fuer dieses Jahr",
                       file=sys.stderr)
 
-            frozen = year < as_of.year
             res = panel_store.write_year_partition(
                 a.panel_base, manifest, symbol, year, rows,
-                listing_date=listing, as_of_date=as_of, frozen=frozen)
+                listing_date=listing, as_of_date=as_of, frozen=frozen,
+                allow_overwrite=allow_overwrite)
             print(f"{symbol}/{year}: {res['status']} ({res['n_rows']}/{res['expected_days']})")
+    if n_skipped:
+        print(f"Resume: {n_skipped} eingefrorene DONE/EMPTY-Partitionen "
+              "uebersprungen (unveraendert, kein Netz).")
     return 0
 
 

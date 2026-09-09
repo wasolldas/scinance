@@ -38,6 +38,7 @@ __all__ = [
     "SCHEMA_VERSION", "PANEL_COLUMNS", "PanelStoreError",
     "partition_path", "expected_days_in_year", "write_year_partition",
     "open_manifest", "manifest_get", "manifest_status_counts",
+    "resume_action",
     "require_all_done", "panel_fingerprint", "range_fingerprint",
     "reverify_sample", "daily_funding_stats", "merge_funding_daily",
     "listing_date_from_launch_time",
@@ -297,6 +298,38 @@ def manifest_get(manifest_path: Path | str, symbol: str, year: int) -> dict[str,
     keys = ("symbol", "year", "status", "n_rows", "expected_days", "sha256",
             "frozen", "updated_at", "failure_reason")
     return dict(zip(keys, row))
+
+
+def resume_action(base_dir: Path | str, manifest_path: Path | str,
+                  symbol: str, year: int, *, frozen: bool) -> str:
+    """What a (re-)run of ``--fetch`` should do with ``(symbol, year)``.
+
+    Returns one of
+      ``"SKIP"``    -- frozen year, partition file present, manifest says
+                       DONE or EMPTY: immutable and complete, no network,
+                       no write (the resume case after an interrupted or
+                       repeated run -- a second ``--fetch`` must never
+                       trip over its own first run).
+      ``"REBUILD"`` -- frozen year, partition file present, but the
+                       manifest says PARTIAL/FAILED (or has no row): the
+                       first attempt was incomplete, so the year is
+                       fetched again and written with ``allow_overwrite``
+                       -- the only sanctioned overwrite of a frozen file.
+      ``"WRITE"``   -- everything else (no file yet, or the still-open
+                       current year, which is rewritten on every run).
+    Pure bookkeeping, no I/O beyond a stat + a read-only manifest lookup.
+    """
+    if not frozen:
+        return "WRITE"
+    path = partition_path(base_dir, symbol, year, frozen=True)
+    if not path.is_file():
+        return "WRITE"
+    if not Path(manifest_path).is_file():
+        return "REBUILD"
+    row = manifest_get(manifest_path, symbol, year)
+    if row is not None and row["status"] in ("DONE", "EMPTY") and row["frozen"]:
+        return "SKIP"
+    return "REBUILD"
 
 
 def manifest_status_counts(manifest_path: Path | str) -> dict[str, int]:
