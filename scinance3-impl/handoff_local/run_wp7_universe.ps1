@@ -28,7 +28,8 @@ param(
     [string]$CorrStart = "",
     [string]$CorrEnd = "",
     [string]$OutDir = "",
-    [switch]$SkipFetch
+    [switch]$SkipFetch,
+    [switch]$AllowPartial
 )
 
 $ErrorActionPreference = "Stop"
@@ -73,8 +74,14 @@ if ($CorrStart -eq "") { $CorrStart = (Get-Date).AddMonths(-24).ToString("yyyy-M
 
 Write-Host ""
 Write-Host "=== WP-7 Schritt 3: Zensus -> $OutDir (rho-Fenster $CorrStart..$CorrEnd) ==="
+# -AllowPartial: nur wenn der Zensus wegen PARTIAL/FAILED-Partitionen laut
+# abbricht (Ausgabe hochladen!) -- der Report traegt dann das Etikett
+# "nicht urteilstragend". Nie stillschweigend als Default.
+$partialArgs = @()
+if ($AllowPartial) { $partialArgs = @("--allow-partial") }
 python scripts\wp7_universe_census.py --census --panel-base $PanelBase --out $OutDir `
-    --bar-cache-dir $BarCacheDir --corr-start $CorrStart --corr-end $CorrEnd
+    --bar-cache-dir $BarCacheDir --corr-start $CorrStart --corr-end $CorrEnd `
+    --harvest-base $HarvestBase --dates $Dates @partialArgs
 $rc = $LASTEXITCODE
 
 Write-Host ""

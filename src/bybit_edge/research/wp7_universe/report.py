@@ -184,7 +184,115 @@ def _to_markdown(report: dict[str, Any]) -> str:
                   f"- Spearman: {pc['spearman']['point']:.4f} "
                   f"[{pc['spearman']['ci_lo']:.4f}, {pc['spearman']['ci_hi']:.4f}]",
                   f"- n_aligned_buckets: {pc['n_aligned_buckets']}", ""]
+
+    lines += _extra_sections_markdown(report.get("extra") or {})
     return "\n".join(lines) + "\n"
+
+
+def _fmt(v: Any, nd: int = 4) -> str:
+    if v is None:
+        return "n/a"
+    if isinstance(v, float):
+        return "n/a" if v != v else f"{v:.{nd}f}"  # v != v -> NaN
+    return str(v)
+
+
+def _extra_sections_markdown(extra: dict[str, Any]) -> list[str]:
+    """Full-census sections (``scripts/wp7_universe_census.py::cmd_census``)
+    -- all descriptive, no verdict; every block says so explicitly. Absent
+    when ``extra`` does not carry the corresponding key (e.g. the old
+    rho-only invocation, or a test that only exercises B1..B5)."""
+    lines: list[str] = []
+
+    if not extra.get("judgement_bearing", True):
+        lines += ["## Hinweis: NICHT urteilstragend",
+                   f"{extra.get('label', '')} -- PARTIAL/FAILED-Partitionen "
+                   "unter --allow-partial akzeptiert; dieser Report ersetzt keinen "
+                   "vollstaendigen Lauf.", ""]
+
+    if "k_per_week" in extra:
+        k = extra["k_per_week"]
+        lines += ["## K je Kalenderwoche",
+                   f"- min={_fmt(k.get('min'), 0)} median={_fmt(k.get('median'))} "
+                   f"max={_fmt(k.get('max'), 0)} (n_weeks={k.get('n_weeks')})",
+                   f"- erste/letzte Woche mit Mitgliedern: "
+                   f"{k.get('first_week_with_members')} .. {k.get('last_week_with_members')}", ""]
+        sens = extra.get("k_per_week_sensitivity") or {}
+        if sens:
+            lines.append("Sensitivitaet MIN_WEEKS_HISTORY (4/12 Wochen, nur berichtet, kein Urteil):")
+            for label, s in sens.items():
+                lines.append(f"- {label}: min={_fmt(s.get('min'), 0)} "
+                              f"median={_fmt(s.get('median'))} max={_fmt(s.get('max'), 0)}")
+            lines.append("")
+
+    if "n_eff_full" in extra:
+        nf = extra["n_eff_full"]
+        lines += [f"## {nf.get('label')} -- volle Historie",
+                   f"- Wert: {_fmt(nf.get('n_eff'))} "
+                   f"(n_symbols_balanced={nf.get('n_symbols_balanced')})", ""]
+    if "n_eff_stress_abs_weeks" in extra:
+        ns = extra["n_eff_stress_abs_weeks"]
+        si = ns.get("stress_info", {})
+        if si.get("available"):
+            lines += [f"## {ns.get('label')}",
+                       f"- Wert: {_fmt(ns.get('n_eff'))} "
+                       f"(n_symbols_balanced={ns.get('n_symbols_balanced')}, "
+                       f"n_stress_wochen={si.get('n_stress_weeks_in_panel')})", ""]
+        else:
+            lines += ["## N_eff im STRESS_ABS-Fenster (DEC-62)",
+                       f"nicht verfuegbar: {si.get('note', 'STRESS_ABS-Fixture fehlt')}", ""]
+
+    if "deadzone_census_dec59" in extra:
+        dz = extra["deadzone_census_dec59"]
+        lines += ["## DEC-59: Totzonen-/Bindungs-Zensus (deskriptiv, kein Urteil)",
+                   f"- Anteil Symbol-Tage exakt bei I: {_fmt(dz.get('overall_share'))} "
+                   f"({dz.get('n_deadzone_symbol_days')}/{dz.get('n_symbol_days_with_funding')})",
+                   "- Intervallklassen (funding_n-abgeleitet):"]
+        for label, n in sorted((dz.get("interval_class_counts") or {}).items()):
+            lines.append(f"  - {label}: {n}")
+        lines.append("- je Dezil (Wochen-SUMME-Sortierschluessel, DEC-59):")
+        for d in dz.get("by_decile", []):
+            lines.append(f"  - Dezil {d['decile']}: Totzonen-Anteil={_fmt(d.get('deadzone_share'))} "
+                          f"(n_symbol_wochen={d.get('n_symbol_weeks')})")
+        lines.append("")
+
+    if "funding_autocorrelation_dec58" in extra:
+        fa = extra["funding_autocorrelation_dec58"]
+        lines += ["## Funding-Autokorrelation (Wochen-SUMME, Median ueber Symbole, deskriptiv)"]
+        for lag, v in (fa.get("median_autocorr") or {}).items():
+            lines.append(f"- {lag}: {_fmt(v)}")
+        lines.append(f"(n_symbols_used={fa.get('n_symbols_used')} von {fa.get('n_symbols_total')})")
+        lines.append("")
+
+    if "delisting_cohorts_dec58g" in extra:
+        lines += ["## DEC-58(g): Delisting-Hazard \"Beifahrer\" je Listing-Jahrgang (deskriptiv, kein Modell)",
+                   "| Jahrgang | gelistet | delistet |", "|---|---|---|"]
+        for c in extra["delisting_cohorts_dec58g"]:
+            lines.append(f"| {c['listing_year']} | {c['n_listed']} | {c['n_delisted']} |")
+        lines.append("")
+
+    if "spread_census_source" in extra:
+        lines += ["## PERP_SPREAD_BP -- Quelle", f"- {extra['spread_census_source']}", ""]
+
+    if "cost_bps_round_trip_taker" in extra:
+        c = extra["cost_bps_round_trip_taker"]
+        lines += ["## Kostenkonstante (B4)", f"- {c.get('label')}: {_fmt(c.get('value'), 2)} bp "
+                   f"(Quelle: {c.get('source')})", ""]
+
+    if "artifacts" in extra:
+        lines += ["## DEC-53-Artefakte"]
+        for name, art in extra["artifacts"].items():
+            if isinstance(art, dict) and "sha256" in art:
+                lines.append(f"- {name}: {art.get('path')} (sha256={art['sha256']})")
+        lines.append("")
+
+    if "range_fingerprint" in extra:
+        rf = extra["range_fingerprint"]
+        lines += ["## Range-Fingerprint (panel_1d)",
+                   f"- sha256={rf.get('sha256')} (n_partitions={rf.get('n_partitions')}, "
+                   f"Jahre={rf.get('year_range')})", ""]
+
+    return lines
 
 
 def write_report(out_dir: Path | str, report: dict[str, Any]) -> dict[str, str]:
