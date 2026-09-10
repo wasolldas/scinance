@@ -27,7 +27,8 @@ param(
     [double]$AdvSelHorizonS = 60.0,
     [double]$QuoteSizeFraction = 0.1,
     [int]$Seed = 53,
-    [int]$NBootstrap = 1000
+    [int]$NBootstrap = 1000,
+    [switch]$NoResume
 )
 
 $ErrorActionPreference = "Stop"
@@ -63,10 +64,16 @@ if ($probeRc -ne 0) {
 
 Write-Host ""
 Write-Host "=== WP-10(B) Schritt 3: Run -> $ReportDir ==="
-python scripts\wp10_fillshadow.py --run --base $HarvestBase --out $StoreOut --symbols $Symbols `
-    --dates "$Start..$End" --stress-canon $StressCanonDir --report-dir $ReportDir `
-    --horizon-s $HorizonS --adv-sel-horizon-s $AdvSelHorizonS `
-    --quote-size-fraction $QuoteSizeFraction --seed $Seed --n-bootstrap $NBootstrap
+$runArgs = @(
+    "--run", "--base", $HarvestBase, "--out", $StoreOut, "--symbols", $Symbols,
+    "--dates", "$Start..$End", "--stress-canon", $StressCanonDir, "--report-dir", $ReportDir,
+    "--horizon-s", $HorizonS, "--adv-sel-horizon-s", $AdvSelHorizonS,
+    "--quote-size-fraction", $QuoteSizeFraction, "--seed", $Seed, "--n-bootstrap", $NBootstrap
+)
+if ($NoResume) {
+    $runArgs += "--no-resume"
+}
+python scripts\wp10_fillshadow.py @runArgs
 $rc = $LASTEXITCODE
 
 Write-Host ""

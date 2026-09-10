@@ -42,6 +42,7 @@ from __future__ import annotations
 import bisect
 import hashlib
 import json
+import time
 from datetime import date, timedelta
 from pathlib import Path
 from typing import Any
@@ -154,23 +155,33 @@ def _trades_sql(glob: str) -> str:
     """
 
 
+def _load_trades_for_day(con: Any, trade_dir: Path, day: str) -> list[tuple[int, str, float, float]]:
+    """One day's ``publicTrade`` rows, ts-ascending (query already orders
+    by ``ts``). Factored out of ``_load_trades`` so the streaming driver
+    can load exactly one day at a time, in lockstep with the book replay,
+    without ever holding more than a few days of trades in memory."""
+    rows: list[tuple[int, str, float, float]] = []
+    if not list((trade_dir / f"date={day}").glob("*.parquet")):
+        return rows
+    glob = (trade_dir / f"date={day}" / "*.parquet").as_posix()
+    cur = con.execute(_trades_sql(glob))
+    while True:
+        chunk = cur.fetchmany(20_000)
+        if not chunk:
+            break
+        for ts, side, px, sz in chunk:
+            if ts is None or side not in ("buy", "sell") or px is None or sz is None:
+                continue
+            if sz <= 0.0 or px <= 0.0:
+                continue
+            rows.append((int(ts), side, float(px), float(sz)))
+    return rows
+
+
 def _load_trades(con: Any, trade_dir: Path, days: list[str]) -> list[tuple[int, str, float, float]]:
     rows: list[tuple[int, str, float, float]] = []
     for day in days:
-        glob = (trade_dir / f"date={day}" / "*.parquet").as_posix()
-        if not list((trade_dir / f"date={day}").glob("*.parquet")):
-            continue
-        cur = con.execute(_trades_sql(glob))
-        while True:
-            chunk = cur.fetchmany(20_000)
-            if not chunk:
-                break
-            for ts, side, px, sz in chunk:
-                if ts is None or side not in ("buy", "sell") or px is None or sz is None:
-                    continue
-                if sz <= 0.0 or px <= 0.0:
-                    continue
-                rows.append((int(ts), side, float(px), float(sz)))
+        rows.extend(_load_trades_for_day(con, trade_dir, day))
     rows.sort(key=lambda r: r[0])
     return rows
 
@@ -179,6 +190,63 @@ def _load_trades(con: Any, trade_dir: Path, days: list[str]) -> list[tuple[int, 
 # orderbook replay -> global touch-sample arrays (WP-2/WP-4 machinery reused)
 # ----------------------------------------------------------------------------
 
+def _replay_one_day(
+    con: Any, ob_dir: Path, day: str, book: Book, *,
+    ts_a: list[int], bid_px_a: list[float], bid_sz_a: list[float],
+    ask_px_a: list[float], ask_sz_a: list[float], max_breaks: int,
+) -> dict[str, Any]:
+    """Replay ONE day's raw orderbook records, mutating ``book`` (carries
+    across days, exactly the WP-2/WP-4 discipline) and APPENDING this
+    day's touch samples to the five parallel arrays (also mutated in
+    place) -- the single per-day unit shared by both the legacy
+    whole-window replay (``_replay_touch_samples``) and the streaming
+    driver (``run_window``), so the two can never silently diverge.
+
+    Returns this day's own ``{"status", "reason", "n_breaks",
+    "n_snapshots", "reset_book"}`` -- ``reset_book`` tells the CALLER
+    whether the break-budget was exceeded (the book must not be trusted
+    going forward; the caller replaces it with a fresh ``Book()``, since a
+    plain object cannot rebind its caller's reference)."""
+    if not list((ob_dir / f"date={day}").glob("*.parquet")):
+        return {"status": "no_raw", "reason": "", "n_breaks": 0, "n_snapshots": 0,
+                "reset_book": False}
+    n_breaks = 0
+    n_snaps = 0
+    any_sample = False
+    for ts, rec, _u in _day_records(con, ob_dir, day):
+        rtype, b, a, u = _rec_parts(rec)
+        if rtype == "snapshot":
+            n_snaps += 1
+            if book.valid and not book.matches_snapshot(b, a):
+                n_breaks += 1
+            book.apply_snapshot(b, a, u)
+        elif rtype == "delta":
+            if book.valid and not book.apply_delta(b, a, u):
+                n_breaks += 1
+        else:
+            continue
+        if book.valid and book.bids and book.asks:
+            bid_key = max(book.bids, key=lambda p: float(p))
+            ask_key = min(book.asks, key=lambda p: float(p))
+            bb, bsz = float(bid_key), book.bids[bid_key]
+            aa, asz = float(ask_key), book.asks[ask_key]
+            if bb > 0.0 and aa >= bb * 0.5 and aa > 0.0:
+                ts_a.append(ts)
+                bid_px_a.append(bb)
+                bid_sz_a.append(bsz)
+                ask_px_a.append(aa)
+                ask_sz_a.append(asz)
+                any_sample = True
+    if n_breaks > max_breaks:
+        return {"status": "discarded", "reason": f"{n_breaks} sequence breaks > {max_breaks}",
+                "n_breaks": n_breaks, "n_snapshots": n_snaps, "reset_book": True}
+    if n_snaps == 0 and not any_sample:
+        return {"status": "discarded", "reason": "no snapshot and no valid state",
+                "n_breaks": n_breaks, "n_snapshots": n_snaps, "reset_book": False}
+    return {"status": "ok", "reason": "", "n_breaks": n_breaks, "n_snapshots": n_snaps,
+            "reset_book": False}
+
+
 def _replay_touch_samples(
     con: Any, ob_dir: Path, days: list[str], *, max_breaks: int,
 ) -> tuple[dict[str, dict[str, Any]], list[int], list[float], list[float], list[float], list[float]]:
@@ -186,7 +254,11 @@ def _replay_touch_samples(
     discipline). Returns ``(day_meta, ts, bid_px, bid_sz, ask_px, ask_sz)``
     -- five parallel arrays, one entry per orderbook record where the book
     was valid with both sides non-empty (used for BOTH the quote's own
-    side and, via mid, the adverse-selection lookup)."""
+    side and, via mid, the adverse-selection lookup).
+
+    Kept ONLY as the whole-window (non-streaming, non-resumable)
+    reference path -- ``_run_window_full_replay`` below uses it, and
+    nothing else does; ``run_window`` itself is the streaming driver."""
     book = Book()
     ts_a: list[int] = []
     bid_px_a: list[float] = []
@@ -196,45 +268,12 @@ def _replay_touch_samples(
     day_meta: dict[str, dict[str, Any]] = {}
 
     for day in days:
-        if not list((ob_dir / f"date={day}").glob("*.parquet")):
-            day_meta[day] = {"status": "no_raw", "n_breaks": 0, "n_snapshots": 0}
-            continue
-        n_breaks = 0
-        n_snaps = 0
-        any_sample = False
-        for ts, rec, _u in _day_records(con, ob_dir, day):
-            rtype, b, a, u = _rec_parts(rec)
-            if rtype == "snapshot":
-                n_snaps += 1
-                if book.valid and not book.matches_snapshot(b, a):
-                    n_breaks += 1
-                book.apply_snapshot(b, a, u)
-            elif rtype == "delta":
-                if book.valid and not book.apply_delta(b, a, u):
-                    n_breaks += 1
-            else:
-                continue
-            if book.valid and book.bids and book.asks:
-                bid_key = max(book.bids, key=lambda p: float(p))
-                ask_key = min(book.asks, key=lambda p: float(p))
-                bb, bsz = float(bid_key), book.bids[bid_key]
-                aa, asz = float(ask_key), book.asks[ask_key]
-                if bb > 0.0 and aa >= bb * 0.5 and aa > 0.0:
-                    ts_a.append(ts)
-                    bid_px_a.append(bb)
-                    bid_sz_a.append(bsz)
-                    ask_px_a.append(aa)
-                    ask_sz_a.append(asz)
-                    any_sample = True
-        if n_breaks > max_breaks:
-            status, reason = "discarded", f"{n_breaks} sequence breaks > {max_breaks}"
+        meta = _replay_one_day(con, ob_dir, day, book, ts_a=ts_a, bid_px_a=bid_px_a,
+                               bid_sz_a=bid_sz_a, ask_px_a=ask_px_a, ask_sz_a=ask_sz_a,
+                               max_breaks=max_breaks)
+        if meta.pop("reset_book", False):
             book = Book()
-        elif n_snaps == 0 and not any_sample:
-            status, reason = "discarded", "no snapshot and no valid state"
-        else:
-            status, reason = "ok", ""
-        day_meta[day] = {"status": status, "reason": reason,
-                         "n_breaks": n_breaks, "n_snapshots": n_snaps}
+        day_meta[day] = meta
     return day_meta, ts_a, bid_px_a, bid_sz_a, ask_px_a, ask_sz_a
 
 
@@ -361,10 +400,10 @@ def _write_day(out_dir: Path, exchange: str, symbol: str, day: str,
 
 
 # ----------------------------------------------------------------------------
-# window driver
+# window driver -- legacy whole-window reference path (test-only)
 # ----------------------------------------------------------------------------
 
-def run_window(
+def _run_window_full_replay(
     base_dir: Path | str, out_dir: Path | str, symbol: str, start: str, end: str,
     *, exchange: str = "bybit", orderbook_stream: str = "orderbook",
     trade_stream: str = "publicTrade", max_breaks: int = MAX_BREAKS_PER_DAY,
@@ -373,19 +412,14 @@ def run_window(
     quote_size_fraction: float = DEFAULT_QUOTE_SIZE_FRACTION,
     require_manifest_done: bool = True, progress: Any = None,
 ) -> dict[str, Any]:
-    """One deterministic pass over ``[start, end]``: replay the book
-    (WP-2/WP-4 machinery), join trades, place+evaluate one hypothetical
-    bid and one ask quote per minute boundary of every eligible day, and
-    write the ``fillshadow_1min`` store (own path, never touching
-    ``tilt_1min``/``spread_1min``).
-
-    A day is ELIGIBLE for quote placement only when its L2 replay is
-    "ok" (break budget respected, first snapshot seen) AND -- when
-    ``require_manifest_done`` -- the harvest manifest marks BOTH the
-    orderbook and publicTrade partitions DONE for that day. Ineligible
-    days get an explicit ``status`` in their manifest and zero quotes;
-    never silently skipped.
-    """
+    """PRE-STREAMING reference implementation of ``run_window``: replays
+    the ENTIRE ``[start, end]`` window (all touch samples + all trades)
+    into memory BEFORE evaluating or writing a single day. Kept ONLY so
+    ``test_wp10_fillshadow.py`` can assert the streaming ``run_window``
+    below produces byte-identical per-day output (``sha256_values``) and
+    identical summary counts on a synthetic multi-day fixture -- never
+    call this from production code (the whole point of the streaming
+    rewrite is to avoid exactly this memory profile)."""
     import duckdb
 
     base, out = Path(base_dir), Path(out_dir)
@@ -446,6 +480,287 @@ def run_window(
         total_prorata_filled += written["n_prorata_filled"]
         if progress is not None:
             progress(symbol, {"day": day, "status": status, "n_quotes": written["n_quotes"]})
+
+    return {
+        "symbol": symbol, "exchange": exchange, "range": [start, end],
+        "days_in_range": len(days), **counts,
+        "n_quotes_total": total_quotes,
+        "n_fifo_filled_total": total_fifo_filled,
+        "n_prorata_filled_total": total_prorata_filled,
+        "horizon_s": horizon_s, "adv_sel_horizon_s": adv_sel_horizon_s,
+        "quote_size_fraction": quote_size_fraction,
+    }
+
+
+# ----------------------------------------------------------------------------
+# window driver -- streaming + resumable
+# ----------------------------------------------------------------------------
+
+def _resumable_meta(part_dir: Path, *, schema_version: int, horizon_s: float,
+                    adv_sel_horizon_s: float, quote_size_fraction: float) -> dict[str, Any] | None:
+    """The stored ``manifest.json`` at ``part_dir`` when it represents a
+    COMPLETE, parameter-matching WP-10(B) day partition that ``run_window``
+    may trust instead of recomputing -- ``None`` when there is nothing (or
+    nothing trustworthy) there, in which case the day is recomputed, never
+    silently trusted half-written.
+
+    Loud, never silent, on a PARAMETER mismatch: a partition written with
+    different ``schema_version``/``horizon_s``/``adv_sel_horizon_s``/
+    ``quote_size_fraction`` raises ``ReplayError`` naming the path and the
+    differing parameter -- the user picks a different ``--out`` or passes
+    ``--no-resume``, never a silent stale reuse.
+    """
+    meta_path = part_dir / "manifest.json"
+    if not meta_path.is_file():
+        return None
+    try:
+        meta = json.loads(meta_path.read_text(encoding="utf-8"))
+    except (json.JSONDecodeError, OSError):
+        return None  # unreadable manifest -- treat as incomplete, recompute
+    for name, want in (("schema_version", schema_version), ("horizon_s", horizon_s),
+                       ("adv_sel_horizon_s", adv_sel_horizon_s),
+                       ("quote_size_fraction", quote_size_fraction)):
+        have = meta.get(name)
+        if have != want:
+            raise ReplayError(
+                f"WP-10(B) partition at {part_dir} was written with {name}={have!r}, "
+                f"this run requested {name}={want!r} -- refusing to silently reuse a "
+                f"mismatched partition (pick a different --out or pass --no-resume).")
+    if meta.get("status") == "ok" and meta.get("n_quotes", 0) > 0:
+        pq_path = part_dir / "fillshadow.parquet"
+        if not pq_path.is_file():
+            return None  # manifest present, parquet missing -- corrupt/partial, recompute
+        try:
+            import pyarrow.parquet as pq
+            table = pq.read_table(pq_path).to_pydict()
+        except Exception:
+            return None  # unreadable parquet -- corrupt, recompute
+        rows = {c: table.get(c, []) for c in FILLSHADOW_COLUMNS}
+        if _rows_hash(rows) != meta.get("sha256_values"):
+            return None  # content hash mismatch -- corrupt/partial, recompute
+    return meta
+
+
+def _trim_before(day: str, ts_a: list[int], bid_px_a: list[float], bid_sz_a: list[float],
+                 ask_px_a: list[float], ask_sz_a: list[float],
+                 trades: list[tuple[int, str, float, float]], trade_ts: list[int]) -> None:
+    """Memory bound: drop touch samples / trades older than the START of
+    ``day`` (the day JUST written) from the rolling buffers, in place.
+    ``day``'s own samples (>= its start) are kept as the ANCHOR the next
+    day's minute-0 boundary lookup needs (the book's state carries across
+    the midnight boundary without a fresh sample exactly AT midnight) --
+    only samples strictly before that are provably never looked up again."""
+    cutoff = _day_ms(day)
+    i = bisect.bisect_left(ts_a, cutoff)
+    if i > 0:
+        del ts_a[:i]
+        del bid_px_a[:i]
+        del bid_sz_a[:i]
+        del ask_px_a[:i]
+        del ask_sz_a[:i]
+    j = bisect.bisect_left(trade_ts, cutoff)
+    if j > 0:
+        del trades[:j]
+        del trade_ts[:j]
+
+
+def run_window(
+    base_dir: Path | str, out_dir: Path | str, symbol: str, start: str, end: str,
+    *, exchange: str = "bybit", orderbook_stream: str = "orderbook",
+    trade_stream: str = "publicTrade", max_breaks: int = MAX_BREAKS_PER_DAY,
+    horizon_s: float = qm.DEFAULT_HORIZON_S,
+    adv_sel_horizon_s: float = qm.DEFAULT_ADV_SEL_HORIZON_S,
+    quote_size_fraction: float = DEFAULT_QUOTE_SIZE_FRACTION,
+    require_manifest_done: bool = True, resume: bool = True, progress: Any = None,
+) -> dict[str, Any]:
+    """One deterministic STREAMING pass over ``[start, end]``: the book
+    still replays continuously day by day (WP-2/WP-4 machinery, same
+    discipline -- state carries across days exactly as before), but day
+    ``D`` is evaluated and WRITTEN as soon as the touch samples and trades
+    covering ``D`` plus the forward lookahead (``horizon_s +
+    adv_sel_horizon_s`` seconds into ``D+1``) have been replayed -- never
+    the whole 80+-day window at once. The rolling sample/trade buffers are
+    then trimmed to drop everything older than ``D``'s start (see
+    ``_trim_before``), so peak memory is bounded by roughly one day's
+    worth of L2 records, not the whole window's.
+
+    Per-day output (columns, ``sha256_values``, every ``manifest.json``
+    field) is BYTE-IDENTICAL to the old whole-window replay
+    (``_run_window_full_replay``, pinned by
+    ``test_replay_streaming_matches_full_replay_identity``) -- streaming
+    changes ONLY memory/latency, never a single value.
+
+    **Resume** (default ON; ``resume=False`` / CLI ``--no-resume`` forces
+    full recomputation). Before evaluating day ``D``, if its output
+    partition already holds a COMPLETE, parameter-matching result (see
+    ``_resumable_meta``: manifest present with matching
+    ``schema_version``/``horizon_s``/``adv_sel_horizon_s``/
+    ``quote_size_fraction``, and -- for an "ok" day with quotes -- a
+    parquet file whose ``sha256_values`` matches the manifest), that day
+    is SKIPPED entirely (never replayed, counted ``resumed``) -- this is
+    what makes resuming after a crash/reboot cheap: an already-written
+    prefix of the window is never re-read from raw L2 at all. A manifest
+    whose PARAMETERS differ from this run's raises ``ReplayError`` loudly
+    (never a silent stale reuse); a manifest whose parquet is missing or
+    hash-mismatched (partial/corrupt write) is treated as absent and
+    recomputed.
+
+    Skipping a day's replay means the continuously-carried book is no
+    longer warm when the run resumes proper evaluation. Rather than
+    replaying the whole skipped prefix (which would defeat the point of
+    resuming), the run replays ONLY the single calendar day immediately
+    before the first day it must actually evaluate, silently (no write,
+    not counted) -- book state resyncs off that day's own snapshot(s), the
+    same way it would at the cold start of any window, so by the
+    following midnight the book is in the state an uninterrupted run
+    would have reached. This is an approximation, not a proof, for the
+    adversarial case where that warm-up day's own break budget would have
+    been judged differently with the TRUE prior history than with a fresh
+    ``Book()`` -- accepted here because it only ever affects whether that
+    ALREADY-DISCARDED-OR-KEPT warm-up day's book gets reset, never the
+    already-written days before it or the values this run itself writes.
+
+    A day is ELIGIBLE for quote placement only when its L2 replay is
+    "ok" (break budget respected, first snapshot seen) AND -- when
+    ``require_manifest_done`` -- the harvest manifest marks BOTH the
+    orderbook and publicTrade partitions DONE for that day. Ineligible
+    days get an explicit ``status`` in their manifest and zero quotes;
+    never silently skipped.
+
+    ``progress(symbol, event)`` (when given) is called: once at the very
+    start with ``{"kind": "start", "days_total": N}``; once after any
+    silent warm-up replay with ``{"kind": "warmup", "day": ..., ...}``;
+    and once per day (resumed or evaluated) with ``{"kind": "day", "day",
+    "status", "n_quotes", "resumed", "elapsed_s"}``.
+    """
+    import duckdb
+
+    base, out = Path(base_dir), Path(out_dir)
+    _refuse_harvest(out)
+    ob_dir = base / "raw" / exchange / orderbook_stream / f"symbol={symbol}"
+    trade_dir = base / "raw" / exchange / trade_stream / f"symbol={symbol}"
+    if not ob_dir.is_dir():
+        raise ReplayError(f"no orderbook stream at {ob_dir}")
+
+    days = _days_between(start, end)
+    done_ob: set[str] = set()
+    done_tr: set[str] = set()
+    if require_manifest_done:
+        done_ob = manifest_done_days(base, exchange, orderbook_stream, symbol, start, end)
+        done_tr = manifest_done_days(base, exchange, trade_stream, symbol, start, end)
+
+    lookahead_ms = int(round(horizon_s * 1000)) + int(round(adv_sel_horizon_s * 1000))
+    part_root = out / "fillshadow_1min" / f"exchange={exchange}" / f"symbol={symbol}"
+
+    t0 = time.time()
+    if progress is not None:
+        progress(symbol, {"kind": "start", "days_total": len(days)})
+
+    counts = {"ok": 0, "discarded": 0, "no_raw": 0, "not_manifest_done": 0, "resumed": 0}
+    total_quotes = 0
+    total_fifo_filled = 0
+    total_prorata_filled = 0
+
+    con = duckdb.connect()
+    try:
+        book = Book()
+        ts_a: list[int] = []
+        bid_px_a: list[float] = []
+        bid_sz_a: list[float] = []
+        ask_px_a: list[float] = []
+        ask_sz_a: list[float] = []
+        trades: list[tuple[int, str, float, float]] = []
+        trade_ts: list[int] = []
+        day_meta: dict[str, dict[str, Any]] = {}
+        rp_idx = 0  # index into `days` of the next day whose raw records are unreplayed
+
+        def _replay_day_into_buffers(d: str) -> dict[str, Any]:
+            nonlocal book
+            meta = _replay_one_day(con, ob_dir, d, book, ts_a=ts_a, bid_px_a=bid_px_a,
+                                   bid_sz_a=bid_sz_a, ask_px_a=ask_px_a, ask_sz_a=ask_sz_a,
+                                   max_breaks=max_breaks)
+            if meta.pop("reset_book", False):
+                book = Book()
+            day_trades = _load_trades_for_day(con, trade_dir, d)
+            trades.extend(day_trades)
+            trade_ts.extend(t[0] for t in day_trades)
+            return meta
+
+        def _ensure_replayed(upto_idx: int) -> None:
+            nonlocal rp_idx
+            while rp_idx <= upto_idx and rp_idx < len(days):
+                day_meta[days[rp_idx]] = _replay_day_into_buffers(days[rp_idx])
+                rp_idx += 1
+
+        prev_skipped = False
+        for di, day in enumerate(days):
+            if resume:
+                part_dir = part_root / f"date={day}"
+                resumed_meta = _resumable_meta(
+                    part_dir, schema_version=SCHEMA_VERSION, horizon_s=horizon_s,
+                    adv_sel_horizon_s=adv_sel_horizon_s, quote_size_fraction=quote_size_fraction)
+                if resumed_meta is not None:
+                    counts["resumed"] += 1
+                    prev_skipped = True
+                    if progress is not None:
+                        progress(symbol, {"kind": "day", "day": day, "status": "resumed",
+                                          "n_quotes": resumed_meta.get("n_quotes", 0),
+                                          "resumed": True,
+                                          "elapsed_s": round(time.time() - t0, 1)})
+                    continue
+
+            if prev_skipped:
+                warm_up_idx = di - 1
+                if warm_up_idx >= rp_idx:  # not yet replayed via an earlier day's lookahead
+                    _replay_day_into_buffers(days[warm_up_idx])  # silent: no write, not counted
+                rp_idx = max(rp_idx, di)
+                prev_skipped = False
+                if progress is not None:
+                    progress(symbol, {"kind": "warmup", "day": days[warm_up_idx],
+                                      "elapsed_s": round(time.time() - t0, 1)})
+
+            _ensure_replayed(di)
+            meta = day_meta[day]
+            status, reason = meta["status"], meta.get("reason", "")
+            if status == "ok" and require_manifest_done and not (day in done_ob and day in done_tr):
+                status, reason = "not_manifest_done", (
+                    f"orderbook DONE={day in done_ob} publicTrade DONE={day in done_tr}")
+
+            if status == "ok":
+                target_ms = _day_ms(day) + MS_PER_DAY + lookahead_ms
+                while (not ts_a or ts_a[-1] < target_ms) and rp_idx < len(days):
+                    day_meta[days[rp_idx]] = _replay_day_into_buffers(days[rp_idx])
+                    rp_idx += 1
+                cols = _place_and_evaluate_day(
+                    day, ts_a=ts_a, bid_px_a=bid_px_a, bid_sz_a=bid_sz_a,
+                    ask_px_a=ask_px_a, ask_sz_a=ask_sz_a, trades=trades,
+                    trade_ts=trade_ts, horizon_s=horizon_s,
+                    adv_sel_horizon_s=adv_sel_horizon_s,
+                    quote_size_fraction=quote_size_fraction,
+                )
+            else:
+                cols = {c: [] for c in FILLSHADOW_COLUMNS}
+
+            written = _write_day(
+                out, exchange, symbol, day, cols, status=status, reason=reason,
+                n_breaks=meta.get("n_breaks", 0), n_snapshots=meta.get("n_snapshots", 0),
+                horizon_s=horizon_s, adv_sel_horizon_s=adv_sel_horizon_s,
+                quote_size_fraction=quote_size_fraction,
+            )
+            counts[status if status in counts else "discarded"] = \
+                counts.get(status if status in counts else "discarded", 0) + 1
+            total_quotes += written["n_quotes"]
+            total_fifo_filled += written["n_fifo_filled"]
+            total_prorata_filled += written["n_prorata_filled"]
+            if progress is not None:
+                progress(symbol, {"kind": "day", "day": day, "status": status,
+                                  "n_quotes": written["n_quotes"], "resumed": False,
+                                  "elapsed_s": round(time.time() - t0, 1)})
+
+            _trim_before(day, ts_a, bid_px_a, bid_sz_a, ask_px_a, ask_sz_a, trades, trade_ts)
+            day_meta.pop(day, None)
+    finally:
+        con.close()
 
     return {
         "symbol": symbol, "exchange": exchange, "range": [start, end],

@@ -22,6 +22,7 @@
 from __future__ import annotations
 
 import json
+import shutil
 import sqlite3
 from datetime import date
 from pathlib import Path
@@ -284,6 +285,45 @@ def _build_day_fixture(base: Path, day: str, *, done: bool = True) -> None:
         ])
 
 
+def _build_multi_day_fixture(base: Path, days: list[str], *, done: bool = True) -> None:
+    """Continuous book across ``len(days)`` consecutive days -- EVERY day
+    carries its own snapshot (real Bybit feeds emit ~2/day, per the WP-2
+    docstring; a warm-up replay of just one calendar day can only resync
+    the book off a snapshot WITHIN that day), each snapshot content
+    matching exactly where the previous day's deltas left the book (no
+    spurious sequence breaks), plus a matching trade each day so quotes
+    actually fill. Exercises exactly the cross-day book continuity +
+    forward-lookahead-into-the-next-day path the streaming rewrite must
+    reproduce byte-for-byte, day by day."""
+    u = 1
+    for day in days:
+        ms = _day_ms(day)
+        records = [
+            _snap(ms + 50, u, 99.9, 100.1, bsz=9.0, asz=9.0),
+        ]
+        u += 1
+        records.append(_delta(ms + 90_000, u, [["99.9", "4.0"]], []))
+        u += 1
+        records.append(_delta(ms + 200_000, u, [["99.9", "4.0"]], [["100.1", "10.0"]]))
+        u += 1
+        # back to (9.0, 9.0) by day's end -- matches the NEXT day's
+        # snapshot exactly, so the day boundary is a clean resync, and the
+        # LAST minute of the day needs lookahead INTO the next day
+        records.append(_delta(ms + 86_390_000, u, [["99.9", "9.0"]], [["100.1", "9.0"]]))
+        u += 1
+        _write_ob_day(base, "TSTUSDT", day, records)
+        _write_trade_day(base, "TSTUSDT", day, [
+            _trade(ms + 90_000, "Sell", 99.9, 6.0),
+            _trade(ms + 86_395_000, "Buy", 100.1, 2.0),
+        ])
+    if done:
+        entries = []
+        for day in days:
+            entries.append(("bybit", "orderbook", "TSTUSDT", day, "DONE"))
+            entries.append(("bybit", "publicTrade", "TSTUSDT", day, "DONE"))
+        _write_manifest(base, entries)
+
+
 def test_replay_end_to_end_and_determinism(tmp_path):
     base = tmp_path / "h"
     d1 = "2026-06-22"
@@ -402,6 +442,195 @@ def test_probe_reports_manifest_error_without_raising(tmp_path):
     _build_day_fixture(base, d1, done=False)  # no manifest file at all
     p = rp.probe(base, "TSTUSDT", d1, d1)
     assert "manifest_error" in p
+
+
+# ----------------------------------------------------------------------------
+# (d2) streaming rewrite -- identity, resume, corruption, memory bound
+# ----------------------------------------------------------------------------
+
+def _manifest_for(out: Path, day: str, symbol: str = "TSTUSDT") -> dict:
+    part = (out / "fillshadow_1min" / "exchange=bybit" / f"symbol={symbol}"
+            / f"date={day}")
+    return json.loads((part / "manifest.json").read_text(encoding="utf-8"))
+
+
+def _part_dir(out: Path, day: str, symbol: str = "TSTUSDT") -> Path:
+    return (out / "fillshadow_1min" / "exchange=bybit" / f"symbol={symbol}"
+            / f"date={day}")
+
+
+def test_replay_streaming_matches_full_replay_identity(tmp_path):
+    """The day-by-day streaming ``run_window`` must reproduce the OLD
+    whole-window replay (``_run_window_full_replay``) byte-for-byte, on a
+    synthetic fixture whose book carries continuously across 3 days and
+    whose last day genuinely runs out of forward lookahead data (window
+    end) -- the exact case where a naive streaming rewrite would compute a
+    different ``insufficient_forward_data``/``data_end_ms`` result."""
+    base = tmp_path / "h"
+    days = ["2026-06-22", "2026-06-23", "2026-06-24"]
+    _build_multi_day_fixture(base, days)
+
+    out_new = tmp_path / "o_new"
+    s_new = rp.run_window(base, out_new, "TSTUSDT", days[0], days[-1],
+                          horizon_s=60.0, adv_sel_horizon_s=60.0, resume=False)
+
+    out_old = tmp_path / "o_old"
+    s_old = rp._run_window_full_replay(base, out_old, "TSTUSDT", days[0], days[-1],
+                                       horizon_s=60.0, adv_sel_horizon_s=60.0)
+
+    for key in ("ok", "discarded", "no_raw", "not_manifest_done", "days_in_range",
+               "n_quotes_total", "n_fifo_filled_total", "n_prorata_filled_total"):
+        assert s_new[key] == s_old[key], key
+
+    assert s_new["ok"] == 3   # sanity: the fixture is fully eligible
+    for day in days:
+        m_new, m_old = _manifest_for(out_new, day), _manifest_for(out_old, day)
+        assert m_new["sha256_values"] == m_old["sha256_values"], day
+        assert m_new["status"] == m_old["status"] == "ok", day
+        assert m_new["n_quotes"] == m_old["n_quotes"] > 0, day
+        assert m_new["n_fifo_filled"] == m_old["n_fifo_filled"], day
+        assert m_new["n_prorata_filled"] == m_old["n_prorata_filled"], day
+
+    quotes_new = rp.load_daily_fillshadow(out_new, "bybit", "TSTUSDT", days[0], days[-1])
+    quotes_old = rp.load_daily_fillshadow(out_old, "bybit", "TSTUSDT", days[0], days[-1])
+    for q_new, q_old in zip(quotes_new, quotes_old):
+        assert q_new["quotes"]["insufficient_forward_data"] == \
+            q_old["quotes"]["insufficient_forward_data"]
+    # the last day, at the true end of the requested window, must show
+    # genuine insufficient-forward-data quotes near its own end -- proof
+    # the streaming path did NOT fabricate extra lookahead beyond `end`
+    last_day_quotes = quotes_new[-1]["quotes"]
+    assert any(last_day_quotes["insufficient_forward_data"])
+
+
+def test_replay_resume_skips_complete_days_and_matches_fresh_run(tmp_path):
+    base = tmp_path / "h"
+    days = ["2026-06-22", "2026-06-23", "2026-06-24"]
+    _build_multi_day_fixture(base, days)
+
+    out_fresh = tmp_path / "o_fresh"
+    s_fresh = rp.run_window(base, out_fresh, "TSTUSDT", days[0], days[-1],
+                            horizon_s=60.0, adv_sel_horizon_s=60.0, resume=False)
+    assert s_fresh["ok"] == 3
+
+    # simulate "crashed after day0 and day1 were already written": seed
+    # out_resumed with EXACTLY those two partitions from the fresh run
+    # (same window end -- a resumed run must cover the identical range,
+    # never a shorter one, since day1's own lookahead needs day2's data).
+    out_resumed = tmp_path / "o_resumed"
+    for day in days[:2]:
+        src = _part_dir(out_fresh, day)
+        dst = _part_dir(out_resumed, day)
+        dst.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copytree(src, dst)
+
+    events: list[dict] = []
+    s_resumed = rp.run_window(base, out_resumed, "TSTUSDT", days[0], days[-1],
+                              horizon_s=60.0, adv_sel_horizon_s=60.0, resume=True,
+                              progress=lambda sym, ev: events.append(ev))
+    assert s_resumed["resumed"] == 2
+    assert s_resumed["ok"] == 1   # only day2 actually recomputed this run
+
+    start_events = [e for e in events if e.get("kind") == "start"]
+    assert start_events and start_events[0]["days_total"] == 3
+    warmup_events = [e for e in events if e.get("kind") == "warmup"]
+    assert len(warmup_events) == 1 and warmup_events[0]["day"] == days[1]
+    resumed_day_events = [e for e in events if e.get("kind") == "day" and e.get("resumed")]
+    assert {e["day"] for e in resumed_day_events} == set(days[:2])
+    assert all("elapsed_s" in e for e in events if e.get("kind") == "day")
+
+    for day in days:
+        assert _manifest_for(out_fresh, day)["sha256_values"] == \
+            _manifest_for(out_resumed, day)["sha256_values"], day
+
+
+def test_replay_resume_recomputes_missing_or_corrupt_parquet(tmp_path):
+    base = tmp_path / "h"
+    days = ["2026-06-22", "2026-06-23"]
+    _build_multi_day_fixture(base, days)
+    out = tmp_path / "o"
+    rp.run_window(base, out, "TSTUSDT", days[0], days[1],
+                 horizon_s=60.0, adv_sel_horizon_s=60.0, resume=False)
+    part0 = _part_dir(out, days[0])
+    assert (part0 / "fillshadow.parquet").is_file()
+
+    # (1) parquet file simply missing -- day0 not trusted, recomputed;
+    #     day1's OWN partition is untouched and still legitimately resumable
+    (part0 / "fillshadow.parquet").unlink()
+    s = rp.run_window(base, out, "TSTUSDT", days[0], days[1],
+                      horizon_s=60.0, adv_sel_horizon_s=60.0, resume=True)
+    assert s["resumed"] == 1
+    assert s["ok"] == 1
+    assert (part0 / "fillshadow.parquet").is_file()
+
+    # (2) parquet present but its content no longer matches the manifest's
+    #     sha256_values (corrupt/partial write) -- also not trusted
+    import pyarrow as pa
+    import pyarrow.parquet as pq
+    bogus = pa.table({"minute_idx": pa.array([0], pa.int64())})
+    pq.write_table(bogus, part0 / "fillshadow.parquet")
+    s2 = rp.run_window(base, out, "TSTUSDT", days[0], days[1],
+                       horizon_s=60.0, adv_sel_horizon_s=60.0, resume=True)
+    assert s2["resumed"] == 1
+    assert s2["ok"] == 1
+
+
+def test_replay_resume_rejects_mismatched_partition_loudly(tmp_path):
+    base = tmp_path / "h"
+    d1 = "2026-06-22"
+    _build_day_fixture(base, d1)
+    out = tmp_path / "o"
+    rp.run_window(base, out, "TSTUSDT", d1, d1, horizon_s=60.0, adv_sel_horizon_s=60.0,
+                 resume=False)
+    with pytest.raises(rp.ReplayError, match="horizon_s"):
+        rp.run_window(base, out, "TSTUSDT", d1, d1, horizon_s=30.0, adv_sel_horizon_s=60.0,
+                      resume=True)
+    # --no-resume forces recomputation instead of raising
+    s = rp.run_window(base, out, "TSTUSDT", d1, d1, horizon_s=30.0, adv_sel_horizon_s=60.0,
+                      resume=False)
+    assert s["ok"] == 1
+
+
+def test_trim_before_drops_only_samples_older_than_days_start():
+    ts_a = [100, 200, 300, 86_400_000 + 50, 86_400_000 + 999]
+    bid_px_a, bid_sz_a, ask_px_a, ask_sz_a = ([1.0] * 5, [1.0] * 5, [1.0] * 5, [1.0] * 5)
+    trades = [(150, "buy", 1.0, 1.0), (86_400_000 + 10, "sell", 1.0, 1.0)]
+    trade_ts = [t[0] for t in trades]
+
+    rp._trim_before("1970-01-02", ts_a, bid_px_a, bid_sz_a, ask_px_a, ask_sz_a,
+                    trades, trade_ts)
+
+    assert ts_a == [86_400_000 + 50, 86_400_000 + 999]
+    assert len(bid_px_a) == len(bid_sz_a) == len(ask_px_a) == len(ask_sz_a) == 2
+    assert trade_ts == [86_400_000 + 10]
+    assert trades == [(86_400_000 + 10, "sell", 1.0, 1.0)]
+
+
+def test_replay_retains_no_timestamps_before_written_days_start(tmp_path, monkeypatch):
+    """Memory bound, exercised end-to-end via a hook on the real internal
+    helper: after ``run_window`` writes day D, the retained sample arrays
+    (as observed by ``_trim_before`` right after it runs) must contain no
+    timestamp before D's own start."""
+    base = tmp_path / "h"
+    days = ["2026-06-22", "2026-06-23", "2026-06-24"]
+    _build_multi_day_fixture(base, days)
+    out = tmp_path / "o"
+
+    real_trim = rp._trim_before
+    seen: list[tuple[str, int]] = []
+
+    def _spy(day, ts_a, bid_px_a, bid_sz_a, ask_px_a, ask_sz_a, trades, trade_ts):
+        real_trim(day, ts_a, bid_px_a, bid_sz_a, ask_px_a, ask_sz_a, trades, trade_ts)
+        seen.append((day, min(ts_a) if ts_a else None))
+
+    monkeypatch.setattr(rp, "_trim_before", _spy)
+    rp.run_window(base, out, "TSTUSDT", days[0], days[-1],
+                 horizon_s=60.0, adv_sel_horizon_s=60.0, resume=False)
+
+    assert [d for d, _ in seen] == days
+    for day, min_ts in seen:
+        if min_ts is not None:
+            assert min_ts >= rp._day_ms(day)
 
 
 # ----------------------------------------------------------------------------

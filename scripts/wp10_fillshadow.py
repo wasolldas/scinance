@@ -109,19 +109,30 @@ def cmd_run(args: argparse.Namespace) -> int:
     summaries = []
     for symbol in symbols:
         t0 = time.time()
-        state = {"n": 0}
 
         def _progress(sym: str, res: dict) -> None:
-            state["n"] += 1
-            if state["n"] % 10 == 0:
-                print(f"[wp10b] {sym}: {state['n']} days (last {res['day']} -> "
-                      f"{res['status']}, {res['n_quotes']} quotes)", file=sys.stderr, flush=True)
+            kind = res.get("kind", "day")
+            if kind == "start":
+                print(f"[wp10b] {sym}: {res['days_total']} days in range",
+                      file=sys.stderr, flush=True)
+            elif kind == "warmup":
+                print(f"[wp10b] {sym}: warm-up day {res['day']} done "
+                      f"(book resynced, no write) at {res['elapsed_s']}s",
+                      file=sys.stderr, flush=True)
+            else:
+                tag = " (resumed)" if res.get("resumed") and res["status"] != "resumed" else ""
+                n_q = res.get("n_quotes")
+                n_q_s = "?" if n_q is None else str(n_q)
+                print(f"[wp10b] {sym}: {res['day']} -> {res['status']}{tag}, "
+                      f"{n_q_s} quotes, {res['elapsed_s']}s elapsed",
+                      file=sys.stderr, flush=True)
 
         try:
             summary = rp.run_window(base, out, symbol, start, end,
                                     horizon_s=args.horizon_s,
                                     adv_sel_horizon_s=args.adv_sel_horizon_s,
                                     quote_size_fraction=args.quote_size_fraction,
+                                    resume=not args.no_resume,
                                     progress=_progress)
         except rp.ReplayError as exc:
             print(f"[wp10b] FATAL {symbol}: {exc}", file=sys.stderr)
@@ -131,6 +142,7 @@ def cmd_run(args: argparse.Namespace) -> int:
         summaries.append(summary)
         print(f"[wp10b] {symbol}: ok={summary['ok']} discarded={summary['discarded']} "
               f"no_raw={summary['no_raw']} not_manifest_done={summary['not_manifest_done']} "
+              f"resumed={summary['resumed']} "
               f"quotes={summary['n_quotes_total']} fifo_filled={summary['n_fifo_filled_total']} "
               f"prorata_filled={summary['n_prorata_filled_total']} in {summary['seconds']}s",
               file=sys.stderr)
@@ -170,6 +182,10 @@ def main(argv: list[str] | None = None) -> int:
                    dest="adv_sel_horizon_s")
     p.add_argument("--quote-size-fraction", type=float, default=rp.DEFAULT_QUOTE_SIZE_FRACTION,
                    dest="quote_size_fraction")
+    p.add_argument("--no-resume", action="store_true", dest="no_resume",
+                   help="Force full recomputation of every day even if a complete, "
+                        "parameter-matching partition already exists (default: resume "
+                        "on -- an already-written prefix is skipped, never re-replayed).")
     p.add_argument("--stress-canon", default="scinance3-impl/state/wp10_stress_canon",
                    help="Dir holding stress_abs.json (WP-10(A) Teil A output). "
                         "Missing -> report without stress/quiet split.")
