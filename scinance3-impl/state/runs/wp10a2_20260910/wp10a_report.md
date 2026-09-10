@@ -126,6 +126,46 @@
   - stress: TOO_FEW (n=1)
   - quiet: rho=0.292, 95%-CI=[0.052, 0.503], n=68 (n_episodes=None), Bonett/Wright-SE=0.131
 
+## Struktureller Nulleffekt der Stress-Zelle (Surrogate, keine Schwelle)
+- funding_backfill_BTCUSDT x funding_backfill_ETHUSDT: real rho_stress=0.570, real Lift=0.218 | Null-Lift (unabhaengige Bloecke) mean=-0.000 [-0.323, 0.312], Rang(real Lift)=87.1% | Null-Lift (Selektion auf gemeinsame Groesse) mean=0.004 [-0.218, 0.236], Rang(real Lift)=93.1%
+- funding_backfill_BTCUSDT x funding_backfill_SOLUSDT: real rho_stress=0.349, real Lift=0.129 | Null-Lift (unabhaengige Bloecke) mean=0.004 [-0.455, 0.459], Rang(real Lift)=66.7% | Null-Lift (Selektion auf gemeinsame Groesse) mean=-0.006 [-0.457, 0.449], Rang(real Lift)=67.8%
+- funding_backfill_BTCUSDT x funding_backfill_XRPUSDT: real rho_stress=0.663, real Lift=0.441 | Null-Lift (unabhaengige Bloecke) mean=-0.005 [-0.402, 0.371], Rang(real Lift)=97.6% | Null-Lift (Selektion auf gemeinsame Groesse) mean=-0.013 [-0.327, 0.284], Rang(real Lift)=99.5%
+- funding_backfill_BTCUSDT x funding_backfill_BNBUSDT: real rho_stress=0.059, real Lift=-0.046 | Null-Lift (unabhaengige Bloecke) mean=0.005 [-0.467, 0.468], Rang(real Lift)=44.0% | Null-Lift (Selektion auf gemeinsame Groesse) mean=0.012 [-0.407, 0.428], Rang(real Lift)=40.3%
+- funding_backfill_BTCUSDT x ivrv_backfill_BTC: real rho_stress=-0.433, real Lift=-0.421 | Null-Lift (unabhaengige Bloecke) mean=0.007 [-0.345, 0.380], Rang(real Lift)=2.1% | Null-Lift (Selektion auf gemeinsame Groesse) mean=-0.006 [-0.420, 0.388], Rang(real Lift)=5.0%
+- funding_backfill_BTCUSDT x ivrv_backfill_ETH: real rho_stress=-0.464, real Lift=-0.442 | Null-Lift (unabhaengige Bloecke) mean=0.012 [-0.328, 0.378], Rang(real Lift)=2.2% | Null-Lift (Selektion auf gemeinsame Groesse) mean=0.002 [-0.388, 0.385], Rang(real Lift)=3.5%
+- funding_backfill_BTCUSDT x basis_BTCUSDT: TOO_FEW (n_stress=0, n_quiet=33)
+- funding_backfill_BTCUSDT x basis_ETHUSDT: TOO_FEW (n_stress=0, n_quiet=33)
+- funding_backfill_ETHUSDT x funding_backfill_SOLUSDT: real rho_stress=0.724, real Lift=0.460 | Null-Lift (unabhaengige Bloecke) mean=0.001 [-0.467, 0.466], Rang(real Lift)=94.6% | Null-Lift (Selektion auf gemeinsame Groesse) mean=0.003 [-0.435, 0.413], Rang(real Lift)=96.5%
+- funding_backfill_ETHUSDT x funding_backfill_XRPUSDT: real rho_stress=0.588, real Lift=0.347 | Null-Lift (unabhaengige Bloecke) mean=0.002 [-0.400, 0.418], Rang(real Lift)=92.3% | Null-Lift (Selektion auf gemeinsame Groesse) mean=-0.022 [-0.323, 0.279], Rang(real Lift)=97.6%
+- funding_backfill_ETHUSDT x funding_backfill_BNBUSDT: real rho_stress=0.741, real Lift=0.574 | Null-Lift (unabhaengige Bloecke) mean=-0.002 [-0.483, 0.462], Rang(real Lift)=98.3% | Null-Lift (Selektion auf gemeinsame Groesse) mean=0.007 [-0.366, 0.399], Rang(real Lift)=99.7%
+- funding_backfill_ETHUSDT x ivrv_backfill_BTC: real rho_stress=-0.012, real Lift=-0.042 | Null-Lift (unabhaengige Bloecke) mean=-0.001 [-0.363, 0.372], Rang(real Lift)=44.2% | Null-Lift (Selektion auf gemeinsame Groesse) mean=-0.002 [-0.377, 0.390], Rang(real Lift)=44.0%
+- funding_backfill_ETHUSDT x ivrv_backfill_ETH: real rho_stress=0.028, real Lift=0.011 | Null-Lift (unabhaengige Bloecke) mean=-0.004 [-0.364, 0.372], Rang(real Lift)=53.7% | Null-Lift (Selektion auf gemeinsame Groesse) mean=-0.000 [-0.387, 0.382], Rang(real Lift)=52.0%
+- funding_backfill_ETHUSDT x basis_BTCUSDT: TOO_FEW (n_stress=0, n_quiet=33)
+- funding_backfill_ETHUSDT x basis_ETHUSDT: TOO_FEW (n_stress=0, n_quiet=33)
+- funding_backfill_SOLUSDT x funding_backfill_XRPUSDT: real rho_stress=0.631, real Lift=0.330 | Null-Lift (unabhaengige Bloecke) mean=0.008 [-0.448, 0.477], Rang(real Lift)=87.5% | Null-Lift (Selektion auf gemeinsame Groesse) mean=0.006 [-0.397, 0.416], Rang(real Lift)=89.7%
+- funding_backfill_SOLUSDT x funding_backfill_BNBUSDT: real rho_stress=0.651, real Lift=0.428 | Null-Lift (unabhaengige Bloecke) mean=0.015 [-0.465, 0.461], Rang(real Lift)=93.4% | Null-Lift (Selektion auf gemeinsame Groesse) mean=-0.006 [-0.462, 0.461], Rang(real Lift)=93.6%
+- funding_backfill_SOLUSDT x ivrv_backfill_BTC: real rho_stress=-0.174, real Lift=-0.158 | Null-Lift (unabhaengige Bloecke) mean=0.008 [-0.473, 0.474], Rang(real Lift)=28.5% | Null-Lift (Selektion auf gemeinsame Groesse) mean=-0.014 [-0.471, 0.485], Rang(real Lift)=30.6%
+- funding_backfill_SOLUSDT x ivrv_backfill_ETH: real rho_stress=-0.191, real Lift=-0.178 | Null-Lift (unabhaengige Bloecke) mean=0.005 [-0.443, 0.473], Rang(real Lift)=26.2% | Null-Lift (Selektion auf gemeinsame Groesse) mean=-0.002 [-0.496, 0.514], Rang(real Lift)=28.5%
+- funding_backfill_SOLUSDT x basis_BTCUSDT: TOO_FEW (n_stress=0, n_quiet=33)
+- funding_backfill_SOLUSDT x basis_ETHUSDT: TOO_FEW (n_stress=0, n_quiet=33)
+- funding_backfill_XRPUSDT x funding_backfill_BNBUSDT: real rho_stress=0.334, real Lift=0.124 | Null-Lift (unabhaengige Bloecke) mean=0.009 [-0.461, 0.467], Rang(real Lift)=64.7% | Null-Lift (Selektion auf gemeinsame Groesse) mean=0.009 [-0.351, 0.366], Rang(real Lift)=68.7%
+- funding_backfill_XRPUSDT x ivrv_backfill_BTC: real rho_stress=-0.291, real Lift=-0.305 | Null-Lift (unabhaengige Bloecke) mean=-0.001 [-0.384, 0.395], Rang(real Lift)=9.8% | Null-Lift (Selektion auf gemeinsame Groesse) mean=0.009 [-0.387, 0.405], Rang(real Lift)=10.8%
+- funding_backfill_XRPUSDT x ivrv_backfill_ETH: real rho_stress=-0.259, real Lift=-0.257 | Null-Lift (unabhaengige Bloecke) mean=0.001 [-0.375, 0.403], Rang(real Lift)=13.6% | Null-Lift (Selektion auf gemeinsame Groesse) mean=0.010 [-0.393, 0.411], Rang(real Lift)=14.4%
+- funding_backfill_XRPUSDT x basis_BTCUSDT: TOO_FEW (n_stress=0, n_quiet=33)
+- funding_backfill_XRPUSDT x basis_ETHUSDT: TOO_FEW (n_stress=0, n_quiet=33)
+- funding_backfill_BNBUSDT x ivrv_backfill_BTC: real rho_stress=0.002, real Lift=-0.001 | Null-Lift (unabhaengige Bloecke) mean=-0.008 [-0.480, 0.470], Rang(real Lift)=50.5% | Null-Lift (Selektion auf gemeinsame Groesse) mean=-0.003 [-0.469, 0.485], Rang(real Lift)=51.9%
+- funding_backfill_BNBUSDT x ivrv_backfill_ETH: real rho_stress=0.064, real Lift=0.052 | Null-Lift (unabhaengige Bloecke) mean=-0.003 [-0.450, 0.485], Rang(real Lift)=58.1% | Null-Lift (Selektion auf gemeinsame Groesse) mean=-0.008 [-0.500, 0.486], Rang(real Lift)=56.3%
+- funding_backfill_BNBUSDT x basis_BTCUSDT: TOO_FEW (n_stress=0, n_quiet=33)
+- funding_backfill_BNBUSDT x basis_ETHUSDT: TOO_FEW (n_stress=0, n_quiet=33)
+- ivrv_backfill_BTC x ivrv_backfill_ETH: real rho_stress=0.886, real Lift=0.011 | Null-Lift (unabhaengige Bloecke) mean=0.006 [-0.363, 0.374], Rang(real Lift)=50.1% | Null-Lift (Selektion auf gemeinsame Groesse) mean=-0.036 [-0.312, 0.240], Rang(real Lift)=61.5%
+- ivrv_backfill_BTC x basis_BTCUSDT: TOO_FEW (n_stress=0, n_quiet=33)
+- ivrv_backfill_BTC x basis_ETHUSDT: TOO_FEW (n_stress=0, n_quiet=33)
+- ivrv_backfill_ETH x basis_BTCUSDT: TOO_FEW (n_stress=0, n_quiet=33)
+- ivrv_backfill_ETH x basis_ETHUSDT: TOO_FEW (n_stress=0, n_quiet=33)
+- basis_BTCUSDT x basis_ETHUSDT: TOO_FEW (n_stress=1, n_quiet=68)
+
+(Deskriptiv, KEINE Schwelle -- der Rang zeigt nur, wo der reale Lift innerhalb der jeweiligen Surrogat-Nullverteilung liegt (B=1.000 seedierte Surrogate je Variante); es folgt daraus KEIN VERDIKT und KEIN PASS/FAIL.)
+
 ## Bestand vs. Backfill (Ueberlappung)
 - funding_BTCUSDT: n_overlap=882, max|diff|=0, n_Tage_diff(>1e-09)=0
 - funding_ETHUSDT: n_overlap=883, max|diff|=0, n_Tage_diff(>1e-09)=0
@@ -159,6 +199,6 @@
 - ivrv_backfill_ETH: E:\Claude\Projects\scinance\scinance3-impl\state\wp10a2_20260910\wp10a_ivrv_backfill_ETH_daily.csv (n=1956, sha256=f95147522cea33e8...)
 - basis_BTCUSDT: E:\Claude\Projects\scinance\scinance3-impl\state\wp10a2_20260910\wp10a_basis_BTCUSDT_daily.csv (n=70, sha256=e2d3eeaf9291301f...)
 - basis_ETHUSDT: E:\Claude\Projects\scinance\scinance3-impl\state\wp10a2_20260910\wp10a_basis_ETHUSDT_daily.csv (n=70, sha256=af2f1cb24a366263...)
-- Bootstrap-Fingerprint: E:\Claude\Projects\scinance\scinance3-impl\state\wp10a2_20260910\wp10a_coherence_bootstrap_fingerprint.json (62 Eintraege, sha256=2ecbb8ac6b034d6f...)
+- Bootstrap-Fingerprint: E:\Claude\Projects\scinance\scinance3-impl\state\wp10a2_20260910\wp10a_coherence_bootstrap_fingerprint.json (83 Eintraege, sha256=9256732b5c0c631c...)
 
 (Seed dieses Laufs: 53. Teil A ist deskriptiv -- kein PASS/FAIL, keine rho-Schwelle.)

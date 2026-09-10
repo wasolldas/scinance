@@ -21,6 +21,18 @@
       "seed": 53
     },
     {
+      "block_len": 5,
+      "independent_blocks_lift_fingerprint_sha256": "d7ca6f17fe3134ab17da8b35365d551d582a760816a82cc2f3f4780454e3af75",
+      "n_surrogates": 1000,
+      "pair": [
+        "funding_backfill_BTCUSDT",
+        "funding_backfill_ETHUSDT"
+      ],
+      "seed": 53,
+      "selection_on_common_size_lift_fingerprint_sha256": "bec017118449b0377d33e48dec207102b4ff1dd1523a1aabaa04f3064c4fa2e0",
+      "surrogate_null": true
+    },
+    {
       "n": 14,
       "n_bootstrap": 1000,
       "pair": [
@@ -39,6 +51,18 @@
       ],
       "regime": "quiet",
       "seed": 53
+    },
+    {
+      "block_len": 5,
+      "independent_blocks_lift_fingerprint_sha256": "8c2a79f035e010a40faeda860e7ba12b0a15b51263a78546327d85b6c8933e8d",
+      "n_surrogates": 1000,
+      "pair": [
+        "funding_backfill_BTCUSDT",
+        "funding_backfill_SOLUSDT"
+      ],
+      "seed": 53,
+      "selection_on_common_size_lift_fingerprint_sha256": "51dfc3c92ed8707d077c6aa3e30d42ebde1acd101201de3f5b25f0b5a700d15c",
+      "surrogate_null": true
     },
     {
       "n": 20,
@@ -61,6 +85,18 @@
       "seed": 53
     },
     {
+      "block_len": 5,
+      "independent_blocks_lift_fingerprint_sha256": "2afb15d43f1e4745f7674e7e32517d748625a6ad3e36fbff9bf7f283c57278f0",
+      "n_surrogates": 1000,
+      "pair": [
+        "funding_backfill_BTCUSDT",
+        "funding_backfill_XRPUSDT"
+      ],
+      "seed": 53,
+      "selection_on_common_size_lift_fingerprint_sha256": "6ed39841617c6d81bd35c80f71291183fb45d376e833e9282735afa8c75bac58",
+      "surrogate_null": true
+    },
+    {
       "n": 14,
       "n_bootstrap": 1000,
       "pair": [
@@ -81,6 +117,18 @@
       "seed": 53
     },
     {
+      "block_len": 5,
+      "independent_blocks_lift_fingerprint_sha256": "a4a52772c319435cadd1eb6bed5e41feb1b793d1f5d1aa34acea6186c67dd033",
+      "n_surrogates": 1000,
+      "pair": [
+        "funding_backfill_BTCUSDT",
+        "funding_backfill_BNBUSDT"
+      ],
+      "seed": 53,
+      "selection_on_common_size_lift_fingerprint_sha256": "1f86ebaf2dd7ee7808523707e1fbb79f179ddcadc044768eaa92a5b1978d4153",
+      "surrogate_null": true
+    },
+    {
       "n": 22,
       "n_bootstrap": 1000,
       "pair": [
@@ -101,6 +149,18 @@
       "seed": 53
     },
     {
+      "block_len": 5,
+      "independent_blocks_lift_fingerprint_sha256": "adb9441de50f2f833642d814485773aa70db152915026d224c658fa9460515aa",
+      "n_surrogates": 1000,
+      "pair": [
+        "funding_backfill_BTCUSDT",
+        "ivrv_backfill_BTC"
+      ],
+      "seed": 53,
+      "selection_on_common_size_lift_fingerprint_sha256": "eb1c13b4c3c82932f2f469c5c245b8ea8acd74b99e109cdf45216dfe9daeb003",
+      "surrogate_null": true
+    },
+    {
       "n": 22,
       "n_bootstrap": 1000,
       "pair": [
@@ -119,6 +179,18 @@
       ],
       "regime": "quiet",
       "seed": 53
+    },
+    {
+      "block_len": 5,
+      "independent_blocks_lift_fingerprint_sha256": "de1ee10eb15578f3a4c99b0790430bed156e405393d099954bff89fd7b28b7e5",
+      "n_surrogates": 1000,
+      "pair": [
+        "funding_backfill_BTCUSDT",
+        "ivrv_backfill_ETH"
+      ],
+      "seed": 53,
+      "selection_on_common_size_lift_fingerprint_sha256": "d68b2b60588dade0410cee47028969cc3d5a2daecb57cdba91cade07b0bff6c4",
+      "surrogate_null": true
     },
     {
       "n": 33,
@@ -161,6 +233,18 @@
       "seed": 53
     },
     {
+      "block_len": 5,
+      "independent_blocks_lift_fingerprint_sha256": "376290d91d7abda24af143fce8531c5c12c137e17c2ea1da76a0372bebffe3dc",
+      "n_surrogates": 1000,
+      "pair": [
+        "funding_backfill_ETHUSDT",
+        "funding_backfill_SOLUSDT"
+      ],
+      "seed": 53,
+      "selection_on_common_size_lift_fingerprint_sha256": "810da8cc2dbcefa84306fc7aeac1ced02c339ba99605384762a27c0fcbf88455",
+      "surrogate_null": true
+    },
+    {
       "n": 20,
       "n_bootstrap": 1000,
       "pair": [
@@ -181,6 +265,18 @@
       "seed": 53
     },
     {
+      "block_len": 5,
+      "independent_blocks_lift_fingerprint_sha256": "4c5444b9cd5789470982dc4045d37a9e0cdb76ac07d923106892d2139d48f5b4",
+      "n_surrogates": 1000,
+      "pair": [
+        "funding_backfill_ETHUSDT",
+        "funding_backfill_XRPUSDT"
+      ],
+      "seed": 53,
+      "selection_on_common_size_lift_fingerprint_sha256": "718164b857dad6a063f1f71e59c7cf7718587073d29d188a381c4d6c85e904c1",
+      "surrogate_null": true
+    },
+    {
       "n": 14,
       "n_bootstrap": 1000,
       "pair": [
@@ -199,6 +295,18 @@
       ],
       "regime": "quiet",
       "seed": 53
+    },
+    {
+      "block_len": 5,
+      "independent_blocks_lift_fingerprint_sha256": "c4e554c9cbdd3d681b9a261720e6da8299e04141308d026bf32859bc947bd649",
+      "n_surrogates": 1000,
+      "pair": [
+        "funding_backfill_ETHUSDT",
+        "funding_backfill_BNBUSDT"
+      ],
+      "seed": 53,
+      "selection_on_common_size_lift_fingerprint_sha256": "9aa5d132d4cf17315fcca70c843c994679d72aa8ceec6fe86c71bf503f396bb6",
+      "surrogate_null": true
     },
     {
       "n": 22,
@@ -221,6 +329,18 @@
       "seed": 53
     },
     {
+      "block_len": 5,
+      "independent_blocks_lift_fingerprint_sha256": "4c29e2cc1e374970264008ea535f2709b1772632d049661aae0445f2cd3a15ea",
+      "n_surrogates": 1000,
+      "pair": [
+        "funding_backfill_ETHUSDT",
+        "ivrv_backfill_BTC"
+      ],
+      "seed": 53,
+      "selection_on_common_size_lift_fingerprint_sha256": "4f39a93a2a493a4cd87ce1832390a792262d52bd62e8dea7f598b1e7d1ad02dd",
+      "surrogate_null": true
+    },
+    {
       "n": 22,
       "n_bootstrap": 1000,
       "pair": [
@@ -241,6 +361,18 @@
       "seed": 53
     },
     {
+      "block_len": 5,
+      "independent_blocks_lift_fingerprint_sha256": "5da7c4b77ffc4cb16341db8434664a624e00c391cefd8e447b2a405e6c8236cd",
+      "n_surrogates": 1000,
+      "pair": [
+        "funding_backfill_ETHUSDT",
+        "ivrv_backfill_ETH"
+      ],
+      "seed": 53,
+      "selection_on_common_size_lift_fingerprint_sha256": "71176f72387839262c4eda813399c8006680230a1d3fa18700a7e21de47ba2b5",
+      "surrogate_null": true
+    },
+    {
       "n": 33,
       "n_bootstrap": 1000,
       "pair": [
@@ -281,6 +413,18 @@
       "seed": 53
     },
     {
+      "block_len": 5,
+      "independent_blocks_lift_fingerprint_sha256": "741932488c8d51fa8e3eecb274db12216039d7603406a63e9b0c1051d8f5e339",
+      "n_surrogates": 1000,
+      "pair": [
+        "funding_backfill_SOLUSDT",
+        "funding_backfill_XRPUSDT"
+      ],
+      "seed": 53,
+      "selection_on_common_size_lift_fingerprint_sha256": "3828869d71e87f74437b97359012089e88100d7ed9d421909734b57aceb4ef08",
+      "surrogate_null": true
+    },
+    {
       "n": 14,
       "n_bootstrap": 1000,
       "pair": [
@@ -299,6 +443,18 @@
       ],
       "regime": "quiet",
       "seed": 53
+    },
+    {
+      "block_len": 5,
+      "independent_blocks_lift_fingerprint_sha256": "712d95ac7a684c7c48ca848938cbcb6a6fb334b768c341580f35a5789dd44050",
+      "n_surrogates": 1000,
+      "pair": [
+        "funding_backfill_SOLUSDT",
+        "funding_backfill_BNBUSDT"
+      ],
+      "seed": 53,
+      "selection_on_common_size_lift_fingerprint_sha256": "02da85c87df2c96be48212e9dc87d893d88fcc2977553909e3a245217ee5d6ae",
+      "surrogate_null": true
     },
     {
       "n": 14,
@@ -321,6 +477,18 @@
       "seed": 53
     },
     {
+      "block_len": 5,
+      "independent_blocks_lift_fingerprint_sha256": "c290b2ceab8b3369de9411ec17c1c0ba4ede4df80bce3d2ddb8700e63cb19647",
+      "n_surrogates": 1000,
+      "pair": [
+        "funding_backfill_SOLUSDT",
+        "ivrv_backfill_BTC"
+      ],
+      "seed": 53,
+      "selection_on_common_size_lift_fingerprint_sha256": "d873e50e39a953be6a973940dc6a2d5d37dc4b1ad5c19dd7d07bd19ac787e04a",
+      "surrogate_null": true
+    },
+    {
       "n": 14,
       "n_bootstrap": 1000,
       "pair": [
@@ -339,6 +507,18 @@
       ],
       "regime": "quiet",
       "seed": 53
+    },
+    {
+      "block_len": 5,
+      "independent_blocks_lift_fingerprint_sha256": "208c6163f27e45c93af687e895d4b3dcd95ff970782427c2a4b042c3b0e9bc41",
+      "n_surrogates": 1000,
+      "pair": [
+        "funding_backfill_SOLUSDT",
+        "ivrv_backfill_ETH"
+      ],
+      "seed": 53,
+      "selection_on_common_size_lift_fingerprint_sha256": "7ed78990bdc884a9bb9746c40a10feaa9555be28da9257456f99b216009703b3",
+      "surrogate_null": true
     },
     {
       "n": 33,
@@ -381,6 +561,18 @@
       "seed": 53
     },
     {
+      "block_len": 5,
+      "independent_blocks_lift_fingerprint_sha256": "ca7a3c851a51ca7db899e559a813220ea3ecd23576b65eab069529124ff55f69",
+      "n_surrogates": 1000,
+      "pair": [
+        "funding_backfill_XRPUSDT",
+        "funding_backfill_BNBUSDT"
+      ],
+      "seed": 53,
+      "selection_on_common_size_lift_fingerprint_sha256": "097c1fb34f9cf45fa51eee0e2c44b226d9bdb5a1fe22eb0b0a69f46c1af257f9",
+      "surrogate_null": true
+    },
+    {
       "n": 20,
       "n_bootstrap": 1000,
       "pair": [
@@ -401,6 +593,18 @@
       "seed": 53
     },
     {
+      "block_len": 5,
+      "independent_blocks_lift_fingerprint_sha256": "b82fefffce1018b09af879f992255d216debb6339cb60e4a1256eb24e5b0ab3f",
+      "n_surrogates": 1000,
+      "pair": [
+        "funding_backfill_XRPUSDT",
+        "ivrv_backfill_BTC"
+      ],
+      "seed": 53,
+      "selection_on_common_size_lift_fingerprint_sha256": "d15d8a68ce024ede5e500d0681b2cd156af279d63af344484a65f8f0b39fb7bb",
+      "surrogate_null": true
+    },
+    {
       "n": 20,
       "n_bootstrap": 1000,
       "pair": [
@@ -419,6 +623,18 @@
       ],
       "regime": "quiet",
       "seed": 53
+    },
+    {
+      "block_len": 5,
+      "independent_blocks_lift_fingerprint_sha256": "8b0a5f972bf8fb0cb6f7b2445873cc2f4c68b8f1ff563865693cbb3b19125c54",
+      "n_surrogates": 1000,
+      "pair": [
+        "funding_backfill_XRPUSDT",
+        "ivrv_backfill_ETH"
+      ],
+      "seed": 53,
+      "selection_on_common_size_lift_fingerprint_sha256": "30f9bf7dd24c038afa33aa3d70b110db9ae18d9bc8ad2c4433b77f5cd0e0921a",
+      "surrogate_null": true
     },
     {
       "n": 33,
@@ -461,6 +677,18 @@
       "seed": 53
     },
     {
+      "block_len": 5,
+      "independent_blocks_lift_fingerprint_sha256": "e83cc0e9aee136359e677f03d7b752af2bc23a69f8d649a1c6d6c420f3acb465",
+      "n_surrogates": 1000,
+      "pair": [
+        "funding_backfill_BNBUSDT",
+        "ivrv_backfill_BTC"
+      ],
+      "seed": 53,
+      "selection_on_common_size_lift_fingerprint_sha256": "f6a3285acece93356c308b9b5da3598348ae17787f8fe6be029e61f4915605a9",
+      "surrogate_null": true
+    },
+    {
       "n": 14,
       "n_bootstrap": 1000,
       "pair": [
@@ -479,6 +707,18 @@
       ],
       "regime": "quiet",
       "seed": 53
+    },
+    {
+      "block_len": 5,
+      "independent_blocks_lift_fingerprint_sha256": "183285dda1b3e80ec8e06fd97cb22a3924941cb9bc12f266b9b4b843bc16bb26",
+      "n_surrogates": 1000,
+      "pair": [
+        "funding_backfill_BNBUSDT",
+        "ivrv_backfill_ETH"
+      ],
+      "seed": 53,
+      "selection_on_common_size_lift_fingerprint_sha256": "1f74c68d3a0e18c96ddbf3a033a5a2556f356279de907e2328340ab26f7c05d3",
+      "surrogate_null": true
     },
     {
       "n": 33,
@@ -519,6 +759,18 @@
       ],
       "regime": "quiet",
       "seed": 53
+    },
+    {
+      "block_len": 5,
+      "independent_blocks_lift_fingerprint_sha256": "f80837399ec4f78df7b2616bfc9ac7a2382c9437ac41da82513f7cb6d537723d",
+      "n_surrogates": 1000,
+      "pair": [
+        "ivrv_backfill_BTC",
+        "ivrv_backfill_ETH"
+      ],
+      "seed": 53,
+      "selection_on_common_size_lift_fingerprint_sha256": "29c61bf8e23a6f789f4e9d1f36c6a59cec71a942d842dbfc641c2d508b02c8a3",
+      "surrogate_null": true
     },
     {
       "n": 33,

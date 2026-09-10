@@ -41,3 +41,30 @@
 ## Konsequenzen (DEC-64)
 - Surrogat-Null der Stress-Zelle nachruesten (zwei Varianten: unabhaengige Block-Surrogate; Selektion auf gemeinsame Groesse) und den Lauf wiederholen; erst dann geht die Stress-Matrix als Konstante in PRD 9.2.
 - Konstanten aus Teil 2 (Portfolio-Null, Selektions-Decke) sind unveraendert reproduziert (Seed 53, identische Werte).
+
+## Nachtrag 2026-09-10: Surrogat-Null der Stress-Zelle (Wiederholungslauf, DEC-64 erfuellt)
+
+Wiederholungslauf `state/runs/wp10a2_20260910/` (ersetzt die Fassung ohne Surrogat-Block vom selben Tag; alle uebrigen Zahlen identisch, Seed 53). Je Paar B = 1.000 Surrogate in zwei Varianten; berichtet wird der Rang der realen Differenz rho_Stress - rho_Ruhe ("Lift") in der jeweiligen Null-Verteilung.
+
+| Paar | realer Lift | Null p95 (unabh. Bloecke) | Rang unabh. Bloecke | Rang Selektion gem. Groesse |
+|---|---:|---:|---:|---:|
+| Funding ETH x BNB | +0,57 | 0,46 | 98,3 % | 99,7 % |
+| Funding BTC x XRP | +0,44 | 0,37 | 97,6 % | 99,5 % |
+| Funding ETH x SOL | +0,46 | 0,47 | 94,6 % | 96,5 % |
+| Funding SOL x BNB | +0,43 | 0,46 | 93,4 % | 93,6 % |
+| Funding ETH x XRP | +0,35 | 0,42 | 92,3 % | 97,6 % |
+| Funding SOL x XRP | +0,33 | 0,48 | 87,5 % | 89,7 % |
+| Funding BTC x ETH | +0,22 | 0,31 | 87,1 % | 93,1 % |
+| Funding BTC x SOL | +0,13 | 0,46 | 66,7 % | 67,8 % |
+| Funding XRP x BNB | +0,12 | 0,47 | 64,7 % | 68,7 % |
+| Funding BTC x BNB | -0,05 | 0,47 | 44,0 % | 40,3 % |
+| Funding BTC x IV-RV BTC / ETH | -0,42 / -0,44 | 0,38 | 2,1 % / 2,2 % | 5,0 % / 3,5 % |
+| Funding XRP x IV-RV BTC / ETH | -0,31 / -0,26 | 0,39 / 0,40 | 9,8 % / 13,6 % | 10,8 % / 14,4 % |
+| IV-RV BTC x ETH | +0,01 | 0,37 | 50,1 % | 61,5 % |
+| uebrige Funding x IV-RV | -0,18 .. +0,05 | 0,37-0,49 | 26-58 % | 28-56 % |
+
+**Lesart (deskriptiv, kein Verdikt):**
+1. Beide Null-Varianten sind um 0 zentriert (Mittel -0,04 .. +0,015); die Variante "Selektion auf gemeinsame Groesse" liegt praktisch auf der unabhaengigen - der mechanische Extremstichproben-Effekt ist fuer diese Serien klein (die Stress-Maske kommt aus der RV, nicht aus den Serien selbst; symmetrische Randverteilungen erzeugen keine Verschiebung). Die breiten Null-Baender (p95 0,31-0,49) spiegeln n_Stress = 14-28.
+2. Der Funding-Kohaerenz-Anstieg im Stress ist damit NICHT durch den Selektionseffekt erklaert: zwei Paare liegen in beiden Varianten ueber p95, fuenf weitere zwischen 87 % und 97 %, und die Richtung ist in 9 von 10 Paaren gleich. Ein formaler Gemeinschaftstest ist nicht registriert und wird nicht nachgeschoben (deskriptives Paket).
+3. BTC-Funding x IV-RV: der negative Stress-Lift liegt am unteren Rand (Rang 2-5 %), ebenfalls konsistent ueber beide IV-Serien. Bleibt Deskriptor; kein Kandidat (DEC-58).
+4. Die Stress-Matrix geht damit als Konstante in PRD 9.2 (DEC-64 Punkt 2 erfuellt): Funding-Beine sind im Stress deutlich kohaerenter (0,6-0,7) als in Ruhe (0,2-0,35); `N_eff` fuer A1 ist im Stress-Fenster getrennt zu fuehren.
