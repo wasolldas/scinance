@@ -7,7 +7,10 @@ seed + generator fingerprint the 1.000 replicates are reproducible from
 raw replicate array, unless explicitly asked for). A run without BOTH is
 "KEIN VERDIKT" -- loud, even though Teil A itself renders no PASS/FAIL:
 the artefact CONTRACT still applies (spec: "obwohl A keinen Verdikt
-kennt, gilt die Artefakt-Pflicht trotzdem").
+kennt, gilt die Artefakt-Pflicht trotzdem"). The fingerprint entries
+also cover each pair's ``surrogate_null`` draws (PRD C.4 -- see
+``coherence``/``surrogate_null``), extending (b) with a SHA-256 over the
+first 100 draws of each surrogate variant's lift distribution.
 
 KAPITALFREI: report plumbing only. No cost quantity, no PASS/FAIL logic.
 """
@@ -83,6 +86,16 @@ def _bootstrap_entries(coherence_result: dict[str, Any],
             if r.get("status") == "OK":
                 entries.append({"pair": pair["pair"], "regime": regime, "seed": r["seed"],
                                 "n_bootstrap": r["n_bootstrap"], "n": r["n"]})
+        sn = pair.get("surrogate_null", {})
+        if sn.get("status") == "OK":
+            entries.append({
+                "pair": pair["pair"], "surrogate_null": True, "seed": sn["seed"],
+                "n_surrogates": sn["n_surrogates"], "block_len": sn["block_len"],
+                "independent_blocks_lift_fingerprint_sha256":
+                    sn["independent_blocks"]["lift_fingerprint_sha256"],
+                "selection_on_common_size_lift_fingerprint_sha256":
+                    sn["selection_on_common_size"]["lift_fingerprint_sha256"],
+            })
     for k, r in portfolio_null.get("table", {}).get("results", {}).items():
         entries.append({"portfolio_null_table_k": k, "seed": r["seed"],
                         "n_bootstrap": r["n_bootstrap"], "block_len": r["block_len"]})
@@ -173,6 +186,29 @@ def render_markdown(summary: dict[str, Any]) -> str:
                              f"Bonett/Wright-SE={r['bonett_wright_se']:.3f}")
             else:
                 lines.append(f"  - {regime}: {r.get('status')} (n={r.get('n_days')})")
+    lines.append("")
+    lines.append("## Struktureller Nulleffekt der Stress-Zelle (Surrogate, keine Schwelle)")
+    for pair in summary["coherence"].get("pairs", []):
+        sn = pair.get("surrogate_null", {})
+        label = f"{pair['pair'][0]} x {pair['pair'][1]}"
+        if sn.get("status") != "OK":
+            lines.append(f"- {label}: {sn.get('status', 'TOO_FEW')} "
+                         f"(n_stress={sn.get('n_stress')}, n_quiet={sn.get('n_quiet')})")
+            continue
+        real, ib, sel = sn["real"], sn["independent_blocks"], sn["selection_on_common_size"]
+        lines.append(
+            f"- {label}: real rho_stress={real['rho_stress']:.3f}, real Lift={real['lift']:.3f} "
+            f"| Null-Lift (unabhaengige Bloecke) mean={ib['lift']['mean']:.3f} "
+            f"[{ib['lift']['p5']:.3f}, {ib['lift']['p95']:.3f}], "
+            f"Rang(real Lift)={ib['real_lift_rank_pct']:.1f}% "
+            f"| Null-Lift (Selektion auf gemeinsame Groesse) mean={sel['lift']['mean']:.3f} "
+            f"[{sel['lift']['p5']:.3f}, {sel['lift']['p95']:.3f}], "
+            f"Rang(real Lift)={sel['real_lift_rank_pct']:.1f}%")
+    lines.append("")
+    lines.append(
+        "(Deskriptiv, KEINE Schwelle -- der Rang zeigt nur, wo der reale Lift innerhalb der "
+        "jeweiligen Surrogat-Nullverteilung liegt (B=1.000 seedierte Surrogate je Variante); "
+        "es folgt daraus KEIN VERDIKT und KEIN PASS/FAIL.)")
     lines.append("")
     if summary.get("comparison") is not None:
         lines.append("## Bestand vs. Backfill (Ueberlappung)")

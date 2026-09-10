@@ -25,6 +25,14 @@ by the LATER of its two source days (so STRESS_ABS/quiet regime
 membership of a differenced value follows the day the change lands on).
 This is a fixed, always-on transform -- there is no "raw levels" mode.
 
+**Structural null effect (PRD 4.3 "Struktureller Nulleffekt (C.4)",
+DEC-62).** Every pair's stress cell additionally carries a
+``surrogate_null`` block (``surrogate_null.pair_surrogate_null``, own
+module -- see its docstring): the block-bootstrap surrogate null the PRD
+requires next to a raw stress-vs-quiet rho comparison, so a reader can
+see how much of any stress-cell "lift" is the mechanical consequence of
+selecting on common magnitude in a small sample, never a threshold.
+
 KAPITALFREI: pure statistics. No cost quantity, no PASS/FAIL.
 """
 from __future__ import annotations
@@ -32,6 +40,8 @@ from __future__ import annotations
 from typing import Any
 
 import numpy as np
+
+from . import surrogate_null
 
 __all__ = [
     "CoherenceError", "spearman_rho", "pair_overlap", "differenced_pair_overlap",
@@ -156,10 +166,16 @@ def effective_n(days: list[str], episodes: list[list[str]] | None) -> dict[str, 
 
 def pairwise_regime_result(series_a: dict[str, Any], series_b: dict[str, Any],
                            stress_days: set[str], episodes: list[list[str]] | None, *,
-                           n_bootstrap: int = 1000, seed: int) -> dict[str, Any]:
+                           n_bootstrap: int = 1000, seed: int,
+                           n_surrogates: int = surrogate_null.N_SURROGATES,
+                           surrogate_block_len: int = surrogate_null.BLOCK_LEN_DAYS
+                           ) -> dict[str, Any]:
     """One pair's STRESS_ABS-vs-quiet split: correlation + bootstrap CI +
     Bonett/Wright anchor + effective N, on each regime's OVERLAP subset --
-    computed on the FIRST-DIFFERENCED series (see module docstring)."""
+    computed on the FIRST-DIFFERENCED series (see module docstring). Also
+    carries ``surrogate_null`` (PRD C.4, see ``surrogate_null`` module):
+    ``{"status": "TOO_FEW"}`` whenever the stress (or quiet) cell itself
+    is TOO_FEW, an ``"OK"`` block with both surrogate variants otherwise."""
     days, x, y = differenced_pair_overlap(series_a, series_b)
     stress_mask = np.asarray([d in stress_days for d in days], dtype=bool)
     out: dict[str, Any] = {"pair": [series_a["name"], series_b["name"]], "n_overlap": len(days)}
@@ -172,17 +188,24 @@ def pairwise_regime_result(series_a: dict[str, Any], series_b: dict[str, Any],
             continue
         boot = cluster_bootstrap_rho_ci(xsub, ysub, n_bootstrap=n_bootstrap, seed=seed)
         out[regime] = {**eff, "status": "OK", **boot}
+    out["surrogate_null"] = surrogate_null.pair_surrogate_null(
+        x, y, stress_mask, n_surrogates=n_surrogates, seed=seed, block_len=surrogate_block_len)
     return out
 
 
 def correlation_matrix(series_list: list[dict[str, Any]], stress_days: set[str],
                        episodes: list[list[str]] | None, *,
-                       n_bootstrap: int = 1000, seed: int) -> dict[str, Any]:
-    """All pairwise STRESS_ABS-vs-quiet Spearman results over ``series_list``."""
+                       n_bootstrap: int = 1000, seed: int,
+                       n_surrogates: int = surrogate_null.N_SURROGATES,
+                       surrogate_block_len: int = surrogate_null.BLOCK_LEN_DAYS
+                       ) -> dict[str, Any]:
+    """All pairwise STRESS_ABS-vs-quiet Spearman results over ``series_list``,
+    each carrying a ``surrogate_null`` block (PRD C.4)."""
     names = [s["name"] for s in series_list]
     pairs = [
         pairwise_regime_result(series_list[i], series_list[j], stress_days, episodes,
-                               n_bootstrap=n_bootstrap, seed=seed)
+                               n_bootstrap=n_bootstrap, seed=seed,
+                               n_surrogates=n_surrogates, surrogate_block_len=surrogate_block_len)
         for i in range(len(series_list)) for j in range(i + 1, len(series_list))
     ]
     return {"names": names, "n_series": len(series_list), "pairs": pairs}
