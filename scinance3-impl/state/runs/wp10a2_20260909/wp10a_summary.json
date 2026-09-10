@@ -1,0 +1,1563 @@
+{
+ "artifacts": {
+  "bootstrap_fingerprint": {
+   "n_entries": 62,
+   "path": "E:\\Claude\\Projects\\scinance\\scinance3-impl\\state\\wp10a2_20260909\\wp10a_coherence_bootstrap_fingerprint.json",
+   "sha256": "53ba6b8fc1d0ed142152c384091306320b3b9452b3be62301726c7718d05041d"
+  },
+  "cluster_series": {
+   "basis_BTCUSDT": {
+    "n_rows": 61,
+    "path": "E:\\Claude\\Projects\\scinance\\scinance3-impl\\state\\wp10a2_20260909\\wp10a_basis_BTCUSDT_daily.csv",
+    "sha256": "1d15006e09c37747be3e07f550e059ebaf84de09b10f9fcd7a66ae6e11648b7c"
+   },
+   "basis_ETHUSDT": {
+    "n_rows": 61,
+    "path": "E:\\Claude\\Projects\\scinance\\scinance3-impl\\state\\wp10a2_20260909\\wp10a_basis_ETHUSDT_daily.csv",
+    "sha256": "3b945da43de3df59f716d5cfe6ae3f1a3499ba77a1ebc6208ccd7e5425e2e5f0"
+   },
+   "funding_backfill_BNBUSDT": {
+    "n_rows": 1859,
+    "path": "E:\\Claude\\Projects\\scinance\\scinance3-impl\\state\\wp10a2_20260909\\wp10a_funding_backfill_BNBUSDT_daily.csv",
+    "sha256": "cc5efdd5390b46a7cd475414661144ee5c31767ff95dcb0b47c75394c916244a"
+   },
+   "funding_backfill_BTCUSDT": {
+    "n_rows": 2320,
+    "path": "E:\\Claude\\Projects\\scinance\\scinance3-impl\\state\\wp10a2_20260909\\wp10a_funding_backfill_BTCUSDT_daily.csv",
+    "sha256": "c8c7547f9bc0cdedf7bad4d48ec7a60a62bda1d8f67dfc8facbddf2b2df92169"
+   },
+   "funding_backfill_ETHUSDT": {
+    "n_rows": 2110,
+    "path": "E:\\Claude\\Projects\\scinance\\scinance3-impl\\state\\wp10a2_20260909\\wp10a_funding_backfill_ETHUSDT_daily.csv",
+    "sha256": "0ad339a48c8b68ac27bea2fe35cbd60f215ea10f4bd4e25daa7c407e841443bf"
+   },
+   "funding_backfill_SOLUSDT": {
+    "n_rows": 1859,
+    "path": "E:\\Claude\\Projects\\scinance\\scinance3-impl\\state\\wp10a2_20260909\\wp10a_funding_backfill_SOLUSDT_daily.csv",
+    "sha256": "781f6f1dc3bf67dfaf3634aa7549c0ca53a348e0dbce9e4f210583b2719d0fc0"
+   },
+   "funding_backfill_XRPUSDT": {
+    "n_rows": 1906,
+    "path": "E:\\Claude\\Projects\\scinance\\scinance3-impl\\state\\wp10a2_20260909\\wp10a_funding_backfill_XRPUSDT_daily.csv",
+    "sha256": "d125c51324c8d0341067b5f22feef6b1a19c069046b085ea58fafa354e841116"
+   },
+   "ivrv_backfill_BTC": {
+    "n_rows": 1956,
+    "path": "E:\\Claude\\Projects\\scinance\\scinance3-impl\\state\\wp10a2_20260909\\wp10a_ivrv_backfill_BTC_daily.csv",
+    "sha256": "bb8adde02092a48dcf7013d13126d6341afb9fa4b586242b9023d1ebb9fa5e72"
+   },
+   "ivrv_backfill_ETH": {
+    "n_rows": 1956,
+    "path": "E:\\Claude\\Projects\\scinance\\scinance3-impl\\state\\wp10a2_20260909\\wp10a_ivrv_backfill_ETH_daily.csv",
+    "sha256": "f95147522cea33e8ad7d40102a78b7a318cfd4d0929ead035fa8c653bf67f60e"
+   }
+  }
+ },
+ "coherence": {
+  "n_series": 9,
+  "names": [
+   "funding_backfill_BTCUSDT",
+   "funding_backfill_ETHUSDT",
+   "funding_backfill_SOLUSDT",
+   "funding_backfill_XRPUSDT",
+   "funding_backfill_BNBUSDT",
+   "ivrv_backfill_BTC",
+   "ivrv_backfill_ETH",
+   "basis_BTCUSDT",
+   "basis_ETHUSDT"
+  ],
+  "pairs": [
+   {
+    "n_overlap": 2109,
+    "pair": [
+     "funding_backfill_BTCUSDT",
+     "funding_backfill_ETHUSDT"
+    ],
+    "quiet": {
+     "alpha": 0.05,
+     "bonett_wright_se": 0.023253219632808412,
+     "ci_hi": 0.39489670191090864,
+     "ci_lo": 0.3069411436124901,
+     "n": 2081,
+     "n_bootstrap": 1000,
+     "n_days": 2081,
+     "n_episodes": null,
+     "rho": 0.35143917449701007,
+     "seed": 53,
+     "status": "OK"
+    },
+    "stress": {
+     "alpha": 0.05,
+     "bonett_wright_se": 0.21200000000000002,
+     "ci_hi": 0.8392223556115145,
+     "ci_lo": 0.17483746453028834,
+     "n": 28,
+     "n_bootstrap": 1000,
+     "n_days": 28,
+     "n_episodes": 17,
+     "rho": 0.5697837400365311,
+     "seed": 53,
+     "status": "OK"
+    }
+   },
+   {
+    "n_overlap": 1858,
+    "pair": [
+     "funding_backfill_BTCUSDT",
+     "funding_backfill_SOLUSDT"
+    ],
+    "quiet": {
+     "alpha": 0.05,
+     "bonett_wright_se": 0.024704665106029804,
+     "ci_hi": 0.26904158819106694,
+     "ci_lo": 0.17337914744254518,
+     "n": 1844,
+     "n_bootstrap": 1000,
+     "n_days": 1844,
+     "n_episodes": null,
+     "rho": 0.22048603616499202,
+     "seed": 53,
+     "status": "OK"
+    },
+    "stress": {
+     "alpha": 0.05,
+     "bonett_wright_se": 0.3196020252524295,
+     "ci_hi": 0.8576642338721219,
+     "ci_lo": -0.28051434783616946,
+     "n": 14,
+     "n_bootstrap": 1000,
+     "n_days": 14,
+     "n_episodes": 9,
+     "rho": 0.3491189427312775,
+     "seed": 53,
+     "status": "OK"
+    }
+   },
+   {
+    "n_overlap": 1905,
+    "pair": [
+     "funding_backfill_BTCUSDT",
+     "funding_backfill_XRPUSDT"
+    ],
+    "quiet": {
+     "alpha": 0.05,
+     "bonett_wright_se": 0.024434083614551426,
+     "ci_hi": 0.26877640142797105,
+     "ci_lo": 0.17484491448808143,
+     "n": 1885,
+     "n_bootstrap": 1000,
+     "n_days": 1885,
+     "n_episodes": null,
+     "rho": 0.22225162438235033,
+     "seed": 53,
+     "status": "OK"
+    },
+    "stress": {
+     "alpha": 0.05,
+     "bonett_wright_se": 0.25708776253851295,
+     "ci_hi": 0.902587690171456,
+     "ci_lo": 0.21026729646060258,
+     "n": 20,
+     "n_bootstrap": 1000,
+     "n_days": 20,
+     "n_episodes": 10,
+     "rho": 0.663280662151994,
+     "seed": 53,
+     "status": "OK"
+    }
+   },
+   {
+    "n_overlap": 1858,
+    "pair": [
+     "funding_backfill_BTCUSDT",
+     "funding_backfill_BNBUSDT"
+    ],
+    "quiet": {
+     "alpha": 0.05,
+     "bonett_wright_se": 0.024704665106029804,
+     "ci_hi": 0.1546139418500006,
+     "ci_lo": 0.057737281739638845,
+     "n": 1844,
+     "n_bootstrap": 1000,
+     "n_days": 1844,
+     "n_episodes": null,
+     "rho": 0.10503169449046239,
+     "seed": 53,
+     "status": "OK"
+    },
+    "stress": {
+     "alpha": 0.05,
+     "bonett_wright_se": 0.3196020252524295,
+     "ci_hi": 0.6609941813804171,
+     "ci_lo": -0.5955282914294352,
+     "n": 14,
+     "n_bootstrap": 1000,
+     "n_days": 14,
+     "n_episodes": 9,
+     "rho": 0.059405976541875294,
+     "seed": 53,
+     "status": "OK"
+    }
+   },
+   {
+    "n_overlap": 1955,
+    "pair": [
+     "funding_backfill_BTCUSDT",
+     "ivrv_backfill_BTC"
+    ],
+    "quiet": {
+     "alpha": 0.05,
+     "bonett_wright_se": 0.02412832704111723,
+     "ci_hi": 0.03452874181483931,
+     "ci_lo": -0.059868447200745044,
+     "n": 1933,
+     "n_bootstrap": 1000,
+     "n_days": 1933,
+     "n_episodes": null,
+     "rho": -0.01181555808295581,
+     "seed": 53,
+     "status": "OK"
+    },
+    "stress": {
+     "alpha": 0.05,
+     "bonett_wright_se": 0.24318067790279546,
+     "ci_hi": 0.02171443662789332,
+     "ci_lo": -0.7455420644799964,
+     "n": 22,
+     "n_bootstrap": 1000,
+     "n_days": 22,
+     "n_episodes": 12,
+     "rho": -0.43321097463166114,
+     "seed": 53,
+     "status": "OK"
+    }
+   },
+   {
+    "n_overlap": 1955,
+    "pair": [
+     "funding_backfill_BTCUSDT",
+     "ivrv_backfill_ETH"
+    ],
+    "quiet": {
+     "alpha": 0.05,
+     "bonett_wright_se": 0.02412832704111723,
+     "ci_hi": 0.028205148158594946,
+     "ci_lo": -0.07217157930486098,
+     "n": 1933,
+     "n_bootstrap": 1000,
+     "n_days": 1933,
+     "n_episodes": null,
+     "rho": -0.021929863157969565,
+     "seed": 53,
+     "status": "OK"
+    },
+    "stress": {
+     "alpha": 0.05,
+     "bonett_wright_se": 0.24318067790279546,
+     "ci_hi": -0.058822232159570276,
+     "ci_lo": -0.7648663268544368,
+     "n": 22,
+     "n_bootstrap": 1000,
+     "n_days": 22,
+     "n_episodes": 12,
+     "rho": -0.4642756468673083,
+     "seed": 53,
+     "status": "OK"
+    }
+   },
+   {
+    "n_overlap": 33,
+    "pair": [
+     "funding_backfill_BTCUSDT",
+     "basis_BTCUSDT"
+    ],
+    "quiet": {
+     "alpha": 0.05,
+     "bonett_wright_se": 0.1935286369851587,
+     "ci_hi": 0.20642486504915428,
+     "ci_lo": -0.5327233858778166,
+     "n": 33,
+     "n_bootstrap": 1000,
+     "n_days": 33,
+     "n_episodes": null,
+     "rho": -0.16343582887700533,
+     "seed": 53,
+     "status": "OK"
+    },
+    "stress": {
+     "n_days": 0,
+     "n_episodes": 0,
+     "rho": null,
+     "status": "TOO_FEW"
+    }
+   },
+   {
+    "n_overlap": 33,
+    "pair": [
+     "funding_backfill_BTCUSDT",
+     "basis_ETHUSDT"
+    ],
+    "quiet": {
+     "alpha": 0.05,
+     "bonett_wright_se": 0.1935286369851587,
+     "ci_hi": 0.4439235394405896,
+     "ci_lo": -0.23514403860616145,
+     "n": 33,
+     "n_bootstrap": 1000,
+     "n_days": 33,
+     "n_episodes": null,
+     "rho": 0.11029411764705882,
+     "seed": 53,
+     "status": "OK"
+    },
+    "stress": {
+     "n_days": 0,
+     "n_episodes": 0,
+     "rho": null,
+     "status": "TOO_FEW"
+    }
+   },
+   {
+    "n_overlap": 1858,
+    "pair": [
+     "funding_backfill_ETHUSDT",
+     "funding_backfill_SOLUSDT"
+    ],
+    "quiet": {
+     "alpha": 0.05,
+     "bonett_wright_se": 0.024704665106029804,
+     "ci_hi": 0.3092408982553411,
+     "ci_lo": 0.2135534589675923,
+     "n": 1844,
+     "n_bootstrap": 1000,
+     "n_days": 1844,
+     "n_episodes": null,
+     "rho": 0.263637388004588,
+     "seed": 53,
+     "status": "OK"
+    },
+    "stress": {
+     "alpha": 0.05,
+     "bonett_wright_se": 0.3196020252524295,
+     "ci_hi": 0.9150703440730976,
+     "ci_lo": 0.2938508736828065,
+     "n": 14,
+     "n_bootstrap": 1000,
+     "n_days": 14,
+     "n_episodes": 9,
+     "rho": 0.723568281938326,
+     "seed": 53,
+     "status": "OK"
+    }
+   },
+   {
+    "n_overlap": 1905,
+    "pair": [
+     "funding_backfill_ETHUSDT",
+     "funding_backfill_XRPUSDT"
+    ],
+    "quiet": {
+     "alpha": 0.05,
+     "bonett_wright_se": 0.024434083614551426,
+     "ci_hi": 0.28756667769947875,
+     "ci_lo": 0.1940120949231023,
+     "n": 1885,
+     "n_bootstrap": 1000,
+     "n_days": 1885,
+     "n_episodes": null,
+     "rho": 0.24148490444468046,
+     "seed": 53,
+     "status": "OK"
+    },
+    "stress": {
+     "alpha": 0.05,
+     "bonett_wright_se": 0.25708776253851295,
+     "ci_hi": 0.8465063793854738,
+     "ci_lo": 0.1592630309284771,
+     "n": 20,
+     "n_bootstrap": 1000,
+     "n_days": 20,
+     "n_episodes": 10,
+     "rho": 0.5881167965200716,
+     "seed": 53,
+     "status": "OK"
+    }
+   },
+   {
+    "n_overlap": 1858,
+    "pair": [
+     "funding_backfill_ETHUSDT",
+     "funding_backfill_BNBUSDT"
+    ],
+    "quiet": {
+     "alpha": 0.05,
+     "bonett_wright_se": 0.024704665106029804,
+     "ci_hi": 0.21510343557609246,
+     "ci_lo": 0.11985698977068406,
+     "n": 1844,
+     "n_bootstrap": 1000,
+     "n_days": 1844,
+     "n_episodes": null,
+     "rho": 0.16782318011237984,
+     "seed": 53,
+     "status": "OK"
+    },
+    "stress": {
+     "alpha": 0.05,
+     "bonett_wright_se": 0.3196020252524295,
+     "ci_hi": 0.9425334407242771,
+     "ci_lo": 0.34596730900800565,
+     "n": 14,
+     "n_bootstrap": 1000,
+     "n_days": 14,
+     "n_episodes": 9,
+     "rho": 0.7414745960967398,
+     "seed": 53,
+     "status": "OK"
+    }
+   },
+   {
+    "n_overlap": 1955,
+    "pair": [
+     "funding_backfill_ETHUSDT",
+     "ivrv_backfill_BTC"
+    ],
+    "quiet": {
+     "alpha": 0.05,
+     "bonett_wright_se": 0.02412832704111723,
+     "ci_hi": 0.07583889630673771,
+     "ci_lo": -0.01310219983811522,
+     "n": 1933,
+     "n_bootstrap": 1000,
+     "n_days": 1933,
+     "n_episodes": null,
+     "rho": 0.03043568818103893,
+     "seed": 53,
+     "status": "OK"
+    },
+    "stress": {
+     "alpha": 0.05,
+     "bonett_wright_se": 0.24318067790279546,
+     "ci_hi": 0.47684891300008836,
+     "ci_lo": -0.477599313164036,
+     "n": 22,
+     "n_bootstrap": 1000,
+     "n_days": 22,
+     "n_episodes": 12,
+     "rho": -0.011925234863957291,
+     "seed": 53,
+     "status": "OK"
+    }
+   },
+   {
+    "n_overlap": 1955,
+    "pair": [
+     "funding_backfill_ETHUSDT",
+     "ivrv_backfill_ETH"
+    ],
+    "quiet": {
+     "alpha": 0.05,
+     "bonett_wright_se": 0.02412832704111723,
+     "ci_hi": 0.06488972141197988,
+     "ci_lo": -0.026977467853429537,
+     "n": 1933,
+     "n_bootstrap": 1000,
+     "n_days": 1933,
+     "n_episodes": null,
+     "rho": 0.017270893442171763,
+     "seed": 53,
+     "status": "OK"
+    },
+    "stress": {
+     "alpha": 0.05,
+     "bonett_wright_se": 0.24318067790279546,
+     "ci_hi": 0.4757547602433205,
+     "ci_lo": -0.4198516307183843,
+     "n": 22,
+     "n_bootstrap": 1000,
+     "n_days": 22,
+     "n_episodes": 12,
+     "rho": 0.027825548015900346,
+     "seed": 53,
+     "status": "OK"
+    }
+   },
+   {
+    "n_overlap": 33,
+    "pair": [
+     "funding_backfill_ETHUSDT",
+     "basis_BTCUSDT"
+    ],
+    "quiet": {
+     "alpha": 0.05,
+     "bonett_wright_se": 0.1935286369851587,
+     "ci_hi": 0.45326086919696706,
+     "ci_lo": -0.24174755945976903,
+     "n": 33,
+     "n_bootstrap": 1000,
+     "n_days": 33,
+     "n_episodes": null,
+     "rho": 0.10594919786096256,
+     "seed": 53,
+     "status": "OK"
+    },
+    "stress": {
+     "n_days": 0,
+     "n_episodes": 0,
+     "rho": null,
+     "status": "TOO_FEW"
+    }
+   },
+   {
+    "n_overlap": 33,
+    "pair": [
+     "funding_backfill_ETHUSDT",
+     "basis_ETHUSDT"
+    ],
+    "quiet": {
+     "alpha": 0.05,
+     "bonett_wright_se": 0.1935286369851587,
+     "ci_hi": 0.3363832684783822,
+     "ci_lo": -0.34683932031926096,
+     "n": 33,
+     "n_bootstrap": 1000,
+     "n_days": 33,
+     "n_episodes": null,
+     "rho": -0.01036096256684492,
+     "seed": 53,
+     "status": "OK"
+    },
+    "stress": {
+     "n_days": 0,
+     "n_episodes": 0,
+     "rho": null,
+     "status": "TOO_FEW"
+    }
+   },
+   {
+    "n_overlap": 1858,
+    "pair": [
+     "funding_backfill_SOLUSDT",
+     "funding_backfill_XRPUSDT"
+    ],
+    "quiet": {
+     "alpha": 0.05,
+     "bonett_wright_se": 0.024704665106029804,
+     "ci_hi": 0.34751328377239404,
+     "ci_lo": 0.25331319447564477,
+     "n": 1844,
+     "n_bootstrap": 1000,
+     "n_days": 1844,
+     "n_episodes": null,
+     "rho": 0.30139283115742044,
+     "seed": 53,
+     "status": "OK"
+    },
+    "stress": {
+     "alpha": 0.05,
+     "bonett_wright_se": 0.3196020252524295,
+     "ci_hi": 0.9378599269778327,
+     "ci_lo": 0.10319129858099102,
+     "n": 14,
+     "n_bootstrap": 1000,
+     "n_days": 14,
+     "n_episodes": 9,
+     "rho": 0.6310572687224669,
+     "seed": 53,
+     "status": "OK"
+    }
+   },
+   {
+    "n_overlap": 1858,
+    "pair": [
+     "funding_backfill_SOLUSDT",
+     "funding_backfill_BNBUSDT"
+    ],
+    "quiet": {
+     "alpha": 0.05,
+     "bonett_wright_se": 0.024704665106029804,
+     "ci_hi": 0.2704481577285305,
+     "ci_lo": 0.1754644584731246,
+     "n": 1844,
+     "n_bootstrap": 1000,
+     "n_days": 1844,
+     "n_episodes": null,
+     "rho": 0.2230821212900585,
+     "seed": 53,
+     "status": "OK"
+    },
+    "stress": {
+     "alpha": 0.05,
+     "bonett_wright_se": 0.3196020252524295,
+     "ci_hi": 0.9585532433717013,
+     "ci_lo": 0.12005822851992222,
+     "n": 14,
+     "n_bootstrap": 1000,
+     "n_days": 14,
+     "n_episodes": 9,
+     "rho": 0.6512655206072254,
+     "seed": 53,
+     "status": "OK"
+    }
+   },
+   {
+    "n_overlap": 1858,
+    "pair": [
+     "funding_backfill_SOLUSDT",
+     "ivrv_backfill_BTC"
+    ],
+    "quiet": {
+     "alpha": 0.05,
+     "bonett_wright_se": 0.024704665106029804,
+     "ci_hi": 0.027825235025288796,
+     "ci_lo": -0.06144513024662405,
+     "n": 1844,
+     "n_bootstrap": 1000,
+     "n_days": 1844,
+     "n_episodes": null,
+     "rho": -0.01581129842596632,
+     "seed": 53,
+     "status": "OK"
+    },
+    "stress": {
+     "alpha": 0.05,
+     "bonett_wright_se": 0.3196020252524295,
+     "ci_hi": 0.4305955676199718,
+     "ci_lo": -0.6948640087987034,
+     "n": 14,
+     "n_bootstrap": 1000,
+     "n_days": 14,
+     "n_episodes": 9,
+     "rho": -0.17381748691882032,
+     "seed": 53,
+     "status": "OK"
+    }
+   },
+   {
+    "n_overlap": 1858,
+    "pair": [
+     "funding_backfill_SOLUSDT",
+     "ivrv_backfill_ETH"
+    ],
+    "quiet": {
+     "alpha": 0.05,
+     "bonett_wright_se": 0.024704665106029804,
+     "ci_hi": 0.0320132332500407,
+     "ci_lo": -0.06325106144914142,
+     "n": 1844,
+     "n_bootstrap": 1000,
+     "n_days": 1844,
+     "n_episodes": null,
+     "rho": -0.01348833862691102,
+     "seed": 53,
+     "status": "OK"
+    },
+    "stress": {
+     "alpha": 0.05,
+     "bonett_wright_se": 0.3196020252524295,
+     "ci_hi": 0.399585576390251,
+     "ci_lo": -0.6279590009293281,
+     "n": 14,
+     "n_bootstrap": 1000,
+     "n_days": 14,
+     "n_episodes": 9,
+     "rho": -0.19141925774604263,
+     "seed": 53,
+     "status": "OK"
+    }
+   },
+   {
+    "n_overlap": 33,
+    "pair": [
+     "funding_backfill_SOLUSDT",
+     "basis_BTCUSDT"
+    ],
+    "quiet": {
+     "alpha": 0.05,
+     "bonett_wright_se": 0.1935286369851587,
+     "ci_hi": 0.16617580351421532,
+     "ci_lo": -0.5490423366226733,
+     "n": 33,
+     "n_bootstrap": 1000,
+     "n_days": 33,
+     "n_episodes": null,
+     "rho": -0.22693850267379678,
+     "seed": 53,
+     "status": "OK"
+    },
+    "stress": {
+     "n_days": 0,
+     "n_episodes": 0,
+     "rho": null,
+     "status": "TOO_FEW"
+    }
+   },
+   {
+    "n_overlap": 33,
+    "pair": [
+     "funding_backfill_SOLUSDT",
+     "basis_ETHUSDT"
+    ],
+    "quiet": {
+     "alpha": 0.05,
+     "bonett_wright_se": 0.1935286369851587,
+     "ci_hi": 0.26434642270463,
+     "ci_lo": -0.3198331568224483,
+     "n": 33,
+     "n_bootstrap": 1000,
+     "n_days": 33,
+     "n_episodes": null,
+     "rho": -0.03910427807486631,
+     "seed": 53,
+     "status": "OK"
+    },
+    "stress": {
+     "n_days": 0,
+     "n_episodes": 0,
+     "rho": null,
+     "status": "TOO_FEW"
+    }
+   },
+   {
+    "n_overlap": 1858,
+    "pair": [
+     "funding_backfill_XRPUSDT",
+     "funding_backfill_BNBUSDT"
+    ],
+    "quiet": {
+     "alpha": 0.05,
+     "bonett_wright_se": 0.024704665106029804,
+     "ci_hi": 0.25376203266329217,
+     "ci_lo": 0.16374558358877983,
+     "n": 1844,
+     "n_bootstrap": 1000,
+     "n_days": 1844,
+     "n_episodes": null,
+     "rho": 0.2099892879799697,
+     "seed": 53,
+     "status": "OK"
+    },
+    "stress": {
+     "alpha": 0.05,
+     "bonett_wright_se": 0.3196020252524295,
+     "ci_hi": 0.7224537974882355,
+     "ci_lo": -0.20460424469413233,
+     "n": 14,
+     "n_bootstrap": 1000,
+     "n_days": 14,
+     "n_episodes": 9,
+     "rho": 0.3344336457172239,
+     "seed": 53,
+     "status": "OK"
+    }
+   },
+   {
+    "n_overlap": 1905,
+    "pair": [
+     "funding_backfill_XRPUSDT",
+     "ivrv_backfill_BTC"
+    ],
+    "quiet": {
+     "alpha": 0.05,
+     "bonett_wright_se": 0.024434083614551426,
+     "ci_hi": 0.06119405032497823,
+     "ci_lo": -0.03065234371138874,
+     "n": 1885,
+     "n_bootstrap": 1000,
+     "n_days": 1885,
+     "n_episodes": null,
+     "rho": 0.01425868660560581,
+     "seed": 53,
+     "status": "OK"
+    },
+    "stress": {
+     "alpha": 0.05,
+     "bonett_wright_se": 0.25708776253851295,
+     "ci_hi": 0.277472026525525,
+     "ci_lo": -0.6955588532749613,
+     "n": 20,
+     "n_bootstrap": 1000,
+     "n_days": 20,
+     "n_episodes": 10,
+     "rho": -0.2910868953501923,
+     "seed": 53,
+     "status": "OK"
+    }
+   },
+   {
+    "n_overlap": 1905,
+    "pair": [
+     "funding_backfill_XRPUSDT",
+     "ivrv_backfill_ETH"
+    ],
+    "quiet": {
+     "alpha": 0.05,
+     "bonett_wright_se": 0.024434083614551426,
+     "ci_hi": 0.04633317383687199,
+     "ci_lo": -0.049196643611034464,
+     "n": 1885,
+     "n_bootstrap": 1000,
+     "n_days": 1885,
+     "n_episodes": null,
+     "rho": -0.002819755326618414,
+     "seed": 53,
+     "status": "OK"
+    },
+    "stress": {
+     "alpha": 0.05,
+     "bonett_wright_se": 0.25708776253851295,
+     "ci_hi": 0.2650603356240711,
+     "ci_lo": -0.6861554860520993,
+     "n": 20,
+     "n_bootstrap": 1000,
+     "n_days": 20,
+     "n_episodes": 10,
+     "rho": -0.25949606949823345,
+     "seed": 53,
+     "status": "OK"
+    }
+   },
+   {
+    "n_overlap": 33,
+    "pair": [
+     "funding_backfill_XRPUSDT",
+     "basis_BTCUSDT"
+    ],
+    "quiet": {
+     "alpha": 0.05,
+     "bonett_wright_se": 0.1935286369851587,
+     "ci_hi": 0.21213237282978034,
+     "ci_lo": -0.5496167059648066,
+     "n": 33,
+     "n_bootstrap": 1000,
+     "n_days": 33,
+     "n_episodes": null,
+     "rho": -0.19217914438502673,
+     "seed": 53,
+     "status": "OK"
+    },
+    "stress": {
+     "n_days": 0,
+     "n_episodes": 0,
+     "rho": null,
+     "status": "TOO_FEW"
+    }
+   },
+   {
+    "n_overlap": 33,
+    "pair": [
+     "funding_backfill_XRPUSDT",
+     "basis_ETHUSDT"
+    ],
+    "quiet": {
+     "alpha": 0.05,
+     "bonett_wright_se": 0.1935286369851587,
+     "ci_hi": -0.017628704520364222,
+     "ci_lo": -0.6414670145377295,
+     "n": 33,
+     "n_bootstrap": 1000,
+     "n_days": 33,
+     "n_episodes": null,
+     "rho": -0.37032085561497324,
+     "seed": 53,
+     "status": "OK"
+    },
+    "stress": {
+     "n_days": 0,
+     "n_episodes": 0,
+     "rho": null,
+     "status": "TOO_FEW"
+    }
+   },
+   {
+    "n_overlap": 1858,
+    "pair": [
+     "funding_backfill_BNBUSDT",
+     "ivrv_backfill_BTC"
+    ],
+    "quiet": {
+     "alpha": 0.05,
+     "bonett_wright_se": 0.024704665106029804,
+     "ci_hi": 0.04895546910070522,
+     "ci_lo": -0.04034114282185625,
+     "n": 1844,
+     "n_bootstrap": 1000,
+     "n_days": 1844,
+     "n_episodes": null,
+     "rho": 0.0033920681581982356,
+     "seed": 53,
+     "status": "OK"
+    },
+    "stress": {
+     "alpha": 0.05,
+     "bonett_wright_se": 0.3196020252524295,
+     "ci_hi": 0.479658553076403,
+     "ci_lo": -0.5849444826007326,
+     "n": 14,
+     "n_bootstrap": 1000,
+     "n_days": 14,
+     "n_episodes": 9,
+     "rho": 0.002197802197802198,
+     "seed": 53,
+     "status": "OK"
+    }
+   },
+   {
+    "n_overlap": 1858,
+    "pair": [
+     "funding_backfill_BNBUSDT",
+     "ivrv_backfill_ETH"
+    ],
+    "quiet": {
+     "alpha": 0.05,
+     "bonett_wright_se": 0.024704665106029804,
+     "ci_hi": 0.05560701231854473,
+     "ci_lo": -0.0340494419727333,
+     "n": 1844,
+     "n_bootstrap": 1000,
+     "n_days": 1844,
+     "n_episodes": null,
+     "rho": 0.01160181578601834,
+     "seed": 53,
+     "status": "OK"
+    },
+    "stress": {
+     "alpha": 0.05,
+     "bonett_wright_se": 0.3196020252524295,
+     "ci_hi": 0.5456574675324674,
+     "ci_lo": -0.5045223618293471,
+     "n": 14,
+     "n_bootstrap": 1000,
+     "n_days": 14,
+     "n_episodes": 9,
+     "rho": 0.06373626373626373,
+     "seed": 53,
+     "status": "OK"
+    }
+   },
+   {
+    "n_overlap": 33,
+    "pair": [
+     "funding_backfill_BNBUSDT",
+     "basis_BTCUSDT"
+    ],
+    "quiet": {
+     "alpha": 0.05,
+     "bonett_wright_se": 0.1935286369851587,
+     "ci_hi": 0.2034057040244193,
+     "ci_lo": -0.5399152665397048,
+     "n": 33,
+     "n_bootstrap": 1000,
+     "n_days": 33,
+     "n_episodes": null,
+     "rho": -0.1731283422459893,
+     "seed": 53,
+     "status": "OK"
+    },
+    "stress": {
+     "n_days": 0,
+     "n_episodes": 0,
+     "rho": null,
+     "status": "TOO_FEW"
+    }
+   },
+   {
+    "n_overlap": 33,
+    "pair": [
+     "funding_backfill_BNBUSDT",
+     "basis_ETHUSDT"
+    ],
+    "quiet": {
+     "alpha": 0.05,
+     "bonett_wright_se": 0.1935286369851587,
+     "ci_hi": 0.23449418923508447,
+     "ci_lo": -0.5370844274632623,
+     "n": 33,
+     "n_bootstrap": 1000,
+     "n_days": 33,
+     "n_episodes": null,
+     "rho": -0.19786096256684493,
+     "seed": 53,
+     "status": "OK"
+    },
+    "stress": {
+     "n_days": 0,
+     "n_episodes": 0,
+     "rho": null,
+     "status": "TOO_FEW"
+    }
+   },
+   {
+    "n_overlap": 1955,
+    "pair": [
+     "ivrv_backfill_BTC",
+     "ivrv_backfill_ETH"
+    ],
+    "quiet": {
+     "alpha": 0.05,
+     "bonett_wright_se": 0.02412832704111723,
+     "ci_hi": 0.8900013493947319,
+     "ci_lo": 0.8600865484836674,
+     "n": 1933,
+     "n_bootstrap": 1000,
+     "n_days": 1933,
+     "n_episodes": null,
+     "rho": 0.8753993443495313,
+     "seed": 53,
+     "status": "OK"
+    },
+    "stress": {
+     "alpha": 0.05,
+     "bonett_wright_se": 0.24318067790279546,
+     "ci_hi": 0.9829059829059829,
+     "ci_lo": 0.660154486483155,
+     "n": 22,
+     "n_bootstrap": 1000,
+     "n_days": 22,
+     "n_episodes": 12,
+     "rho": 0.885940146809712,
+     "seed": 53,
+     "status": "OK"
+    }
+   },
+   {
+    "n_overlap": 33,
+    "pair": [
+     "ivrv_backfill_BTC",
+     "basis_BTCUSDT"
+    ],
+    "quiet": {
+     "alpha": 0.05,
+     "bonett_wright_se": 0.1935286369851587,
+     "ci_hi": 0.5051111967874774,
+     "ci_lo": -0.29486124321781887,
+     "n": 33,
+     "n_bootstrap": 1000,
+     "n_days": 33,
+     "n_episodes": null,
+     "rho": 0.12533422459893048,
+     "seed": 53,
+     "status": "OK"
+    },
+    "stress": {
+     "n_days": 0,
+     "n_episodes": 0,
+     "rho": null,
+     "status": "TOO_FEW"
+    }
+   },
+   {
+    "n_overlap": 33,
+    "pair": [
+     "ivrv_backfill_BTC",
+     "basis_ETHUSDT"
+    ],
+    "quiet": {
+     "alpha": 0.05,
+     "bonett_wright_se": 0.1935286369851587,
+     "ci_hi": 0.2200097280459436,
+     "ci_lo": -0.5469586378286484,
+     "n": 33,
+     "n_bootstrap": 1000,
+     "n_days": 33,
+     "n_episodes": null,
+     "rho": -0.1731283422459893,
+     "seed": 53,
+     "status": "OK"
+    },
+    "stress": {
+     "n_days": 0,
+     "n_episodes": 0,
+     "rho": null,
+     "status": "TOO_FEW"
+    }
+   },
+   {
+    "n_overlap": 33,
+    "pair": [
+     "ivrv_backfill_ETH",
+     "basis_BTCUSDT"
+    ],
+    "quiet": {
+     "alpha": 0.05,
+     "bonett_wright_se": 0.1935286369851587,
+     "ci_hi": 0.39327857299872293,
+     "ci_lo": -0.364408645971795,
+     "n": 33,
+     "n_bootstrap": 1000,
+     "n_days": 33,
+     "n_episodes": null,
+     "rho": 0.016377005347593582,
+     "seed": 53,
+     "status": "OK"
+    },
+    "stress": {
+     "n_days": 0,
+     "n_episodes": 0,
+     "rho": null,
+     "status": "TOO_FEW"
+    }
+   },
+   {
+    "n_overlap": 33,
+    "pair": [
+     "ivrv_backfill_ETH",
+     "basis_ETHUSDT"
+    ],
+    "quiet": {
+     "alpha": 0.05,
+     "bonett_wright_se": 0.1935286369851587,
+     "ci_hi": 0.30202815577143366,
+     "ci_lo": -0.5045537482162985,
+     "n": 33,
+     "n_bootstrap": 1000,
+     "n_days": 33,
+     "n_episodes": null,
+     "rho": -0.12533422459893048,
+     "seed": 53,
+     "status": "OK"
+    },
+    "stress": {
+     "n_days": 0,
+     "n_episodes": 0,
+     "rho": null,
+     "status": "TOO_FEW"
+    }
+   },
+   {
+    "n_overlap": 60,
+    "pair": [
+     "basis_BTCUSDT",
+     "basis_ETHUSDT"
+    ],
+    "quiet": {
+     "alpha": 0.05,
+     "bonett_wright_se": 0.14164845821358493,
+     "ci_hi": 0.5677646931460514,
+     "ci_lo": 0.07344043445866945,
+     "n": 59,
+     "n_bootstrap": 1000,
+     "n_days": 59,
+     "n_episodes": null,
+     "rho": 0.33489187609585036,
+     "seed": 53,
+     "status": "OK"
+    },
+    "stress": {
+     "n_days": 1,
+     "n_episodes": 1,
+     "rho": null,
+     "status": "TOO_FEW"
+    }
+   }
+  ]
+ },
+ "comparison": [
+  {
+   "diff_days": [],
+   "diff_threshold": 1e-09,
+   "max_abs_diff": 0.0,
+   "n_days_diff": 0,
+   "n_overlap": 882,
+   "name": "funding_BTCUSDT",
+   "reason": null,
+   "status": "OK"
+  },
+  {
+   "diff_days": [],
+   "diff_threshold": 1e-09,
+   "max_abs_diff": 0.0,
+   "n_days_diff": 0,
+   "n_overlap": 883,
+   "name": "funding_ETHUSDT",
+   "reason": null,
+   "status": "OK"
+  },
+  {
+   "diff_days": [],
+   "diff_threshold": 1e-09,
+   "max_abs_diff": 0.0,
+   "n_days_diff": 0,
+   "n_overlap": 128,
+   "name": "funding_SOLUSDT",
+   "reason": null,
+   "status": "OK"
+  },
+  {
+   "diff_days": [],
+   "diff_threshold": 1e-09,
+   "max_abs_diff": 0.0,
+   "n_days_diff": 0,
+   "n_overlap": 128,
+   "name": "funding_XRPUSDT",
+   "reason": null,
+   "status": "OK"
+  },
+  {
+   "diff_days": [],
+   "diff_threshold": 1e-09,
+   "max_abs_diff": 0.0,
+   "n_days_diff": 0,
+   "n_overlap": 128,
+   "name": "funding_BNBUSDT",
+   "reason": null,
+   "status": "OK"
+  },
+  {
+   "diff_days": [],
+   "materiality_band_volpts": 0.3,
+   "max_abs_diff": 0.0,
+   "n_days_diff": 0,
+   "n_overlap": 165,
+   "name": "ivrv_BTC",
+   "reason": null,
+   "status": "OK",
+   "within_band": true
+  },
+  {
+   "diff_days": [],
+   "materiality_band_volpts": 0.3,
+   "max_abs_diff": 0.0,
+   "n_days_diff": 0,
+   "n_overlap": 165,
+   "name": "ivrv_ETH",
+   "reason": null,
+   "status": "OK",
+   "within_band": true
+  }
+ ],
+ "portfolio_null": {
+  "selection_ceiling": {
+   "K_values": [
+    5,
+    10,
+    20,
+    50,
+    100
+   ],
+   "block_len": 5,
+   "n_returns": 2319,
+   "pool_size": 5000,
+   "results": {
+    "5": {
+     "K": 5,
+     "analytic_expected_max": 0.4751626121839618,
+     "empirical_expected_max": 0.463748562334659,
+     "n_groups": 1000
+    },
+    "10": {
+     "K": 10,
+     "analytic_expected_max": 0.6273637476460886,
+     "empirical_expected_max": 0.6141430305650647,
+     "n_groups": 500
+    },
+    "20": {
+     "K": 20,
+     "analytic_expected_max": 0.7572948991145098,
+     "empirical_expected_max": 0.7383599338066827,
+     "n_groups": 250
+    },
+    "50": {
+     "K": 50,
+     "analytic_expected_max": 0.9069424488000186,
+     "empirical_expected_max": 0.8830110599667935,
+     "n_groups": 100
+    },
+    "100": {
+     "K": 100,
+     "analytic_expected_max": 1.0082625607373747,
+     "empirical_expected_max": 0.9693447403805393,
+     "n_groups": 50
+    }
+   },
+   "seed": 53,
+   "sigma_sr": 0.3984278065758138
+  },
+  "table": {
+   "block_len": 5,
+   "ks": [
+    2,
+    3,
+    4,
+    5
+   ],
+   "n_bootstrap": 1000,
+   "results": {
+    "2": {
+     "block_len": 5,
+     "k": 2,
+     "mean": 0.025069654160433268,
+     "n_bootstrap": 1000,
+     "n_returns": 2319,
+     "p95": 0.6644955166316056,
+     "p99": 0.9117779098260493,
+     "sd": 0.40340777196001176,
+     "seed": 53
+    },
+    "3": {
+     "block_len": 5,
+     "k": 3,
+     "mean": -0.03113070819076728,
+     "n_bootstrap": 1000,
+     "n_returns": 2319,
+     "p95": 0.6287370085488913,
+     "p99": 0.9701267799556921,
+     "sd": 0.4084319266740142,
+     "seed": 53
+    },
+    "4": {
+     "block_len": 5,
+     "k": 4,
+     "mean": -0.015154937169514666,
+     "n_bootstrap": 1000,
+     "n_returns": 2319,
+     "p95": 0.6480937720644743,
+     "p99": 0.9731274547385925,
+     "sd": 0.40998872226871586,
+     "seed": 53
+    },
+    "5": {
+     "block_len": 5,
+     "k": 5,
+     "mean": -0.01779153432729774,
+     "n_bootstrap": 1000,
+     "n_returns": 2319,
+     "p95": 0.6618253995353978,
+     "p99": 0.9519651555315514,
+     "sd": 0.41238308017357284,
+     "seed": 53
+    }
+   },
+   "seed": 53
+  }
+ },
+ "seed": 53,
+ "series": [
+  {
+   "coverage": {
+    "first": "2020-03-25",
+    "last": "2026-07-31",
+    "n_days": 2320
+   },
+   "kind": "funding_cashflow_backfill",
+   "name": "funding_backfill_BTCUSDT",
+   "reason": null,
+   "status": "OK"
+  },
+  {
+   "coverage": {
+    "first": "2020-10-21",
+    "last": "2026-07-31",
+    "n_days": 2110
+   },
+   "kind": "funding_cashflow_backfill",
+   "name": "funding_backfill_ETHUSDT",
+   "reason": null,
+   "status": "OK"
+  },
+  {
+   "coverage": {
+    "first": "2021-06-29",
+    "last": "2026-07-31",
+    "n_days": 1859
+   },
+   "kind": "funding_cashflow_backfill",
+   "name": "funding_backfill_SOLUSDT",
+   "reason": null,
+   "status": "OK"
+  },
+  {
+   "coverage": {
+    "first": "2021-05-13",
+    "last": "2026-07-31",
+    "n_days": 1906
+   },
+   "kind": "funding_cashflow_backfill",
+   "name": "funding_backfill_XRPUSDT",
+   "reason": null,
+   "status": "OK"
+  },
+  {
+   "coverage": {
+    "first": "2021-06-29",
+    "last": "2026-07-31",
+    "n_days": 1859
+   },
+   "kind": "funding_cashflow_backfill",
+   "name": "funding_backfill_BNBUSDT",
+   "reason": null,
+   "status": "OK"
+  },
+  {
+   "coverage": {
+    "first": "2021-03-24",
+    "last": "2026-07-31",
+    "n_days": 1956
+   },
+   "kind": "iv_rv_diff_backfill",
+   "name": "ivrv_backfill_BTC",
+   "reason": null,
+   "status": "OK"
+  },
+  {
+   "coverage": {
+    "first": "2021-03-24",
+    "last": "2026-07-31",
+    "n_days": 1956
+   },
+   "kind": "iv_rv_diff_backfill",
+   "name": "ivrv_backfill_ETH",
+   "reason": null,
+   "status": "OK"
+  },
+  {
+   "coverage": {
+    "first": "2026-06-16",
+    "last": "2026-08-29",
+    "n_days": 61
+   },
+   "kind": "perp_basis_proxy",
+   "name": "basis_BTCUSDT",
+   "reason": null,
+   "status": "OK"
+  },
+  {
+   "coverage": {
+    "first": "2026-06-16",
+    "last": "2026-08-29",
+    "n_days": 61
+   },
+   "kind": "perp_basis_proxy",
+   "name": "basis_ETHUSDT",
+   "reason": null,
+   "status": "OK"
+  }
+ ],
+ "source": "backfill",
+ "stress_canon": {
+  "STRESS_ABS": {
+   "canon": "STRESS_ABS",
+   "days": [
+    "2020-05-10",
+    "2021-01-04",
+    "2021-01-08",
+    "2021-01-11",
+    "2021-01-29",
+    "2021-02-22",
+    "2021-02-23",
+    "2021-04-18",
+    "2021-05-13",
+    "2021-05-19",
+    "2021-05-20",
+    "2021-05-21",
+    "2021-05-22",
+    "2021-05-23",
+    "2021-05-24",
+    "2021-09-07",
+    "2021-12-04",
+    "2022-05-11",
+    "2022-05-12",
+    "2022-06-13",
+    "2022-06-14",
+    "2022-06-15",
+    "2022-11-08",
+    "2022-11-09",
+    "2022-11-10",
+    "2023-08-17",
+    "2024-08-05",
+    "2025-02-03",
+    "2025-10-10",
+    "2026-08-19"
+   ],
+   "decision": "DEC-56",
+   "episodes": [
+    [
+     "2020-05-10"
+    ],
+    [
+     "2021-01-04"
+    ],
+    [
+     "2021-01-08"
+    ],
+    [
+     "2021-01-11"
+    ],
+    [
+     "2021-01-29"
+    ],
+    [
+     "2021-02-22",
+     "2021-02-23"
+    ],
+    [
+     "2021-04-18"
+    ],
+    [
+     "2021-05-13"
+    ],
+    [
+     "2021-05-19",
+     "2021-05-20",
+     "2021-05-21",
+     "2021-05-22",
+     "2021-05-23",
+     "2021-05-24"
+    ],
+    [
+     "2021-09-07"
+    ],
+    [
+     "2021-12-04"
+    ],
+    [
+     "2022-05-11",
+     "2022-05-12"
+    ],
+    [
+     "2022-06-13",
+     "2022-06-14",
+     "2022-06-15"
+    ],
+    [
+     "2022-11-08",
+     "2022-11-09",
+     "2022-11-10"
+    ],
+    [
+     "2023-08-17"
+    ],
+    [
+     "2024-08-05"
+    ],
+    [
+     "2025-02-03"
+    ],
+    [
+     "2025-10-10"
+    ],
+    [
+     "2026-08-19"
+    ]
+   ],
+   "gap_max_days": 1,
+   "n_days": 30,
+   "n_days_used_per_symbol": {
+    "BTCUSDT": 2320,
+    "ETHUSDT": 2110
+   },
+   "n_episodes": 19,
+   "named_dates": [
+    "2025-10-10",
+    "2026-08-19"
+   ],
+   "pctl": 99.0,
+   "sha256": "b75fb7a08a6d590363f62828de99f23359c1c63fe1f385d0e4f37ba09bccf794",
+   "thresholds": {
+    "BTCUSDT": 0.09195257377755968,
+    "ETHUSDT": 0.12180118771394075
+   }
+  }
+ },
+ "wp": "WP-10A"
+}
