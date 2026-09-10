@@ -64,8 +64,15 @@ if (-not $SkipFetch) {
     }
 }
 
+# rho(BTC,ETH)-Fenster: Default = die letzten 24 Monate bis heute (Bar-Cache
+# begrenzt real; leere Tage werden vom Zensus als Abdeckung berichtet).
+# Leere Strings duerfen NIE als Argument durchgereicht werden (argparse
+# bricht mit "expected one argument" ab -- Lauf 2026-09-10).
+if ($CorrEnd -eq "") { $CorrEnd = (Get-Date).ToString("yyyy-MM-dd") }
+if ($CorrStart -eq "") { $CorrStart = (Get-Date).AddMonths(-24).ToString("yyyy-MM-dd") }
+
 Write-Host ""
-Write-Host "=== WP-7 Schritt 3: Zensus -> $OutDir ==="
+Write-Host "=== WP-7 Schritt 3: Zensus -> $OutDir (rho-Fenster $CorrStart..$CorrEnd) ==="
 python scripts\wp7_universe_census.py --census --panel-base $PanelBase --out $OutDir `
     --bar-cache-dir $BarCacheDir --corr-start $CorrStart --corr-end $CorrEnd
 $rc = $LASTEXITCODE
