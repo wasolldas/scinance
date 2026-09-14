@@ -26,6 +26,7 @@ Covers (per ``scinance3-impl/WP7_SPEZIFIKATION.md`` section 3):
 from __future__ import annotations
 
 import json
+import math
 import subprocess
 import sys
 from datetime import date, timedelta
@@ -36,8 +37,8 @@ import pytest
 
 from bybit_edge.research.bar_cache import build_range
 from bybit_edge.research.wp7_universe import (
-    bybit_rest, null_ic, pair_corr, panel_store, pit_universe, report,
-    spread_probe, stats,
+    bybit_rest, null_ic, pair_corr, panel_load, panel_store, pit_universe,
+    report, spread_probe, stats,
 )
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -1006,3 +1007,198 @@ def test_report_markdown_shows_sd_null_threshold_formula():
     md = _to_markdown(full)
     assert "IC_prior * sqrt(W) / z" in md
     assert f"z={stats.Z_PER_WINDOW}" in md and f"z={stats.Z_POOLED}" in md
+
+
+# ============================================================================
+# DEC-67 Entscheidung 6 -- census correction (additive): A1 sort key,
+# decile-degeneration census, N_eff judgement windows, interval-class
+# switching, W_eff-adjusted SD_null. All panel_load/stats function-level
+# tests; the full CLI driver's wiring of these is covered in
+# test_wp7_census_driver.py.
+# ============================================================================
+
+def test_a1_key_zero_at_interest_regardless_of_interval_class_and_offset_scales_with_payments():
+    """DEC-67 Entscheidung 2 -- task item 7(a): a symbol with every payment
+    EXACTLY at I gives key 0.0 every week, regardless of whether that
+    day's interval class is 480min or 240min (the interval-class
+    heterogeneity DEC-59 found must NOT leak into the key, unlike the raw
+    sum it replaces); a symbol with F = I + 0.0001 PER PAYMENT gives key =
+    n_payments_in_week * 0.0001."""
+    dates = [(date(2024, 1, 1) + timedelta(days=i)).isoformat() for i in range(14)]  # 2 full ISO weeks
+    symbols = ["EXACTUSDT", "OFFSETUSDT"]
+    n_days = len(dates)
+    funding_n = np.zeros((n_days, 2))
+    funding_sum = np.zeros((n_days, 2))
+    for i in range(n_days):
+        fn = 3.0 if i % 2 == 0 else 6.0  # alternates 480min / 240min class day-to-day
+        i_pp = panel_load.funding_i_per_payment(fn)
+        funding_n[i, 0] = fn
+        funding_sum[i, 0] = fn * i_pp             # EXACTLY at I -> excess 0
+        funding_n[i, 1] = fn
+        funding_sum[i, 1] = fn * (i_pp + 0.0001)  # I + 0.0001 PER PAYMENT
+
+    panel = {"symbols": symbols, "dates": dates, "funding_n": funding_n, "funding_sum": funding_sum}
+    excess_daily, has_funding = panel_load.funding_excess_daily(panel)
+    assert has_funding.all()
+    assert np.allclose(excess_daily[:, 0], 0.0, atol=1e-15)
+    assert np.allclose(excess_daily[:, 1], funding_n[:, 1] * 0.0001)
+
+    weeks = sorted({pit_universe.iso_week_start(date.fromisoformat(d)).isoformat() for d in dates})
+    weekly = panel_load.funding_excess_weekly(panel, weeks)
+    key = weekly["key"]
+    assert np.allclose(key[:, 0], 0.0, atol=1e-15)
+
+    dates_by_week: dict[str, list[int]] = {}
+    for i, d in enumerate(dates):
+        w = pit_universe.iso_week_start(date.fromisoformat(d)).isoformat()
+        dates_by_week.setdefault(w, []).append(i)
+    for wi, w in enumerate(weeks):
+        n_pay = float(funding_n[dates_by_week[w], 1].sum())
+        assert key[wi, 1] == pytest.approx(n_pay * 0.0001)
+
+
+def test_a1_key_missing_funding_day_contributes_zero_not_nan():
+    dates = [(date(2024, 1, 1) + timedelta(days=i)).isoformat() for i in range(7)]
+    symbols = ["GAPPYUSDT"]
+    n_days = len(dates)
+    funding_n = np.full((n_days, 1), np.nan)
+    funding_sum = np.full((n_days, 1), np.nan)
+    funding_n[0, 0] = 3.0
+    funding_sum[0, 0] = 3.0 * panel_load.I_PER_8H  # one real day, exactly at I
+    panel = {"symbols": symbols, "dates": dates, "funding_n": funding_n, "funding_sum": funding_sum}
+    weeks = [pit_universe.iso_week_start(date(2024, 1, 1)).isoformat()]
+    weekly = panel_load.funding_excess_weekly(panel, weeks)
+    assert not math.isnan(weekly["key"][0, 0])
+    assert weekly["key"][0, 0] == pytest.approx(0.0)
+    assert int(weekly["n_days_with_funding"][0, 0]) == 1
+    assert int(weekly["n_days_total"][0, 0]) == n_days
+
+
+def test_decile_degeneration_flags_lump_and_neither_leg_degenerate():
+    """DEC-67 Entscheidung 3 -- task item 7(b): a week where 95% of
+    symbols carry key EXACTLY 0 flags BOTH legs degenerate (< 10% strictly
+    negative AND < 10% strictly positive); a week with 30% negative / 30%
+    positive flags NEITHER."""
+    weeks = ["2024-01-01", "2024-01-08"]
+    n_symbols = 100
+    alive = np.ones((2, n_symbols), dtype=bool)
+    key = np.zeros((2, n_symbols))
+    key[0, :95] = 0.0
+    key[0, 95:98] = -1.0
+    key[0, 98:100] = 1.0
+    key[1, :30] = -1.0
+    key[1, 30:60] = 1.0
+    key[1, 60:] = 0.0
+
+    result = panel_load.decile_degeneration_weekly(key, alive, weeks)
+    rows = {r["week"]: r for r in result["weekly"]}
+    assert rows["2024-01-01"]["d1_degenerate"] is True
+    assert rows["2024-01-01"]["d10_degenerate"] is True
+    assert rows["2024-01-01"]["lump_share"] == pytest.approx(0.95)
+    assert rows["2024-01-08"]["d1_degenerate"] is False
+    assert rows["2024-01-08"]["d10_degenerate"] is False
+    assert rows["2024-01-08"]["neg_share"] == pytest.approx(0.30)
+    assert rows["2024-01-08"]["pos_share"] == pytest.approx(0.30)
+
+
+def test_decile_degeneration_window_summary_reports_positional_median_week():
+    weekly_rows = [{"week": f"w{i:03d}", "n_symbols": 10, "lump_share": 0.0,
+                     "neg_share": 0.5, "pos_share": 0.5,
+                     "d1_degenerate": False, "d10_degenerate": False} for i in range(52)]
+    mid_idx = (52 - 1) // 2
+    weekly_rows[mid_idx] = {**weekly_rows[mid_idx], "neg_share": 0.05, "d1_degenerate": True}
+    summary = panel_load.decile_degeneration_window_summary(weekly_rows, last_n=52, offset=0)
+    assert summary["n_weeks"] == 52
+    assert summary["median_week"] == f"w{mid_idx:03d}"
+    assert summary["median_week_d1_degenerate"] is True
+    assert summary["n_weeks_d1_degenerate"] == 1
+    assert summary["n_weeks_d10_degenerate"] == 0
+
+    # offset selects the window BEFORE the tail -- "previous 52"
+    prev = panel_load.decile_degeneration_window_summary(weekly_rows, last_n=52, offset=52)
+    assert prev["n_weeks"] == 0  # only 52 rows exist total -> nothing lies before them
+
+
+def test_n_eff_windows_full_history_nan_but_52_week_window_finite():
+    """DEC-67 Entscheidung 6, task item 7(c): on a synthetic panel where
+    every symbol is alive ONLY in the last 60 weeks, full-history N_eff
+    (``stats.n_eff`` on the whole array, the OLD call) stays n/a (no
+    symbol is alive every week of a 200-week array), while the 52-week
+    JUDGEMENT window (fully inside the alive span) returns a finite
+    value -- the exact bug DEC-67 fixes."""
+    n_weeks_total = 200
+    n_symbols = 60
+    rng = np.random.default_rng(7)
+    returns = rng.normal(0, 0.05, size=(n_weeks_total, n_symbols))
+    alive = np.zeros((n_weeks_total, n_symbols), dtype=bool)
+    alive[-60:, :] = True
+    weeks = [f"2020-{t:03d}" for t in range(n_weeks_total)]
+
+    full = stats.n_eff(returns, alive)
+    assert math.isnan(full["n_eff"])
+    assert full["n_symbols_balanced"] == 0
+
+    windows = panel_load.n_eff_windows(returns, alive, weeks, stress_week_indices=None)
+    # the 52-week window is fully INSIDE the 60-week alive span -> balanced, finite.
+    assert not math.isnan(windows["w52"]["n_eff"])
+    assert windows["w52"]["n_symbols_balanced"] == n_symbols
+    assert windows["w52"]["window_weeks"] == 52
+    assert windows["w52"]["week_end"] == weeks[-1]
+    # the 104-week window is LARGER than the 60-week alive span -> still
+    # legitimately n/a (no symbol is alive every week of THIS window
+    # either) -- the fix is choosing the right window, not making every
+    # window finite regardless of the underlying data.
+    assert math.isnan(windows["w104"]["n_eff"])
+    assert windows["w104"]["n_symbols_balanced"] == 0
+    assert math.isnan(windows["stress_abs_last104"]["n_eff"])
+    assert "note" in windows["stress_abs_last104"]
+
+    stress_idx = list(range(n_weeks_total - 10, n_weeks_total))  # inside both alive span and last-104
+    windows2 = panel_load.n_eff_windows(returns, alive, weeks, stress_week_indices=stress_idx)
+    assert not math.isnan(windows2["stress_abs_last104"]["n_eff"])
+    assert windows2["stress_abs_last104"]["n_symbols_balanced"] == n_symbols
+    assert windows2["stress_abs_last104"]["n_weeks_in_window"] == 10
+
+
+def test_interval_class_switching_counts_transitions():
+    """DEC-67 Entscheidung 6, task item 7(d): switch counts ignore
+    unclassified/missing days entirely (they neither start nor end a
+    transition) and count only actual class-to-class changes."""
+    dates = [(date(2024, 1, 1) + timedelta(days=i)).isoformat() for i in range(10)]
+    symbols = ["STEADYUSDT", "ONCEUSDT", "MANYUSDT"]
+    n_days = len(dates)
+    funding_n = np.full((n_days, 3), np.nan)
+    funding_n[:, 0] = 3.0                      # STEADYUSDT: constant 480min -> 0 switches
+    funding_n[:5, 1] = 3.0
+    funding_n[5:, 1] = 6.0                     # ONCEUSDT: 480min then 240min -> 1 switch
+    # MANYUSDT: 480/240/120/60 repeated, with a NaN and a funding_n=0 day
+    # interleaved that must be IGNORED (never counted as an edge).
+    funding_n[:, 2] = [3.0, 6.0, np.nan, 12.0, 24.0, 3.0, 6.0, 0.0, 12.0, 24.0]
+
+    panel = {"symbols": symbols, "dates": dates, "funding_n": funding_n}
+    result = panel_load.interval_class_switching(panel)
+    per = {r["symbol"]: r for r in result["per_symbol"]}
+
+    assert per["STEADYUSDT"]["n_switches"] == 0
+    assert per["STEADYUSDT"]["n_classified_days"] == n_days
+    assert per["ONCEUSDT"]["n_switches"] == 1
+    assert per["ONCEUSDT"]["n_classified_days"] == n_days
+    # classified sequence for MANYUSDT (NaN and funding_n=0 dropped):
+    # 480,240,120,60,480,240,120,60 -> 7 transitions, 8 classified days
+    assert per["MANYUSDT"]["n_classified_days"] == 8
+    assert per["MANYUSDT"]["n_switches"] == 7
+
+    assert result["n_switch_distribution"] == {"0": 1, "1": 1, "2-5": 0, ">5": 1}
+    assert result["days_per_class_total"] == {"480min": 17, "240min": 7, "120min": 2, "60min": 2}
+    assert result["n_symbols"] == 3
+    assert result["descriptive_only"] is True
+
+
+def test_sd_null_w_eff_adjusted_scales_by_sqrt_inverse_factor():
+    """DEC-67 Entscheidung 4: SD_null * sqrt(W/W_eff) with W_eff=0.41*W
+    reduces to a CONSTANT sqrt(1/0.41) factor, independent of W."""
+    assert stats.W_EFF_FACTOR == 0.41
+    sd = 0.0435
+    adjusted = stats.sd_null_w_eff_adjusted(sd)
+    assert adjusted == pytest.approx(sd * math.sqrt(1.0 / 0.41))
+    assert adjusted > sd  # a WIDER noise floor, never narrower

@@ -264,6 +264,66 @@ def _extra_sections_markdown(extra: dict[str, Any]) -> list[str]:
         lines.append(f"(n_symbols_used={fa.get('n_symbols_used')} von {fa.get('n_symbols_total')})")
         lines.append("")
 
+    if "n_eff_windows" in extra:
+        nw = extra["n_eff_windows"]
+        lines += [f"## {nw.get('label')} -- urteilstragende Fenster (DEC-67 Korrektur)"]
+        for key, title in (("w52", "letzte 52 Wochen"), ("w104", "letzte 104 Wochen")):
+            w = nw.get(key, {})
+            lines.append(
+                f"- {title} ({w.get('week_start')}..{w.get('week_end')}): "
+                f"Wert={_fmt(w.get('n_eff'))} (n_symbols_balanced={w.get('n_symbols_balanced')}, "
+                f"n_wochen_im_fenster={w.get('n_weeks_in_window')})")
+        sa = nw.get("stress_abs_last104", {})
+        if sa.get("note"):
+            lines.append(f"- STRESS_ABS (auf letzte 104 Wochen begrenzt): nicht verfuegbar "
+                          f"({sa['note']})")
+        else:
+            lines.append(
+                f"- STRESS_ABS (auf letzte 104 Wochen begrenzt): Wert={_fmt(sa.get('n_eff'))} "
+                f"(n_symbols_balanced={sa.get('n_symbols_balanced')}, "
+                f"n_stress_wochen={sa.get('n_weeks_in_window')})")
+        lines.append("")
+
+    if "a1_key_null" in extra:
+        an = extra["a1_key_null"]
+        lines += [f"## {an.get('label')}",
+                   "Deskriptiv, kein Verdikt -- die reale IC des A1-Schluessels wird hier NICHT "
+                   "berechnet oder berichtet (DEC-67 E6, gesperrt bis A1-Registrierung).",
+                   f"- SD_null je Fenster (W=52): {_fmt(an.get('sd_null_per_window'), 5)} "
+                   f"(Schranke {_fmt(an.get('threshold_per_window'), 5)}, "
+                   f"W_eff-adjustiert={_fmt(an.get('sd_null_per_window_w_eff_adjusted'), 5)})",
+                   f"- SD_null gepoolt (W=104): {_fmt(an.get('sd_null_pooled'), 5)} "
+                   f"(Schranke {_fmt(an.get('threshold_pooled'), 5)}, "
+                   f"W_eff-adjustiert={_fmt(an.get('sd_null_pooled_w_eff_adjusted'), 5)})",
+                   f"- W_eff-Faktor: {an.get('w_eff_factor')} (DEC-67 E4)",
+                   f"- feasible je Fenster={an.get('feasible_per_window')}, "
+                   f"feasible gepoolt={an.get('feasible_pooled')}", ""]
+
+    if "decile_degeneration" in extra:
+        dd = extra["decile_degeneration"]
+        lines += [f"## {dd.get('label')}"]
+        for key, title in (("last_52", "letzte 52 Wochen"), ("previous_52", "vorherige 52 Wochen")):
+            s = dd.get(key, {})
+            lines.append(
+                f"- {title} ({s.get('week_start')}..{s.get('week_end')}), "
+                f"Median-Woche {s.get('median_week')}: Klumpen={_fmt(s.get('median_week_lump_share'))} "
+                f"neg={_fmt(s.get('median_week_neg_share'))} pos={_fmt(s.get('median_week_pos_share'))} "
+                f"D1-degeneriert={s.get('median_week_d1_degenerate')} "
+                f"D10-degeneriert={s.get('median_week_d10_degenerate')} "
+                f"(n_wochen_degeneriert D1={s.get('n_weeks_d1_degenerate')}/"
+                f"D10={s.get('n_weeks_d10_degenerate')} von {s.get('n_weeks')})")
+        lines.append("")
+
+    if "interval_switching" in extra:
+        iw = extra["interval_switching"]
+        lines += [f"## {iw.get('label')}",
+                   f"- Verteilung Wechsel je Symbol (n={iw.get('n_symbols')}): "
+                   f"{iw.get('n_switch_distribution')}",
+                   "- Symbol-Tage je Klasse:"]
+        for label, n in sorted((iw.get("days_per_class_total") or {}).items()):
+            lines.append(f"  - {label}: {n}")
+        lines.append("")
+
     if "delisting_cohorts_dec58g" in extra:
         lines += ["## DEC-58(g): Delisting-Hazard \"Beifahrer\" je Listing-Jahrgang (deskriptiv, kein Modell)",
                    "| Jahrgang | gelistet | delistet |", "|---|---|---|"]

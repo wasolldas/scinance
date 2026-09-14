@@ -12,6 +12,8 @@ from __future__ import annotations
 import argparse
 import importlib.util
 import json
+import math
+import re
 from datetime import date, timedelta
 from pathlib import Path
 
@@ -361,3 +363,158 @@ def test_census_loud_fail_on_partial_manifest_without_allow_partial(tmp_path, mo
     report = json.loads((out2 / "wp7_report.json").read_text())
     assert report["extra"]["judgement_bearing"] is False
     assert "nicht urteilstragend" in report["extra"]["label"]
+
+
+# ============================================================================
+# DEC-67 Entscheidung 6 -- census correction: driver wiring (task item 7e/f)
+# ============================================================================
+
+_FORBIDDEN_KEY_RE = re.compile(r"(real_ic|ic_a1|a1_ic)", re.IGNORECASE)
+
+
+def _walk_keys(obj):
+    if isinstance(obj, dict):
+        for k, v in obj.items():
+            yield k
+            yield from _walk_keys(v)
+    elif isinstance(obj, list):
+        for v in obj:
+            yield from _walk_keys(v)
+
+
+def test_census_report_carries_dec67_correction_keys_and_artifacts(tmp_path, monkeypatch):
+    """Task item 7(e): the driver's JSON carries the four new ``extra``
+    sections (n_eff_windows, a1_key_null, decile_degeneration,
+    interval_switching) with sane values, and every existing value/section
+    (K, SD_null, B1..B5, n_eff full-history) is untouched."""
+    base, _manifest, symbols, _weeks, _ = _momentum_panel(
+        tmp_path, k_symbols=150, seed=5, momentum_loading=0.1,
+        start=date(2021, 1, 1), end=date(2025, 12, 31))
+    statuses = {s: "Trading" for s in symbols}
+    monkeypatch.setattr(bybit_rest, "fetch_instruments", _fake_instruments(statuses))
+    monkeypatch.setattr(bybit_rest, "fetch_tickers", _fake_tickers())
+
+    out = tmp_path / "out"
+    a = _ns(panel_base=str(base), out=str(out), as_of="2025-12-31", start_year=2021, end_year=2025)
+    rc = CENSUS.cmd_census(a)
+    assert rc == 0
+    report = json.loads((out / "wp7_report.json").read_text())
+    extra = report["extra"]
+
+    for key in ("n_eff_windows", "a1_key_null", "decile_degeneration", "interval_switching"):
+        assert key in extra, key
+
+    # old sections/values untouched by the additive correction.
+    assert "n_eff_full" in extra and "n_eff_stress_abs_weeks" in extra
+    assert report["n_eff"]["label"] == "N_eff (Ledoit-Wolf-geschrumpft, deskriptiv, kein Urteil)"
+    assert math.isnan(report["n_eff"]["n_eff"])  # full-history line legitimately n/a (ramp-up weeks)
+    assert report["findings"]["b1_b2"]["finding"] in ("B1", "B2")
+
+    nw = extra["n_eff_windows"]
+    assert nw["label"] == report["n_eff"]["label"]
+    assert nw["w52"]["window_weeks"] == 52 and nw["w104"]["window_weeks"] == 104
+    # 5 years of a STABLE symbol set -> both judgement windows are balanced
+    # and finite -- this is the bug fix under test.
+    assert not math.isnan(nw["w52"]["n_eff"])
+    assert nw["w52"]["n_symbols_balanced"] == len(symbols)
+    assert not math.isnan(nw["w104"]["n_eff"])
+    assert nw["w104"]["n_symbols_balanced"] == len(symbols)
+    assert "note" in nw["stress_abs_last104"]  # no STRESS_ABS fixture in this sandbox -> n/a, labelled
+
+    an = extra["a1_key_null"]
+    assert an["sd_null_per_window"] >= 0.0
+    assert an["sd_null_pooled"] >= 0.0
+    assert an["sd_null_per_window_w_eff_adjusted"] == pytest.approx(
+        an["sd_null_per_window"] * math.sqrt(1.0 / 0.41), rel=1e-9)
+    assert an["sd_null_pooled_w_eff_adjusted"] == pytest.approx(
+        an["sd_null_pooled"] * math.sqrt(1.0 / 0.41), rel=1e-9)
+    assert an["w_eff_factor"] == 0.41
+    assert an["threshold_per_window"] == pytest.approx(0.08699, abs=1e-4)
+    assert an["threshold_pooled"] == pytest.approx(0.09657, abs=1e-4)
+
+    dd = extra["decile_degeneration"]
+    assert dd["last_52"]["n_weeks"] <= 52
+    assert dd["previous_52"]["n_weeks"] <= 52
+
+    isw = extra["interval_switching"]
+    assert isw["n_symbols"] == len(symbols)
+    assert sum(isw["n_switch_distribution"].values()) == len(symbols)
+    assert isw["days_per_class_total"] == {}  # _momentum_panel attaches no funding data at all
+
+    arts = extra["artifacts"]
+    for name in ("a1_key_null_per_window", "a1_key_null_pooled"):
+        assert name in arts, name
+        p = Path(arts[name]["path"])
+        assert p.is_file()
+        # DEC-53 artifact: sha256 is over the content fields (null_ic.
+        # artifact_fingerprint), not the raw file bytes -- read_artifacts
+        # recomputes and raises loudly on any mismatch/corruption.
+        from bybit_edge.research.wp7_universe import null_ic
+        verified = null_ic.read_artifacts(p)
+        assert verified["sha256"] == arts[name]["sha256"]
+
+    dd_csv = arts["decile_degeneration_weekly_csv"]
+    p = Path(dd_csv["path"])
+    assert p.is_file()
+    assert dd_csv["sha256"] == panel_load.sha256_file(p)
+
+    md = (out / "wp7_report.md").read_text()
+    for label in ("N_eff (Ledoit-Wolf-geschrumpft", "A1-Schluessel Permutations-Null",
+                  "Dezil-Degeneration des A1-Schluessels", "Intervallklassen-Wechsel"):
+        assert label in md
+
+
+def test_census_report_seals_a1_real_ic_never_computed_or_named(tmp_path, monkeypatch):
+    """Task item 7(f): no key named like real_ic/ic_a1/a1_ic anywhere in
+    the report, and the a1_key_null section carries ONLY permutation-null
+    figures -- never a real Spearman IC of the actual A1 key."""
+    base, _manifest, symbols, _weeks, _ = _momentum_panel(
+        tmp_path, k_symbols=140, seed=6, momentum_loading=0.15,
+        start=date(2022, 1, 1), end=date(2024, 12, 31))
+    statuses = {s: "Trading" for s in symbols}
+    monkeypatch.setattr(bybit_rest, "fetch_instruments", _fake_instruments(statuses))
+    monkeypatch.setattr(bybit_rest, "fetch_tickers", _fake_tickers())
+
+    out = tmp_path / "out"
+    a = _ns(panel_base=str(base), out=str(out), as_of="2024-12-31", start_year=2022, end_year=2024)
+    rc = CENSUS.cmd_census(a)
+    assert rc == 0
+
+    report = json.loads((out / "wp7_report.json").read_text())
+    offending_keys = sorted({k for k in _walk_keys(report) if _FORBIDDEN_KEY_RE.search(k)})
+    assert offending_keys == []
+
+    md_text = (out / "wp7_report.md").read_text()
+    assert not _FORBIDDEN_KEY_RE.search(md_text)
+
+    an = report["extra"]["a1_key_null"]
+    assert set(an) == {
+        "label", "sd_null_per_window", "sd_null_pooled", "threshold_per_window",
+        "threshold_pooled", "sd_null_per_window_w_eff_adjusted",
+        "sd_null_pooled_w_eff_adjusted", "w_eff_factor", "feasible_per_window",
+        "feasible_pooled", "seed", "note",
+    }
+
+
+def test_a1_key_null_deterministic_same_seed(tmp_path, monkeypatch):
+    """Task item 7(f), determinism: same seed -> byte-identical a1_key_null
+    (and decile_degeneration) section across two independent runs."""
+    base, _manifest, symbols, _weeks, _ = _momentum_panel(
+        tmp_path, k_symbols=50, seed=9, momentum_loading=0.05,
+        start=date(2023, 1, 1), end=date(2024, 12, 31))
+    statuses = {s: "Trading" for s in symbols}
+    monkeypatch.setattr(bybit_rest, "fetch_instruments", _fake_instruments(statuses))
+    monkeypatch.setattr(bybit_rest, "fetch_tickers", _fake_tickers())
+
+    a1_results, deg_results = [], []
+    out = tmp_path / "out"
+    for _ in range(2):
+        a = _ns(panel_base=str(base), out=str(out), as_of="2024-12-31",
+                start_year=2023, end_year=2024, seed=53)
+        rc = CENSUS.cmd_census(a)
+        assert rc == 0
+        report = json.loads((out / "wp7_report.json").read_text())
+        a1_results.append(report["extra"]["a1_key_null"])
+        deg_results.append(report["extra"]["decile_degeneration"])
+    assert a1_results[0] == a1_results[1]
+    assert deg_results[0] == deg_results[1]

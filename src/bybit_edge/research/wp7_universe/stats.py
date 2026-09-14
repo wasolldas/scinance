@@ -21,6 +21,7 @@ __all__ = [
     "DECILE_FACTOR", "cross_sectional_demean", "n_eff", "sigma_xs_series",
     "sigma_xs_summary", "sigma_ls_series", "detectable_effect",
     "sd_null_threshold", "feasible", "sigma_xs_min_bps",
+    "W_EFF_FACTOR", "sd_null_w_eff_adjusted",
 ]
 
 #: DEC-51 (per-window, W=52, alpha 0.05 one-sided) / DEC-52(iv) (pooled,
@@ -225,6 +226,24 @@ def sd_null_threshold(*, pooled: bool) -> float:
 
 def feasible(sd_null: float, *, pooled: bool) -> bool:
     return detectable_effect(sd_null, pooled=pooled) <= IC_PRIOR
+
+
+#: DEC-67 Entscheidung 4 (funding-weekly-SUM lag1 autocorrelation 0.42,
+#: WELLE1_BEFUND_TEIL4): funding-based hypotheses' DEC-51 power arithmetic
+#: uses W_eff = W_EFF_FACTOR * W, not the raw window length W.
+W_EFF_FACTOR = 0.41
+
+
+def sd_null_w_eff_adjusted(sd_null: float) -> float:
+    """DEC-67 Entscheidung 4 -- ``SD_null`` scaled by ``sqrt(W / W_eff)``
+    with ``W_eff = W_EFF_FACTOR * W``; the ratio ``W / W_eff = 1 /
+    W_EFF_FACTOR`` is a CONSTANT independent of ``W`` itself, so this
+    takes only the already-measured ``sd_null`` (per-window or pooled --
+    the caller picks which). A funding-based signal's weeks are NOT an
+    independent cluster (lag1 autocorrelation 0.42, DEC-67 E4); this is
+    the resulting WIDER descriptive noise-floor line, reported ALONGSIDE
+    the plain ``sd_null``, never replacing it."""
+    return sd_null * math.sqrt(1.0 / W_EFF_FACTOR)
 
 
 def sigma_xs_min_bps(cost_bps: float, *, f: float = DECILE_FACTOR,

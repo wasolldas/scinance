@@ -284,6 +284,61 @@ def cmd_census(a: argparse.Namespace) -> int:  # noqa: C901 -- one linear pipeli
     funding_autocorr = panel_load.funding_autocorrelation(panel)
     cohorts = panel_load.delisting_cohorts(weekly, as_of_week=pit_universe.iso_week_start(as_of).isoformat())
 
+    log("[9b/10] DEC-67 Zensus-Korrektur: N_eff-Fenster, A1-Schluessel-Null, "
+        "Dezil-Degeneration, Intervallklassen-Wechsel")
+    stress_idx_for_windows = stress_info["week_indices"] if stress_info.get("available") else None
+    neff_windows = panel_load.n_eff_windows(returns, alive, weeks, stress_week_indices=stress_idx_for_windows)
+    log(f"  N_eff Fenster: w52={neff_windows['w52']['n_eff']:.2f} "
+        f"(n_balanced={neff_windows['w52']['n_symbols_balanced']}), "
+        f"w104={neff_windows['w104']['n_eff']:.2f} "
+        f"(n_balanced={neff_windows['w104']['n_symbols_balanced']})")
+
+    funding_excess = panel_load.funding_excess_weekly(panel, weeks)
+    a1_key = funding_excess["key"]
+
+    # DEC-67 Entscheidung 6: A1-Schluessel-Permutations-Null -- EXAKT dieselbe
+    # Prozedur wie fuer das Momentum-Signal (null_ic.permutation_null_sd ist
+    # signal-agnostisch: sie permutiert 0..K-1, nie den echten Schluessel --
+    # siehe null_ic.py Docstring). Der reale IC des A1-Schluessels wird HIER
+    # NICHT berechnet (versiegelt bis zur A1-Registrierung, DEC-67 E6).
+    sd_null_a1_pw = null_ic.permutation_null_sd(
+        returns[-w_pw:], alive[-w_pw:], week_labels=weeks[-w_pw:], seed=seed)
+    sd_null_a1_pooled = null_ic.permutation_null_sd(
+        returns[-w_pooled:], alive[-w_pooled:], week_labels=weeks[-w_pooled:], seed=seed)
+    a1_key_null = {
+        "label": "A1-Schluessel Permutations-Null (deskriptiv, KEIN echter IC, Feasibility-Zeile)",
+        "sd_null_per_window": sd_null_a1_pw["sd_null"],
+        "sd_null_pooled": sd_null_a1_pooled["sd_null"],
+        "threshold_per_window": stats.sd_null_threshold(pooled=False),
+        "threshold_pooled": stats.sd_null_threshold(pooled=True),
+        "sd_null_per_window_w_eff_adjusted": stats.sd_null_w_eff_adjusted(sd_null_a1_pw["sd_null"]),
+        "sd_null_pooled_w_eff_adjusted": stats.sd_null_w_eff_adjusted(sd_null_a1_pooled["sd_null"]),
+        "w_eff_factor": stats.W_EFF_FACTOR,
+        "feasible_per_window": stats.feasible(sd_null_a1_pw["sd_null"], pooled=False),
+        "feasible_pooled": stats.feasible(sd_null_a1_pooled["sd_null"], pooled=True),
+        "seed": seed,
+        "note": "Die reale IC des A1-Schluessels (Signal-Ausgang-Beziehung) wird in diesem "
+                "Zensus nicht berechnet oder berichtet -- versiegelt bis zur A1-Registrierung "
+                "(DEC-67 E6).",
+    }
+    log(f"  A1-Schluessel SD_null je Fenster={a1_key_null['sd_null_per_window']:.5f} "
+        f"gepoolt={a1_key_null['sd_null_pooled']:.5f} (Schranken "
+        f"{a1_key_null['threshold_per_window']:.5f}/{a1_key_null['threshold_pooled']:.5f})")
+
+    deg_weekly = panel_load.decile_degeneration_weekly(a1_key, alive, weeks)
+    decile_degeneration = {
+        "label": "Dezil-Degeneration des A1-Schluessels (DEC-67 E3, deskriptiv, kein Urteil)",
+        "last_52": panel_load.decile_degeneration_window_summary(
+            deg_weekly["weekly"], last_n=52, offset=0),
+        "previous_52": panel_load.decile_degeneration_window_summary(
+            deg_weekly["weekly"], last_n=52, offset=52),
+    }
+
+    interval_switching = {
+        "label": "Intervallklassen-Wechsel je Symbol (deskriptiv, kein Urteil)",
+        **panel_load.interval_class_switching(panel),
+    }
+
     pc = None
     if a.bar_cache_dir and a.corr_start and a.corr_end:
         try:
@@ -303,6 +358,10 @@ def cmd_census(a: argparse.Namespace) -> int:  # noqa: C901 -- one linear pipeli
     log("[10/10] DEC-53-Artefakte + Report schreiben")
     null_pw_art = null_ic.write_artifacts(out_dir, sd_null_pw, window_label="per_window_w52")
     null_pooled_art = null_ic.write_artifacts(out_dir, sd_null_pooled, window_label="pooled_w104")
+    a1_null_pw_art = null_ic.write_artifacts(
+        out_dir, sd_null_a1_pw, window_label="funding_excess_key_per_window_w52")
+    a1_null_pooled_art = null_ic.write_artifacts(
+        out_dir, sd_null_a1_pooled, window_label="funding_excess_key_pooled_w104")
 
     ic_csv = panel_load.write_csv(
         out_dir / "weekly_ic_series.csv", ["week", "ic", "k"],
@@ -324,6 +383,15 @@ def cmd_census(a: argparse.Namespace) -> int:  # noqa: C901 -- one linear pipeli
         ["decile", "n_symbol_weeks", "n_symbol_days_with_funding", "n_deadzone_symbol_days", "deadzone_share"],
         [[d["decile"], d["n_symbol_weeks"], d["n_symbol_days_with_funding"],
           d["n_deadzone_symbol_days"], d["deadzone_share"]] for d in deadzone["by_decile"]])
+
+    decile_degeneration_csv = panel_load.write_csv(
+        out_dir / "decile_degeneration_weekly.csv",
+        ["week", "n_symbols", "lump_share", "neg_share", "pos_share", "d1_degenerate", "d10_degenerate"],
+        [[r["week"], r["n_symbols"],
+          None if r["lump_share"] is None else round(float(r["lump_share"]), 10),
+          None if r["neg_share"] is None else round(float(r["neg_share"]), 10),
+          None if r["pos_share"] is None else round(float(r["pos_share"]), 10),
+          r["d1_degenerate"], r["d10_degenerate"]] for r in deg_weekly["weekly"]])
 
     spread_json_path = out_dir / "spread_census.json"
     spread_json_path.write_text(json.dumps({"source": spread_source, **spread_census}, indent=1))
@@ -353,11 +421,18 @@ def cmd_census(a: argparse.Namespace) -> int:  # noqa: C901 -- one linear pipeli
         "funding_autocorrelation_dec58": funding_autocorr,
         "delisting_cohorts_dec58g": cohorts,
         "spread_census_source": spread_source,
+        # DEC-67 Entscheidung 6 (census correction, additive -- nothing above changes):
+        "n_eff_windows": {"label": report_mod.N_EFF_LABEL, **neff_windows},
+        "a1_key_null": a1_key_null,
+        "decile_degeneration": decile_degeneration,
+        "interval_switching": interval_switching,
         "artifacts": {
             "weekly_ic_series_csv": ic_csv,
             "null_ic_per_window": null_pw_art, "null_ic_pooled": null_pooled_art,
             "weekly_sigma_csv": sigma_csv, "deadzone_by_decile_csv": deadzone_csv,
             "spread_census_json": spread_json_art,
+            "a1_key_null_per_window": a1_null_pw_art, "a1_key_null_pooled": a1_null_pooled_art,
+            "decile_degeneration_weekly_csv": decile_degeneration_csv,
             **({"pair_corr_btc_eth": pc_art} if pc_art else {}),
         },
     }

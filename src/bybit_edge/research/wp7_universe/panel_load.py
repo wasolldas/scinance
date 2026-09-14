@@ -36,7 +36,7 @@ from typing import Any
 
 import numpy as np
 
-from . import panel_store, pit_universe
+from . import panel_store, pit_universe, stats
 
 __all__ = [
     "PanelLoadError", "load_panel_symbols", "load_panel",
@@ -44,6 +44,10 @@ __all__ = [
     "momentum_signal", "k_per_week_summary", "funding_deadzone_census",
     "funding_autocorrelation", "delisting_cohorts", "stress_weeks",
     "sha256_file", "write_csv",
+    # DEC-67 Entscheidung 6 (census correction, additive):
+    "funding_i_per_payment", "funding_excess_daily", "funding_excess_weekly",
+    "n_eff_windows", "decile_degeneration_weekly",
+    "decile_degeneration_window_summary", "interval_class_switching",
 ]
 
 _EPOCH = date(1970, 1, 1)
@@ -53,10 +57,12 @@ _EPOCH = date(1970, 1, 1)
 #: never assumed -- DEC-59's "4h/8h ist die Heterogenitaet, nicht 1h/8h"
 #: finding is exactly why this is measured per day, not looked up once).
 I_PER_8H = 0.0001
-#: funding_n -> interval-minutes map for the interval classes DEC-59 found
-#: on the real book (240/480/60 min); any other observed funding_n is
-#: reported as its own bucket, never silently folded into one of these.
-_FUNDING_N_TO_MINUTES: dict[int, int] = {24: 60, 6: 240, 3: 480}
+#: funding_n -> interval-minutes map for the interval classes DEC-59/DEC-67
+#: found on the real book (60/120/240/480 min, WELLE1_BEFUND_TEIL4:
+#: "120 min (funding_n = 12): 6.129" symbol-days); any other observed
+#: funding_n is reported as its own bucket, never silently folded into one
+#: of these.
+_FUNDING_N_TO_MINUTES: dict[int, int] = {24: 60, 12: 120, 6: 240, 3: 480}
 
 
 class PanelLoadError(RuntimeError):
@@ -476,6 +482,207 @@ def delisting_cohorts(weekly: dict[str, Any], *, as_of_week: str) -> list[dict[s
 
 
 # ----------------------------------------------------------------------------
+# DEC-67 Entscheidung 2: A1 sort key (funding_excess_sum = SUM(F - I))
+# ----------------------------------------------------------------------------
+
+def funding_i_per_payment(funding_n: np.ndarray | float) -> np.ndarray | float:
+    """DEC-67 Entscheidung 2 -- interest term ``I`` per SETTLEMENT, derived
+    ALWAYS from the day's own ``funding_n`` (never a fixed-interval
+    lookup): ``I_per_payment = I_PER_8H * (24/funding_n)/8 = I_PER_8H *
+    3/funding_n``. Matches every interval class DEC-59/DEC-67 measured on
+    the real book (funding_n=3/480min -> I_PER_8H; funding_n=6/240min ->
+    I_PER_8H/2; funding_n=12/120min -> I_PER_8H/4; funding_n=24/60min ->
+    I_PER_8H/8) and ALSO covers any other observed funding_n without
+    inventing a bucket for it -- the A1 sort key must never silently drop
+    an unclassified symbol-day (unlike ``funding_deadzone_census``'s
+    ``classified`` restriction, which is fine to leave narrow since it
+    only reports a share)."""
+    return I_PER_8H * 3.0 / funding_n
+
+
+def funding_excess_daily(panel: dict[str, Any]) -> tuple[np.ndarray, np.ndarray]:
+    """DEC-67 Entscheidung 2 -- A1 sort key, daily building block:
+    ``[n_days, n_symbols]`` array of ``funding_sum - funding_n *
+    funding_i_per_payment(funding_n)`` (a day's payments minus their
+    combined interest term). A day with no funding (``funding_n`` NaN, 0,
+    or its ``funding_sum`` counterpart NaN) contributes EXACTLY 0.0, never
+    NaN -- it is a MISSING day, not a measured deadzone day, but it must
+    not poison a weekly SUM by turning it into NaN (the entire point of a
+    SUM key, DEC-67 E2). The second return value is the ``has_funding``
+    mask so callers can still tell missing from measured-zero when they
+    need to (``funding_excess_weekly``'s ``n_days_with_funding``)."""
+    funding_n, funding_sum = panel["funding_n"], panel["funding_sum"]
+    has_funding = ~np.isnan(funding_n) & (funding_n > 0) & ~np.isnan(funding_sum)
+    with np.errstate(invalid="ignore", divide="ignore"):
+        safe_n = np.where(has_funding, funding_n, 1.0)
+        i_per_payment = funding_i_per_payment(safe_n)
+        excess = np.where(has_funding, funding_sum - funding_n * i_per_payment, 0.0)
+    return excess, has_funding
+
+
+def funding_excess_weekly(panel: dict[str, Any], weeks: list[str]) -> dict[str, Any]:
+    """DEC-67 Entscheidung 2 -- weekly A1 sort key: per symbol-week, the
+    SUM of ``funding_excess_daily`` over the ISO week's days. Aligned to
+    the EXACT SAME ``weeks`` grid ``weekly_returns_and_mask`` returns --
+    row ``t`` here lines up with ``returns[t]``/``alive[t]`` everywhere
+    downstream, the convention every WP-7 IC/permutation-null call already
+    relies on (``pit_universe.weekly_ic_series``, ``null_ic.
+    permutation_null_sd``). A week with zero funding-bearing days for a
+    symbol gets key 0.0 (DEC-67: "Totzonen-Wochen liegen ... bei 0" --
+    a genuine deadzone week and a no-data week are INDISTINGUISHABLE for
+    the sort key by design, DEC-67 E2's "kein Tie-Break innerhalb des
+    Klumpens"); ``n_days_with_funding``/``n_days_total`` keep the
+    distinction available for descriptive use (the decile-degeneration
+    census does not need it, but a future audit might)."""
+    symbols, dates = panel["symbols"], panel["dates"]
+    excess_daily, has_funding = funding_excess_daily(panel)
+    n_days, n_symbols = excess_daily.shape
+    week_start = [pit_universe.iso_week_start(date.fromisoformat(d)).isoformat() for d in dates]
+    week_pos = {w: i for i, w in enumerate(weeks)}
+    n_weeks = len(weeks)
+    key = np.zeros((n_weeks, n_symbols), dtype=np.float64)
+    n_days_with_funding = np.zeros((n_weeks, n_symbols), dtype=np.int64)
+    n_days_total = np.zeros((n_weeks, n_symbols), dtype=np.int64)
+    for i, w in enumerate(week_start):
+        wi = week_pos.get(w)
+        if wi is None:
+            continue  # a calendar week outside the returns/alive grid (no weekly close anywhere)
+        key[wi] += excess_daily[i]
+        n_days_with_funding[wi] += has_funding[i].astype(np.int64)
+        n_days_total[wi] += 1
+    return {"weeks": weeks, "symbols": symbols, "key": key,
+            "n_days_with_funding": n_days_with_funding, "n_days_total": n_days_total}
+
+
+# ----------------------------------------------------------------------------
+# DEC-67 Entscheidung 3: decile-degeneration census of the A1 sort key
+# ----------------------------------------------------------------------------
+
+def decile_degeneration_weekly(
+    key: np.ndarray, alive: np.ndarray, weeks: list[str], *, tol: float = 1e-12,
+) -> dict[str, Any]:
+    """DEC-67 Entscheidung 3 -- per-week decile-degeneration census of the
+    A1 sort key (``key``, e.g. ``funding_excess_weekly``'s ``key``): for
+    each week's ALIVE symbols, the share with key EXACTLY 0 (the deadzone
+    lump, within ``tol``), strictly negative, and strictly positive. D1
+    (the long leg) is degenerate that week if the strictly-negative share
+    is below 0.10; D10 (the short leg) if the strictly-positive share is
+    below 0.10 (DEC-67 E3: below that, the zero-lump reaches into the
+    decile and its ranking inside is arbitrary). This is the raw per-week
+    table only -- window summaries are ``decile_degeneration_window_
+    summary``'s job; this function makes NO verdict, only reports shares.
+    """
+    n_weeks, n_symbols = key.shape
+    rows: list[dict[str, Any]] = []
+    for t in range(n_weeks):
+        mask = alive[t]
+        n = int(mask.sum())
+        if n == 0:
+            rows.append({"week": weeks[t], "n_symbols": 0, "lump_share": None,
+                         "neg_share": None, "pos_share": None,
+                         "d1_degenerate": None, "d10_degenerate": None})
+            continue
+        k = key[t, mask]
+        n_zero = int(np.sum(np.abs(k) < tol))
+        n_neg = int(np.sum(k < -tol))
+        n_pos = int(np.sum(k > tol))
+        neg_share = n_neg / n
+        pos_share = n_pos / n
+        rows.append({
+            "week": weeks[t], "n_symbols": n, "lump_share": n_zero / n,
+            "neg_share": neg_share, "pos_share": pos_share,
+            "d1_degenerate": neg_share < 0.10, "d10_degenerate": pos_share < 0.10,
+        })
+    return {"weekly": rows, "tol": tol, "descriptive_only": True}
+
+
+def decile_degeneration_window_summary(
+    weekly_rows: list[dict[str, Any]], *, last_n: int, offset: int = 0,
+) -> dict[str, Any]:
+    """DEC-67 Entscheidung 3 -- window summary of ``decile_degeneration_
+    weekly``'s per-week table: the ``last_n`` weeks starting ``offset``
+    weeks before the very end of ``weekly_rows`` (``offset=0`` -> the most
+    recent ``last_n`` weeks; ``offset=52`` with ``last_n=52`` -> the 52
+    weeks BEFORE that -- DEC-67's "letzte 52 / vorherige 52" window pair).
+    Reports the CHRONOLOGICAL MEDIAN week of the window (positional median
+    -- for an even count, the lower of the two middle weeks, a fixed,
+    documented convention) and whether THAT week's shares flag a
+    degenerate leg (DEC-67 E3: "die Median-Woche des Fensters"), plus how
+    many weeks in the window are individually degenerate. Weeks with no
+    alive symbols (``lump_share`` ``None``) are excluded before taking the
+    median."""
+    n = len(weekly_rows)
+    hi = n - offset
+    lo = max(0, hi - last_n)
+    window = [r for r in weekly_rows[lo:hi] if r["lump_share"] is not None]
+    if not window:
+        return {"n_weeks": 0, "week_start": None, "week_end": None, "median_week": None,
+                "median_week_lump_share": None, "median_week_neg_share": None,
+                "median_week_pos_share": None, "median_week_d1_degenerate": None,
+                "median_week_d10_degenerate": None,
+                "n_weeks_d1_degenerate": 0, "n_weeks_d10_degenerate": 0}
+    mid = window[(len(window) - 1) // 2]
+    return {
+        "n_weeks": len(window), "week_start": window[0]["week"], "week_end": window[-1]["week"],
+        "median_week": mid["week"], "median_week_lump_share": mid["lump_share"],
+        "median_week_neg_share": mid["neg_share"], "median_week_pos_share": mid["pos_share"],
+        "median_week_d1_degenerate": mid["d1_degenerate"],
+        "median_week_d10_degenerate": mid["d10_degenerate"],
+        "n_weeks_d1_degenerate": sum(1 for r in window if r["d1_degenerate"]),
+        "n_weeks_d10_degenerate": sum(1 for r in window if r["d10_degenerate"]),
+    }
+
+
+# ----------------------------------------------------------------------------
+# DEC-67 Entscheidung 6: interval-class switching per symbol
+# ----------------------------------------------------------------------------
+
+def interval_class_switching(panel: dict[str, Any]) -> dict[str, Any]:
+    """DEC-67 Entscheidung 6 -- per-symbol interval-CLASS switching
+    (DEC-59: a symbol's settlement interval can change mid-history). For
+    each symbol, days are filtered to CLASSIFIED days only (480/240/120/
+    60-min -- unclassified/missing days are ignored, they neither start
+    nor end a transition), then the number of transitions between
+    consecutive classified days' classes is counted (a run of the SAME
+    class counts zero transitions no matter how long it is). Returns the
+    per-symbol switch count + days-per-class, the DISTRIBUTION over
+    symbols (never switches / switches once / 2-5 times />5 times), and
+    the total symbol-days per class (same totals ``funding_deadzone_
+    census``'s ``interval_class_counts`` reports, repeated here so this
+    section is self-contained) -- descriptive, no verdict."""
+    symbols = panel["symbols"]
+    funding_n = panel["funding_n"]
+    n_days, n_symbols = funding_n.shape
+    has_funding = ~np.isnan(funding_n) & (funding_n > 0)
+    fn_int = np.where(has_funding, np.round(funding_n), -1).astype(np.int64)
+    minutes = np.full(fn_int.shape, -1, dtype=np.int64)
+    for fn_val, mins in _FUNDING_N_TO_MINUTES.items():
+        minutes[fn_int == fn_val] = mins
+    classified = has_funding & (minutes > 0)
+
+    per_symbol: list[dict[str, Any]] = []
+    days_per_class_total: dict[str, int] = {}
+    n_switch_distribution = {"0": 0, "1": 0, "2-5": 0, ">5": 0}
+    for j, sym in enumerate(symbols):
+        idx = np.flatnonzero(classified[:, j])  # rows are already date-sorted (load_panel)
+        classes = [int(minutes[i, j]) for i in idx]
+        days_per_class: dict[str, int] = {}
+        for m in classes:
+            label = f"{m}min"
+            days_per_class[label] = days_per_class.get(label, 0) + 1
+            days_per_class_total[label] = days_per_class_total.get(label, 0) + 1
+        n_switches = sum(1 for k in range(1, len(classes)) if classes[k] != classes[k - 1])
+        bucket = "0" if n_switches == 0 else "1" if n_switches == 1 else (
+            "2-5" if n_switches <= 5 else ">5")
+        n_switch_distribution[bucket] += 1
+        per_symbol.append({"symbol": sym, "n_switches": n_switches,
+                            "n_classified_days": len(classes), "days_per_class": days_per_class})
+    return {"per_symbol": per_symbol, "n_switch_distribution": n_switch_distribution,
+            "days_per_class_total": days_per_class_total, "n_symbols": len(symbols),
+            "descriptive_only": True}
+
+
+# ----------------------------------------------------------------------------
 # STRESS_ABS weeks (DEC-62 N_eff-in-stress line -- optional, label only)
 # ----------------------------------------------------------------------------
 
@@ -500,6 +707,71 @@ def stress_weeks(stress_abs_path: Path | str, weeks: list[str]) -> dict[str, Any
     idx = sorted(week_pos[w] for w in stress_week_set if w in week_pos)
     return {"available": True, "n_stress_days": len(days), "n_stress_weeks_in_panel": len(idx),
             "week_indices": idx}
+
+
+# ----------------------------------------------------------------------------
+# DEC-67 Entscheidung 6: N_eff bug fix -- judgement-window N_eff, not full history
+# ----------------------------------------------------------------------------
+
+def n_eff_windows(
+    returns: np.ndarray, alive: np.ndarray, weeks: list[str], *,
+    stress_week_indices: list[int] | None = None,
+) -> dict[str, Any]:
+    """DEC-67 Entscheidung 6 -- N_eff bug fix (WELLE1_BEFUND_TEIL4: "N_eff
+    nan (Bau-Fehler)"). ``stats.n_eff`` needs a BALANCED panel (every
+    symbol alive every week of the array it is given); the full
+    multi-year history is never balanced (listings/delistings span all
+    298 weeks), so calling it on the whole history legitimately returns
+    ``nan``/``n_symbols_balanced=0`` -- that was the WRONG WINDOW being
+    passed in, not a data finding. This computes N_eff on the JUDGEMENT
+    windows instead -- the last 52 and the last 104 weeks, each balanced
+    only WITHIN that window -- plus the STRESS_ABS weeks
+    (``stress_week_indices``, absolute row indices into ``returns``/
+    ``alive``, from ``stress_weeks``) RESTRICTED to the last 104 weeks,
+    balanced across just those weeks. ``stats.n_eff`` itself is untouched;
+    only the slice passed to it is new (the old full-history call, e.g.
+    ``stats.n_eff(returns, alive)``, is left exactly as it was -- callers
+    keep reporting it too, labelled why it may legitimately be n/a)."""
+    n_weeks = returns.shape[0]
+
+    def _tail(n: int) -> tuple[int, int]:
+        lo = max(0, n_weeks - n)
+        return lo, n_weeks
+
+    def _window_result(lo: int, hi: int, window_weeks: int) -> dict[str, Any]:
+        res = stats.n_eff(returns[lo:hi], alive[lo:hi])
+        return {**res, "window_weeks": window_weeks, "n_weeks_in_window": hi - lo,
+                "week_start": weeks[lo] if hi > lo else None,
+                "week_end": weeks[hi - 1] if hi > lo else None}
+
+    lo52, hi52 = _tail(52)
+    lo104, hi104 = _tail(104)
+    out: dict[str, Any] = {
+        "w52": _window_result(lo52, hi52, 52),
+        "w104": _window_result(lo104, hi104, 104),
+    }
+
+    if stress_week_indices:
+        idx = sorted(i for i in stress_week_indices if lo104 <= i < hi104)
+        if len(idx) >= 2:
+            res = stats.n_eff(returns[idx], alive[idx])
+            out["stress_abs_last104"] = {
+                **res, "n_weeks_in_window": len(idx), "week_indices": idx,
+                "restricted_to": "letzte 104 Wochen",
+            }
+        else:
+            out["stress_abs_last104"] = {
+                "n_eff": float("nan"), "n_symbols_balanced": 0, "inv_n_eff": None,
+                "n_weeks_in_window": len(idx),
+                "note": "weniger als 2 STRESS_ABS-Wochen in den letzten 104 Wochen",
+            }
+    else:
+        out["stress_abs_last104"] = {
+            "n_eff": float("nan"), "n_symbols_balanced": 0, "inv_n_eff": None,
+            "n_weeks_in_window": 0,
+            "note": "STRESS_ABS-Fixture nicht verfuegbar oder keine Stress-Wochen im Panel",
+        }
+    return out
 
 
 # ----------------------------------------------------------------------------
