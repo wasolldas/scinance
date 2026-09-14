@@ -1,0 +1,47 @@
+{
+ "adv_sel": {
+  "fifo": [],
+  "prorata": []
+ },
+ "adv_sel_by_regime": {
+  "fifo": [],
+  "prorata": []
+ },
+ "adv_sel_horizon_s": 60.0,
+ "artifacts": {
+  "bootstrap_fingerprint": {
+   "n_entries": 0,
+   "path": "E:\\Claude\\Projects\\scinance\\scinance3-impl\\state\\wp10b_20260910\\wp10b_bootstrap_fingerprint.json",
+   "sha256": "96019ccaadccbee50f970079d949558079bd97ae3739901862e63ee60f06ae13"
+  },
+  "quote_outcomes": {
+   "n_rows": 0,
+   "path": "E:\\Claude\\Projects\\scinance\\scinance3-impl\\state\\wp10b_20260910\\wp10b_quote_outcomes.csv",
+   "sha256": "93511727136d0fdfb1df3f825f2104db66acf0ca3ac10ee97e62f95e8ffd859e"
+  }
+ },
+ "bootstrap_ci": {
+  "adv_sel_fifo": [],
+  "p_fill_fifo": []
+ },
+ "horizons_s": [
+  10.0,
+  60.0
+ ],
+ "label_threshold_bp": 1.75,
+ "n_quotes_total": 0,
+ "p_fill": {
+  "fifo": [],
+  "prorata": []
+ },
+ "p_fill_by_hour": {
+  "fifo": [],
+  "prorata": []
+ },
+ "p_fill_by_regime": {
+  "fifo": [],
+  "prorata": []
+ },
+ "seed": 53,
+ "wp": "WP-10B"
+}

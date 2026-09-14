@@ -157,11 +157,59 @@ def cmd_run(args: argparse.Namespace) -> int:
         print(f"[wp10b] FATAL: {exc}", file=sys.stderr)
         return 1
 
-    print(json.dumps({"windows": summaries, "report": {
+    # Tages-Status je Symbol in den Report (Lehre Lauf 2026-09-10: 0 Quotes,
+    # Report ohne Ursache). Zaehlt Status und Gruende aus den meta.json des
+    # Stores (read-only) und schreibt wp10b_windows.json + einen Abschnitt.
+    day_status = _collect_day_status(out, "bybit", symbols, start, end)
+    (report_dir / "wp10b_windows.json").write_text(
+        json.dumps({"windows": summaries, "day_status": day_status}, indent=1))
+    lines = ["", "## Tages-Status je Symbol (aus dem fillshadow_1min-Store)", ""]
+    for sym, st in day_status.items():
+        lines.append(f"- {sym}: " + ", ".join(f"{k}={v}" for k, v in sorted(st["counts"].items())))
+        for reason, n in st["top_reasons"]:
+            lines.append(f"    - {n}x {reason}")
+    lines.append("")
+    lines.append("(Ein Tag ohne 'ok' liefert keine Quotes: no_raw = keine Rohdaten im "
+                 "Harvest, not_manifest_done = Harvest-Manifest ohne DONE fuer orderbook "
+                 "oder publicTrade, discarded = Sequenzbruch-Budget ueberschritten.)")
+    with open(report["markdown_path"], "a", encoding="utf-8") as fh:
+        fh.write("\n".join(lines) + "\n")
+
+    print(json.dumps({"windows": summaries, "day_status": day_status, "report": {
         "summary_path": report["summary_path"], "markdown_path": report["markdown_path"]}},
         indent=2))
     print(f"[wp10b] Bericht: {report['markdown_path']}", file=sys.stderr)
     return 0 if ok else 1
+
+
+def _collect_day_status(out: Path, exchange: str, symbols: list[str],
+                        start: str, end: str) -> dict[str, dict[str, Any]]:
+    """Status-/Grund-Zaehlung je Symbol aus den meta.json des Stores."""
+    from collections import Counter
+    result: dict[str, dict[str, Any]] = {}
+    for sym in symbols:
+        root = out / "fillshadow_1min" / f"exchange={exchange}" / f"symbol={sym}"
+        counts: Counter = Counter()
+        reasons: Counter = Counter()
+        if root.is_dir():
+            for part in sorted(root.glob("date=*")):
+                day = part.name[len("date="):]
+                if day < start or day > end:
+                    continue
+                mp = part / "meta.json"
+                if not mp.is_file():
+                    counts["meta_missing"] += 1
+                    continue
+                try:
+                    meta = json.loads(mp.read_text())
+                except ValueError:
+                    counts["meta_unreadable"] += 1
+                    continue
+                counts[str(meta.get("status"))] += 1
+                if meta.get("status") != "ok":
+                    reasons[str(meta.get("reason") or "(kein Grund)")] += 1
+        result[sym] = {"counts": dict(counts), "top_reasons": reasons.most_common(5)}
+    return result
 
 
 def main(argv: list[str] | None = None) -> int:
