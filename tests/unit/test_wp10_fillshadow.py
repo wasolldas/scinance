@@ -407,6 +407,69 @@ def test_replay_manifest_done_gating_excludes_undone_day(tmp_path):
     assert s_ungated["ok"] == 2 and s_ungated["not_manifest_done"] == 0
 
 
+def test_replay_compacted_day_counts_as_closed_even_if_manifest_empty(tmp_path):
+    """DEC-68: a day whose harvest partition carries the harvester's
+    ``_compacted.parquet`` is CLOSED, even when the manifest row says EMPTY
+    (real tree 2026-09-15: 78 orderbook days compacted, manifest EMPTY).
+    A day with only hourly parts and no DONE stays gated (live day)."""
+    base = tmp_path / "h"
+    d1, d2, d3 = "2026-06-22", "2026-06-23", "2026-06-24"
+    for d in (d1, d2, d3):
+        _build_day_fixture(base, d, done=False)
+    _write_manifest(base, [
+        ("bybit", "orderbook", "TSTUSDT", d1, "EMPTY"),
+        ("bybit", "publicTrade", "TSTUSDT", d1, "DONE"),
+        ("bybit", "orderbook", "TSTUSDT", d2, "EMPTY"),
+        ("bybit", "publicTrade", "TSTUSDT", d2, "EMPTY"),
+        ("bybit", "orderbook", "TSTUSDT", d3, "EMPTY"),
+        ("bybit", "publicTrade", "TSTUSDT", d3, "DONE"),
+    ])
+    # d1: orderbook compacted -> closed; d2: both compacted -> closed;
+    # d3: orderbook neither DONE nor compacted -> gated
+    ob = base / "raw" / "bybit" / "orderbook" / "symbol=TSTUSDT"
+    tr = base / "raw" / "bybit" / "publicTrade" / "symbol=TSTUSDT"
+    for sd, d in ((ob, d1), (ob, d2), (tr, d2)):
+        # the marker alone decides eligibility; the replay reads *.parquet,
+        # so give the marker the same rows as the fixture file to keep the
+        # day's values unchanged -- copy the existing parquet.
+        import shutil
+        src = next((sd / f"date={d}").glob("*.parquet"))
+        shutil.copy(src, sd / f"date={d}" / rp.COMPACTED_FILE)
+        src.unlink()
+    pr = rp.probe(base, "TSTUSDT", d1, d3)
+    assert pr["orderbook_days_compacted"] == 2 and pr["trade_days_compacted"] == 1
+    assert pr["days_eligible_for_placement"] == 2
+    out = tmp_path / "o"
+    s = rp.run_window(base, out, "TSTUSDT", d1, d3, require_manifest_done=True)
+    assert s["ok"] == 2 and s["not_manifest_done"] == 1
+    meta3 = json.loads((out / "fillshadow_1min" / "exchange=bybit" / "symbol=TSTUSDT"
+                        / f"date={d3}" / "manifest.json").read_text())
+    assert meta3["status"] == "not_manifest_done"
+    assert "compacted=False" in meta3["reason"]
+
+
+def test_resume_reevaluates_gated_days_once_they_close(tmp_path):
+    """A day stored as not_manifest_done is never resumed as final: when the
+    harvester later compacts it (DEC-68), the next run recomputes it."""
+    import shutil
+    base = tmp_path / "h"
+    d1 = "2026-06-22"
+    _build_day_fixture(base, d1, done=False)
+    _write_manifest(base, [
+        ("bybit", "orderbook", "TSTUSDT", d1, "EMPTY"),
+        ("bybit", "publicTrade", "TSTUSDT", d1, "DONE"),
+    ])
+    out = tmp_path / "o"
+    s1 = rp.run_window(base, out, "TSTUSDT", d1, d1, require_manifest_done=True)
+    assert s1["not_manifest_done"] == 1 and s1["ok"] == 0
+    ob_day = base / "raw" / "bybit" / "orderbook" / "symbol=TSTUSDT" / f"date={d1}"
+    src = next(ob_day.glob("*.parquet"))
+    shutil.copy(src, ob_day / rp.COMPACTED_FILE)
+    src.unlink()
+    s2 = rp.run_window(base, out, "TSTUSDT", d1, d1, require_manifest_done=True)
+    assert s2["ok"] == 1 and s2["resumed"] == 0 and s2["not_manifest_done"] == 0
+
+
 def test_replay_missing_manifest_raises(tmp_path):
     base = tmp_path / "h"
     d1 = "2026-06-22"

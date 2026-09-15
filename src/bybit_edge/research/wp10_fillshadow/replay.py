@@ -105,6 +105,38 @@ def _days_between(start: str, end: str) -> list[str]:
 # probe: what's actually present, no replay
 # ----------------------------------------------------------------------------
 
+#: Name of the harvester's per-day compaction output. A day carrying this
+#: file has been CLOSED and compacted by the harvester (compaction runs
+#: after day end); the harvester's manifest may then show the raw
+#: partition as EMPTY/archived instead of DONE (observed 2026-09-15 on the
+#: real tree: 78 bybit/orderbook days with a 300-MB ``_compacted.parquet``
+#: each, manifest status EMPTY; DEC-68). Eligibility therefore accepts
+#: manifest-DONE OR compacted-file-present, never a bare glob of hourly
+#: files (a live, half-recorded day has hourly parts but no compaction).
+COMPACTED_FILE = "_compacted.parquet"
+
+
+def compacted_days(stream_dir: Path, days: list[str]) -> set[str]:
+    """Days under ``stream_dir`` (``.../symbol=X``) that carry the
+    harvester's ``_compacted.parquet`` -- closed days by construction."""
+    return {d for d in days if (stream_dir / f"date={d}" / COMPACTED_FILE).is_file()}
+
+
+def closed_days(base: Path, exchange: str, stream: str, symbol: str,
+                stream_dir: Path, days: list[str], start: str, end: str) -> tuple[set[str], set[str]]:
+    """``(done, compacted)`` for one stream: manifest-DONE days (read-only
+    harvest manifest, loud fail if unreadable -- unchanged discipline) and
+    compacted days. A day is CLOSED if it is in either set."""
+    done = manifest_done_days(base, exchange, stream, symbol, start, end)
+    return done, compacted_days(stream_dir, days)
+
+
+def _closed_reason(day: str, done_ob: set[str], comp_ob: set[str],
+                   done_tr: set[str], comp_tr: set[str]) -> str:
+    return (f"orderbook DONE={day in done_ob} compacted={day in comp_ob} "
+            f"publicTrade DONE={day in done_tr} compacted={day in comp_tr}")
+
+
 def probe(base_dir: Path | str, symbol: str, start: str, end: str, *,
          exchange: str = "bybit", orderbook_stream: str = "orderbook",
          trade_stream: str = "publicTrade") -> dict[str, Any]:
@@ -126,12 +158,17 @@ def probe(base_dir: Path | str, symbol: str, start: str, end: str, *,
         "orderbook_stream_dir_exists": ob_dir.is_dir(),
         "trade_stream_dir_exists": tr_dir.is_dir(),
     }
+    comp_ob = compacted_days(ob_dir, days)
+    comp_tr = compacted_days(tr_dir, days)
+    result["orderbook_days_compacted"] = len(comp_ob)
+    result["trade_days_compacted"] = len(comp_tr)
     try:
         done_ob = manifest_done_days(base, exchange, orderbook_stream, symbol, start, end)
         done_tr = manifest_done_days(base, exchange, trade_stream, symbol, start, end)
         result["orderbook_days_done"] = len(done_ob)
         result["trade_days_done"] = len(done_tr)
-        result["days_eligible_for_placement"] = len(done_ob & done_tr)
+        result["days_eligible_for_placement"] = len((done_ob | comp_ob) & (done_tr | comp_tr))
+        result["eligibility_rule"] = "manifest DONE oder _compacted.parquet je Strom (DEC-68)"
     except BarCacheError as exc:
         result["manifest_error"] = str(exc)
     return result
@@ -432,9 +469,11 @@ def _run_window_full_replay(
     days = _days_between(start, end)
     done_ob: set[str] = set()
     done_tr: set[str] = set()
+    comp_ob: set[str] = set()
+    comp_tr: set[str] = set()
     if require_manifest_done:
-        done_ob = manifest_done_days(base, exchange, orderbook_stream, symbol, start, end)
-        done_tr = manifest_done_days(base, exchange, trade_stream, symbol, start, end)
+        done_ob, comp_ob = closed_days(base, exchange, orderbook_stream, symbol, ob_dir, days, start, end)
+        done_tr, comp_tr = closed_days(base, exchange, trade_stream, symbol, trade_dir, days, start, end)
 
     con = duckdb.connect()
     try:
@@ -452,9 +491,9 @@ def _run_window_full_replay(
     for day in days:
         meta = day_meta.get(day, {"status": "no_raw", "reason": "", "n_breaks": 0, "n_snapshots": 0})
         status, reason = meta["status"], meta.get("reason", "")
-        if status == "ok" and require_manifest_done and not (day in done_ob and day in done_tr):
-            status, reason = "not_manifest_done", (
-                f"orderbook DONE={day in done_ob} publicTrade DONE={day in done_tr}")
+        if status == "ok" and require_manifest_done and not (
+                (day in done_ob or day in comp_ob) and (day in done_tr or day in comp_tr)):
+            status, reason = "not_manifest_done", _closed_reason(day, done_ob, comp_ob, done_tr, comp_tr)
 
         if status == "ok":
             cols = _place_and_evaluate_day(
@@ -526,6 +565,10 @@ def _resumable_meta(part_dir: Path, *, schema_version: int, horizon_s: float,
                 f"WP-10(B) partition at {part_dir} was written with {name}={have!r}, "
                 f"this run requested {name}={want!r} -- refusing to silently reuse a "
                 f"mismatched partition (pick a different --out or pass --no-resume).")
+    if meta.get("status") == "not_manifest_done":
+        # Gated days are never final: the harvester may mark the day DONE or
+        # compact it later (DEC-68), so a resumed run re-evaluates them.
+        return None
     if meta.get("status") == "ok" and meta.get("n_quotes", 0) > 0:
         pq_path = part_dir / "fillshadow.parquet"
         if not pq_path.is_file():
@@ -645,9 +688,11 @@ def run_window(
     days = _days_between(start, end)
     done_ob: set[str] = set()
     done_tr: set[str] = set()
+    comp_ob: set[str] = set()
+    comp_tr: set[str] = set()
     if require_manifest_done:
-        done_ob = manifest_done_days(base, exchange, orderbook_stream, symbol, start, end)
-        done_tr = manifest_done_days(base, exchange, trade_stream, symbol, start, end)
+        done_ob, comp_ob = closed_days(base, exchange, orderbook_stream, symbol, ob_dir, days, start, end)
+        done_tr, comp_tr = closed_days(base, exchange, trade_stream, symbol, trade_dir, days, start, end)
 
     lookahead_ms = int(round(horizon_s * 1000)) + int(round(adv_sel_horizon_s * 1000))
     part_root = out / "fillshadow_1min" / f"exchange={exchange}" / f"symbol={symbol}"
@@ -722,9 +767,9 @@ def run_window(
             _ensure_replayed(di)
             meta = day_meta[day]
             status, reason = meta["status"], meta.get("reason", "")
-            if status == "ok" and require_manifest_done and not (day in done_ob and day in done_tr):
-                status, reason = "not_manifest_done", (
-                    f"orderbook DONE={day in done_ob} publicTrade DONE={day in done_tr}")
+            if status == "ok" and require_manifest_done and not (
+                    (day in done_ob or day in comp_ob) and (day in done_tr or day in comp_tr)):
+                status, reason = "not_manifest_done", _closed_reason(day, done_ob, comp_ob, done_tr, comp_tr)
 
             if status == "ok":
                 target_ms = _day_ms(day) + MS_PER_DAY + lookahead_ms

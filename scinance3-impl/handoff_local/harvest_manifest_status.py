@@ -45,3 +45,9 @@ print("\n== Harvester-Gesundheit: neuester Tag je Exchange/Stream (alle Symbole)
 for r in con.execute("SELECT exchange, stream, max(date), max(ts_done) FROM partitions "
                      "GROUP BY exchange, stream ORDER BY exchange, stream"):
     print(r)
+
+print("\n== Detail: bybit orderbook BTCUSDT, drei Tage (Kompaktierungs-Semantik) ==")
+for r in con.execute("SELECT date, status, rows, size_bytes, archived_at, error, ts_done FROM partitions "
+                     "WHERE exchange='bybit' AND stream='orderbook' AND symbol='BTCUSDT' "
+                     "AND date IN ('2026-07-01','2026-08-02','2026-09-05')"):
+    print(r)
