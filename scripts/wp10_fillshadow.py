@@ -196,7 +196,7 @@ def _collect_day_status(out: Path, exchange: str, symbols: list[str],
                 day = part.name[len("date="):]
                 if day < start or day > end:
                     continue
-                mp = part / "meta.json"
+                mp = part / "manifest.json"
                 if not mp.is_file():
                     counts["meta_missing"] += 1
                     continue

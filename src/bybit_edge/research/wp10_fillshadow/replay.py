@@ -64,7 +64,7 @@ from bybit_edge.research.payload_sql import cross_form_dedup_qualify, trade_rows
 
 from . import queue_model as qm
 
-SCHEMA_VERSION = 1
+SCHEMA_VERSION = 2  # 2: adv_sel mid slice reaches the full lookahead (DEC-69)
 
 MS_PER_MINUTE = 60_000
 MS_PER_DAY = 86_400_000
@@ -343,9 +343,15 @@ def _place_and_evaluate_day(
         idx_hi = bisect.bisect_right(ts_a, t_end)
         insufficient = data_end_ms < boundary + lookahead_ms
 
-        # mids shared by both sides: (ts, mid) from the same touch samples
+        # mids shared by both sides: (ts, mid) from the same touch samples.
+        # The slice must reach boundary + horizon + adv_sel_horizon (the
+        # LOOKAHEAD), not just the fill horizon: adv_sel needs mid(t_fill +
+        # adv_sel_horizon) and t_fill can be anywhere inside the horizon.
+        # Lauf 2026-09-15 (DEC-69): the slice ended at the fill horizon, so
+        # only sub-second fills carried an adv_sel value (1.5 % of fills).
+        idx_la = bisect.bisect_right(ts_a, boundary + lookahead_ms)
         mid_slice = [(ts_a[i], 0.5 * (bid_px_a[i] + ask_px_a[i]))
-                    for i in range(idx0, min(idx_hi + 1, len(ts_a)))]
+                    for i in range(idx0, min(idx_la + 1, len(ts_a)))]
 
         t_lo = bisect.bisect_right(trade_ts, boundary)  # trades strictly after boundary
         t_hi = bisect.bisect_right(trade_ts, t_end)

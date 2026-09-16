@@ -470,6 +470,30 @@ def test_resume_reevaluates_gated_days_once_they_close(tmp_path):
     assert s2["ok"] == 1 and s2["resumed"] == 0 and s2["not_manifest_done"] == 0
 
 
+def test_adv_sel_is_measured_for_fills_anywhere_inside_the_horizon():
+    """DEC-69: a fill 30 s after placement needs mid(t_fill + 60 s), i.e.
+    a sample 90 s after the boundary -- beyond the 60-s fill horizon. The
+    real run 2026-09-15 carried adv_sel for only 1.5 % of fills because the
+    mid slice stopped at the fill horizon; the slice must reach the full
+    lookahead (horizon + adv_sel_horizon)."""
+    day = "2026-06-22"
+    d0 = rp._day_ms(day)
+    ts = [d0 + i * 1000 for i in range(0, 200)]
+    n = len(ts)
+    out = rp._place_and_evaluate_day(
+        day, ts_a=ts, bid_px_a=[100.0] * n, bid_sz_a=[10.0] * n,
+        ask_px_a=[101.0] * n, ask_sz_a=[10.0] * n,
+        trades=[(d0 + 30_000, "sell", 100.0, 50.0)], trade_ts=[d0 + 30_000],
+        horizon_s=60.0, adv_sel_horizon_s=60.0, quote_size_fraction=0.1)
+    fills = [i for i in range(len(out["minute_idx"])) if out["fifo_filled"][i]]
+    assert len(fills) == 1
+    i = fills[0]
+    assert out["fifo_latency_s"][i] == 30.0
+    assert out["fifo_adv_sel_bp"][i] is not None
+    assert abs(out["fifo_adv_sel_bp"][i] - (-50.0)) < 1e-9   # mid 100.5 vs buy at 100 -> favourable
+    assert out["prorata_adv_sel_bp"][i] is not None
+
+
 def test_replay_missing_manifest_raises(tmp_path):
     base = tmp_path / "h"
     d1 = "2026-06-22"
