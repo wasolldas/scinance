@@ -1,0 +1,33 @@
+{
+ "exchange": "bybit",
+ "symbol_a": "BTCUSDT",
+ "symbol_b": "ETHUSDT",
+ "range": [
+  "2024-09-16",
+  "2026-09-16"
+ ],
+ "bucket_minutes": 30,
+ "n_aligned_buckets": 32831,
+ "seed": 53,
+ "pearson": {
+  "statistic": "pearson",
+  "point": 0.8147985412898803,
+  "ci_lo": 0.8007752444081373,
+  "ci_hi": 0.8290445504980515,
+  "n": 32831,
+  "n_boot": 1000,
+  "seed": 53,
+  "block_size": 48
+ },
+ "spearman": {
+  "statistic": "spearman",
+  "point": 0.7970350824470132,
+  "ci_lo": 0.7881896279413231,
+  "ci_hi": 0.8054918254893024,
+  "n": 32831,
+  "n_boot": 1000,
+  "seed": 53,
+  "block_size": 48
+ },
+ "sha256": "3c50cbf0ce4d37c7f16afa94a1b59397048c981de347a0790156fd462d561d0d"
+}
