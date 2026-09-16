@@ -151,10 +151,13 @@ def cmd_fetch(a: argparse.Namespace) -> int:
 
 
 def cmd_census(a: argparse.Namespace) -> int:  # noqa: C901 -- one linear pipeline, staged prints
+    import numpy as np
+
     from bybit_edge.config import FEE_TAKER
     from bybit_edge.research.wp7_universe import null_ic, panel_load
     from bybit_edge.research.wp7_universe import pair_corr as pair_corr_mod
     from bybit_edge.research.wp7_universe import pit_universe, report as report_mod, stats
+    from bybit_edge.research.wp12_delisting import survivorship_fixture as sf
 
     def log(msg: str) -> None:
         print(msg, file=sys.stderr)
@@ -173,6 +176,11 @@ def cmd_census(a: argparse.Namespace) -> int:  # noqa: C901 -- one linear pipeli
     as_of = date.fromisoformat(a.as_of) if a.as_of else date.today()
     seed = a.seed if a.seed is not None else 53
     judgement_bearing = not (partial_or_failed and a.allow_partial)
+    # getattr, not a.include_delisted: keeps this function callable with an
+    # older-shaped argparse.Namespace (e.g. the pre-WP-12b unit tests'
+    # hand-built namespaces) that never set the new WP-12b fields -- the
+    # survivors-only path must stay byte-identical and crash-free either way.
+    include_delisted = getattr(a, "include_delisted", False)
 
     out_dir = Path(a.out)
     out_dir.mkdir(parents=True, exist_ok=True)
@@ -180,21 +188,47 @@ def cmd_census(a: argparse.Namespace) -> int:  # noqa: C901 -- one linear pipeli
 
     log("[2/10] Panel laden (panel_1d -> Tages-Arrays)")
     symbols = panel_load.load_panel_symbols(manifest)
+    delisted_base = delisted_manifest = delisting_dates_path = None
     try:
-        panel = panel_load.load_panel(
-            a.panel_base, manifest, year_start=a.start_year, year_end=a.end_year,
-            as_of=as_of, symbols=symbols, allow_partial=a.allow_partial)
+        if include_delisted:
+            delisted_base = Path(a.delisted_base)
+            delisted_manifest = (Path(a.delisted_manifest) if a.delisted_manifest
+                                  else delisted_base / "panel_manifest.sqlite")
+            delisting_dates_path = (Path(a.delisting_dates) if a.delisting_dates
+                                     else delisted_base / "delisting_dates.json")
+            panel = panel_load.load_panel_union(
+                a.panel_base, manifest, delisted_base, delisted_manifest,
+                year_start=a.start_year, year_end=a.end_year, as_of=as_of,
+                delisting_dates_path=delisting_dates_path, symbols=symbols,
+                allow_partial=a.allow_partial)
+        else:
+            panel = panel_load.load_panel(
+                a.panel_base, manifest, year_start=a.start_year, year_end=a.end_year,
+                as_of=as_of, symbols=symbols, allow_partial=a.allow_partial)
     except (panel_store.PanelStoreError, panel_load.PanelLoadError) as exc:
         log(f"FEHLER (loud fail): {exc}")
         return 1
     log(f"  {len(panel['symbols'])} Symbole, {len(panel['dates'])} Tage, "
         f"{panel['n_partitions_used']} Partitionen gelesen.")
+    if include_delisted:
+        log(f"  WP-12b/DEC-70: {panel['n_symbols_survivors']} Ueberlebende + "
+            f"{panel['n_symbols_delisted']} delistete Symbole mit Historie in der Union "
+            f"({panel.get('n_no_history_only', 0)} NO_HISTORY-Symbole ausgeschlossen).")
 
-    range_fp = panel_load.combined_range_fingerprint(
-        a.panel_base, panel["symbols"], a.start_year, a.end_year, as_of=as_of)
+    if include_delisted:
+        surv_syms_for_fp = [s for s, d in zip(panel["symbols"], panel["is_delisted"]) if not d]
+        range_fp = panel_load.union_range_fingerprint(
+            a.panel_base, delisted_base, surv_syms_for_fp, panel["delisted_symbols"],
+            year_start=a.start_year, year_end=a.end_year, as_of=as_of)
+    else:
+        range_fp = panel_load.combined_range_fingerprint(
+            a.panel_base, panel["symbols"], a.start_year, a.end_year, as_of=as_of)
 
     log("[3/10] Woechentliche Renditen + PIT-Alive-Maske")
-    weekly = panel_load.weekly_returns_and_mask(panel)
+    if include_delisted:
+        weekly = panel_load.weekly_returns_and_mask_union(panel, panel["last_alive_day"])
+    else:
+        weekly = panel_load.weekly_returns_and_mask(panel)
     returns, alive, weeks = weekly["returns"], weekly["alive"], weekly["weeks"]
     n_weeks = len(weeks)
     k_full = pit_universe.k_per_week(alive)
@@ -339,6 +373,53 @@ def cmd_census(a: argparse.Namespace) -> int:  # noqa: C901 -- one linear pipeli
         **panel_load.interval_class_switching(panel),
     }
 
+    fixture_result = None
+    delisted_extra = None
+    if include_delisted:
+        log("[9c/10] WP-12b/DEC-70: Survivorship-Verzerrung IC_union - IC_survivors "
+            "(Wochen-Cluster-Bootstrap, KEIN PASS/FAIL)")
+        is_delisted = panel["is_delisted"]
+        surv_cols = np.flatnonzero(~is_delisted)
+        del_cols = np.flatnonzero(is_delisted)
+        dd_payload = json.loads(Path(delisting_dates_path).read_text(encoding="utf-8"))
+        n_delisted_register = dd_payload.get("n_symbols")
+        dd_sha256 = panel_load.sha256_file(delisting_dates_path)
+        if del_cols.size == 0:
+            log("  keine delisteten Symbole mit Historie in der Union -- Verzerrung nicht messbar.")
+            b3["survivorship_bias"] = {
+                "n_delisted_symbols": n_delisted_register, "n_with_history": 0,
+                "bias_ic_union_minus_survivors": None, "ci_lo": None, "ci_hi": None,
+                "n_weeks": 0, "seed": seed, "n_boot": a.n_boot_survivorship,
+                "threshold_note": "keine delisteten Symbole mit Historie in der Union -- "
+                                   "Verzerrung nicht messbar.",
+            }
+        else:
+            fixture_result = sf.run_fixture_measurement(
+                returns[:, surv_cols], alive[:, surv_cols],
+                returns[:, del_cols], alive[:, del_cols],
+                seed=seed, n_boot=a.n_boot_survivorship, week_labels=weeks,
+                mode_label="UNION_REAL")
+            b = fixture_result["bootstrap"]
+            log(f"  Verzerrung IC_union - IC_survivors = {fixture_result['bias_point']:.4f} "
+                f"[{b['ci_lo']:.4f}; {b['ci_hi']:.4f}] (n_weeks={b['n_weeks']}, "
+                f"n_boot={b['n_boot']}, seed={b['seed']})")
+            log(f"  {sf.THRESHOLD_NOT_REGISTERED_NOTE}")
+            b3["survivorship_bias"] = {
+                "n_delisted_symbols": n_delisted_register,
+                "n_with_history": int(del_cols.size),
+                "bias_ic_union_minus_survivors": fixture_result["bias_point"],
+                "ci_lo": b["ci_lo"], "ci_hi": b["ci_hi"], "n_weeks": b["n_weeks"],
+                "seed": b["seed"], "n_boot": b["n_boot"],
+                "threshold_note": sf.THRESHOLD_NOT_REGISTERED_NOTE,
+            }
+        delisted_extra = {
+            "n_delisted_symbols": n_delisted_register,
+            "n_with_history": int(del_cols.size),
+            "n_no_history_only": int(panel.get("n_no_history_only", 0)),
+            "delisting_dates_sha256": dd_sha256,
+            "union_range_fingerprint": range_fp,
+        }
+
     pc = None
     if a.bar_cache_dir and a.corr_start and a.corr_end:
         try:
@@ -397,6 +478,13 @@ def cmd_census(a: argparse.Namespace) -> int:  # noqa: C901 -- one linear pipeli
     spread_json_path.write_text(json.dumps({"source": spread_source, **spread_census}, indent=1))
     spread_json_art = {"path": str(spread_json_path), "sha256": panel_load.sha256_file(spread_json_path)}
 
+    sf_art = sf_csv = None
+    if fixture_result is not None:
+        sf_art = sf.write_artifacts(out_dir, fixture_result)
+        sf_csv = sf.write_ic_series_csv(out_dir, fixture_result)
+        delisted_extra["artifacts"] = {
+            k: v for k, v in {"survivorship_bias_union": sf_art, "ic_series_csv": sf_csv}.items() if v}
+
     extra: dict = {
         "judgement_bearing": judgement_bearing,
         "label": "urteilstragend" if judgement_bearing else "nicht urteilstragend (--allow-partial)",
@@ -434,7 +522,10 @@ def cmd_census(a: argparse.Namespace) -> int:  # noqa: C901 -- one linear pipeli
             "a1_key_null_per_window": a1_null_pw_art, "a1_key_null_pooled": a1_null_pooled_art,
             "decile_degeneration_weekly_csv": decile_degeneration_csv,
             **({"pair_corr_btc_eth": pc_art} if pc_art else {}),
+            **({"survivorship_bias_union": sf_art} if sf_art else {}),
+            **({"survivorship_ic_series_csv": sf_csv} if sf_csv else {}),
         },
+        **({"delisted": delisted_extra} if delisted_extra is not None else {}),
     }
 
     full = report_mod.assemble_report(
@@ -484,6 +575,23 @@ def main() -> int:
     ap.add_argument("--as-of", default="",
                     help="Referenzdatum fuer frozen/open-Jahresgrenze und Delisting-Kohorten "
                          "(YYYY-MM-DD, Default: heute)")
+    ap.add_argument("--include-delisted", action="store_true",
+                    help="WP-12b (DEC-70): Zensus auf der UNION aus panel_1d (Ueberlebende) + "
+                         "panel_1d_delisted (delistet) laufen lassen, plus Survivorship-"
+                         "Verzerrung IC_union - IC_survivors (Cluster-Bootstrap-CI, KEIN "
+                         "PASS/FAIL). Ohne dieses Flag laeuft der Zensus byteidentisch wie "
+                         "zuvor (Ueberlebende allein).")
+    ap.add_argument("--delisted-base", default="data/panel_1d_delisted",
+                    help="WP-12b: Basisverzeichnis des delisteten panel_1d-Baums")
+    ap.add_argument("--delisted-manifest", default="",
+                    help="WP-12b: Manifest des delisteten Baums (Default: "
+                         "<delisted-base>/panel_manifest.sqlite)")
+    ap.add_argument("--delisting-dates", default="",
+                    help="WP-12b: Pfad zu delisting_dates.json (Default: "
+                         "<delisted-base>/delisting_dates.json)")
+    ap.add_argument("--n-boot-survivorship", type=int, default=1000,
+                    help="WP-12b: Anzahl Cluster-Bootstrap-Ziehungen fuer die "
+                         "Survivorship-Verzerrung IC_union - IC_survivors")
     a = ap.parse_args()
 
     modes = [a.probe_tickers, a.fetch, a.census, a.reverify]

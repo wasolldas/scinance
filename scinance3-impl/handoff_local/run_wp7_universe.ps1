@@ -10,6 +10,11 @@
 #   3) Zensus  -- K, SD_null(IC_t), N_eff, sigma_xs, sigma_LS,
 #                 PERP_SPREAD_BP, rho(BTC,ETH) -> Befund B1..B5,
 #                 Report-JSON + Markdown nach scinance3-impl\state\wp7_<datum>.
+#                 Mit -IncludeDelisted: Zensus laeuft auf der UNION aus
+#                 panel_1d (Ueberlebende) + panel_1d_delisted (WP-12b,
+#                 DEC-70; siehe run_wp12_delisting.ps1 Schritt 4), plus
+#                 Survivorship-Verzerrung IC_union - IC_survivors
+#                 (Cluster-Bootstrap-CI, KEIN PASS/FAIL).
 #   4) Reverify -- 1%-Zufallsstichprobe eingefrorener Partitionen neu
 #                 gezogen, Fingerprints geprueft (monatlich, Provenienz).
 #
@@ -28,8 +33,11 @@ param(
     [string]$CorrStart = "",
     [string]$CorrEnd = "",
     [string]$OutDir = "",
+    [string]$DelistedBase = "",
+    [string]$NBootSurvivorship = "1000",
     [switch]$SkipFetch,
-    [switch]$AllowPartial
+    [switch]$AllowPartial,
+    [switch]$IncludeDelisted
 )
 
 $ErrorActionPreference = "Stop"
@@ -37,6 +45,9 @@ Set-Location $RepoRoot
 
 if ($PanelBase -eq "") {
     $PanelBase = Join-Path $RepoRoot "data\panel_1d"
+}
+if ($DelistedBase -eq "") {
+    $DelistedBase = Join-Path $RepoRoot "data\panel_1d_delisted"
 }
 if ($BarCacheDir -eq "") {
     $BarCacheDir = Join-Path $RepoRoot "data\barcache"
@@ -79,9 +90,15 @@ Write-Host "=== WP-7 Schritt 3: Zensus -> $OutDir (rho-Fenster $CorrStart..$Corr
 # "nicht urteilstragend". Nie stillschweigend als Default.
 $partialArgs = @()
 if ($AllowPartial) { $partialArgs = @("--allow-partial") }
+$delistedArgs = @()
+if ($IncludeDelisted) {
+    $delistedArgs = @("--include-delisted", "--delisted-base", $DelistedBase, `
+        "--n-boot-survivorship", $NBootSurvivorship)
+    Write-Host "Hinweis: -IncludeDelisted gesetzt -- Zensus laeuft auf der UNION panel_1d + $DelistedBase (WP-12b, DEC-70)."
+}
 python scripts\wp7_universe_census.py --census --panel-base $PanelBase --out $OutDir `
     --bar-cache-dir $BarCacheDir --corr-start $CorrStart --corr-end $CorrEnd `
-    --harvest-base $HarvestBase --dates $Dates @partialArgs
+    --harvest-base $HarvestBase --dates $Dates @partialArgs @delistedArgs
 $rc = $LASTEXITCODE
 
 Write-Host ""

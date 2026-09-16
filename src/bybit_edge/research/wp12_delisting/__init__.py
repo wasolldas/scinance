@@ -42,5 +42,13 @@ IC series with/without CSV, bootstrap seed).
 Everything here is read-only with respect to existing data and NEVER
 writes under ``data/harvest`` (Schutzgut, CLAUDE.md). Public endpoints
 only, no API keys, no private endpoints, no orders.
+
+**WP-12b addendum (DEC-70):** ``delisted_panel.py`` fetches the FULL daily
+kline (+funding) history for every delisted linear symbol into its own
+``data/panel_1d_delisted/`` tree (same on-disk layout/manifest discipline
+as ``wp7_universe.panel_store``, never ``data/panel_1d/``). See
+``wp7_universe.panel_load.load_panel_union`` for the point-in-time
+survivorship-free union read path and ``scripts/wp7_universe_census.py
+--include-delisted`` for the census that runs on it.
 """
 from __future__ import annotations

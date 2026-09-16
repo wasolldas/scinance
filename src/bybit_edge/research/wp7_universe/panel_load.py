@@ -48,6 +48,9 @@ __all__ = [
     "funding_i_per_payment", "funding_excess_daily", "funding_excess_weekly",
     "n_eff_windows", "decile_degeneration_weekly",
     "decile_degeneration_window_summary", "interval_class_switching",
+    # WP-12b / DEC-70 (union of panel_1d + panel_1d_delisted, additive):
+    "delisted_symbols_with_history", "load_delisting_dates", "load_panel_union",
+    "weekly_returns_and_mask_union", "union_range_fingerprint",
 ]
 
 _EPOCH = date(1970, 1, 1)
@@ -247,14 +250,19 @@ def combined_range_fingerprint(
 # daily -> weekly
 # ----------------------------------------------------------------------------
 
-def weekly_returns_and_mask(
-    panel: dict[str, Any], *, min_weeks_history: int = pit_universe.MIN_WEEKS_HISTORY,
-) -> dict[str, Any]:
-    """Daily ``panel`` (from ``load_panel``) -> weekly closes/returns/PIT
-    alive mask, all ``[n_weeks, n_symbols]`` (ISO-week rows, ascending,
-    ``panel['symbols']`` column order). A gap never manufactures a weekly
-    return (only CONSECUTIVE week indices get one, same discipline as
-    ``pair_corr.log_returns``)."""
+def _daily_close_to_weekly(
+    panel: dict[str, Any],
+) -> tuple[list[str], np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+    """Shared core of ``weekly_returns_and_mask``/``weekly_returns_and_mask_
+    union``: daily ``panel['close']`` -> ``(weeks, close_mat, returns,
+    first_week, last_week)``, all ``[n_weeks, n_symbols]`` (or
+    ``[n_symbols]`` for the two week-index arrays), ``panel['symbols']``
+    column order. A gap never manufactures a weekly return (only
+    CONSECUTIVE week indices get one, same discipline as
+    ``pair_corr.log_returns``). Factored out so the union path (WP-12b)
+    reuses the EXACT same close->weekly arithmetic instead of a parallel
+    reimplementation -- the two callers only differ in how they turn
+    ``first_week``/``last_week`` into an alive mask afterward."""
     symbols, dates, close = panel["symbols"], panel["dates"], panel["close"]
     n_days, n_symbols = close.shape
 
@@ -292,9 +300,23 @@ def weekly_returns_and_mask(
             if c0 > 0 and c1 > 0:
                 returns[t1, j] = math.log(c1 / c0)
 
+    return all_weeks, close_mat, returns, first_week, last_week
+
+
+def weekly_returns_and_mask(
+    panel: dict[str, Any], *, min_weeks_history: int = pit_universe.MIN_WEEKS_HISTORY,
+) -> dict[str, Any]:
+    """Daily ``panel`` (from ``load_panel``) -> weekly closes/returns/PIT
+    alive mask, all ``[n_weeks, n_symbols]`` (ISO-week rows, ascending,
+    ``panel['symbols']`` column order). A gap never manufactures a weekly
+    return (only CONSECUTIVE week indices get one, same discipline as
+    ``pair_corr.log_returns``)."""
+    symbols = panel["symbols"]
+    weeks, close_mat, returns, first_week, last_week = _daily_close_to_weekly(panel)
+    n_weeks = len(weeks)
     alive = pit_universe.pit_alive_mask(first_week, last_week, n_weeks,
                                          min_weeks_history=min_weeks_history)
-    return {"weeks": all_weeks, "close": close_mat, "returns": returns, "alive": alive,
+    return {"weeks": weeks, "close": close_mat, "returns": returns, "alive": alive,
             "first_week": first_week, "last_week": last_week, "symbols": symbols}
 
 
@@ -772,6 +794,277 @@ def n_eff_windows(
             "note": "STRESS_ABS-Fixture nicht verfuegbar oder keine Stress-Wochen im Panel",
         }
     return out
+
+
+# ----------------------------------------------------------------------------
+# WP-12b / DEC-70: union of panel_1d (survivors) + panel_1d_delisted
+# ----------------------------------------------------------------------------
+
+def delisted_symbols_with_history(manifest_path: Path | str) -> tuple[list[str], list[str]]:
+    """Symbols recorded in a WP-12b ``panel_1d_delisted`` manifest, split
+    into (a) symbols with at least one NON-FAILED partition row (usable,
+    sorted) and (b) symbols whose ONLY row(s) are FAILED (the
+    ``delisted_panel.NO_HISTORY_REASON`` marker -- a symbol
+    ``delisted_panel.fetch_delisted_panel`` reports loudly but never
+    writes a parquet partition for). A NO_HISTORY-only symbol must never
+    silently trip ``load_panel``'s PARTIAL/FAILED loud-fail gate on every
+    ``--include-delisted`` census run -- it is an EXPECTED, already-
+    reported condition (the kline endpoint genuinely serves nothing for
+    that symbol), not a fetch error to gate a run on; excluding it from
+    the "usable" set here is how that distinction is kept without
+    weakening ``load_panel``'s general PARTIAL/FAILED discipline for
+    every other caller."""
+    con = sqlite3.connect(f"file:{Path(manifest_path).as_posix()}?mode=ro", uri=True)
+    try:
+        all_syms = {r[0] for r in con.execute("SELECT DISTINCT symbol FROM partitions").fetchall()}
+        ok_syms = {r[0] for r in con.execute(
+            "SELECT DISTINCT symbol FROM partitions WHERE status != 'FAILED'").fetchall()}
+    finally:
+        con.close()
+    return sorted(ok_syms), sorted(all_syms - ok_syms)
+
+
+def load_delisting_dates(path: Path | str) -> dict[str, date]:
+    """``delisted_panel.write_delisting_dates_json``'s payload ->
+    ``{symbol: delist_date}`` (dropping the announcement-id/source
+    provenance fields -- callers that need those read the JSON directly)."""
+    path = Path(path)
+    if not path.is_file():
+        raise PanelLoadError(f"delisting_dates.json not found at {path}")
+    payload = json.loads(path.read_text(encoding="utf-8"))
+    out: dict[str, date] = {}
+    for sym, info in (payload.get("symbols") or {}).items():
+        out[sym] = date.fromisoformat(info["delist_date"])
+    return out
+
+
+def _scatter_panel(dst: dict[str, np.ndarray], day_pos: dict[int, int],
+                    sym_pos: dict[str, int], panel: dict[str, Any]) -> None:
+    """Vectorised in-place scatter of one ``load_panel`` result's daily
+    columns into pre-allocated (NaN-filled) union arrays, at the day/symbol
+    positions the union grid assigns them. Safe to call once per source
+    tree in sequence PROVIDED the trees' symbol sets are disjoint (the
+    caller, ``load_panel_union``, asserts this before ever calling here)."""
+    i_idx = np.array([day_pos[d] for d in panel["day_index"]], dtype=np.int64)
+    j_idx = np.array([sym_pos[s] for s in panel["symbols"]], dtype=np.int64)
+    for key in ("close", "turnover", "funding_n", "funding_sum"):
+        dst[key][np.ix_(i_idx, j_idx)] = panel[key]
+
+
+def load_panel_union(
+    base_dir: Path | str, manifest_path: Path | str,
+    delisted_base: Path | str, delisted_manifest_path: Path | str, *,
+    year_start: int, year_end: int, as_of: date,
+    delisting_dates_path: Path | str | None = None,
+    symbols: list[str] | None = None, delisted_symbols: list[str] | None = None,
+    allow_partial: bool = False,
+) -> dict[str, Any]:
+    """Survivors ``panel_1d`` (``load_panel``) UNION the ``panel_1d_
+    delisted`` tree (WP-12b, DEC-70), on one dense day/symbol grid with
+    symbols sorted GLOBALLY across both trees -- the same single
+    deterministic ordering ``load_panel``'s module docstring already
+    promises, just extended over the union symbol set. A symbol present
+    in BOTH trees is a loud ``PanelLoadError`` (a delisted symbol must
+    NEVER also be a live ``panel_1d`` symbol -- that would double-count it
+    and silently corrupt every downstream K(t)/IC/N_eff figure).
+
+    ``delisted_manifest_path`` must exist (a caller only reaches this
+    function because it explicitly asked for the union path, e.g.
+    ``--include-delisted`` -- a missing delisted tree is then a loud
+    precondition failure, not a silent fall-back to survivors-only;
+    contrast ``load_panel``'s own MISSING/EMPTY-is-expected discipline,
+    which is about individual (symbol, year) gaps within an existing
+    manifest, not a whole missing tree).
+
+    Symbol selection on the delisted side defaults to
+    ``delisted_symbols_with_history``'s "usable" set (excludes NO_HISTORY-
+    only symbols, see that function's docstring); pass ``delisted_symbols``
+    explicitly to override (e.g. a test fixture with a hand-picked set).
+
+    Returns everything ``load_panel`` returns (on the UNION day/symbol
+    grid) plus: ``last_alive_day`` (``[n_symbols]``, ISO date string or
+    ``None`` per symbol -- the registered delisting date for a delisted
+    symbol, ``None`` for a survivor), ``is_delisted`` (``[n_symbols]``
+    bool), ``delisted_symbols`` (sorted list), ``n_symbols_survivors``,
+    ``n_symbols_delisted``.
+    """
+    surv = load_panel(base_dir, manifest_path, year_start=year_start, year_end=year_end,
+                       as_of=as_of, symbols=symbols, allow_partial=allow_partial)
+
+    delisted_manifest_path = Path(delisted_manifest_path)
+    if not delisted_manifest_path.is_file():
+        raise PanelLoadError(
+            f"panel_1d_delisted manifest not found at {delisted_manifest_path} -- "
+            "run scripts/wp12_delisting.py --fetch-delisted-panel first (WP-12b, DEC-70) "
+            "before --include-delisted")
+
+    if delisted_symbols is not None:
+        dsyms = sorted(delisted_symbols)
+        no_history_only: list[str] = []
+    else:
+        dsyms, no_history_only = delisted_symbols_with_history(delisted_manifest_path)
+
+    overlap = sorted(set(surv["symbols"]) & set(dsyms))
+    if overlap:
+        raise PanelLoadError(
+            f"{len(overlap)} symbol(s) present in BOTH panel_1d and panel_1d_delisted -- "
+            f"a delisted symbol must never also live in the survivors tree: {overlap[:20]}")
+
+    if not dsyms:
+        out = dict(surv)
+        out["last_alive_day"] = [None] * len(surv["symbols"])
+        out["is_delisted"] = np.zeros(len(surv["symbols"]), dtype=bool)
+        out["delisted_symbols"] = []
+        out["n_symbols_survivors"] = len(surv["symbols"])
+        out["n_symbols_delisted"] = 0
+        out["n_no_history_only"] = len(no_history_only)
+        return out
+
+    delisted = load_panel(delisted_base, delisted_manifest_path, year_start=year_start,
+                           year_end=year_end, as_of=as_of, symbols=dsyms, allow_partial=allow_partial)
+
+    all_symbols = sorted(surv["symbols"] + delisted["symbols"])
+    all_days = sorted(set(surv["day_index"]) | set(delisted["day_index"]))
+    n_days, n_symbols = len(all_days), len(all_symbols)
+    day_pos = {d: i for i, d in enumerate(all_days)}
+    sym_pos = {s: j for j, s in enumerate(all_symbols)}
+    dates = [(_EPOCH + timedelta(days=d)).isoformat() for d in all_days]
+
+    dst = {
+        "close": np.full((n_days, n_symbols), np.nan, dtype=np.float64),
+        "turnover": np.full((n_days, n_symbols), np.nan, dtype=np.float64),
+        "funding_n": np.full((n_days, n_symbols), np.nan, dtype=np.float64),
+        "funding_sum": np.full((n_days, n_symbols), np.nan, dtype=np.float64),
+    }
+    _scatter_panel(dst, day_pos, sym_pos, surv)
+    _scatter_panel(dst, day_pos, sym_pos, delisted)
+
+    delisting_dates = load_delisting_dates(delisting_dates_path) if delisting_dates_path else {}
+    is_delisted = np.zeros(n_symbols, dtype=bool)
+    last_alive_day: list[str | None] = [None] * n_symbols
+    missing_dates = []
+    for s in delisted["symbols"]:
+        j = sym_pos[s]
+        is_delisted[j] = True
+        d = delisting_dates.get(s)
+        if d is None:
+            missing_dates.append(s)
+        else:
+            last_alive_day[j] = d.isoformat()
+    if missing_dates:
+        raise PanelLoadError(
+            f"{len(missing_dates)} delisted symbol(s) loaded from panel_1d_delisted have no "
+            f"entry in delisting_dates.json -- last_alive_day would be undefined "
+            f"(pass delisting_dates_path): {missing_dates[:20]}")
+
+    return {
+        "symbols": all_symbols, "dates": dates, "day_index": all_days,
+        "close": dst["close"], "turnover": dst["turnover"],
+        "funding_n": dst["funding_n"], "funding_sum": dst["funding_sum"],
+        "n_partitions_used": surv["n_partitions_used"] + delisted["n_partitions_used"],
+        "status_counts": {"survivors": surv["status_counts"], "delisted": delisted["status_counts"]},
+        "allow_partial": allow_partial, "year_range": [year_start, year_end], "as_of": as_of.isoformat(),
+        "last_alive_day": last_alive_day, "is_delisted": is_delisted,
+        "delisted_symbols": delisted["symbols"], "n_symbols_survivors": len(surv["symbols"]),
+        "n_symbols_delisted": len(delisted["symbols"]), "n_no_history_only": len(no_history_only),
+    }
+
+
+def weekly_returns_and_mask_union(
+    panel: dict[str, Any], last_alive_day: list[str | None], *,
+    min_weeks_history: int = pit_universe.MIN_WEEKS_HISTORY,
+) -> dict[str, Any]:
+    """Like ``weekly_returns_and_mask``, but for a UNION panel
+    (``load_panel_union``'s output) carrying delisted symbols alongside
+    survivors.
+
+    **Delisting-week convention (WP-12b task brief item 2 -- documented
+    here as the single source of truth for this repo):**
+
+      * A delisted symbol's alive mask ends at the WEEK CONTAINING its
+        registered delisting date (``last_alive_day[j]``) -- that week is
+        the LAST week the symbol is a member of the universe, never
+        later. This is a defensive CAP on the real observed
+        ``last_week`` computed from its close series (``delisted_panel``'s
+        fetch never writes klines past ``delist_date`` in the first
+        place, so the cap is normally a no-op; it exists so a data-layer
+        change elsewhere can never silently extend a dead symbol's
+        membership).
+      * The delisting week's OWN return is the REAL, observed
+        last-traded-price return -- the exact same "closed at the last
+        traded price" rule ``pit_universe``'s module docstring already
+        states for any symbol's last week. There is NO overwrite with an
+        assumed total-loss (-100%) return anywhere in this function.
+        ``pit_universe.naive_delisting_overlay`` is the DELIBERATELY WRONG
+        reference estimator that performs that overwrite (for the DEC-39
+        adversarial test only, per its own docstring) -- this function
+        never calls it and never reproduces its behaviour.
+      * Because every (signal, outcome) pair at week ``t`` downstream
+        (``pit_universe.weekly_ic_series``/``momentum_ic_series``,
+        ``wp12_delisting.survivorship_fixture.weekly_signal_outcome_
+        pairs``) requires ``alive[t] & alive[t+1]``, a delisted symbol's
+        delisting week is AUTOMATICALLY excluded as a signal week too (no
+        week-``t+1`` outcome exists for it, since ``alive`` is False from
+        the week after delisting onward) -- it simply stops contributing
+        after its last alive week. No special-cased outcome value is
+        substituted anywhere.
+      * NO return imputation of any kind (a -100% overlay or similar
+        would be a SEPARATE, not-yet-registered choice, per the task
+        brief -- this function implements ONLY the cap + natural-alive-
+        mask-exclusion convention above, nothing else).
+    """
+    symbols = panel["symbols"]
+    weeks, close_mat, returns, first_week, last_week = _daily_close_to_weekly(panel)
+    n_weeks = len(weeks)
+    week_pos = {w: i for i, w in enumerate(weeks)}
+
+    capped_last_week = last_week.copy()
+    for j, lad in enumerate(last_alive_day):
+        if lad is None:
+            continue
+        delist_week = pit_universe.iso_week_start(date.fromisoformat(lad)).isoformat()
+        cap_idx = week_pos.get(delist_week)
+        if cap_idx is None:
+            # the delisting week itself falls outside this panel's loaded
+            # week grid (e.g. the union's day range is shorter than the
+            # register implies) -- cap at the last week actually in range,
+            # NEVER extend membership past what this panel can see.
+            cap_idx = n_weeks - 1
+        if capped_last_week[j] > cap_idx:
+            capped_last_week[j] = cap_idx
+
+    alive = pit_universe.pit_alive_mask(first_week, capped_last_week, n_weeks,
+                                         min_weeks_history=min_weeks_history)
+    return {"weeks": weeks, "close": close_mat, "returns": returns, "alive": alive,
+            "first_week": first_week, "last_week": capped_last_week,
+            "last_week_uncapped": last_week, "symbols": symbols,
+            "last_alive_day": last_alive_day}
+
+
+def union_range_fingerprint(
+    base_dir: Path | str, delisted_base: Path | str,
+    survivor_symbols: list[str], delisted_symbols: list[str], *,
+    year_start: int, year_end: int, as_of: date,
+) -> dict[str, Any]:
+    """Range fingerprint over the UNION panel (survivors tree + delisted
+    tree, WP-12b/DEC-70). Computed as a SHA-256 over the two trees' OWN
+    ``combined_range_fingerprint`` results (each fingerprinted from its
+    own base_dir -- a delisted symbol lives under a physically different
+    tree, ``data/panel_1d_delisted/`` by convention) plus the sorted union
+    symbol set -- never merges the two trees' file layouts into one
+    lookup, so a survivors-only reader's fingerprint stays unaffected and
+    independently reproducible."""
+    surv_fp = combined_range_fingerprint(base_dir, survivor_symbols, year_start, year_end, as_of=as_of)
+    del_fp = combined_range_fingerprint(delisted_base, delisted_symbols, year_start, year_end, as_of=as_of)
+    h = hashlib.sha256()
+    h.update(surv_fp["sha256"].encode("ascii"))
+    h.update(del_fp["sha256"].encode("ascii"))
+    all_symbols = sorted(set(survivor_symbols) | set(delisted_symbols))
+    h.update(json.dumps(all_symbols).encode("utf-8"))
+    return {"symbols": all_symbols, "year_range": [year_start, year_end],
+            "n_partitions": surv_fp["n_partitions"] + del_fp["n_partitions"],
+            "sha256": h.hexdigest(),
+            "survivors_fingerprint": surv_fp["sha256"], "delisted_fingerprint": del_fp["sha256"]}
 
 
 # ----------------------------------------------------------------------------

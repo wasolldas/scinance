@@ -24,6 +24,15 @@ Drei Schritte, meistens in dieser Reihenfolge (siehe
       --register-base data/delisting_register --panel-base data/panel_1d \
       --out scinance3-impl/state/wp12_YYYYMMDD
 
+  # 4) WP-12b (DEC-70): volle Tages-Historie (+Funding) je delistetem
+  #    linearem Symbol -> data/panel_1d_delisted/ (NIE data/panel_1d/,
+  #    NIE data/harvest; braucht echtes Netz). Fuettert
+  #    wp7_universe.panel_load.load_panel_union und
+  #    scripts/wp7_universe_census.py --include-delisted.
+  python scripts/wp12_delisting.py --fetch-delisted-panel \
+      --register-base data/delisting_register \
+      --delisted-panel-base data/panel_1d_delisted --start-year 2021
+
 KEIN PASS/FAIL: das Survivorship-Fixture berichtet ausschliesslich die
 gemessene Verzerrung + CI (PRD 4.1 B3 -- die registrierte Schwelle ist
 noch nicht gesetzt, A3 ist nicht registriert, DEC-67 Entscheidung 1).
@@ -39,7 +48,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
 from bybit_edge.research.wp12_delisting import (  # noqa: E402
-    announcements, kline_probe, panel_read, report, survivorship_fixture as sf,
+    announcements, delisted_panel, kline_probe, panel_read, report, survivorship_fixture as sf,
 )
 
 
@@ -110,6 +119,34 @@ def cmd_probe_klines(a: argparse.Namespace) -> int:
         f"({probe['n_skipped_no_reference_date']} ohne Referenzdatum uebersprungen)")
     log(f"  {len(written)} Kline-Parquet-Dateien unter {klines_dir}")
     log(f"  Zusammenfassung: {summ_art['path']} (sha256={summ_art['sha256']})")
+    return 0
+
+
+# ----------------------------------------------------------------------------
+# cmd_fetch_delisted_panel (WP-12b, DEC-70)
+# ----------------------------------------------------------------------------
+
+def cmd_fetch_delisted_panel(a: argparse.Namespace) -> int:
+    register_dir = _register_dir(a)
+    delisted_base = Path(a.delisted_panel_base)
+    if "data/harvest" in delisted_base.as_posix():
+        raise SystemExit("ERROR: delisted-panel-base darf niemals unter data/harvest liegen.")
+    rows = _read_register_rows(register_dir)
+    log(f"=== WP-12b Schritt 4: Delisted-Panel fetchen (ab {a.start_year}, {delisted_base}) ===")
+    manifest = delisted_base / "panel_manifest.sqlite"
+    result = delisted_panel.fetch_delisted_panel(
+        rows, base_dir=delisted_base, manifest_path=manifest,
+        start_year=a.start_year, category=a.category)
+    log(f"  {result['n_symbols_register']} delistete lineare Symbole im Register; "
+        f"{result['n_fetched']} gefetcht, {result['n_skipped_resume']} per Resume uebersprungen "
+        f"(kein Netz), {result['n_no_history']} ohne Historie (NO_HISTORY), "
+        f"{result['n_skipped_no_reference_date']} ohne Referenzdatum uebersprungen.")
+    dd = result["delisting_dates_artifact"]
+    log(f"  delisting_dates.json: {dd['path']} (sha256={dd['sha256']}, n_symbols={dd['n_symbols']})")
+    if result["no_history_symbols"]:
+        shown = ", ".join(result["no_history_symbols"][:20])
+        more = f" (+{len(result['no_history_symbols']) - 20} weitere)" if len(result["no_history_symbols"]) > 20 else ""
+        log(f"  NO_HISTORY: {shown}{more}")
     return 0
 
 
@@ -199,6 +236,9 @@ def build_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     p.add_argument("--announce", action="store_true", help="Schritt 1: Delisting-Register fetchen")
     p.add_argument("--probe-klines", action="store_true", help="Schritt 2: Kline-Verfuegbarkeit probieren")
+    p.add_argument("--fetch-delisted-panel", action="store_true",
+                    help="Schritt 4 (WP-12b, DEC-70): volle Tages-Historie je delistetem "
+                         "Symbol -> data/panel_1d_delisted/")
     p.add_argument("--mode", choices=["probe", "fixture"], help="Schritt 3: Report-Modus")
 
     p.add_argument("--register-base", default="data/delisting_register")
@@ -209,6 +249,10 @@ def build_parser() -> argparse.ArgumentParser:
 
     p.add_argument("--window-days", type=int, default=kline_probe.PROBE_WINDOW_DAYS)
     p.add_argument("--max-symbols", type=int, default=None)
+
+    p.add_argument("--delisted-panel-base", default="data/panel_1d_delisted",
+                    help="WP-12b (DEC-70): Zielbaum fuer --fetch-delisted-panel")
+    p.add_argument("--category", default="linear")
 
     p.add_argument("--panel-base", default="data/panel_1d")
     p.add_argument("--manifest", default="data/panel_1d/panel_manifest.sqlite")
@@ -225,13 +269,17 @@ def build_parser() -> argparse.ArgumentParser:
 
 def main(argv: list[str] | None = None) -> int:
     a = build_parser().parse_args(argv)
-    if not (a.announce or a.probe_klines or a.mode):
-        raise SystemExit("ERROR: mindestens eines von --announce/--probe-klines/--mode noetig.")
+    if not (a.announce or a.probe_klines or a.fetch_delisted_panel or a.mode):
+        raise SystemExit(
+            "ERROR: mindestens eines von --announce/--probe-klines/"
+            "--fetch-delisted-panel/--mode noetig.")
     rc = 0
     if a.announce:
         rc = cmd_announce(a) or rc
     if a.probe_klines:
         rc = cmd_probe_klines(a) or rc
+    if a.fetch_delisted_panel:
+        rc = cmd_fetch_delisted_panel(a) or rc
     if a.mode:
         rc = cmd_report(a) or rc
     return rc

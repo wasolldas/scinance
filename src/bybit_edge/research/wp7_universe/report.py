@@ -163,6 +163,17 @@ def _to_markdown(report: dict[str, Any]) -> str:
              f"- K verfuegbar: {b12['k_available']}", ""]
     lines += ["## B3" if b3["triggered"] else "## B3 (nicht ausgeloest)",
               b3["consequence"] or "kein Befund -- Survivorship-freies Universum vorhanden.", ""]
+    sbias = b3.get("survivorship_bias")
+    if sbias is not None:
+        lines += [
+            "Survivorship-freies Universum aus oeffentlichen Daten (WP-12b, DEC-70): "
+            f"n_delisted_symbols={sbias.get('n_delisted_symbols')}, "
+            f"n_with_history={sbias.get('n_with_history')}, "
+            f"Verzerrung IC_union - IC_survivors = {_fmt(sbias.get('bias_ic_union_minus_survivors'))} "
+            f"[{_fmt(sbias.get('ci_lo'))}; {_fmt(sbias.get('ci_hi'))}] "
+            f"(n_weeks={sbias.get('n_weeks')}, seed={sbias.get('seed')}, n_boot={sbias.get('n_boot')})",
+            sbias.get("threshold_note", ""), "",
+        ]
     lines += ["## B4" if b4["triggered"] else "## B4 (nicht ausgeloest)",
               b4["consequence"] or "kein Befund -- sigma_xs erreicht sigma_xs_min.", ""]
     lines += ["## B5", b5["consequence"], ""]
@@ -323,6 +334,17 @@ def _extra_sections_markdown(extra: dict[str, Any]) -> list[str]:
         for label, n in sorted((iw.get("days_per_class_total") or {}).items()):
             lines.append(f"  - {label}: {n}")
         lines.append("")
+
+    if "delisted" in extra:
+        d = extra["delisted"]
+        lines += ["## WP-12b/DEC-70: Survivorship-freies Universum (--include-delisted)",
+                   f"- n_delisted_symbols_register={_fmt(d.get('n_delisted_symbols'), 0)}, "
+                   f"n_with_history={_fmt(d.get('n_with_history'), 0)}, "
+                   f"n_no_history_only={_fmt(d.get('n_no_history_only'), 0)}",
+                   f"- delisting_dates.json sha256={d.get('delisting_dates_sha256')}",
+                   f"- Union-Range-Fingerprint sha256={(d.get('union_range_fingerprint') or {}).get('sha256')} "
+                   f"(n_partitions={(d.get('union_range_fingerprint') or {}).get('n_partitions')})",
+                   ""]
 
     if "delisting_cohorts_dec58g" in extra:
         lines += ["## DEC-58(g): Delisting-Hazard \"Beifahrer\" je Listing-Jahrgang (deskriptiv, kein Modell)",
