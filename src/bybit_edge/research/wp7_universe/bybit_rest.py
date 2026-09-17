@@ -240,11 +240,43 @@ def fixture_fetcher(pages: list[Any]) -> Callable[[str], bytes]:
     return _fetch
 
 
+#: Bybit retCode for "Too many visits. Exceeded the API Rate Limit." [sek]
+RATE_LIMIT_RET_CODE = 10006
+#: Exponential backoff schedule (seconds) on a rate-limit reply, then loud fail.
+#: Observed 2026-09-17 on the WP-12b delisted-panel fetch (268 symbols, kline
+#: + funding back to 2021): the 5 req/s self-throttle alone is not enough
+#: when many long histories are paged back to back.
+RATE_LIMIT_BACKOFF_S: tuple[float, ...] = (2.0, 4.0, 8.0, 16.0, 32.0, 64.0)
+
+
+def _is_rate_limited(raw_text: str) -> bool:
+    """True when the body is a Bybit envelope carrying the rate-limit code
+    (parsed, never a substring guess on arbitrary text)."""
+    try:
+        body = json.loads(raw_text)
+    except ValueError:
+        return False
+    return isinstance(body, dict) and body.get("retCode") == RATE_LIMIT_RET_CODE
+
+
 def _get(url: str, params: dict[str, Any],
-         fetcher: Callable[[str], bytes]) -> tuple[bytes, str]:
+         fetcher: Callable[[str], bytes], *,
+         backoff_s: tuple[float, ...] = RATE_LIMIT_BACKOFF_S,
+         sleep: Callable[[float], None] = time.sleep) -> tuple[bytes, str]:
+    """One GET with rate-limit backoff: a retCode-10006 reply is retried
+    after each ``backoff_s`` step (2..64 s, ~2 min total); after the last
+    step the reply is returned as-is so ``unwrap_result`` fails loudly
+    with Bybit's own message. Every other reply passes through unchanged."""
     full = f"{url}?{urllib.parse.urlencode(params)}"
     raw = fetcher(full)
-    return raw, raw.decode("utf-8", errors="replace")
+    text = raw.decode("utf-8", errors="replace")
+    for wait in backoff_s:
+        if not _is_rate_limited(text):
+            break
+        sleep(wait)
+        raw = fetcher(full)
+        text = raw.decode("utf-8", errors="replace")
+    return raw, text
 
 
 def _parse_body(raw_text: str, ctx: str) -> Any:

@@ -1,0 +1,102 @@
+{
+ "windows": [
+  {
+   "symbol": "BTCUSDT",
+   "exchange": "bybit",
+   "range": [
+    "2026-06-22",
+    "2026-09-16"
+   ],
+   "days_in_range": 87,
+   "ok": 66,
+   "discarded": 3,
+   "no_raw": 18,
+   "not_manifest_done": 0,
+   "resumed": 0,
+   "n_quotes_total": 181614,
+   "n_fifo_filled_total": 11437,
+   "n_prorata_filled_total": 67135,
+   "horizon_s": 60.0,
+   "adv_sel_horizon_s": 60.0,
+   "quote_size_fraction": 0.1,
+   "seconds": 10939.1
+  },
+  {
+   "symbol": "ETHUSDT",
+   "exchange": "bybit",
+   "range": [
+    "2026-06-22",
+    "2026-09-16"
+   ],
+   "days_in_range": 87,
+   "ok": 64,
+   "discarded": 5,
+   "no_raw": 18,
+   "not_manifest_done": 0,
+   "resumed": 0,
+   "n_quotes_total": 175854,
+   "n_fifo_filled_total": 9970,
+   "n_prorata_filled_total": 55785,
+   "horizon_s": 60.0,
+   "adv_sel_horizon_s": 60.0,
+   "quote_size_fraction": 0.1,
+   "seconds": 9680.8
+  }
+ ],
+ "day_status": {
+  "BTCUSDT": {
+   "counts": {
+    "ok": 66,
+    "no_raw": 18,
+    "discarded": 3
+   },
+   "top_reasons": [
+    [
+     "(kein Grund)",
+     18
+    ],
+    [
+     "14 sequence breaks > 10",
+     1
+    ],
+    [
+     "24 sequence breaks > 10",
+     1
+    ],
+    [
+     "277792 sequence breaks > 10",
+     1
+    ]
+   ]
+  },
+  "ETHUSDT": {
+   "counts": {
+    "ok": 64,
+    "no_raw": 18,
+    "discarded": 5
+   },
+   "top_reasons": [
+    [
+     "(kein Grund)",
+     18
+    ],
+    [
+     "11 sequence breaks > 10",
+     1
+    ],
+    [
+     "16 sequence breaks > 10",
+     1
+    ],
+    [
+     "28 sequence breaks > 10",
+     1
+    ],
+    [
+     "27 sequence breaks > 10",
+     1
+    ]
+   ]
+  }
+ }
+}

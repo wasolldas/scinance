@@ -1202,3 +1202,25 @@ def test_sd_null_w_eff_adjusted_scales_by_sqrt_inverse_factor():
     adjusted = stats.sd_null_w_eff_adjusted(sd)
     assert adjusted == pytest.approx(sd * math.sqrt(1.0 / 0.41))
     assert adjusted > sd  # a WIDER noise floor, never narrower
+
+
+def test_get_retries_on_rate_limit_then_succeeds_and_fails_loudly_after_backoff():
+    """retCode 10006 (Too many visits) is retried with backoff; a persistent
+    limit ends in the loud BybitFieldLayoutError carrying Bybit's message."""
+    import json as _json
+    from bybit_edge.research.wp7_universe import bybit_rest as br
+    limited = _json.dumps({"retCode": 10006, "retMsg": "Too many visits. Exceeded the API Rate Limit."}).encode()
+    ok = _json.dumps({"retCode": 0, "retMsg": "OK", "result": {"list": []}}).encode()
+    replies = [limited, limited, ok]
+    calls, sleeps = [], []
+    def fetcher(url):
+        calls.append(url)
+        return replies.pop(0)
+    raw, text = br._get("https://x/y", {"a": 1}, fetcher, backoff_s=(0.01, 0.02, 0.03), sleep=sleeps.append)
+    assert br.unwrap_result(_json.loads(text)) == {"list": []}
+    assert len(calls) == 3 and sleeps == [0.01, 0.02]
+
+    always = lambda url: limited  # noqa: E731
+    raw, text = br._get("https://x/y", {"a": 1}, always, backoff_s=(0.01, 0.02), sleep=sleeps.append)
+    with pytest.raises(br.BybitFieldLayoutError, match="10006"):
+        br.unwrap_result(_json.loads(text))
