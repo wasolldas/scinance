@@ -85,3 +85,9 @@ bedingung_welle_1: [WP-7 B2, WP-12b, WP-10 FDR-Struktur]
 **Kill-Bedingungen (vorab):** K < 134 in einem Fenster; H-29: Bounce-Abzug erklaert den IC allein; H-30: Drag-Term > 2x plausible Kante und durch Vol-Gewichtung nicht unter ein Viertel drueckbar (Feasibility-Zeile). NICHT: sigma_xs (Etikett).
 
 **Etiketten:** Klasse W; kapitalfrei; C.10 hart; unter_wand; zweistufige FDR abhaengigkeitsrobust; H-29 Bounce-Kontrolle urteilstragend; H-30 schaetzfehler-dominiert; Union-Panel survivorship-frei (DEC-72), `--allow-partial` (DEC-66).
+
+---
+
+## Rueckzug des Eintrags H-28/H-29/H-30 vom 2026-09-21 (Erstfassung) - append-only, kein Lauf erfolgt
+
+**Datum:** 2026-09-21 (Orchestrator), nach adversarischem Opus-Review (`state/REVIEW_H28_H30_v1.md`). Der Eintrag oben bleibt unveraendert stehen und ist **zurueckgezogen**; kein Treiber wurde gegen ihn gebaut, keine IC-Serie gelesen. Bindende Befunde des Reviews (DEC-74): Schwelle aus einem fensterfremden Messfenster (W1 um 17 % zu niedrig); Permutations-Null ist die Identitaet E_t[1/sqrt(K_t-1)], Serienabhaengigkeit bleibt unbehandelt (rho = 0 in der Schwelle, DEC-51 (3)); Persistenz-Null ohne Wert und Regel (C.4); FDR-Stufe nicht ausfuehrbar; Gate (4) widerspruechlich; Gate (5) Erreichbarkeit nicht geprueft, aber als geprueft beschrieben (C.1); H-30-Feasibility einheitenlos; Survivorship-Behandlung weicht von PRD 4.1 DoD (4) ab; oekonomisches Etikett veraltet; Positiv-Fixture blind fuer Selbst-Ausrichtung. **Zweitfassung folgt nach dem Vorlauf WP-13a** (Schwellen je Fenster, Persistenz-Null, Erreichbarkeit 0,60, Vol-Drag-Feasibility, Delisting-Zaehlung, STRESS_REL-Abdeckung - alles ohne Outcome-Daten).
