@@ -624,3 +624,48 @@ def test_load_panel_union_relisted_symbol_with_full_history_in_survivors_gets_a_
             surv_base, surv_manifest, del2, del2 / "panel_manifest.sqlite",
             year_start=2023, year_end=2023, as_of=date(2024, 1, 1),
             delisting_dates_path=Path(dd2["path"]), allow_partial=True)
+
+
+def test_load_panel_union_fresh_delisting_drops_stale_survivor_column(tmp_path):
+    """DEC-72 (c), real tree ICXUSDT: the register's delisting date lies after
+    the survivors tree's last day (survivors fetched before the delisting).
+    The delisted tree is authoritative; the survivor column is dropped; the
+    survivor's LAST day may differ (live candle), earlier days must agree."""
+    surv_base = tmp_path / "panel_1d"
+    surv_manifest = surv_base / "panel_manifest.sqlite"
+    del_base = tmp_path / "panel_1d_delisted"
+    del_manifest = del_base / "panel_manifest.sqlite"
+    full = _closes(date(2023, 1, 1), date(2023, 9, 16), seed=3)
+    surv = full[:-2]                      # fetched two days before the delisting
+    surv[-1] = (surv[-1][0], surv[-1][1] * 1.01)   # live, unfinished candle on the fetch day
+    _write_full_history(surv_base, surv_manifest, "FRESHUSDT", surv, as_of_date=date(2023, 9, 14))
+    _write_full_history(surv_base, surv_manifest, "FULLUSDT",
+                         _closes(date(2023, 1, 1), date(2023, 12, 31), seed=5), as_of_date=date(2023, 12, 31))
+    _write_full_history(del_base, del_manifest, "FRESHUSDT", full, as_of_date=date(2023, 9, 16))
+    dd = delisted_panel.write_delisting_dates_json(del_base, {
+        "FRESHUSDT": {"delist_date": "2023-09-16", "announcement_id": "x", "source": "publish_ms"}})
+    panel = panel_load.load_panel_union(
+        surv_base, surv_manifest, del_base, del_manifest,
+        year_start=2023, year_end=2023, as_of=date(2024, 1, 1),
+        delisting_dates_path=Path(dd["path"]), allow_partial=True)
+    assert panel["symbols"] == ["FRESHUSDT", "FULLUSDT"]
+    assert panel["fresh_delisted_symbols"] == ["FRESHUSDT"]
+    j = panel["symbols"].index("FRESHUSDT")
+    assert bool(panel["is_delisted"][j]) and panel["last_alive_day"][j] == "2023-09-16"
+    assert panel["n_symbols_survivors"] == 1 and panel["n_symbols_delisted"] == 1
+    # the authoritative (delisted-tree) close is used on the survivor's last fetch day
+    i_last = panel["dates"].index(surv[-1][0])
+    assert abs(panel["close"][i_last, j] - dict(full)[surv[-1][0]]) < 1e-9
+    weekly = panel_load.weekly_returns_and_mask_union(panel, panel["last_alive_day"])
+    t_del = weekly["weeks"].index("2023-09-11")
+    assert weekly["alive"][t_del, j] and not weekly["alive"][t_del + 1:, j].any()
+
+    # an EARLIER day differing -> still loud
+    surv2 = list(full[:-2]); surv2[10] = (surv2[10][0], surv2[10][1] * 1.01)
+    sb2 = tmp_path / "panel_1d_b"
+    _write_full_history(sb2, sb2 / "panel_manifest.sqlite", "FRESHUSDT", surv2, as_of_date=date(2023, 9, 14))
+    with pytest.raises(panel_load.PanelLoadError, match="FRESHUSDT"):
+        panel_load.load_panel_union(
+            sb2, sb2 / "panel_manifest.sqlite", del_base, del_manifest,
+            year_start=2023, year_end=2023, as_of=date(2024, 1, 1),
+            delisting_dates_path=Path(dd["path"]), allow_partial=True)

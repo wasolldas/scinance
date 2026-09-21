@@ -939,6 +939,7 @@ def load_panel_union(
     #      (``relisted_gaps``, applied by ``weekly_returns_and_mask_union``).
     #      Overlapping days with DIFFERENT closes stay a loud error.
     relisted_gaps: dict[str, dict[str, str]] = {}
+    fresh_delisted: list[str] = []
     delisting_dates_pre = load_delisting_dates(delisting_dates_path) if delisting_dates_path else {}
     if overlap:
         conflicts = []
@@ -960,6 +961,22 @@ def load_panel_union(
             dd = delisting_dates_pre.get(s_)
             delist_ord = (dd - _EPOCH).days if dd is not None else None
             later = [d for d in surv_close if delist_ord is not None and d > delist_ord]
+            # Form (c), DEC-72: FRESH delisting -- the register's delisting date
+            # lies at/after the survivors tree's last day (the survivors fetch
+            # predates the delisting; ICXUSDT delisted 2026-09-16, survivors
+            # fetched 2026-09-14). The delisted tree is then authoritative
+            # (complete history up to the delisting); the survivor column is
+            # DROPPED. Closes must agree on every common day except the
+            # survivor's LAST day (its open-year partition may hold the live,
+            # unfinished candle of the fetch day).
+            if dd is not None and delist_ord >= max(surv_close) and not later:
+                last_s = max(surv_close)
+                strict = [d for d in common if d != last_s]
+                max_rel_strict = max((abs(surv_close[d] - del_close[d]) / max(abs(del_close[d]), 1e-12)
+                                      for d in strict), default=0.0)
+                if max_rel_strict <= 1e-9:
+                    fresh_delisted.append(s_)
+                    continue
             if not same or dd is None or not later:
                 diag = (f"{s_}: n_common_days={len(common)} "
                         f"common={(_EPOCH + timedelta(days=common[0])).isoformat()}.."
@@ -988,6 +1005,12 @@ def load_panel_union(
             for key in ("close", "turnover", "funding_n", "funding_sum"):
                 delisted[key] = delisted[key][:, keep]
             delisted["symbols"] = [delisted["symbols"][k] for k in keep]
+        if fresh_delisted:
+            keep_s = [k for k, s_ in enumerate(surv["symbols"]) if s_ not in set(fresh_delisted)]
+            surv = dict(surv)
+            for key in ("close", "turnover", "funding_n", "funding_sum"):
+                surv[key] = surv[key][:, keep_s]
+            surv["symbols"] = [surv["symbols"][k] for k in keep_s]
         delisted = dict(delisted)
         delisted["symbols"] = [f"{s_}#delisted" if s_ in relisted else s_ for s_ in delisted["symbols"]]
 
@@ -1036,6 +1059,7 @@ def load_panel_union(
         "delisted_symbols": delisted["symbols"], "n_symbols_survivors": len(surv["symbols"]),
         "n_symbols_delisted": len(delisted["symbols"]), "n_no_history_only": len(no_history_only),
         "relisted_symbols": sorted(relisted), "relisted_gaps": relisted_gaps,
+        "fresh_delisted_symbols": sorted(fresh_delisted),
     }
 
 
