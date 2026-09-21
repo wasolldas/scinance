@@ -1,0 +1,26 @@
+{
+ "mode_label": "UNION_REAL",
+ "trail_win": 4,
+ "min_universe": 10,
+ "n_symbols_without": 877,
+ "n_symbols_delisted_added": 261,
+ "n_symbols_with": 1138,
+ "n_weeks_used_with": 271,
+ "n_weeks_used_without": 271,
+ "rho_with": -0.00011877404084009626,
+ "rho_without": -0.0033938042827979862,
+ "bias_point": 0.00327503024195789,
+ "bootstrap": {
+  "seed": 53,
+  "n_boot": 1000,
+  "n_weeks": 271,
+  "ci": 0.95,
+  "point": 0.00327503024195789,
+  "ci_lo": -0.007635869853336541,
+  "ci_hi": 0.013241411018613387,
+  "bootstrap_mean": 0.0029479590022277557,
+  "bootstrap_sd": 0.005298715129858266
+ },
+ "threshold_note": "Die registrierte Schwelle (PRD 4.1 B3: 'kleiner als die halbe registrierte Schwelle') ist noch NICHT gesetzt -- A3 ist nicht registriert (DEC-67 Entscheidung 1: der A3-Lauf ist bis zum Survivorship-Fixture gesperrt). Diese Messung berichtet ausschliesslich die gemessene Verzerrung (IC_with - IC_without) und ihr Cluster-Bootstrap-CI -- KEIN PASS/FAIL, KEIN VERDIKT.",
+ "sha256": "4fb81859040d9cb1c581aa8e23ac9ca942ef5d77bf2c4c8f4aa79e607d00c90d"
+}

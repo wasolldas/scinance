@@ -1,0 +1,58 @@
+{
+ "source": "REST-Fallback (bybit_rest.fetch_tickers, ein Call; Inhaltsprobe fehlgeschlagen)",
+ "n_symbols": 886,
+ "n_ranked": 886,
+ "n_unranked_no_turnover": 0,
+ "deciles": [
+  {
+   "decile": 1,
+   "n_symbols": 88,
+   "perp_spread_bp_median": 1.6178
+  },
+  {
+   "decile": 2,
+   "n_symbols": 89,
+   "perp_spread_bp_median": 5.322
+  },
+  {
+   "decile": 3,
+   "n_symbols": 88,
+   "perp_spread_bp_median": 7.3855
+  },
+  {
+   "decile": 4,
+   "n_symbols": 89,
+   "perp_spread_bp_median": 9.2773
+  },
+  {
+   "decile": 5,
+   "n_symbols": 89,
+   "perp_spread_bp_median": 9.8678
+  },
+  {
+   "decile": 6,
+   "n_symbols": 88,
+   "perp_spread_bp_median": 10.1424
+  },
+  {
+   "decile": 7,
+   "n_symbols": 89,
+   "perp_spread_bp_median": 13.3879
+  },
+  {
+   "decile": 8,
+   "n_symbols": 88,
+   "perp_spread_bp_median": 14.9539
+  },
+  {
+   "decile": 9,
+   "n_symbols": 89,
+   "perp_spread_bp_median": 19.5312
+  },
+  {
+   "decile": 10,
+   "n_symbols": 89,
+   "perp_spread_bp_median": 36.21
+  }
+ ]
+}
