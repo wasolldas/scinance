@@ -955,15 +955,23 @@ def load_panel_union(
             if not common:
                 relisted.append(s_)
                 continue
-            same = all(math.isclose(surv_close[d], del_close[d], rel_tol=1e-9, abs_tol=1e-12) for d in common)
+            max_rel = max(abs(surv_close[d] - del_close[d]) / max(abs(del_close[d]), 1e-12) for d in common)
+            same = max_rel <= 1e-9
             dd = delisting_dates_pre.get(s_)
-            if not same or dd is None:
-                conflicts.append(s_)
-                continue
-            delist_ord = (dd - _EPOCH).days
-            later = [d for d in surv_close if d > delist_ord]
-            if not later:
-                conflicts.append(s_)
+            delist_ord = (dd - _EPOCH).days if dd is not None else None
+            later = [d for d in surv_close if delist_ord is not None and d > delist_ord]
+            if not same or dd is None or not later:
+                diag = (f"{s_}: n_common_days={len(common)} "
+                        f"common={(_EPOCH + timedelta(days=common[0])).isoformat()}.."
+                        f"{(_EPOCH + timedelta(days=common[-1])).isoformat()} "
+                        f"max_rel_close_diff={max_rel:.3e} "
+                        f"delist_date={dd.isoformat() if dd else None} "
+                        f"survivor_days={(_EPOCH + timedelta(days=min(surv_close))).isoformat()}.."
+                        f"{(_EPOCH + timedelta(days=max(surv_close))).isoformat()} "
+                        f"delisted_days={(_EPOCH + timedelta(days=min(del_close))).isoformat()}.."
+                        f"{(_EPOCH + timedelta(days=max(del_close))).isoformat()} "
+                        f"n_survivor_days_after_delist={len(later)}")
+                conflicts.append(diag)
                 continue
             relist_day = (_EPOCH + timedelta(days=min(later))).isoformat()
             relisted_gaps[s_] = {"delist_date": dd.isoformat(), "relist_first_day": relist_day}
@@ -972,8 +980,8 @@ def load_panel_union(
             raise PanelLoadError(
                 f"{len(conflicts)} symbol(s) present in BOTH panel_1d and panel_1d_delisted with "
                 f"OVERLAPPING trading days and differing closes (or no delisting date / no "
-                f"relisting after it) -- a contract cannot be alive twice on the same day: "
-                f"{conflicts[:20]}")
+                f"relisting after it) -- a contract cannot be alive twice on the same day. "
+                f"Diagnose je Symbol: " + " | ".join(conflicts[:20]))
         if drop:
             keep = [k for k, s_ in enumerate(delisted["symbols"]) if s_ not in drop]
             delisted = dict(delisted)
