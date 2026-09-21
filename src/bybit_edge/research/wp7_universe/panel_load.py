@@ -904,11 +904,16 @@ def load_panel_union(
     else:
         dsyms, no_history_only = delisted_symbols_with_history(delisted_manifest_path)
 
+    # RELISTINGS (DEC-72; real tree 2026-09-21: ICXUSDT delisted and later
+    # relisted under the same name). A symbol in BOTH trees is a relisting
+    # iff its delisted episode ends strictly BEFORE the survivor listing
+    # starts -- then it becomes TWO panel columns: the survivor column
+    # keeps the symbol name, the earlier episode becomes
+    # ``<symbol>#delisted`` with its own last_alive_day. Any overlap in
+    # days between the two episodes stays a loud error (a contract cannot
+    # be alive twice on the same day).
     overlap = sorted(set(surv["symbols"]) & set(dsyms))
-    if overlap:
-        raise PanelLoadError(
-            f"{len(overlap)} symbol(s) present in BOTH panel_1d and panel_1d_delisted -- "
-            f"a delisted symbol must never also live in the survivors tree: {overlap[:20]}")
+    relisted: list[str] = []
 
     if not dsyms:
         out = dict(surv)
@@ -922,6 +927,25 @@ def load_panel_union(
 
     delisted = load_panel(delisted_base, delisted_manifest_path, year_start=year_start,
                            year_end=year_end, as_of=as_of, symbols=dsyms, allow_partial=allow_partial)
+
+    if overlap:
+        conflicts = []
+        for s_ in overlap:
+            js = surv["symbols"].index(s_)
+            jd = delisted["symbols"].index(s_)
+            surv_days = [d for d, v in zip(surv["day_index"], surv["close"][:, js]) if not math.isnan(v)]
+            del_days = [d for d, v in zip(delisted["day_index"], delisted["close"][:, jd]) if not math.isnan(v)]
+            if not surv_days or not del_days or max(del_days) >= min(surv_days):
+                conflicts.append(s_)
+            else:
+                relisted.append(s_)
+        if conflicts:
+            raise PanelLoadError(
+                f"{len(conflicts)} symbol(s) present in BOTH panel_1d and panel_1d_delisted with "
+                f"OVERLAPPING trading days -- a contract cannot be alive twice on the same day: "
+                f"{conflicts[:20]}")
+        delisted = dict(delisted)
+        delisted["symbols"] = [f"{s_}#delisted" if s_ in relisted else s_ for s_ in delisted["symbols"]]
 
     all_symbols = sorted(surv["symbols"] + delisted["symbols"])
     all_days = sorted(set(surv["day_index"]) | set(delisted["day_index"]))
@@ -946,7 +970,7 @@ def load_panel_union(
     for s in delisted["symbols"]:
         j = sym_pos[s]
         is_delisted[j] = True
-        d = delisting_dates.get(s)
+        d = delisting_dates.get(s.split("#", 1)[0])
         if d is None:
             missing_dates.append(s)
         else:
@@ -967,6 +991,7 @@ def load_panel_union(
         "last_alive_day": last_alive_day, "is_delisted": is_delisted,
         "delisted_symbols": delisted["symbols"], "n_symbols_survivors": len(surv["symbols"]),
         "n_symbols_delisted": len(delisted["symbols"]), "n_no_history_only": len(no_history_only),
+        "relisted_symbols": sorted(relisted),
     }
 
 
@@ -1055,7 +1080,8 @@ def union_range_fingerprint(
     lookup, so a survivors-only reader's fingerprint stays unaffected and
     independently reproducible."""
     surv_fp = combined_range_fingerprint(base_dir, survivor_symbols, year_start, year_end, as_of=as_of)
-    del_fp = combined_range_fingerprint(delisted_base, delisted_symbols, year_start, year_end, as_of=as_of)
+    del_fp = combined_range_fingerprint(
+        delisted_base, [d.split("#", 1)[0] for d in delisted_symbols], year_start, year_end, as_of=as_of)
     h = hashlib.sha256()
     h.update(surv_fp["sha256"].encode("ascii"))
     h.update(del_fp["sha256"].encode("ascii"))

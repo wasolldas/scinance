@@ -219,3 +219,10 @@
   - Regime: STRESS_ABS im Fenster nur 2026-08-19 (1.440 Quotes je Seite, 81-93 FIFO-Fills): p_fill unveraendert (0,056-0,065), adv_sel -2,4 bis +3,5 bp ohne Muster - **Stress-Zelle deskriptiv leer** (ein Tag), keine Aussage.
 - **Entscheidung:** (1) Beide Kurven gehen als Konstanten in `tradability3` (PRD 9.2): Maker-Rehedging rechnet mit p_fill(60 s) 0,06 (FIFO-Untergrenze) bis 0,35 (Pro-rata-Obergrenze), Taker-Rueckfall fuer den Rest, und mit adv_sel 0,7 bp (FIFO) je Bein in Ruhe. Der Maker-Nettovorteil in Ruhe betraegt damit ~3,5 - 0,7 = 2,8 bp je gefuelltem Bein, gewichtet mit p_fill. (2) Fuer Stress-Tage gilt bis zu einer Messung mit >= 10 Stress-Tagen der Taker-Pfad (RAISE in `tradability3` fuer Maker-Annahmen im Stress). (3) Kein Alpha-Kandidat (Null-Zensus-Klausel). (4) Die 18 `no_raw`-Tage und der defekte Tag werden dem Registrar gemeldet (Aufzeichnungsluecken Juni/Juli, ein korrupter Orderbuch-Tag).
 - **Rueckbauweg:** Dokumentation; Laeufe 2 und 3 bleiben mit Fingerprints erhalten.
+
+---
+
+### DEC-72 · Wiedergelistete Symbole in der Union: delistete Episode wird eigene Spalte `<Symbol>#delisted`
+- **Anlass:** Union-Zensus 2026-09-21 brach laut ab: ICXUSDT liegt in beiden Baeumen (delistet, spaeter unter demselben Namen neu gelistet). WP-12b-Fetch selbst sauber: 261 Symbole mit Historie, 7 ohne (BNX, DATA, KORU, LIT, MON, SPCX, ZK), Resume idempotent.
+- **Entscheidung:** Ein Symbol in beiden Baeumen ist eine Wiederlistung, wenn die delistete Episode strikt VOR dem ersten Handelstag der Ueberlebenden-Episode endet; sie wird als eigene Panel-Spalte `<Symbol>#delisted` gefuehrt (eigene Delisting-Woche, PIT-Maske endet dort), die Ueberlebenden-Spalte bleibt unveraendert; die beiden Masken sind nie gleichzeitig wahr. Ueberlappende Handelstage bleiben ein lauter Fehler. Der Range-Fingerprint nutzt die physischen Symbolnamen. Zensus ohne `--include-delisted` unveraendert.
+- **Rueckbauweg:** additiv; Test gepinnt.

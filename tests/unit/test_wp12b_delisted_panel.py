@@ -339,11 +339,47 @@ def test_load_panel_union_adversarial_symbol_in_both_trees_is_loud_error(tmp_pat
     dd = delisted_panel.write_delisting_dates_json(del_base, {
         "DUPUSDT": {"delist_date": "2023-06-01", "announcement_id": "x", "source": "delisting_ms"}})
 
+    # overlapping trading days (both episodes start 2023-01-01) -> loud
     with pytest.raises(panel_load.PanelLoadError, match="DUPUSDT"):
         panel_load.load_panel_union(
             surv_base, surv_manifest, del_base, del_manifest,
             year_start=2023, year_end=2023, as_of=date(2024, 1, 1),
             delisting_dates_path=Path(dd["path"]))
+
+
+def test_load_panel_union_relisted_symbol_becomes_two_columns(tmp_path):
+    """DEC-72: a symbol delisted and later RELISTED under the same name
+    (real tree: ICXUSDT) is split into ``<sym>#delisted`` (earlier episode,
+    alive until its delisting week) and ``<sym>`` (survivor). The two
+    episodes must be day-disjoint; their alive masks never overlap."""
+    surv_base = tmp_path / "panel_1d"
+    surv_manifest = surv_base / "panel_manifest.sqlite"
+    del_base = tmp_path / "panel_1d_delisted"
+    del_manifest = del_base / "panel_manifest.sqlite"
+    year_end = date(2023, 12, 31)
+    _write_full_history(del_base, del_manifest, "RELUSDT",
+                         _closes(date(2023, 1, 1), date(2023, 4, 30), seed=2),
+                         as_of_date=date(2023, 4, 30))
+    _write_full_history(surv_base, surv_manifest, "RELUSDT",
+                         _closes(date(2023, 8, 1), year_end, seed=1), as_of_date=year_end)
+    dd = delisted_panel.write_delisting_dates_json(del_base, {
+        "RELUSDT": {"delist_date": "2023-04-30", "announcement_id": "x", "source": "delisting_ms"}})
+    panel = panel_load.load_panel_union(
+        surv_base, surv_manifest, del_base, del_manifest,
+        year_start=2023, year_end=2023, as_of=date(2024, 1, 1),
+        delisting_dates_path=Path(dd["path"]))
+    assert panel["symbols"] == ["RELUSDT", "RELUSDT#delisted"]
+    assert panel["relisted_symbols"] == ["RELUSDT"]
+    assert list(panel["is_delisted"]) == [False, True]
+    assert panel["last_alive_day"] == [None, "2023-04-30"]
+    weekly = panel_load.weekly_returns_and_mask_union(panel, panel["last_alive_day"])
+    alive = weekly["alive"]
+    assert not (alive[:, 0] & alive[:, 1]).any()          # never alive simultaneously
+    assert alive[:, 1].any() and alive[:, 0].any()
+    fp = panel_load.union_range_fingerprint(
+        surv_base, del_base, ["RELUSDT"], ["RELUSDT#delisted"],
+        year_start=2023, year_end=2023, as_of=date(2024, 1, 1))
+    assert fp["n_partitions"] == 2
 
 
 def test_load_panel_union_missing_delisted_manifest_is_loud_error(tmp_path):
