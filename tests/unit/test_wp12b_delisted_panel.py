@@ -573,3 +573,54 @@ def test_cli_fetch_delisted_panel_end_to_end_no_network(tmp_path, monkeypatch):
     row = panel_store.manifest_get(manifest, "CLIUSDT", 2023)
     assert row["status"] == "DONE"
     assert (delisted_base / "delisting_dates.json").is_file()
+
+
+def test_load_panel_union_relisted_symbol_with_full_history_in_survivors_gets_a_gap(tmp_path):
+    """DEC-72 (b), real tree ICXUSDT: the survivors tree already carries the
+    earlier episode (identical closes on the overlapping days). The delisted
+    column is dropped and the survivor column is NOT alive between the
+    delisting week and the relisting week. Differing closes stay loud."""
+    surv_base = tmp_path / "panel_1d"
+    surv_manifest = surv_base / "panel_manifest.sqlite"
+    del_base = tmp_path / "panel_1d_delisted"
+    del_manifest = del_base / "panel_manifest.sqlite"
+    year_end = date(2023, 12, 31)
+    early = _closes(date(2023, 1, 1), date(2023, 4, 30), seed=2)
+    late = _closes(date(2023, 8, 1), year_end, seed=1)
+    _write_full_history(surv_base, surv_manifest, "GAPUSDT", early + late, as_of_date=year_end)
+    # a second, always-alive survivor keeps the day/week grid dense across the gap
+    _write_full_history(surv_base, surv_manifest, "FULLUSDT",
+                         _closes(date(2023, 1, 1), year_end, seed=5), as_of_date=year_end)
+    _write_full_history(del_base, del_manifest, "GAPUSDT", early, as_of_date=date(2023, 4, 30))
+    dd = delisted_panel.write_delisting_dates_json(del_base, {
+        "GAPUSDT": {"delist_date": "2023-04-30", "announcement_id": "x", "source": "delisting_ms"}})
+    panel = panel_load.load_panel_union(
+        surv_base, surv_manifest, del_base, del_manifest,
+        year_start=2023, year_end=2023, as_of=date(2024, 1, 1),
+        delisting_dates_path=Path(dd["path"]), allow_partial=True)  # survivor year has the gap
+    assert panel["symbols"] == ["FULLUSDT", "GAPUSDT"]
+    assert panel["relisted_gaps"] == {"GAPUSDT": {"delist_date": "2023-04-30", "relist_first_day": "2023-08-01"}}
+    assert panel["n_symbols_delisted"] == 0
+    weekly = panel_load.weekly_returns_and_mask_union(panel, panel["last_alive_day"])
+    weeks = weekly["weeks"]; alive = weekly["alive"][:, 1]
+    in_gap = [t for t, w in enumerate(weeks) if "2023-05-08" <= w <= "2023-07-24"]
+    assert in_gap and not alive[in_gap].any()
+    before = [t for t, w in enumerate(weeks) if "2023-03-01" <= w <= "2023-04-24"]
+    after = [t for t, w in enumerate(weeks) if "2023-08-14" <= w <= "2023-12-01"]
+    assert alive[before].all() and alive[after].all()
+    # no return is manufactured ACROSS the gap: the relisting week (2023-07-31)
+    # carries 0.0 (non-consecutive week indices) and its predecessor week is not alive
+    t_rel = weeks.index("2023-07-31")
+    assert weekly["returns"][t_rel, 1] == 0.0 and not alive[t_rel - 1]
+
+    # differing closes on the overlap -> loud
+    del2 = tmp_path / "panel_1d_delisted2"
+    _write_full_history(del2, del2 / "panel_manifest.sqlite", "GAPUSDT",
+                         _closes(date(2023, 1, 1), date(2023, 4, 30), seed=9), as_of_date=date(2023, 4, 30))
+    dd2 = delisted_panel.write_delisting_dates_json(del2, {
+        "GAPUSDT": {"delist_date": "2023-04-30", "announcement_id": "x", "source": "delisting_ms"}})
+    with pytest.raises(panel_load.PanelLoadError, match="GAPUSDT"):
+        panel_load.load_panel_union(
+            surv_base, surv_manifest, del2, del2 / "panel_manifest.sqlite",
+            year_start=2023, year_end=2023, as_of=date(2024, 1, 1),
+            delisting_dates_path=Path(dd2["path"]), allow_partial=True)

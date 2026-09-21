@@ -928,22 +928,58 @@ def load_panel_union(
     delisted = load_panel(delisted_base, delisted_manifest_path, year_start=year_start,
                            year_end=year_end, as_of=as_of, symbols=dsyms, allow_partial=allow_partial)
 
+    # Two relisting shapes exist on the real tree (DEC-72):
+    #  (a) day-DISJOINT episodes -> the earlier one becomes ``<sym>#delisted``;
+    #  (b) the survivors tree ALREADY carries the earlier episode (Bybit's
+    #      kline endpoint returns the full history of a reused symbol name;
+    #      ICXUSDT 2026-09-21) -> the delisted column is a duplicate of
+    #      what the survivor column holds on those days. Then the delisted
+    #      column is DROPPED and the survivor column gets a GAP: not alive
+    #      strictly between its delisting week and its relisting week
+    #      (``relisted_gaps``, applied by ``weekly_returns_and_mask_union``).
+    #      Overlapping days with DIFFERENT closes stay a loud error.
+    relisted_gaps: dict[str, dict[str, str]] = {}
+    delisting_dates_pre = load_delisting_dates(delisting_dates_path) if delisting_dates_path else {}
     if overlap:
         conflicts = []
+        drop: set[str] = set()
         for s_ in overlap:
             js = surv["symbols"].index(s_)
             jd = delisted["symbols"].index(s_)
-            surv_days = [d for d, v in zip(surv["day_index"], surv["close"][:, js]) if not math.isnan(v)]
-            del_days = [d for d, v in zip(delisted["day_index"], delisted["close"][:, jd]) if not math.isnan(v)]
-            if not surv_days or not del_days or max(del_days) >= min(surv_days):
+            surv_close = {d: v for d, v in zip(surv["day_index"], surv["close"][:, js]) if not math.isnan(v)}
+            del_close = {d: v for d, v in zip(delisted["day_index"], delisted["close"][:, jd]) if not math.isnan(v)}
+            if not surv_close or not del_close:
                 conflicts.append(s_)
-            else:
+                continue
+            common = sorted(set(surv_close) & set(del_close))
+            if not common:
                 relisted.append(s_)
+                continue
+            same = all(math.isclose(surv_close[d], del_close[d], rel_tol=1e-9, abs_tol=1e-12) for d in common)
+            dd = delisting_dates_pre.get(s_)
+            if not same or dd is None:
+                conflicts.append(s_)
+                continue
+            delist_ord = (dd - _EPOCH).days
+            later = [d for d in surv_close if d > delist_ord]
+            if not later:
+                conflicts.append(s_)
+                continue
+            relist_day = (_EPOCH + timedelta(days=min(later))).isoformat()
+            relisted_gaps[s_] = {"delist_date": dd.isoformat(), "relist_first_day": relist_day}
+            drop.add(s_)
         if conflicts:
             raise PanelLoadError(
                 f"{len(conflicts)} symbol(s) present in BOTH panel_1d and panel_1d_delisted with "
-                f"OVERLAPPING trading days -- a contract cannot be alive twice on the same day: "
+                f"OVERLAPPING trading days and differing closes (or no delisting date / no "
+                f"relisting after it) -- a contract cannot be alive twice on the same day: "
                 f"{conflicts[:20]}")
+        if drop:
+            keep = [k for k, s_ in enumerate(delisted["symbols"]) if s_ not in drop]
+            delisted = dict(delisted)
+            for key in ("close", "turnover", "funding_n", "funding_sum"):
+                delisted[key] = delisted[key][:, keep]
+            delisted["symbols"] = [delisted["symbols"][k] for k in keep]
         delisted = dict(delisted)
         delisted["symbols"] = [f"{s_}#delisted" if s_ in relisted else s_ for s_ in delisted["symbols"]]
 
@@ -991,7 +1027,7 @@ def load_panel_union(
         "last_alive_day": last_alive_day, "is_delisted": is_delisted,
         "delisted_symbols": delisted["symbols"], "n_symbols_survivors": len(surv["symbols"]),
         "n_symbols_delisted": len(delisted["symbols"]), "n_no_history_only": len(no_history_only),
-        "relisted_symbols": sorted(relisted),
+        "relisted_symbols": sorted(relisted), "relisted_gaps": relisted_gaps,
     }
 
 
@@ -1060,10 +1096,25 @@ def weekly_returns_and_mask_union(
 
     alive = pit_universe.pit_alive_mask(first_week, capped_last_week, n_weeks,
                                          min_weeks_history=min_weeks_history)
+    # DEC-72 (b): relisted symbols whose survivor column carries both
+    # episodes are NOT alive strictly between the delisting week and the
+    # relisting week (no bars there; the pair (t, t+1) across the gap is
+    # dropped automatically because alive[t+1] is False).
+    gaps = panel.get("relisted_gaps") or {}
+    sym_pos = {s_: j for j, s_ in enumerate(symbols)}
+    for s_, g in gaps.items():
+        j = sym_pos.get(s_)
+        if j is None:
+            continue
+        w_del = pit_universe.iso_week_start(date.fromisoformat(g["delist_date"])).isoformat()
+        w_rel = pit_universe.iso_week_start(date.fromisoformat(g["relist_first_day"])).isoformat()
+        for t, w in enumerate(weeks):
+            if w_del < w < w_rel:
+                alive[t, j] = False
     return {"weeks": weeks, "close": close_mat, "returns": returns, "alive": alive,
             "first_week": first_week, "last_week": capped_last_week,
             "last_week_uncapped": last_week, "symbols": symbols,
-            "last_alive_day": last_alive_day}
+            "last_alive_day": last_alive_day, "relisted_gaps": gaps}
 
 
 def union_range_fingerprint(
