@@ -52,6 +52,7 @@ __all__ = [
     "beta_characteristic", "weekly_turnover", "trailing_median_turnover",
     "decile_bucket", "compute_all_characteristics",
     "weekly_only_proxy_characteristic", "WEEKLY_ONLY_VARIANT_NAMES",
+    "weekly_valid_day_count",
 ]
 
 #: PRD 5.3: momentum formation lengths 1/2/4 weeks.
@@ -182,6 +183,27 @@ def max_return_characteristic(panel: dict[str, Any], weeks: list[str], *,
             col = block[valid[:, j], j]
             if col.size:
                 out[wi, j] = float(col.max())
+    return out
+
+
+def weekly_valid_day_count(panel: dict[str, Any], weeks: list[str], *,
+                            daily_ret: np.ndarray | None = None) -> np.ndarray:
+    """DEC-75 Entscheidung 1 (4) / task brief item 4: number of valid
+    daily log returns observed within week ``t`` per symbol -- the ``n``
+    :func:`prelaunch.h30_feasibility`'s ``SE(sigma_w^2/2)`` needs
+    (``relative SE ~= 1/sqrt(2*(n-1))``). Shares
+    ``realized_vol_characteristic``'s week-grouping exactly (same
+    ``_week_row_groups`` helper), so the ``n`` reported here is always the
+    SAME ``n`` that vol estimate was computed from."""
+    if daily_ret is None:
+        daily_ret = daily_log_returns(panel)
+    n_symbols = daily_ret.shape[1]
+    n_weeks = len(weeks)
+    out = np.zeros((n_weeks, n_symbols), dtype=np.int64)
+    groups = _week_row_groups(panel, weeks)
+    for wi, rows in groups.items():
+        block = daily_ret[rows, :]
+        out[wi] = (~np.isnan(block)).sum(axis=0)
     return out
 
 

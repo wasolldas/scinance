@@ -53,6 +53,7 @@ from ..wp7_universe.pit_universe import spearman_rank_ic
 
 __all__ = [
     "DELISTING_CONVENTIONS", "weekly_ic_series", "mean_ic", "vol_weighted_outcome_with_drag",
+    "residualize_outcome",
 ]
 
 DELISTING_CONVENTIONS: tuple[str, ...] = ("drop", "close_at_last")
@@ -124,37 +125,81 @@ def mean_ic(characteristic: np.ndarray, returns: np.ndarray, alive: np.ndarray, 
 
 
 def vol_weighted_outcome_with_drag(
-    returns: np.ndarray, weekly_vol: np.ndarray, *, target_vol: float | None = None, floor: float = 1e-8,
+    returns: np.ndarray, weekly_vol: np.ndarray, *, weight_source: str = "pit",
+    target_vol: float | None = None, floor: float = 1e-8,
 ) -> dict[str, Any]:
-    """PRD 5.3 A3-V's mandatory (i)/(ii) construction: each symbol-week's
-    return is scaled by ``target_vol / weekly_vol`` (risk-parity-style
-    inverse-vol weighting, capping every leg's contributed variance at the
-    same ``target_vol``), and the analytic vol-drag term
-    ``E[r_arith] - E[r_geom] = sigma^2/2`` (PRD 5.3, verbatim) is returned
-    alongside it -- BOTH the raw per-symbol-week drag (``sigma_j^2/2``,
-    what the position would carry UNWEIGHTED) and the drag AFTER
-    vol-weighting (``target_vol^2/2`` for every leg, since vol-weighting
-    normalises every leg's realised vol to the SAME ``target_vol`` --
-    documented here as ``prelaunch.py``'s ``Drag_rest`` computation
-    verbatim, PRD 5.3 (ii)/(iii)). ``target_vol`` defaults to the
-    CROSS-SECTIONAL MEDIAN of ``weekly_vol`` over its finite entries (a
-    single scalar, not per-week -- the simplest defensible "normalise to a
-    common risk budget" choice; the caller may override it).
+    """DEC-75 Entscheidung 1 (4) / task brief item 4 -- H-30, corrected
+    (v2) construction (Review B-5/B-6 fixes, verbatim):
 
-    Returns ``{"weighted_returns", "weight", "drag_raw", "drag_after_weighting",
-    "target_vol"}``, all ``[n_weeks, n_symbols]`` except ``target_vol``
-    (scalar). NaN propagates from ``weekly_vol``'s own NaNs (a
-    symbol-week with no measurable vol gets no weight, no drag)."""
+      B-6 fix: ``weekly_vol[t]`` is the FORMATION week's realised vol
+      (``characteristics.realized_vol_characteristic``'s ``vol_rv[t]``,
+      known PIT by week ``t``'s end) and it now weights
+      ``returns[t+1]`` -- the NEXT week's outcome -- not
+      ``returns[t]`` paired with the same row index (the v1 bug B-6
+      names explicitly: "Helfer nutzt Zeilenindex des Outcomes").
+      B-5 fix: the drag term ``sigma_w[t]^2/2`` is subtracted from the
+      UNWEIGHTED outcome ``returns[t+1]`` FIRST, and only THEN is the
+      (drag-adjusted) outcome scaled by the weight -- so the reported
+      drag is heterogeneous ACROSS symbol-weeks again (``sigma_w[t]`` is
+      the formation week's own vol, not the post-weighting constant
+      ``target_vol`` every leg shares -- v1's bug B-5, verbatim:
+      "target_vol^2/2 ist rangneutral (misst nichts)").
+
+    Formally, for formation week ``t`` (``t in [0, n_weeks-2]``):
+      ``weight[t]   = target_vol / max(weekly_vol[t], floor)``
+      ``drag[t]     = 0.5 * weekly_vol[t]**2``               (log-return units)
+      ``weighted_outcome[t] = (returns[t+1] - drag[t]) * weight[t]``
+    ``weight_source`` MUST be the literal string ``"pit"`` (C.14 loud
+    fail, DEC-75: the task brief explicitly requires this so a future
+    caller can never silently swap in a non-PIT vol source -- e.g. the
+    OUTCOME week's own realised vol, which would leak the outcome into
+    its own weight). ``target_vol`` defaults to the CROSS-SECTIONAL
+    MEDIAN of ``weekly_vol`` over its finite entries (unchanged from v1).
+
+    Returns ``{"weighted_outcome", "weight", "drag", "target_vol",
+    "weight_source"}`` all shaped ``[n_weeks, n_symbols]`` (row ``t`` =
+    formation week ``t``'s weighted, drag-adjusted view of week ``t+1``'s
+    outcome; the LAST row is NaN -- no ``t+1`` inside the array) except
+    ``target_vol`` (scalar). Units: weekly LOG return throughout (NOT
+    basis points -- callers that want bp multiply by 1e4 themselves, same
+    convention as ``characteristics.realized_vol_characteristic``'s
+    output). NaN propagates from ``weekly_vol``'s own NaNs and from
+    ``returns[t+1]``'s own NaNs."""
+    if weight_source != "pit":
+        raise ValueError(f"weight_source must be the literal 'pit' (C.14 loud fail), got {weight_source!r}")
     finite_vol = weekly_vol[~np.isnan(weekly_vol)]
     if target_vol is None:
         target_vol = float(np.median(finite_vol)) if finite_vol.size else float("nan")
+    n_weeks, n_symbols = returns.shape
     safe_vol = np.where(np.isnan(weekly_vol), np.nan, np.maximum(weekly_vol, floor))
-    weight = target_vol / safe_vol
-    weighted_returns = returns * weight
-    drag_raw = 0.5 * weekly_vol ** 2
-    drag_after_weighting = np.where(np.isnan(weekly_vol), np.nan, 0.5 * target_vol ** 2)
+    weight_full = target_vol / safe_vol
+    drag_full = 0.5 * weekly_vol ** 2
+
+    weighted_outcome = np.full((n_weeks, n_symbols), np.nan, dtype=np.float64)
+    weight = np.full((n_weeks, n_symbols), np.nan, dtype=np.float64)
+    drag = np.full((n_weeks, n_symbols), np.nan, dtype=np.float64)
+    for t in range(n_weeks - 1):
+        weight[t] = weight_full[t]
+        drag[t] = drag_full[t]
+        weighted_outcome[t] = (returns[t + 1] - drag_full[t]) * weight_full[t]
+
     return {
-        "weighted_returns": weighted_returns, "weight": weight,
-        "drag_raw": drag_raw, "drag_after_weighting": drag_after_weighting,
-        "target_vol": target_vol,
+        "weighted_outcome": weighted_outcome, "weight": weight, "drag": drag,
+        "target_vol": target_vol, "weight_source": weight_source,
+        "note": "Einheit: woechentliche Log-Rendite; weighted_outcome[t] gehoert zu Woche t+1's "
+                "Outcome, gewichtet mit Formationswoche t's PIT-Vol (DEC-75 (4)).",
     }
+
+
+def residualize_outcome(returns: np.ndarray, beta_8w_pit: np.ndarray, r_btc: np.ndarray) -> np.ndarray:
+    """DEC-75 Entscheidung 1 (3) / task brief item 6: market-residualised
+    outcome, ``r_i - beta_i^{8W,PIT} * r_BTC`` -- ``beta_8w_pit`` is
+    ``characteristics.beta_characteristic``'s TRAILING-8-week PIT beta
+    (already computed elsewhere in this package, reused unchanged here,
+    never recomputed), ``r_btc`` is BTCUSDT's own weekly-return COLUMN
+    (``[n_weeks]``, e.g. ``returns[:, symbols.index('BTCUSDT')]``). Pure
+    function, no I/O; ``returns``/``beta_8w_pit`` are ``[n_weeks,
+    n_symbols]``, broadcasting ``r_btc`` over the symbol axis. NaN
+    propagates from either input (a symbol-week with no trailing beta yet
+    gets no residual)."""
+    return returns - beta_8w_pit * r_btc[:, None]

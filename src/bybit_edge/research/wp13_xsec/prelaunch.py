@@ -40,7 +40,8 @@ __all__ = [
     "no_history_symbols_report", "stress_coverage",
     "analytic_bailey_ldp_ceiling", "analytic_selection_ceiling",
     "measured_selection_ceiling", "assemble_prelaunch_report",
-    "write_prelaunch_artifacts",
+    "write_prelaunch_artifacts", "factor_preserving_report",
+    "survivorship_drawdown_fixture",
 ]
 
 #: PRD 5.3 / DEC-74: judgement-bearing windows W1/W2, descriptive-only L.
@@ -88,7 +89,7 @@ def slice_window(weeks: list[str], start_iso: str, end_iso: str,
     lo, hi = idx[0], idx[-1] + 1
     out: dict[str, Any] = {"weeks": weeks[lo:hi], "lo": lo, "hi": hi,
                             "start_iso": start_iso, "end_iso": end_iso}
-    for name, arr in zip(("returns", "alive", "vol_rv", "turnover_trail")[:len(arrays)], arrays):
+    for name, arr in zip(("returns", "alive", "vol_rv", "turnover_trail", "day_count")[:len(arrays)], arrays):
         out[name] = arr[lo:hi]
     return out
 
@@ -109,14 +110,27 @@ def window_noise_floor_and_threshold(
     SIMULATED returns, and the floor only ever reads ``window['alive']``.
     """
     floor = nulls.analytic_permutation_floor(window["alive"], window["weeks"])
+    w_judged = floor["w_judged"]
     pnull = nulls.persistence_null(window["returns"], window["alive"], window["weeks"],
                                     variants=variants, convention=convention,
                                     n_sims=n_sims, seed=seed)
-    thresholds = {
-        v: nulls.ic_threshold(floor["e_floor"], pnull["variants"][v]["c_rho"], floor["n_weeks"])
+    # DEC-75 (1)/(2)/(8): IC_min uses W_judged (not the raw week count) and the
+    # BIAS-CORRECTED c_rho; both the capped (registered, "ic_min_capped") and the
+    # uncapped ("ic_min_raw") value are reported side by side (task brief item 2).
+    thresholds_capped = {
+        v: nulls.ic_threshold(floor["e_floor"], pnull["variants"][v]["c_rho_corrected"], w_judged, cap_c_rho=True)
         for v in variants
     }
-    return {"floor": floor, "persistence_null": pnull, "ic_min_per_variant": thresholds}
+    thresholds_raw = {
+        v: nulls.ic_threshold(floor["e_floor"], pnull["variants"][v]["c_rho_corrected"], w_judged, cap_c_rho=False)
+        for v in variants
+    }
+    return {
+        "floor": floor, "persistence_null": pnull, "w_judged": w_judged,
+        "ic_min_per_variant": thresholds_capped,           # backward-compat name = registered (capped)
+        "ic_min_capped_per_variant": thresholds_capped,
+        "ic_min_raw_per_variant": thresholds_raw,
+    }
 
 
 # ----------------------------------------------------------------------------
@@ -159,33 +173,37 @@ def gate5_reachability(window: dict[str, Any], *, min_universe: int = 10) -> dic
 
 def h30_feasibility(window_l: dict[str, Any], *, ic_prior: float = stats.IC_PRIOR,
                      f: float = stats.DECILE_FACTOR) -> dict[str, Any]:
-    """DEC-74 (h): ``Kante = 3.51 * IC_prior * sigma_xs(L)`` (bp/week);
-    ``Drag_rest`` after vol-weighting, ``Drag_rest/Kante``.
+    """DEC-75 Entscheidung 1 (4) / task brief item 4, v2: ``Kante = 3.51 *
+    IC_prior * sigma_xs(L)`` (bp/week, unchanged); feasibility is now TWO
+    ratios against ``Kante``, both required ``<= 0.5``:
 
-    **``Drag_rest`` computation, spelled out exactly (task brief
-    requirement).** ``ic.vol_weighted_outcome_with_drag`` scales every
-    symbol-week's exposure by ``target_vol/vol_j`` (``target_vol`` =
-    cross-sectional MEDIAN of the L-window's realized weekly vol,
-    ``vol_rv``) so every leg contributes the SAME target variance; the
-    per-leg vol-drag term ``sigma^2/2`` (PRD 5.3, verbatim) THEN COLLAPSES
-    to the SAME constant ``target_vol^2/2`` for every leg (since every
-    leg's realised vol is now ``target_vol`` by construction), replacing
-    the heterogeneous raw ``sigma_j^2/2``. ``Drag_rest`` is that constant,
-    reported in bp/week (``0.5 * target_vol^2 * 1e4``); the RAW (pre-
-    weighting) per-decile drag table is reported alongside it for
-    comparison (PRD 5.3 (iii): "Permutations-Null auf identisch
-    vol-geschichteten Zufallsportfolios" needs the raw table too, even
-    though the null itself is not computed in --prelaunch).
+      (i)  ``spread_D10_minus_D1 / Kante`` -- the RAW (pre-weighting)
+           decile drag spread (``sigma_w^2/2`` in bp, per vol decile,
+           highest-vol decile minus lowest-vol decile).
+      (ii) ``SE(sigma_w^2/2) / Kante`` -- the ESTIMATION-ERROR ratio
+           (Review B-5: "Schaetzfehler ~60% auf sigma_w^2/2
+           unquantifiziert" -- this closes that gap). ``SE`` is derived
+           from ``n``, the median number of daily returns feeding a
+           week's realised-vol estimate (``characteristics.
+           weekly_valid_day_count``): the relative SE of a sample
+           variance from ``n`` i.i.d. observations is ``1/sqrt(2*(n-1))``
+           (standard chi-squared-based large-sample approximation,
+           Var(s^2)/E[s^2]^2 ~= 2/(n-1)); applied to the OVERALL median
+           raw drag (pooled over every symbol-week in ``L``, not just one
+           decile -- the task brief: "applied to the median drag").
+
+    Both ratios are reported with the ``0.5`` bound; ``feasible`` is
+    ``True`` iff BOTH are ``<= 0.5`` (task brief item 4, verbatim).
     """
     sigma_xs = stats.sigma_xs_summary(window_l["returns"], window_l["alive"])
     sigma_xs_median = sigma_xs["median"] or 0.0
     kante_bps = f * ic_prior * sigma_xs_median * 10_000.0
 
     vol_rv, alive, weeks = window_l["vol_rv"], window_l["alive"], window_l["weeks"]
-    vw = ic.vol_weighted_outcome_with_drag(window_l["returns"], vol_rv)
-    drag_rest_bps = float(vw["target_vol"] ** 2 * 0.5 * 10_000.0)
+    target_vol = float(np.median(vol_rv[~np.isnan(vol_rv)])) if np.isfinite(vol_rv).any() else float("nan")
 
     by_decile: dict[int, list[float]] = {d: [] for d in range(1, 11)}
+    all_drag_raw_bps: list[float] = []
     for t in range(len(weeks)):
         mask = alive[t]
         buckets = characteristics.decile_bucket(vol_rv[t], mask)
@@ -193,20 +211,46 @@ def h30_feasibility(window_l: dict[str, Any], *, ic_prior: float = stats.IC_PRIO
         for d in range(1, 11):
             vals = drag_raw_t[(buckets == d) & ~np.isnan(drag_raw_t)]
             by_decile[d].extend(float(v) for v in vals)
+            all_drag_raw_bps.extend(float(v) for v in vals)
     decile_table = [
         {"decile": d, "median_drag_raw_bps": (float(np.median(v)) if v else None), "n_symbol_weeks": len(v)}
         for d, v in by_decile.items()
     ]
+    d1_med = decile_table[0]["median_drag_raw_bps"]
+    d10_med = decile_table[9]["median_drag_raw_bps"]
+    spread_d10_d1_bps = (d10_med - d1_med) if (d1_med is not None and d10_med is not None) else None
 
-    ratio = (drag_rest_bps / kante_bps) if kante_bps else float("nan")
+    day_count = window_l.get("day_count")
+    if day_count is not None:
+        n_valid = day_count[alive & (day_count > 0)]
+        n_median = float(np.median(n_valid)) if n_valid.size else float("nan")
+    else:
+        n_median = float("nan")
+    overall_median_drag_bps = float(np.median(all_drag_raw_bps)) if all_drag_raw_bps else float("nan")
+    relative_se = (1.0 / math.sqrt(2.0 * (n_median - 1.0))) if (n_median and n_median > 1.0) else float("nan")
+    se_drag_bps = (relative_se * overall_median_drag_bps
+                   if (not math.isnan(relative_se) and not math.isnan(overall_median_drag_bps)) else float("nan"))
+
+    ratio_spread = (spread_d10_d1_bps / kante_bps) if (kante_bps and spread_d10_d1_bps is not None) else float("nan")
+    ratio_se = (se_drag_bps / kante_bps) if (kante_bps and not math.isnan(se_drag_bps)) else float("nan")
+    feasible = (not math.isnan(ratio_spread) and not math.isnan(ratio_se)
+                and ratio_spread <= 0.5 and ratio_se <= 0.5)
+
     return {
         "sigma_xs_l": sigma_xs, "ic_prior": ic_prior, "decile_factor": f,
-        "kante_bps_per_week": kante_bps, "target_vol": vw["target_vol"],
-        "drag_rest_bps_per_week": drag_rest_bps, "drag_rest_over_kante": ratio,
-        "feasible": (ratio <= 0.5) if not math.isnan(ratio) else None,
+        "kante_bps_per_week": kante_bps, "target_vol": target_vol,
         "decile_drag_table_raw_bps": decile_table,
-        "note": "Drag_rest = 0.5*target_vol^2 (bp/Woche); target_vol = Median von vol_rv(L) -- "
-                "siehe h30_feasibility Docstring fuer die exakte Herleitung.",
+        "spread_d10_minus_d1_bps": spread_d10_d1_bps,
+        "spread_d10_minus_d1_over_kante": ratio_spread,
+        "n_days_median": n_median, "overall_median_drag_raw_bps": overall_median_drag_bps,
+        "relative_se_drag": relative_se, "se_drag_bps": se_drag_bps,
+        "se_drag_over_kante": ratio_se,
+        "feasible": feasible,
+        "note": "DEC-75 (4) v2: feasibel <=> spread_D10_minus_D1/Kante <= 0.5 UND "
+                "SE(sigma_w^2/2)/Kante <= 0.5, beide auf L. SE(sigma_w^2/2) aus "
+                "relative_se = 1/sqrt(2*(n_median-1)) (n = Median-Zahl Tagesrenditen je Woche), "
+                "angewandt auf den ueber alle Symbol-Wochen gepoolten Median-Drag. "
+                "Vorbehalt 'schaetzfehlerdominiert', falls se_drag_over_kante > 0.5.",
     }
 
 
@@ -307,10 +351,12 @@ def _pure_noise_window_mean_ic(alive_window: np.ndarray, rng: np.random.Generato
     is used for BOTH the 'characteristic' and the 'outcome' (never the
     real returns -- this only uses ``alive_window`` for its K_t
     structure, matching the task brief's "measured ceiling ... with the
-    window's K series and W")."""
+    window's K series and W"). DEC-75 (1): loops over the JUDGED weeks
+    (``n_weeks - 1``), same range as ``ic.weekly_ic_series``."""
     n_weeks = alive_window.shape[0]
+    w_judged = nulls.w_judged_of(n_weeks)
     ics: list[float] = []
-    for t in range(n_weeks):
+    for t in range(w_judged):
         mask = alive_window[t]
         k = int(mask.sum())
         if k < min_universe:
@@ -344,6 +390,121 @@ def measured_selection_ceiling(alive_window: np.ndarray, *, k: int = SELECTION_K
 
 
 # ----------------------------------------------------------------------------
+# DEC-75 Entscheidung 1 (2)/(3): factor-preserving null report wrapper
+# ----------------------------------------------------------------------------
+
+def factor_preserving_report(
+    window: dict[str, Any], symbols: list[str], *,
+    variants: tuple[str, ...] = characteristics.VARIANT_NAMES,
+    convention: ic.Convention = "close_at_last",
+    n_reps: int = nulls.FACTOR_NULL_N_REPS_DEFAULT, seed: int = nulls.FACTOR_NULL_SEED,
+) -> dict[str, Any]:
+    """Thin wrapper: :func:`nulls.factor_preserving_null` on this window's
+    ``returns``/``alive`` (used ONLY for K/W sizing and the two
+    descriptive vol scalars -- THE SEAL, see that function's docstring).
+    """
+    return nulls.factor_preserving_null(
+        window["returns"], window["alive"], symbols, variants=variants,
+        convention=convention, n_reps=n_reps, seed=seed)
+
+
+# ----------------------------------------------------------------------------
+# DEC-75 Entscheidung 1 (5) / task brief item 5: survivorship drawdown fixture
+# ----------------------------------------------------------------------------
+
+def survivorship_drawdown_fixture(
+    window: dict[str, Any], *, ic_min_mom1: float, ic_min_rev_gap: float,
+    seed: int = 53, drawdown_trigger: float = -0.40, drawdown_window: int = 8,
+    delete_frac: float = 0.30, sigma: float = 0.05,
+) -> dict[str, Any]:
+    """DEC-75 Entscheidung 1 (5) / PRD 4.1's Survivorship-Fixture, now also
+    a PRELAUNCH REPORT LINE (task brief item 5), not just a T1 test. A
+    SIGNAL-FREE synthetic panel, sized like ``window`` (``K`` = the
+    window's MEDIAN weekly ``alive`` count, ``W`` = the window's week
+    count), i.i.d. ``N(0, sigma)`` weekly returns -- no true
+    predictability anywhere, so any apparent momentum/reversal premium the
+    UNCONTROLLED estimator finds is PURELY the survivorship-bias artifact
+    this fixture exists to catch.
+
+    Delisting: for each symbol, the trailing ``drawdown_window``-week
+    cumulative return (``characteristics.momentum_characteristic``,
+    reused) is checked against ``drawdown_trigger``; among symbols that
+    ever cross it, the ``round(delete_frac * K)`` EARLIEST-triggering
+    symbols are delisted the week immediately after their trigger week
+    (PRD 4.1's "nach einem simulierten Drawdown-Trigger"). If fewer than
+    ``round(delete_frac*K)`` symbols ever trigger, every triggering symbol
+    is delisted (documented, not silently padded).
+
+    Two estimators on the SAME simulated returns:
+      - **UNCONTROLLED** ("Beobachtung verworfen"): the delisted symbols'
+        columns are dropped from the ENTIRE panel (as if they never
+        existed), ``convention="drop"`` on the remaining survivors-only
+        columns.
+      - **CONTROLLED** ("zum letzten Schlusskurs geschlossen", PRD 4.1 DoD
+        (4)): the real PIT alive mask (``pit_universe.pit_alive_mask``,
+        ``min_weeks_history=0`` -- this fixture is about delisting bias,
+        not the separate listing-pump cutoff), ``convention="close_at_last"``.
+
+    Reports ``mom1``/``rev_gap`` IC under both, their DIFFERENCE
+    (uncontrolled - controlled), and that difference in UNITS OF IC_min
+    (task brief: "the prelaunch line reports the difference in units of
+    IC_min (must be a number, no verdict)" -- no PASS/FAIL/methodisch-
+    invalide label is attached here; PRD 4.1's own adversarial T1 test
+    (``tests/unit/test_wp13_xsec.py``) is where the verdict-bearing
+    assertion lives).
+    """
+    n_weeks = window["returns"].shape[0]
+    k_median = int(np.median(window["alive"].sum(axis=1))) if window["alive"].size else 0
+    k_median = max(k_median, 10)
+    rng = np.random.default_rng(seed)
+    returns_sim = rng.normal(0.0, sigma, size=(n_weeks, k_median))
+
+    cum_trail = characteristics.momentum_characteristic(returns_sim, trail_win=drawdown_window)
+    triggered: list[tuple[int, int]] = []
+    for j in range(k_median):
+        idx = np.flatnonzero(cum_trail[:, j] < drawdown_trigger)
+        if idx.size:
+            triggered.append((j, int(idx[0])))
+    triggered.sort(key=lambda p: p[1])
+    n_target = int(round(delete_frac * k_median))
+    chosen = triggered[:n_target]
+
+    last_bar = np.full(k_median, n_weeks - 1, dtype=np.int64)
+    survivor_cols = np.ones(k_median, dtype=bool)
+    for j, t_trigger in chosen:
+        last_bar[j] = min(t_trigger + 1, n_weeks - 1)
+        survivor_cols[j] = False
+
+    alive_controlled = pit_universe.pit_alive_mask(
+        np.zeros(k_median, dtype=np.int64), last_bar, n_weeks, min_weeks_history=0)
+    alive_uncontrolled = np.ones((n_weeks, k_median), dtype=bool) & survivor_cols[None, :]
+
+    mom1_sim = characteristics.momentum_characteristic(returns_sim, trail_win=1)
+    rev_sim = characteristics.reversal_gap_characteristic(returns_sim)
+
+    mom1_controlled = ic.weekly_ic_series(mom1_sim, returns_sim, alive_controlled, convention="close_at_last")["mean_ic"]
+    rev_controlled = ic.weekly_ic_series(rev_sim, returns_sim, alive_controlled, convention="close_at_last")["mean_ic"]
+    mom1_uncontrolled = ic.weekly_ic_series(mom1_sim, returns_sim, alive_uncontrolled, convention="drop")["mean_ic"]
+    rev_uncontrolled = ic.weekly_ic_series(rev_sim, returns_sim, alive_uncontrolled, convention="drop")["mean_ic"]
+
+    diff_mom1 = mom1_uncontrolled - mom1_controlled
+    diff_rev = rev_uncontrolled - rev_controlled
+    return {
+        "k": k_median, "n_weeks": n_weeks, "seed": seed,
+        "drawdown_trigger": drawdown_trigger, "drawdown_window": drawdown_window,
+        "delete_frac": delete_frac, "n_triggered": len(triggered), "n_deleted": len(chosen),
+        "mom1_uncontrolled": mom1_uncontrolled, "mom1_controlled": mom1_controlled,
+        "mom1_diff": diff_mom1,
+        "mom1_diff_in_ic_min_units": (diff_mom1 / ic_min_mom1) if ic_min_mom1 else float("nan"),
+        "rev_gap_uncontrolled": rev_uncontrolled, "rev_gap_controlled": rev_controlled,
+        "rev_gap_diff": diff_rev,
+        "rev_gap_diff_in_ic_min_units": (diff_rev / ic_min_rev_gap) if ic_min_rev_gap else float("nan"),
+        "note": "Signalfreies synthetisches Panel (PRD 4.1); Differenz in IC_min-Einheiten, "
+                "OHNE Verdikt (task brief item 5).",
+    }
+
+
+# ----------------------------------------------------------------------------
 # assembly
 # ----------------------------------------------------------------------------
 
@@ -354,6 +515,7 @@ def assemble_prelaunch_report(
     stress_rel_path: Path | str | None = None,
     stress_abs_path: Path | str | None = None,
     n_sims: int = nulls.PERSISTENCE_NULL_N_SIMS_DEFAULT,
+    n_reps_factor_null: int = nulls.FACTOR_NULL_N_REPS_DEFAULT,
     seed: int = nulls.PERSISTENCE_NULL_SEED,
     convention: ic.Convention = "close_at_last",
 ) -> dict[str, Any]:
@@ -375,16 +537,21 @@ def assemble_prelaunch_report(
     call is an IC). ``ic.weekly_ic_series`` itself is never called from
     this module.
     """
+    # DEC-75 (8) / task brief item 8: characteristics/day-counts are built on the FULL
+    # panel FIRST, then sliced to windows -- the SAME path the future run mode uses
+    # (see wp13_xsec.run's module docstring).
     weeks = weekly["weeks"]
+    symbols = panel["symbols"]
     returns, alive = weekly["returns"], weekly["alive"]
     vol_rv = characteristics.realized_vol_characteristic(panel, weeks)
     turnover_weekly = characteristics.weekly_turnover(panel, weeks)
     turnover_trail = characteristics.trailing_median_turnover(turnover_weekly)
+    day_count = characteristics.weekly_valid_day_count(panel, weeks)
 
     windows_out: dict[str, Any] = {}
     for name, (start, end) in WINDOWS.items():
         try:
-            window = slice_window(weeks, start, end, returns, alive, vol_rv, turnover_trail)
+            window = slice_window(weeks, start, end, returns, alive, vol_rv, turnover_trail, day_count)
         except ValueError as exc:
             windows_out[name] = {"available": False, "note": str(exc)}
             continue
@@ -398,11 +565,16 @@ def assemble_prelaunch_report(
             entry["descriptive_only"] = True
             entry["h30_feasibility"] = h30_feasibility(window)
         else:
-            entry["noise_floor_and_threshold"] = window_noise_floor_and_threshold(
-                window, convention=convention, n_sims=n_sims, seed=seed)
-            e_floor = entry["noise_floor_and_threshold"]["floor"]["e_floor"]
-            entry["selection_ceiling_analytic"] = analytic_selection_ceiling(e_floor, len(window["weeks"]))
+            nf = window_noise_floor_and_threshold(window, convention=convention, n_sims=n_sims, seed=seed)
+            entry["noise_floor_and_threshold"] = nf
+            e_floor, w_judged = nf["floor"]["e_floor"], nf["w_judged"]
+            entry["selection_ceiling_analytic"] = analytic_selection_ceiling(e_floor, w_judged)
             entry["selection_ceiling_measured"] = measured_selection_ceiling(window["alive"], seed=seed)
+            entry["factor_preserving_null"] = factor_preserving_report(
+                window, symbols, convention=convention, n_reps=n_reps_factor_null, seed=seed)
+            entry["survivorship_fixture"] = survivorship_drawdown_fixture(
+                window, ic_min_mom1=nf["ic_min_capped_per_variant"]["mom1"],
+                ic_min_rev_gap=nf["ic_min_capped_per_variant"]["rev_gap"], seed=seed)
         if stress_rel_path is not None:
             entry["stress_rel"] = stress_coverage(stress_rel_path, start, end)
         if stress_abs_path is not None:
@@ -422,7 +594,8 @@ def assemble_prelaunch_report(
                  "(Siegel-Test).",
         "windows": windows_out,
         "no_history_symbols": no_history,
-        "seed": seed, "n_sims": n_sims, "convention": convention, "variants": list(characteristics.VARIANT_NAMES),
+        "seed": seed, "n_sims": n_sims, "n_reps_factor_null": n_reps_factor_null,
+        "convention": convention, "variants": list(characteristics.VARIANT_NAMES),
         "reversal_gap_design_deviation": (
             "PRD 5.3 verlangt einen EIN-TAGES-Gap zwischen Formation und Halteperiode; WP-13 "
             "laeuft ausschliesslich auf dem woechentlichen panel_1d/panel_1d_delisted-Panel, "
@@ -453,22 +626,38 @@ def _to_markdown(report: dict[str, Any]) -> str:
                       f"(< 0,60 = {g5['gate5_reachable']}, n={g5['n_weeks_used']} Wochen)")
         if name == "L":
             h = w["h30_feasibility"]
-            lines.append(f"- H-30 Kante = {h['kante_bps_per_week']:.2f} bp/Woche, "
-                          f"Drag_rest = {h['drag_rest_bps_per_week']:.2f} bp/Woche, "
-                          f"Drag_rest/Kante = {h['drag_rest_over_kante']:.3f} "
-                          f"(feasibel <= 0,5: {h['feasible']})")
+            lines.append(f"- H-30 (v2) Kante = {h['kante_bps_per_week']:.2f} bp/Woche, "
+                          f"Spread(D10-D1)/Kante = {h['spread_d10_minus_d1_over_kante']:.3f}, "
+                          f"SE(sigma_w^2/2)/Kante = {h['se_drag_over_kante']:.3f} "
+                          f"(feasibel <= 0,5 beide: {h['feasible']})")
         else:
             nf = w["noise_floor_and_threshold"]
-            lines.append(f"- E_t[1/sqrt(K_t-1)] = {nf['floor']['e_floor']:.5f} "
-                         f"(K min/median/max siehe Artefakt)")
+            lines.append(f"- W_geurteilt = {nf['w_judged']}, E_t[1/sqrt(K_t-1)] = "
+                          f"{nf['floor']['e_floor']:.5f} (K min/median/max siehe Artefakt)")
             for v in report["variants"]:
-                thr = nf["ic_min_per_variant"][v]
-                c_rho = nf["persistence_null"]["variants"][v]["c_rho"]
-                lines.append(f"  - {v}: IC_min = {thr:.5f} (c_rho={c_rho:.4f})")
+                thr_capped = nf["ic_min_capped_per_variant"][v]
+                thr_raw = nf["ic_min_raw_per_variant"][v]
+                pv = nf["persistence_null"]["variants"][v]
+                lines.append(f"  - {v}: IC_min_capped = {thr_capped:.5f}, IC_min_raw = {thr_raw:.5f} "
+                              f"(c_rho_raw={pv['c_rho_raw']:.4f}, c_rho_corrected={pv['c_rho_corrected']:.4f})")
             sc_a = w["selection_ceiling_analytic"]
             sc_m = w["selection_ceiling_measured"]
             lines.append(f"- Selektions-Decke K=7 analytisch = {sc_a['ceiling_ic']:.5f}, "
-                         f"gemessen = {sc_m['ceiling_ic_mean']:.5f} (n_replicates={sc_m['n_replicates']})")
+                         f"gemessen (reine Rauschen) = {sc_m['ceiling_ic_mean']:.5f} "
+                         f"(n_replicates={sc_m['n_replicates']})")
+            fp = w["factor_preserving_null"]
+            lines.append(f"- Faktorerhaltende Decke (mean-of-max, n_reps={fp['n_reps']}) = "
+                         f"{fp['selection_ceiling_mean_of_max']:.5f}")
+            for v in report["variants"]:
+                fpv = fp["variants"][v]
+                lines.append(f"  - {v}: factor_SD={fpv['factor_sd']:.5f}, "
+                              f"Quantil({fpv['quantile_level']:.4f})={fpv['quantile_one_sided']:.5f}")
+            sv = w["survivorship_fixture"]
+            lines.append(f"- Survivorship-Fixture: mom1 Diff={sv['mom1_diff']:.5f} "
+                         f"({sv['mom1_diff_in_ic_min_units']:.3f} IC_min-Einheiten), "
+                         f"rev_gap Diff={sv['rev_gap_diff']:.5f} "
+                         f"({sv['rev_gap_diff_in_ic_min_units']:.3f} IC_min-Einheiten), "
+                         f"n_deleted={sv['n_deleted']}/{sv['k']} (kein Verdikt)")
         if "stress_rel" in w:
             sr = w["stress_rel"]
             lines.append(f"- STRESS_REL: {'nicht vorhanden' if not sr.get('available') else sr.get('n_days_in_window')}")
