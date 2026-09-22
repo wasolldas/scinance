@@ -123,8 +123,10 @@ def cmd_run(args: argparse.Namespace) -> int:
                 tag = " (resumed)" if res.get("resumed") and res["status"] != "resumed" else ""
                 n_q = res.get("n_quotes")
                 n_q_s = "?" if n_q is None else str(n_q)
+                n_dup = res.get("n_duplicates_dropped", 0)
+                dup_s = f", {n_dup} Duplikate verworfen" if n_dup else ""
                 print(f"[wp10b] {sym}: {res['day']} -> {res['status']}{tag}, "
-                      f"{n_q_s} quotes, {res['elapsed_s']}s elapsed",
+                      f"{n_q_s} quotes{dup_s}, {res['elapsed_s']}s elapsed",
                       file=sys.stderr, flush=True)
 
         try:

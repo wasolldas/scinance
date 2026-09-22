@@ -715,6 +715,129 @@ def test_adversarial_v2_residualized_ic_near_zero_and_bounded_by_factor_null():
 
 
 # ============================================================================
+# DEC-76 Vorlauf v3 -- Task A item 1: idiosyncratic sigma_e, drift_f
+# configurations, residualized factor-preserving-null fields
+# ============================================================================
+
+def test_idiosyncratic_vol_excludes_market_and_is_smaller_than_naive_total():
+    """A pure-beta panel (returns = beta_i * r_btc + idio_i, idio SD much
+    smaller than the market's own SD): the idiosyncratic sigma_e must be
+    close to the TRUE idio SD, clearly smaller than the naive per-symbol
+    TOTAL SD (which is inflated by each symbol's own beta*market
+    component) -- the DEC-76 "Anlass" double-counting bug this function
+    fixes."""
+    w, k = 200, 30
+    rng = np.random.default_rng(21)
+    beta_true = rng.uniform(0.5, 2.0, size=k)
+    r_btc = rng.normal(0.0, 0.05, size=w)
+    idio_sd_true = 0.01
+    idio = rng.normal(0.0, idio_sd_true, size=(w, k))
+    returns = beta_true[None, :] * r_btc[:, None] + idio
+    symbols = [f"s{i}" for i in range(k)] + ["BTCUSDT"]
+    returns_full = np.concatenate([returns, r_btc[:, None]], axis=1)
+
+    res = nulls.idiosyncratic_vol_from_beta_regression(returns_full, symbols, market_symbol="BTCUSDT")
+    assert res["market_symbol"] == "BTCUSDT"
+    assert "BTCUSDT" not in res["per_symbol_residual_sd"]        # market excluded from its own median
+    assert res["n_symbols_used"] == k
+    assert res["sigma_e_idiosyncratic"] == pytest.approx(idio_sd_true, rel=0.25)
+
+    naive_total_sd = float(np.median(np.std(returns_full[:, :k], axis=0, ddof=1)))
+    assert res["sigma_e_idiosyncratic"] < naive_total_sd          # strictly smaller: no double-counting
+
+
+def test_idiosyncratic_vol_nan_when_market_symbol_absent():
+    returns = np.random.default_rng(0).normal(0, 0.03, size=(20, 5))
+    symbols = [f"s{i}" for i in range(5)]
+    res = nulls.idiosyncratic_vol_from_beta_regression(returns, symbols, market_symbol="BTCUSDT")
+    assert math.isnan(res["sigma_e_idiosyncratic"])
+    assert res["n_symbols_used"] == 0
+
+
+def test_factor_preserving_null_drift_f_configurations_report_raw_and_residualized():
+    """DEC-76 Entscheidung 2 (Vorlauf v3): one call = one (rho_f, drift_f)
+    configuration; drift_f=0 ("driftfree") vs. drift_f=0.002 ("drifting")
+    are two SEPARATE calls, each reporting RAW (unchanged DEC-75 fields)
+    AND residualized (DEC-76, additive) statistics side by side."""
+    n_weeks, k = 60, 60
+    rng = np.random.default_rng(3)
+    returns = rng.normal(0, 0.03, size=(n_weeks, k))
+    symbols = [f"s{i}" for i in range(k - 1)] + ["BTCUSDT"]
+    alive = np.ones((n_weeks, k), dtype=bool)
+
+    drifting = nulls.factor_preserving_null(returns, alive, symbols, variants=("mom1", "rev_gap"),
+                                             n_reps=40, seed=53, drift_f=nulls.DRIFT_F_DRIFTING)
+    driftfree = nulls.factor_preserving_null(returns, alive, symbols, variants=("mom1", "rev_gap"),
+                                              n_reps=40, seed=53, drift_f=nulls.DRIFT_F_DRIFTFREE)
+
+    assert drifting["drift_f"] == pytest.approx(0.002)
+    assert driftfree["drift_f"] == 0.0
+    assert drifting["rho_f"] == driftfree["rho_f"] == pytest.approx(0.2)
+
+    for fp in (drifting, driftfree):
+        assert math.isfinite(fp["sigma_e_median_symbol_weekly"])                     # old (total), unchanged
+        assert math.isfinite(fp["sigma_e_median_symbol_weekly_idiosyncratic"])       # new (DEC-76 (e))
+        assert fp["sigma_e_used_in_simulation"] == pytest.approx(
+            fp["sigma_e_median_symbol_weekly_idiosyncratic"])                        # (e): idio value USED
+        assert math.isfinite(fp["selection_ceiling_mean_of_max"])                    # unchanged (raw)
+        assert math.isfinite(fp["selection_ceiling_mean_of_max_residualized"])       # DEC-76 (c), additive
+        for v in ("mom1", "rev_gap"):
+            vv = fp["variants"][v]
+            assert math.isfinite(vv["factor_sd"]) and math.isfinite(vv["quantile_one_sided"])
+            assert math.isfinite(vv["factor_sd_residualized"])
+            assert math.isfinite(vv["quantile_one_sided_residualized"])
+            assert vv["quantile_level_residualized"] == vv["quantile_level"]
+
+
+def test_factor_preserving_null_no_market_symbol_residualized_fields_are_none():
+    n_weeks, k = 40, 30
+    rng = np.random.default_rng(5)
+    returns = rng.normal(0, 0.03, size=(n_weeks, k))
+    symbols = [f"s{i}" for i in range(k)]     # no BTCUSDT
+    alive = np.ones((n_weeks, k), dtype=bool)
+    fp = nulls.factor_preserving_null(returns, alive, symbols, variants=("mom1",), n_reps=10, seed=53)
+    assert fp["selection_ceiling_mean_of_max_residualized"] is None
+    v = fp["variants"]["mom1"]
+    assert v["factor_sd_residualized"] is None and v["quantile_one_sided_residualized"] is None
+
+
+def test_factor_preserving_null_residualization_shrinks_drifting_mean_toward_zero():
+    """DEC-76 "Anlass": under the DRIFTING null, the RESIDUALIZED mean IC
+    must sit much closer to 0 than the RAW mean IC (the raw null's
+    positive mean IS beta-driven market-timing, exactly what
+    residualisation removes) -- the empirical property the whole DEC-76
+    fix rests on."""
+    n_weeks, k = 104, 150
+    rng = np.random.default_rng(9)
+    symbols = [f"s{i}" for i in range(k - 1)] + ["BTCUSDT"]
+    alive = np.ones((n_weeks, k), dtype=bool)
+    returns = rng.normal(0, 0.03, size=(n_weeks, k))       # sigma_f/sigma_e derived from this, real construction
+
+    fp = nulls.factor_preserving_null(returns, alive, symbols, variants=("mom1",), n_reps=150, seed=53,
+                                       drift_f=nulls.DRIFT_F_DRIFTING)
+    v = fp["variants"]["mom1"]
+    assert abs(v["mean_ic_draws_mean_residualized"]) < abs(v["mean_ic_draws_mean"]) + 1e-9
+
+
+# ============================================================================
+# DEC-76 -- prelaunch.factor_preserving_report (Task A item 1/2 wrapper)
+# ============================================================================
+
+def test_factor_preserving_report_wraps_both_configurations():
+    n_weeks, k = 60, 60
+    rng = np.random.default_rng(4)
+    returns = rng.normal(0, 0.03, size=(n_weeks, k))
+    symbols = [f"s{i}" for i in range(k - 1)] + ["BTCUSDT"]
+    alive = np.ones((n_weeks, k), dtype=bool)
+    window = {"returns": returns, "alive": alive}
+    rep = prelaunch.factor_preserving_report(window, symbols, variants=("mom1",), n_reps=15, seed=53)
+    assert set(rep.keys()) >= {"drifting", "driftfree", "binding", "report_only", "label"}
+    assert rep["drifting"]["drift_f"] == pytest.approx(nulls.DRIFT_F_DRIFTING)
+    assert rep["driftfree"]["drift_f"] == nulls.DRIFT_F_DRIFTFREE
+    assert math.isfinite(rep["driftfree"]["selection_ceiling_mean_of_max_residualized"])
+
+
+# ============================================================================
 # end-to-end --prelaunch CLI (existing suite continues below)
 # ============================================================================
 

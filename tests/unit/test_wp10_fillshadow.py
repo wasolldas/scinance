@@ -470,6 +470,166 @@ def test_resume_reevaluates_gated_days_once_they_close(tmp_path):
     assert s2["ok"] == 1 and s2["resumed"] == 0 and s2["not_manifest_done"] == 0
 
 
+# ============================================================================
+# DEC-76 Entscheidung 3 -- exact-duplicate-frame dedup, discarded-not-final
+# ============================================================================
+
+def test_duplicate_frames_deduped_before_replay_zero_breaks_and_identical_quotes(tmp_path):
+    """DEC-76 "Anlass": 2026-08-13 had two interleaved copies of the same
+    L2 stream (a doubled collector), EXACTLY doubling frame count AND
+    sequence-break count. A day whose frames are each duplicated once
+    must, after dedup, replay with the SAME 0 sequence breaks as the
+    un-duplicated day and produce BYTE-IDENTICAL quote outcomes -- never
+    double the breaks."""
+    base_clean = tmp_path / "h_clean"
+    base_dup = tmp_path / "h_dup"
+    d1 = "2026-06-22"
+    _build_day_fixture(base_clean, d1)
+
+    ms = rp._day_ms(d1)
+    records = [
+        _snap(ms + 500, 1, 99.9, 100.1, bsz=10.0, asz=10.0),
+        _delta(ms + 90_000, 2, [["99.9", "4.0"]], []),
+        _delta(ms + 200_000, 3, [["99.9", "4.0"]], [["100.1", "10.0"]]),
+    ]
+    duplicated = []
+    for r in records:
+        duplicated.append(r)
+        duplicated.append(dict(r))       # value-identical copy -- same payload_json TEXT
+    _write_ob_day(base_dup, "TSTUSDT", d1, duplicated)
+    _write_trade_day(base_dup, "TSTUSDT", d1, [_trade(ms + 90_000, "Sell", 99.9, 6.0)])
+    _write_manifest(base_dup, [
+        ("bybit", "orderbook", "TSTUSDT", d1, "DONE"),
+        ("bybit", "publicTrade", "TSTUSDT", d1, "DONE"),
+    ])
+
+    out_clean = tmp_path / "o_clean"
+    out_dup = tmp_path / "o_dup"
+    s_clean = rp.run_window(base_clean, out_clean, "TSTUSDT", d1, d1, horizon_s=60.0, adv_sel_horizon_s=60.0)
+    s_dup = rp.run_window(base_dup, out_dup, "TSTUSDT", d1, d1, horizon_s=60.0, adv_sel_horizon_s=60.0)
+    assert s_clean["ok"] == 1 and s_dup["ok"] == 1
+
+    meta_clean = _manifest_for(out_clean, d1)
+    meta_dup = _manifest_for(out_dup, d1)
+    assert meta_clean["n_seq_breaks"] == 0
+    assert meta_dup["n_seq_breaks"] == 0                              # dedup happens BEFORE break counting
+    assert meta_clean.get("n_duplicates_dropped", 0) == 0
+    assert meta_dup["n_duplicates_dropped"] == len(records)           # exactly the doubled count
+
+    fp_clean = rp.fillshadow_fingerprint(out_clean, "bybit", "TSTUSDT", d1, d1)
+    fp_dup = rp.fillshadow_fingerprint(out_dup, "bybit", "TSTUSDT", d1, d1)
+    assert fp_dup["sha256_values"] == fp_clean["sha256_values"]       # byte-identical quote outcomes
+
+
+def test_frames_sharing_a_timestamp_with_different_content_are_not_deduped(tmp_path):
+    """Only an EXACT ``(ts_exchange_ms, payload_json)`` match is dropped --
+    two genuinely DIFFERENT frames that happen to share one
+    ``ts_exchange_ms`` (a real same-millisecond burst of updates) must
+    BOTH survive."""
+    base = tmp_path / "h"
+    d1 = "2026-06-22"
+    ms = rp._day_ms(d1)
+    records = [
+        _snap(ms + 500, 1, 99.9, 100.1, bsz=10.0, asz=10.0),
+        _delta(ms + 90_000, 2, [["99.9", "4.0"]], []),        # same ts as the next record...
+        _delta(ms + 90_000, 3, [["99.8", "1.0"]], []),        # ...but DIFFERENT u/content
+    ]
+    _write_ob_day(base, "TSTUSDT", d1, records)
+    _write_trade_day(base, "TSTUSDT", d1, [_trade(ms + 95_000, "Sell", 99.8, 1.0)])
+    _write_manifest(base, [
+        ("bybit", "orderbook", "TSTUSDT", d1, "DONE"),
+        ("bybit", "publicTrade", "TSTUSDT", d1, "DONE"),
+    ])
+    out = tmp_path / "o"
+    s = rp.run_window(base, out, "TSTUSDT", d1, d1)
+    assert s["ok"] == 1
+    meta = _manifest_for(out, d1)
+    assert meta["n_duplicates_dropped"] == 0
+    assert meta["status"] == "ok"
+
+
+def test_day_records_deduped_drops_only_exact_ts_and_payload_matches(tmp_path):
+    """Direct unit test of :func:`replay._day_records_deduped`, isolated
+    from the full replay pipeline: 4 raw rows -- one exact duplicate (same
+    ts AND payload), one same-ts-different-payload pair, one lone row --
+    must yield exactly 3 records and drop exactly 1."""
+    import duckdb
+
+    base = tmp_path / "h"
+    d1 = "2026-06-22"
+    ms = rp._day_ms(d1)
+    r_a = _snap(ms + 500, 1, 99.9, 100.1, bsz=10.0, asz=10.0)
+    r_b = _delta(ms + 1_000, 2, [["99.9", "4.0"]], [])
+    r_c = _delta(ms + 1_000, 3, [["99.8", "1.0"]], [])     # same ts as r_b, different content
+    _write_ob_day(base, "TSTUSDT", d1, [r_a, dict(r_a), r_b, r_c])
+
+    ob_dir = base / "raw" / "bybit" / "orderbook" / "symbol=TSTUSDT"
+    con = duckdb.connect()
+    try:
+        dup_counter = [0]
+        got = list(rp._day_records_deduped(con, ob_dir, d1, dup_counter=dup_counter))
+    finally:
+        con.close()
+    assert len(got) == 3
+    assert dup_counter[0] == 1
+
+
+def test_resumable_meta_treats_discarded_as_non_final(tmp_path):
+    """DEC-76 Entscheidung 3, verbatim: "discarded-Partitionen sind nicht
+    resume-final (wie not_manifest_done)" -- a stored ``discarded``
+    manifest must never be trusted as a complete result by
+    ``_resumable_meta``, exactly like ``not_manifest_done``."""
+    part_dir = tmp_path / "date=2026-06-22"
+    part_dir.mkdir(parents=True)
+    (part_dir / "manifest.json").write_text(json.dumps({
+        "schema_version": rp.SCHEMA_VERSION, "horizon_s": 60.0, "adv_sel_horizon_s": 60.0,
+        "quote_size_fraction": rp.DEFAULT_QUOTE_SIZE_FRACTION,
+        "status": "discarded", "n_quotes": 0,
+    }), encoding="utf-8")
+    got = rp._resumable_meta(part_dir, schema_version=rp.SCHEMA_VERSION, horizon_s=60.0,
+                             adv_sel_horizon_s=60.0, quote_size_fraction=rp.DEFAULT_QUOTE_SIZE_FRACTION)
+    assert got is None
+
+
+def test_resume_reevaluates_discarded_days_once_the_raw_data_is_fixed(tmp_path):
+    """End-to-end companion to the pure-function test above: a day whose
+    FIRST run was ``discarded`` (broken sequence, > MAX_BREAKS_PER_DAY)
+    must be RE-REPLAYED on a resumed run once the underlying raw data
+    changes -- never trusted as a final, zero-quote result forever, the
+    same discipline ``test_resume_reevaluates_gated_days_once_they_close``
+    already pins for ``not_manifest_done``."""
+    base = tmp_path / "h"
+    d1 = "2026-06-22"
+    ms = rp._day_ms(d1)
+    broken = [_snap(ms + 500, 1, 99.9, 100.1, bsz=10.0, asz=10.0)]
+    for i in range(rp.MAX_BREAKS_PER_DAY + 2):
+        broken.append(_delta(ms + 1_000 + i * 1_000, 100 + i * 50, [["99.9", "4.0"]], []))
+    _write_ob_day(base, "TSTUSDT", d1, broken)
+    _write_trade_day(base, "TSTUSDT", d1, [_trade(ms + 90_000, "Sell", 99.9, 6.0)])
+    _write_manifest(base, [
+        ("bybit", "orderbook", "TSTUSDT", d1, "DONE"),
+        ("bybit", "publicTrade", "TSTUSDT", d1, "DONE"),
+    ])
+    out = tmp_path / "o"
+    s1 = rp.run_window(base, out, "TSTUSDT", d1, d1)
+    assert s1["discarded"] == 1 and s1["ok"] == 0
+
+    ob_dir = base / "raw" / "bybit" / "orderbook" / "symbol=TSTUSDT" / f"date={d1}"
+    for p in ob_dir.glob("*.parquet"):
+        p.unlink()
+    _write_ob_day(base, "TSTUSDT", d1, [
+        _snap(ms + 500, 1, 99.9, 100.1, bsz=10.0, asz=10.0),
+        _delta(ms + 90_000, 2, [["99.9", "4.0"]], []),
+        _delta(ms + 200_000, 3, [["99.9", "4.0"]], [["100.1", "10.0"]]),
+    ])
+    s2 = rp.run_window(base, out, "TSTUSDT", d1, d1)      # resume=True default
+    assert s2["ok"] == 1 and s2["resumed"] == 0 and s2["discarded"] == 0
+
+
+def test_schema_version_bumped_to_3_for_dedup():
+    assert rp.SCHEMA_VERSION == 3
+
+
 def test_adv_sel_is_measured_for_fills_anywhere_inside_the_horizon():
     """DEC-69: a fill 30 s after placement needs mid(t_fill + 60 s), i.e.
     a sample 90 s after the boundary -- beyond the 60-s fill horizon. The

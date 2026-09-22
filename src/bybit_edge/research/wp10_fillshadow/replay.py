@@ -57,14 +57,19 @@ from bybit_edge.research.bar_cache import (
 from bybit_edge.research.c22_l2tilt.extract import (
     MAX_BREAKS_PER_DAY,
     Book,
-    _day_records,
     _rec_parts,
 )
 from bybit_edge.research.payload_sql import cross_form_dedup_qualify, trade_rows_sql
 
 from . import queue_model as qm
 
-SCHEMA_VERSION = 2  # 2: adv_sel mid slice reaches the full lookahead (DEC-69)
+# 2: adv_sel mid slice reaches the full lookahead (DEC-69)
+# 3: DEC-76 Entscheidung 3 -- exact duplicate L2 frames (same ts_exchange_ms AND same
+#    payload_json) are dropped before the book replay of a day (2026-08-13 had two
+#    interleaved copies of the same stream, EXACTLY doubling frame count and sequence
+#    breaks); `n_duplicates_dropped` is now a manifest field; `discarded` partitions are
+#    no longer resume-final (re-evaluated on a resumed run, like `not_manifest_done`).
+SCHEMA_VERSION = 3
 
 MS_PER_MINUTE = 60_000
 MS_PER_DAY = 86_400_000
@@ -227,6 +232,65 @@ def _load_trades(con: Any, trade_dir: Path, days: list[str]) -> list[tuple[int, 
 # orderbook replay -> global touch-sample arrays (WP-2/WP-4 machinery reused)
 # ----------------------------------------------------------------------------
 
+def _day_records_deduped(con: Any, raw_dir: Path, day: str, *, dup_counter: list[int]):
+    """DEC-76 Entscheidung 3: the SAME ``(ts_ms, rec, u)`` stream as
+    ``c22_l2tilt.extract._day_records`` (identical ``ORDER BY
+    ts_exchange_ms, u``), but with EXACT duplicate frames -- same
+    ``ts_exchange_ms`` AND same raw ``payload_json`` TEXT -- dropped
+    BEFORE the book ever sees them, keeping the FIRST occurrence in
+    stored order. 2026-08-13 (DEC-76 "Anlass"): two interleaved copies of
+    the same L2 stream (a doubled collector the day before an outage)
+    produced EXACTLY twice the frame count and EXACTLY half as many
+    frames as sequence breaks (277,792 breaks / 555,584 frames) -- a
+    duplicate-stream signature, not the Registrar's original topic-
+    mixing hypothesis (DEC-68), which DEC-76 Entscheidung 3 found
+    disproved by a per-day topic count.
+
+    ``dup_counter`` is a caller-owned one-item mutable list;
+    ``dup_counter[0]`` is INCREMENTED for every dropped duplicate frame as
+    the generator runs -- read it only AFTER the generator is fully
+    exhausted (a generator's side effects are not visible mid-iteration).
+
+    Deliberately reimplements ``_day_records``'s SQL here (never a second
+    BOOK REPLAY -- ``Book``/``apply_snapshot``/``apply_delta``/the
+    break-budget rule all stay in ``c22_l2tilt.extract``, reused
+    unchanged, via :func:`_rec_parts` on this generator's ``rec``) because
+    that function never exposes the raw ``payload_json`` TEXT the DEC-76
+    comparison needs -- it only yields the already-``json.loads``'d dict.
+    A day with genuinely DIFFERENT frames sharing one ``ts_exchange_ms``
+    (a real burst of updates in the same millisecond) is UNAFFECTED: only
+    an exact ``(ts, payload_json)`` match is dropped, never a same-
+    timestamp-different-payload pair."""
+    glob = (raw_dir / f"date={day}" / "*.parquet").as_posix()
+    cur = con.execute(f"""
+        SELECT ts_exchange_ms,
+               payload_json,
+               COALESCE(TRY_CAST(json_extract_string(payload_json,'$.data.u') AS BIGINT),
+                        TRY_CAST(json_extract_string(payload_json,'$.u') AS BIGINT)) AS u
+        FROM read_parquet('{glob}', union_by_name=1)
+        WHERE ts_exchange_ms IS NOT NULL
+        ORDER BY ts_exchange_ms, u
+    """)
+    seen: set[tuple[int, str]] = set()
+    while True:
+        chunk = cur.fetchmany(20_000)
+        if not chunk:
+            break
+        for ts, payload, u in chunk:
+            if payload is None:
+                continue
+            key = (int(ts), payload)
+            if key in seen:
+                dup_counter[0] += 1
+                continue
+            seen.add(key)
+            try:
+                rec = json.loads(payload)
+            except (TypeError, ValueError):
+                continue
+            yield int(ts), rec, u
+
+
 def _replay_one_day(
     con: Any, ob_dir: Path, day: str, book: Book, *,
     ts_a: list[int], bid_px_a: list[float], bid_sz_a: list[float],
@@ -240,17 +304,21 @@ def _replay_one_day(
     driver (``run_window``), so the two can never silently diverge.
 
     Returns this day's own ``{"status", "reason", "n_breaks",
-    "n_snapshots", "reset_book"}`` -- ``reset_book`` tells the CALLER
+    "n_snapshots", "n_duplicates_dropped", "reset_book"}`` --
+    ``n_duplicates_dropped`` is DEC-76 Entscheidung 3's exact-duplicate-
+    frame count (:func:`_day_records_deduped`, dropped BEFORE any of the
+    counts/samples below are touched); ``reset_book`` tells the CALLER
     whether the break-budget was exceeded (the book must not be trusted
     going forward; the caller replaces it with a fresh ``Book()``, since a
     plain object cannot rebind its caller's reference)."""
     if not list((ob_dir / f"date={day}").glob("*.parquet")):
         return {"status": "no_raw", "reason": "", "n_breaks": 0, "n_snapshots": 0,
-                "reset_book": False}
+                "n_duplicates_dropped": 0, "reset_book": False}
     n_breaks = 0
     n_snaps = 0
     any_sample = False
-    for ts, rec, _u in _day_records(con, ob_dir, day):
+    dup_counter = [0]
+    for ts, rec, _u in _day_records_deduped(con, ob_dir, day, dup_counter=dup_counter):
         rtype, b, a, u = _rec_parts(rec)
         if rtype == "snapshot":
             n_snaps += 1
@@ -274,14 +342,17 @@ def _replay_one_day(
                 ask_px_a.append(aa)
                 ask_sz_a.append(asz)
                 any_sample = True
+    n_dups = dup_counter[0]
     if n_breaks > max_breaks:
         return {"status": "discarded", "reason": f"{n_breaks} sequence breaks > {max_breaks}",
-                "n_breaks": n_breaks, "n_snapshots": n_snaps, "reset_book": True}
+                "n_breaks": n_breaks, "n_snapshots": n_snaps, "n_duplicates_dropped": n_dups,
+                "reset_book": True}
     if n_snaps == 0 and not any_sample:
         return {"status": "discarded", "reason": "no snapshot and no valid state",
-                "n_breaks": n_breaks, "n_snapshots": n_snaps, "reset_book": False}
+                "n_breaks": n_breaks, "n_snapshots": n_snaps, "n_duplicates_dropped": n_dups,
+                "reset_book": False}
     return {"status": "ok", "reason": "", "n_breaks": n_breaks, "n_snapshots": n_snaps,
-            "reset_book": False}
+            "n_duplicates_dropped": n_dups, "reset_book": False}
 
 
 def _replay_touch_samples(
@@ -400,7 +471,8 @@ def _rows_hash(out: dict[str, list[Any]]) -> str:
 def _write_day(out_dir: Path, exchange: str, symbol: str, day: str,
                cols: dict[str, list[Any]], *, status: str, reason: str,
                n_breaks: int, n_snapshots: int, horizon_s: float,
-               adv_sel_horizon_s: float, quote_size_fraction: float) -> dict[str, Any]:
+               adv_sel_horizon_s: float, quote_size_fraction: float,
+               n_duplicates_dropped: int = 0) -> dict[str, Any]:
     import pyarrow as pa
     import pyarrow.parquet as pq
 
@@ -412,7 +484,9 @@ def _write_day(out_dir: Path, exchange: str, symbol: str, day: str,
         "exchange": exchange, "symbol": symbol, "date": day,
         "status": status, "reason": reason,
         "n_quotes": len(cols["minute_idx"]), "n_seq_breaks": n_breaks,
-        "n_snapshots": n_snapshots, "horizon_s": horizon_s,
+        "n_snapshots": n_snapshots,
+        "n_duplicates_dropped": n_duplicates_dropped,   # DEC-76 Entscheidung 3
+        "horizon_s": horizon_s,
         "adv_sel_horizon_s": adv_sel_horizon_s,
         "quote_size_fraction": quote_size_fraction,
         "n_fifo_filled": int(sum(1 for v in cols["fifo_filled"] if v)),
@@ -517,6 +591,7 @@ def _run_window_full_replay(
             n_breaks=meta.get("n_breaks", 0), n_snapshots=meta.get("n_snapshots", 0),
             horizon_s=horizon_s, adv_sel_horizon_s=adv_sel_horizon_s,
             quote_size_fraction=quote_size_fraction,
+            n_duplicates_dropped=meta.get("n_duplicates_dropped", 0),
         )
         counts[status if status in counts else "discarded"] = \
             counts.get(status if status in counts else "discarded", 0) + 1
@@ -524,7 +599,8 @@ def _run_window_full_replay(
         total_fifo_filled += written["n_fifo_filled"]
         total_prorata_filled += written["n_prorata_filled"]
         if progress is not None:
-            progress(symbol, {"day": day, "status": status, "n_quotes": written["n_quotes"]})
+            progress(symbol, {"day": day, "status": status, "n_quotes": written["n_quotes"],
+                              "n_duplicates_dropped": written["n_duplicates_dropped"]})
 
     return {
         "symbol": symbol, "exchange": exchange, "range": [start, end],
@@ -571,9 +647,15 @@ def _resumable_meta(part_dir: Path, *, schema_version: int, horizon_s: float,
                 f"WP-10(B) partition at {part_dir} was written with {name}={have!r}, "
                 f"this run requested {name}={want!r} -- refusing to silently reuse a "
                 f"mismatched partition (pick a different --out or pass --no-resume).")
-    if meta.get("status") == "not_manifest_done":
-        # Gated days are never final: the harvester may mark the day DONE or
-        # compact it later (DEC-68), so a resumed run re-evaluates them.
+    if meta.get("status") in ("not_manifest_done", "discarded"):
+        # Gated days are never final: the harvester may mark the day DONE or compact it
+        # later (DEC-68), so a resumed run re-evaluates them. DEC-76 Entscheidung 3:
+        # `discarded` (break-budget exceeded, or no snapshot/no valid state) is ALSO not
+        # resume-final -- a fix on OUR side (e.g. this module's own duplicate-frame
+        # dedup, or a future break-budget/parsing fix) can turn a discarded day into an
+        # ok one without the harvester ever touching it, so it must be re-evaluated too,
+        # exactly like a not_manifest_done day (DEC-76, verbatim: "discarded-Partitionen
+        # sind nicht resume-final (wie not_manifest_done)").
         return None
     if meta.get("status") == "ok" and meta.get("n_quotes", 0) > 0:
         pq_path = part_dir / "fillshadow.parquet"
@@ -757,6 +839,7 @@ def run_window(
                         progress(symbol, {"kind": "day", "day": day, "status": "resumed",
                                           "n_quotes": resumed_meta.get("n_quotes", 0),
                                           "resumed": True,
+                                          "n_duplicates_dropped": resumed_meta.get("n_duplicates_dropped", 0),
                                           "elapsed_s": round(time.time() - t0, 1)})
                     continue
 
@@ -797,6 +880,7 @@ def run_window(
                 n_breaks=meta.get("n_breaks", 0), n_snapshots=meta.get("n_snapshots", 0),
                 horizon_s=horizon_s, adv_sel_horizon_s=adv_sel_horizon_s,
                 quote_size_fraction=quote_size_fraction,
+                n_duplicates_dropped=meta.get("n_duplicates_dropped", 0),
             )
             counts[status if status in counts else "discarded"] = \
                 counts.get(status if status in counts else "discarded", 0) + 1
@@ -806,6 +890,7 @@ def run_window(
             if progress is not None:
                 progress(symbol, {"kind": "day", "day": day, "status": status,
                                   "n_quotes": written["n_quotes"], "resumed": False,
+                                  "n_duplicates_dropped": written["n_duplicates_dropped"],
                                   "elapsed_s": round(time.time() - t0, 1)})
 
             _trim_before(day, ts_a, bid_px_a, bid_sz_a, ask_px_a, ask_sz_a, trades, trade_ts)

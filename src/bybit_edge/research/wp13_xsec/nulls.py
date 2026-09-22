@@ -93,6 +93,60 @@ zu langsam, 500 Simulationen mit Flag und Hinweis").
       the UNCAPPED value (``ic_min_raw``, may be smaller than the capped
       value when ``c_rho_corrected < 1``) so both can be written to the
       artifact side by side (task brief item 2).
+
+**DEC-76 Entscheidung 1/2 -- roles of the nulls, Vorlauf v3 (additive).**
+The Vorlauf v2 finding (DEC-76 "Anlass"): the DRIFTING factor-preserving
+null's RAW mean-IC is NOT centered at 0 -- with drift and AR(1)
+persistence in the market factor, a heterogeneous beta (0.5..2.0) IS a
+genuine cross-sectional predictor of next week's return (pure
+market-timing, no idiosyncratic signal anywhere). Using that null's raw
+quantile as a PASS threshold would be a false-DROP path (real momentum
+buried under a stricter-than-necessary bar); ignoring it without the beta
+control is the false-PASS path DEC-75 Entscheidung 1 (3) already guards
+against. DEC-76 Entscheidung 1 therefore fixes each null's ROLE:
+
+  (a) The RAW mean IC's threshold stays exactly DEC-75 (1)'s ``SE =
+      max(floor, SD(IC_t real))/sqrt(W_judged)`` (``run.se_of_mean_ic``,
+      unchanged) -- the REAL series carries its own factor variance, no
+      simulated factor SD enters this threshold.
+  (b) The BETA CONTROL (market-residualised outcome, DEC-75 (3)) gets a
+      SECOND PASS requirement on top of ``|IC_res| >= IC_min``: the
+      residualised mean IC must lie BEYOND the drifting null's OWN
+      residualised-mean-IC quantile (``quantile_one_sided_residualized``
+      below) -- under residualisation the drifting null's mean IS 0 (the
+      whole point of removing beta first), so this quantile is a genuine
+      noise bound, unlike the raw one.
+  (c) The GL-012 selection ceiling uses the DRIFTFREE factor null (``rho_f``
+      stays 0.2, ``drift_f=0``) -- with no drift a heterogeneous beta
+      carries no directional information, so BOTH its raw and residualised
+      mean-of-max are genuine noise ceilings; RAW and RESIDUALIZED are
+      reported side by side, but the binding GL-012 kill uses the
+      RESIDUALIZED driftfree ceiling (the same beta-controlled comparison
+      basis as (b)).
+  (d) Block-permutation p-values (DEC-75 (2), ``block_permutation_pvalue``)
+      stay unchanged, report-only.
+  (e) The simulation's ``sigma_e`` is now the MEDIAN IDIOSYNCRATIC weekly
+      vol (:func:`idiosyncratic_vol_from_beta_regression` -- SD of each
+      symbol's OLS residual after regressing its weekly return on BTC's
+      weekly return over the window, median across symbols), not the
+      window's TOTAL per-symbol vol (the DEC-75 v2 value, which double-
+      counts the factor's own contribution -- DEC-76 "Anlass", verbatim:
+      "sigma_e ist zudem die Gesamt- statt die idiosynkratische Vol"). Both
+      are reported (``sigma_e_median_symbol_weekly`` = total,
+      ``sigma_e_median_symbol_weekly_idiosyncratic`` = the new value
+      actually fed to the simulation, ``sigma_e_used_in_simulation`` makes
+      the choice explicit even if a future caller changes the fallback).
+
+**"Simulated BTC column" convention (task brief: "document how the market
+column is chosen").** :func:`factor_preserving_null` simulates ONE column
+per REAL symbol (``n_symbols = len(symbols)``, same order); the "simulated
+BTC column" used for both the idiosyncratic-vol regression and the
+per-replicate beta-residualisation is simply ``sim_returns[:,
+symbols.index(market_symbol)]`` -- the simulated draw that LANDS at
+BTCUSDT's own real position in the symbol list, never a separately
+re-derived series. This mirrors :func:`ic.residualize_outcome`'s own
+``r_btc = returns[:, symbols.index(market_symbol)]`` convention exactly,
+just applied to the simulated panel instead of the real one.
 """
 from __future__ import annotations
 
@@ -111,7 +165,8 @@ __all__ = [
     "FACTOR_NULL_SEED", "FACTOR_NULL_N_REPS_DEFAULT", "BLOCK_SIZE_WEEKS",
     "SELECTION_CEILING_ONE_SIDED_QUANTILE", "simulate_factor_panel",
     "factor_preserving_null", "block_permute_week_index", "block_permutation_null_draws",
-    "block_permutation_pvalue",
+    "block_permutation_pvalue", "idiosyncratic_vol_from_beta_regression",
+    "DRIFT_F_DRIFTING", "DRIFT_F_DRIFTFREE",
 ]
 
 #: DEC-51/DEC-74 (d): per-window critical value (alpha 0.05 one-sided).
@@ -401,6 +456,11 @@ BLOCK_SIZE_WEEKS = 4
 #: DEC-75 Entscheidung 1 (1): registered one-sided level 1 - 0.0064 = 0.9936.
 SELECTION_CEILING_ONE_SIDED_QUANTILE = 1.0 - 0.0064
 
+#: DEC-76 Entscheidung 2 (Vorlauf v3): the two factor-null configurations,
+#: rho_f=0.2 in BOTH (AR(1) persistence kept), drift_f differs.
+DRIFT_F_DRIFTING = 0.002
+DRIFT_F_DRIFTFREE = 0.0
+
 
 def simulate_factor_panel(
     n_weeks: int, n_symbols: int, *, sigma_f: float, sigma_e: float,
@@ -438,41 +498,118 @@ def simulate_factor_panel(
     return {"returns": returns, "beta": beta, "f": f}
 
 
+def idiosyncratic_vol_from_beta_regression(
+    window_returns: np.ndarray, symbols: list[str], *, market_symbol: str = "BTCUSDT",
+) -> dict[str, Any]:
+    """DEC-76 Entscheidung 1 (e): the simulation's ``sigma_e`` is the MEDIAN
+    IDIOSYNCRATIC weekly vol, not the total one. For every symbol OTHER
+    THAN ``market_symbol``, ONE static OLS is fit over the WHOLE window
+    (``symbol_return[t] = alpha + beta*btc_return[t] + resid[t]``, both
+    demeaned so ``alpha`` drops out, exactly ``fit_ar1_per_symbol``'s
+    "demean, then OLS slope" discipline applied cross-sectionally instead
+    of across lags) and the residual SD (``ddof=1``) is recorded; the
+    reported ``sigma_e_idiosyncratic`` is the MEDIAN of those per-symbol
+    residual SDs. Purely descriptive (a dispersion statistic of the REAL
+    window, same discipline as ``prelaunch.h30_feasibility``'s
+    ``sigma_xs`` -- never an IC, never touches an outcome ranking).
+
+    ``market_symbol`` itself is EXCLUDED from the median: regressing BTC's
+    own return on itself is a perfect fit by construction (beta=1,
+    residual identically 0), which would mechanically pull the median
+    down -- a documented, deliberate exclusion, not an oversight.
+
+    Returns ``{"sigma_e_idiosyncratic", "per_symbol_residual_sd",
+    "market_symbol", "n_symbols_used"}``; ``sigma_e_idiosyncratic`` is
+    ``NaN`` if ``market_symbol`` is absent from ``symbols`` or fewer than
+    one other symbol has >= 3 valid weeks paired with the market -- the
+    caller (:func:`factor_preserving_null`) falls back to the TOTAL vol in
+    that case, documented at the call site.
+    """
+    if market_symbol not in symbols:
+        return {"sigma_e_idiosyncratic": float("nan"), "per_symbol_residual_sd": {},
+                "market_symbol": market_symbol, "n_symbols_used": 0}
+    m = symbols.index(market_symbol)
+    mkt = window_returns[:, m]
+    valid_m = ~np.isnan(mkt)
+    residual_sds: dict[str, float] = {}
+    for j, sym in enumerate(symbols):
+        if j == m:
+            continue
+        y = window_returns[:, j]
+        valid = valid_m & ~np.isnan(y)
+        if int(valid.sum()) < 3:
+            continue
+        x, yy = mkt[valid], y[valid]
+        var_x = float(np.var(x, ddof=1))
+        if var_x <= 0.0:
+            continue
+        x_c, y_c = x - x.mean(), yy - yy.mean()
+        beta_j = float(np.dot(x_c, y_c) / np.dot(x_c, x_c))
+        resid = y_c - beta_j * x_c
+        if resid.size > 1:
+            residual_sds[sym] = float(resid.std(ddof=1))
+    finite = np.array(list(residual_sds.values()), dtype=np.float64)
+    sigma_e_idio = float(np.median(finite)) if finite.size else float("nan")
+    return {"sigma_e_idiosyncratic": sigma_e_idio, "per_symbol_residual_sd": residual_sds,
+            "market_symbol": market_symbol, "n_symbols_used": int(finite.size)}
+
+
 def factor_preserving_null(
     window_returns: np.ndarray, window_alive: np.ndarray, symbols: list[str], *,
     variants: tuple[str, ...] = characteristics.VARIANT_NAMES,
     convention: ic.Convention = "close_at_last",
     n_reps: int = FACTOR_NULL_N_REPS_DEFAULT, seed: int = FACTOR_NULL_SEED,
     quantile: float = SELECTION_CEILING_ONE_SIDED_QUANTILE,
-    market_symbol: str = "BTCUSDT",
+    market_symbol: str = "BTCUSDT", rho_f: float = 0.2, drift_f: float = DRIFT_F_DRIFTING,
+    beta_trail_win: int = characteristics.VOL_BETA_TRAIL_WEEKS,
 ) -> dict[str, Any]:
-    """DEC-75 Entscheidung 1 (2) / task brief item 3: the factor-preserving
-    null, sized to the window (``K`` from ``window_alive``, ``W`` from
-    ``window_returns``). Only ever reads ``window_returns`` for TWO
-    descriptive volatility scalars (``sigma_f`` = the window's BTC weekly
-    return SD, ``sigma_e`` = the window's median per-symbol weekly return
-    SD) -- the SAME "real returns feed a descriptive dispersion statistic,
-    never an IC" discipline ``prelaunch.h30_feasibility`` already uses for
-    ``sigma_xs``; every simulated IC in this function is
-    SIMULATED-characteristic-vs-SIMULATED-outcome, per THE SEAL.
+    """DEC-75 Entscheidung 1 (2) / DEC-76 Entscheidung 1/2 / task brief item
+    3: the factor-preserving null, sized to the window (``K`` from
+    ``window_alive``, ``W`` from ``window_returns``). Only ever reads
+    ``window_returns`` for descriptive volatility scalars (``sigma_f`` =
+    the window's BTC weekly return SD, ``sigma_e`` = DEC-76 Entscheidung 1
+    (e)'s idiosyncratic vol, :func:`idiosyncratic_vol_from_beta_regression`
+    -- falls back to the OLD total per-symbol-vol median, reported as
+    ``sigma_e_median_symbol_weekly``, if the idiosyncratic value is not
+    finite, e.g. ``market_symbol`` absent) -- the SAME "real returns feed a
+    descriptive dispersion statistic, never an IC" discipline
+    ``prelaunch.h30_feasibility`` already uses for ``sigma_xs``; every
+    simulated IC in this function is SIMULATED-characteristic-vs-SIMULATED-
+    outcome, per THE SEAL.
+
+    ONE call = ONE configuration (``rho_f``/``drift_f`` pair) -- DEC-76
+    Entscheidung 2's two Vorlauf v3 configurations (``drift_f=0.002``
+    "drifting", the default, and ``drift_f=0.0`` "driftfree") are two
+    SEPARATE calls (``prelaunch.factor_preserving_report`` makes both).
 
     For ``n_reps`` replicates (``beta`` redrawn once per replicate, ``f``/
     ``e_it`` redrawn every replicate -- see :func:`simulate_factor_panel`),
-    runs the FULL per-variant pipeline
-    (``characteristics.weekly_only_proxy_characteristic`` ->
-    ``ic.weekly_ic_series`` on the window's REAL ``alive`` mask, matching
-    ``persistence_null``'s reuse discipline) and reports, per variant:
-      (a) ``factor_sd`` -- SD of the per-week IC, pooled over ALL weeks of
-          ALL replicates (task brief: "SD(IC_t) per variant, the 'factor
-          SD'").
-      (b) (once, not per variant) ``selection_ceiling_mean_of_max`` --
-          mean, over replicates, of that replicate's MAX window-mean-IC
-          across the 7 variants (task brief: "the selection ceiling as
-          mean-of-max over the 7 variants").
-      (c) ``quantile_one_sided`` -- the registered-direction one-sided
-          ``quantile`` (default 0.9936) of the window-mean-IC draws (task
-          brief: "a per-variant one-sided 99.36% quantile of the
-          window-mean IC").
+    runs the FULL per-variant pipeline TWICE per replicate:
+      - RAW: ``characteristics.weekly_only_proxy_characteristic`` ->
+        ``ic.weekly_ic_series(char, sim_returns, window_alive, ...)`` --
+        UNCHANGED from DEC-75, all field names below unchanged (``factor_sd``,
+        ``quantile_one_sided``, ``selection_ceiling_mean_of_max``, etc.).
+      - RESIDUALIZED (DEC-76 (b)/(c), additive): the simulated panel's OWN
+        trailing-``beta_trail_win``-week PIT beta to the "simulated BTC
+        column" (see module docstring for that convention) via
+        ``characteristics.beta_characteristic``, then
+        ``ic.residualize_outcome`` (both reused unchanged) before the SAME
+        ``ic.weekly_ic_series`` call -- every RAW field gets an
+        ``..._residualized`` sibling (``factor_sd_residualized``,
+        ``quantile_one_sided_residualized``,
+        ``selection_ceiling_mean_of_max_residualized``, etc.). ``None``
+        (never computed) if ``market_symbol`` is absent from ``symbols``.
+
+    Per variant:
+      (a) ``factor_sd`` / ``factor_sd_residualized`` -- SD of the per-week
+          IC, pooled over ALL weeks of ALL replicates.
+      (c) ``quantile_one_sided`` / ``quantile_one_sided_residualized`` --
+          the registered-direction one-sided ``quantile`` (default 0.9936)
+          of the window-mean-IC draws.
+    Once (not per variant):
+      (b) ``selection_ceiling_mean_of_max`` / ``..._residualized`` -- mean,
+          over replicates, of that replicate's MAX window-mean-IC across
+          the 7 variants.
     """
     n_weeks, n_symbols = window_returns.shape
     if market_symbol in symbols:
@@ -487,56 +624,110 @@ def factor_preserving_null(
         for j in range(n_symbols)
     ])
     finite_sd = per_symbol_sd[~np.isnan(per_symbol_sd)]
-    sigma_e = float(np.median(finite_sd)) if finite_sd.size else 0.03
+    sigma_e_total = float(np.median(finite_sd)) if finite_sd.size else 0.03
+    idio_report = idiosyncratic_vol_from_beta_regression(window_returns, symbols, market_symbol=market_symbol)
+    sigma_e_idio = idio_report["sigma_e_idiosyncratic"]
+    # DEC-76 (e): the simulation USES the idiosyncratic value; falls back to the total
+    # vol (documented, never silent) only if the idiosyncratic estimate is unavailable.
+    sigma_e_used = sigma_e_idio if math.isfinite(sigma_e_idio) else sigma_e_total
+
+    has_market = market_symbol in symbols
+    market_idx = symbols.index(market_symbol) if has_market else None
 
     rng = np.random.default_rng(seed)
     per_week_ic_pool: dict[str, list[float]] = {v: [] for v in variants}
     mean_ic_draws: dict[str, list[float]] = {v: [] for v in variants}
+    per_week_ic_pool_res: dict[str, list[float]] = {v: [] for v in variants}
+    mean_ic_draws_res: dict[str, list[float]] = {v: [] for v in variants}
 
     for _rep in range(n_reps):
-        sim = simulate_factor_panel(n_weeks, n_symbols, sigma_f=sigma_f, sigma_e=sigma_e, rng=rng)
+        sim = simulate_factor_panel(n_weeks, n_symbols, sigma_f=sigma_f, sigma_e=sigma_e_used,
+                                     rho_f=rho_f, drift_f=drift_f, rng=rng)
         sim_returns = sim["returns"]
+        resid_returns = None
+        if has_market:
+            # DEC-76 (b)/(c): the simulated panel's OWN trailing PIT beta to the
+            # "simulated BTC column" (module docstring's convention) -- the SAME
+            # beta_characteristic/residualize_outcome pair run.py uses on real data.
+            beta_sim = characteristics.beta_characteristic(
+                sim_returns, symbols, market_symbol=market_symbol, trail_win=beta_trail_win)
+            r_btc_sim = sim_returns[:, market_idx]
+            resid_returns = ic.residualize_outcome(sim_returns, beta_sim, r_btc_sim)
         for variant in variants:
             char = characteristics.weekly_only_proxy_characteristic(variant, sim_returns)
             res = ic.weekly_ic_series(char, sim_returns, window_alive, convention=convention)
             mean_ic_draws[variant].append(res["mean_ic"])
             per_week_ic_pool[variant].extend(w["ic"] for w in res["weekly"] if not math.isnan(w["ic"]))
+            if resid_returns is not None:
+                res_r = ic.weekly_ic_series(char, resid_returns, window_alive, convention=convention)
+                mean_ic_draws_res[variant].append(res_r["mean_ic"])
+                per_week_ic_pool_res[variant].extend(w["ic"] for w in res_r["weekly"] if not math.isnan(w["ic"]))
+            else:
+                mean_ic_draws_res[variant].append(float("nan"))
 
-    per_variant: dict[str, Any] = {}
-    max_per_rep = np.full(n_reps, np.nan, dtype=np.float64)
-    for rep_i in range(n_reps):
-        vals = [mean_ic_draws[v][rep_i] for v in variants if not math.isnan(mean_ic_draws[v][rep_i])]
-        if vals:
-            max_per_rep[rep_i] = max(vals)
-    finite_max = max_per_rep[~np.isnan(max_per_rep)]
-    selection_ceiling_mean_of_max = float(finite_max.mean()) if finite_max.size else float("nan")
+    def _mean_of_max(draws: dict[str, list[float]]) -> float:
+        max_per_rep = np.full(n_reps, np.nan, dtype=np.float64)
+        for rep_i in range(n_reps):
+            vals = [draws[v][rep_i] for v in variants if not math.isnan(draws[v][rep_i])]
+            if vals:
+                max_per_rep[rep_i] = max(vals)
+        finite_max = max_per_rep[~np.isnan(max_per_rep)]
+        return float(finite_max.mean()) if finite_max.size else float("nan")
 
-    for variant in variants:
-        pool = np.array(per_week_ic_pool[variant], dtype=np.float64)
-        factor_sd = float(pool.std(ddof=1)) if pool.size > 1 else float("nan")
-        draws = np.array([d for d in mean_ic_draws[variant] if not math.isnan(d)], dtype=np.float64)
-        direction = REGISTERED_DIRECTION[variant]
+    selection_ceiling_mean_of_max = _mean_of_max(mean_ic_draws)
+    selection_ceiling_mean_of_max_residualized = _mean_of_max(mean_ic_draws_res) if has_market else None
+
+    def _variant_stats(pool: list[float], draws_list: list[float], direction: str) -> dict[str, Any]:
+        pool_arr = np.array(pool, dtype=np.float64)
+        factor_sd = float(pool_arr.std(ddof=1)) if pool_arr.size > 1 else float("nan")
+        draws = np.array([d for d in draws_list if not math.isnan(d)], dtype=np.float64)
         if draws.size == 0:
             q = float("nan")
         elif direction == "positive":
             q = float(np.quantile(draws, quantile))
         else:
             q = float(np.quantile(draws, 1.0 - quantile))
-        per_variant[variant] = {
-            "direction": direction, "factor_sd": factor_sd, "n_ic_pooled": int(pool.size),
-            "quantile_one_sided": q, "quantile_level": quantile,
-            "mean_ic_draws_mean": float(draws.mean()) if draws.size else float("nan"),
-            "mean_ic_draws_sd": float(draws.std(ddof=1)) if draws.size > 1 else float("nan"),
-            "n_reps_finite": int(draws.size),
-        }
+        return {"factor_sd": factor_sd, "n_ic_pooled": int(pool_arr.size),
+                "quantile_one_sided": q, "quantile_level": quantile,
+                "mean_ic_draws_mean": float(draws.mean()) if draws.size else float("nan"),
+                "mean_ic_draws_sd": float(draws.std(ddof=1)) if draws.size > 1 else float("nan"),
+                "n_reps_finite": int(draws.size)}
+
+    per_variant: dict[str, Any] = {}
+    for variant in variants:
+        direction = REGISTERED_DIRECTION[variant]
+        raw_stats = _variant_stats(per_week_ic_pool[variant], mean_ic_draws[variant], direction)
+        entry = {"direction": direction, **raw_stats}
+        if has_market:
+            res_stats = _variant_stats(per_week_ic_pool_res[variant], mean_ic_draws_res[variant], direction)
+        else:
+            # No market column at all -- nothing to residualise against. ``None`` (not NaN) is
+            # deliberate: a NaN would make two otherwise-identical reports compare unequal
+            # (float('nan') != float('nan')), breaking T2 determinism-style equality checks for
+            # no real reason; ``None`` is also the honest "never computed" sentinel (docstring).
+            res_stats = {"factor_sd": None, "n_ic_pooled": None, "quantile_one_sided": None,
+                         "quantile_level": quantile, "mean_ic_draws_mean": None,
+                         "mean_ic_draws_sd": None, "n_reps_finite": None}
+        entry.update({f"{k}_residualized": v for k, v in res_stats.items()})
+        per_variant[variant] = entry
 
     return {
         "variants": per_variant, "n_reps": n_reps, "seed": seed, "convention": convention,
-        "sigma_f_btc_weekly": sigma_f, "sigma_e_median_symbol_weekly": sigma_e,
-        "rho_f": 0.2, "drift_f": 0.002, "market_symbol": market_symbol,
+        "sigma_f_btc_weekly": sigma_f,
+        "sigma_e_median_symbol_weekly": sigma_e_total,                       # DEC-75 v2 value, kept (total vol)
+        "sigma_e_median_symbol_weekly_idiosyncratic": sigma_e_idio,          # DEC-76 (e), new
+        "sigma_e_used_in_simulation": sigma_e_used,                          # documents which one was fed in
+        "rho_f": rho_f, "drift_f": drift_f, "market_symbol": market_symbol,
         "selection_ceiling_mean_of_max": selection_ceiling_mean_of_max,
+        "selection_ceiling_mean_of_max_residualized": selection_ceiling_mean_of_max_residualized,
         "n_weeks": n_weeks, "n_symbols": n_symbols,
-        "label": "faktorerhaltende Null (DEC-75 (2)): returns = beta_i*f_t + e_it, signalfrei.",
+        "market_column_convention": (
+            "Simulierte BTC-Spalte = sim_returns[:, symbols.index(market_symbol)] -- dieselbe "
+            "Position wie das echte BTCUSDT in der Symbolliste, nie eine separat hergeleitete Serie "
+            "(siehe nulls.py Modul-Docstring)."),
+        "label": ("faktorerhaltende Null (DEC-75 (2)/DEC-76 (1)/(2)): returns = beta_i*f_t + e_it, "
+                  f"signalfrei; rho_f={rho_f}, drift_f={drift_f} "
+                  f"({'drifting' if drift_f != 0.0 else 'driftfree'})."),
     }
 
 

@@ -27,7 +27,18 @@ exists to catch a future regression that sneaks in hidden state).
       "Kill: Decke >= IC_min -> GL-012 vor dem Verdikt").
   (3) Beta-control (market-residualised outcome) is an ADDITIONAL PASS
       component (DEC-75 Entscheidung 1 (3)): same sign, ``|residualized_
-      mean_ic| >= IC_min_capped``, both windows.
+      mean_ic| >= IC_min_capped``, both windows. **DEC-76 Entscheidung 1
+      (b), additive:** the residualised mean IC must ALSO lie beyond the
+      DRIFTING factor null's own residualised-mean-IC one-sided 99.36%
+      quantile (``windows.<W>.res_quantile_drifting``, registered
+      direction) -- under residualisation that null's mean is 0 (DEC-76
+      "Anlass": only the RAW null carries the drift-driven market-timing
+      bias), so this is a genuine noise bound, closing the gap DEC-76
+      found in the plain ``|IC_res| >= IC_min`` check alone. Backward
+      compatible: a payload window WITHOUT ``res_quantile_drifting`` (an
+      older/unit-test payload) trivially satisfies this component -- it is
+      additive, never retroactively stricter for a payload that predates
+      it.
   (4) H-30-specific (vol-weighted outcome) is computed upstream in
       ``run.py`` -- the SAME (1)/(3) machinery applies to its own
       variant's ``mean_ic``/``residualized_mean_ic`` here, nothing
@@ -64,6 +75,7 @@ def _window_pass(w: dict[str, Any], direction: str, ic_min_capped: float) -> dic
     se = w["se"]
     ci_bound = w["ci_bound_toward_sign"]
     resid_ic = w.get("residualized_mean_ic")
+    resid_quantile = w.get("res_quantile_drifting")          # DEC-76 Entscheidung 1 (b)
 
     sign_ok = (mean_ic > 0) if direction == "positive" else (mean_ic < 0)
     magnitude_ok = abs(mean_ic) >= Z_PER_WINDOW * se if se and not math.isnan(se) else False
@@ -73,10 +85,22 @@ def _window_pass(w: dict[str, Any], direction: str, ic_min_capped: float) -> dic
     resid_sign_ok = (resid_ic is not None) and ((resid_ic > 0) if direction == "positive" else (resid_ic < 0))
     resid_magnitude_ok = (resid_ic is not None) and (abs(resid_ic) >= ic_min_capped)
 
-    window_pass = sign_ok and magnitude_ok and ci_ok and ic_min_ok and resid_sign_ok and resid_magnitude_ok
+    # DEC-76 Entscheidung 1 (b): additive -- absent quantile (older/unit-test payload)
+    # trivially satisfies this component; present but no residualized IC to compare fails
+    # closed (never silently PASS on missing data).
+    if resid_quantile is None:
+        resid_beyond_null_ok = True
+    elif resid_ic is None:
+        resid_beyond_null_ok = False
+    else:
+        resid_beyond_null_ok = (resid_ic > resid_quantile) if direction == "positive" else (resid_ic < resid_quantile)
+
+    window_pass = (sign_ok and magnitude_ok and ci_ok and ic_min_ok
+                   and resid_sign_ok and resid_magnitude_ok and resid_beyond_null_ok)
     return {
         "sign_ok": sign_ok, "magnitude_ok": magnitude_ok, "ci_ok": ci_ok, "ic_min_ok": ic_min_ok,
         "beta_control_sign_ok": resid_sign_ok, "beta_control_magnitude_ok": resid_magnitude_ok,
+        "beta_control_beyond_drifting_null_ok": resid_beyond_null_ok,
         "window_pass": window_pass,
     }
 
@@ -92,6 +116,7 @@ def evaluate(payload: dict[str, Any]) -> dict[str, Any]:
           "windows": {
             "W1": {"mean_ic": float, "se": float, "ci_bound_toward_sign": float,
                     "ic_min_capped": float, "residualized_mean_ic": float,
+                    "res_quantile_drifting": float | None,   # DEC-76 (b), optional/additive
                     "selection_ceiling_mean_of_max": float,
                     "block_permutation_p": float},
             "W2": {...},

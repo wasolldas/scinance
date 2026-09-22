@@ -399,13 +399,45 @@ def factor_preserving_report(
     convention: ic.Convention = "close_at_last",
     n_reps: int = nulls.FACTOR_NULL_N_REPS_DEFAULT, seed: int = nulls.FACTOR_NULL_SEED,
 ) -> dict[str, Any]:
-    """Thin wrapper: :func:`nulls.factor_preserving_null` on this window's
-    ``returns``/``alive`` (used ONLY for K/W sizing and the two
-    descriptive vol scalars -- THE SEAL, see that function's docstring).
+    """DEC-76 Entscheidung 2 (Vorlauf v3, additive): TWO calls to
+    :func:`nulls.factor_preserving_null` on this window's ``returns``/
+    ``alive`` (used ONLY for K/W sizing and the two descriptive vol scalars
+    -- THE SEAL, see that function's docstring) -- ``"drifting"``
+    (``drift_f=0.002``, DEC-75's original configuration) and
+    ``"driftfree"`` (``drift_f=0.0``), ``rho_f=0.2`` in BOTH. Each carries
+    its own raw AND residualized statistics (module docstring of
+    ``nulls.factor_preserving_null``).
+
+    **Binding vs. report-only (DEC-76 Entscheidung 1 (b)/(c), verbatim):**
+    the GL-012 kill binds ONLY to
+    ``driftfree["selection_ceiling_mean_of_max_residualized"]`` and the
+    beta-control PASS quantile binds ONLY to
+    ``drifting["variants"][v]["quantile_one_sided_residualized"]`` -- every
+    other number here (drifting raw mean -- "Beta-Prognostizierbarkeit",
+    driftfree raw ceiling, drifting residualized ceiling, driftfree
+    residualized quantile) is REPORT-ONLY, labelled as such below.
     """
-    return nulls.factor_preserving_null(
+    drifting = nulls.factor_preserving_null(
         window["returns"], window["alive"], symbols, variants=variants,
-        convention=convention, n_reps=n_reps, seed=seed)
+        convention=convention, n_reps=n_reps, seed=seed, drift_f=nulls.DRIFT_F_DRIFTING)
+    driftfree = nulls.factor_preserving_null(
+        window["returns"], window["alive"], symbols, variants=variants,
+        convention=convention, n_reps=n_reps, seed=seed, drift_f=nulls.DRIFT_F_DRIFTFREE)
+    return {
+        "drifting": drifting, "driftfree": driftfree,
+        "binding": {
+            "gl012_ceiling": "driftfree.selection_ceiling_mean_of_max_residualized",
+            "beta_control_quantile_per_variant": "drifting.variants.<v>.quantile_one_sided_residualized",
+        },
+        "report_only": [
+            "drifting.variants.<v>.mean_ic_draws_mean (Beta-Prognostizierbarkeit)",
+            "drifting.selection_ceiling_mean_of_max", "drifting.selection_ceiling_mean_of_max_residualized",
+            "driftfree.selection_ceiling_mean_of_max",
+            "driftfree.variants.<v>.quantile_one_sided_residualized",
+        ],
+        "label": "DEC-76 Entscheidung 2 (Vorlauf v3): drifting (drift_f=0.002) + driftfree "
+                 "(drift_f=0.0) Konfigurationen, rho_f=0.2 in beiden.",
+    }
 
 
 # ----------------------------------------------------------------------------
@@ -609,6 +641,14 @@ def assemble_prelaunch_report(
     }
 
 
+def _fmt5(v: float | None) -> str:
+    """``:.5f`` formatting that tolerates ``None`` (DEC-76: a market-less
+    window's residualized fields are ``None``, never NaN -- see
+    ``nulls.factor_preserving_null``'s docstring) without crashing the
+    report; ``NaN`` still renders as the literal ``"nan"`` (unchanged)."""
+    return "n/a (kein Marktsymbol)" if v is None else f"{v:.5f}"
+
+
 def _to_markdown(report: dict[str, Any]) -> str:
     lines = ["# WP-13a -- Vorlauf-Befund (DEC-74 Entscheidung 3)", "", report["label"], "",
               "**KEIN VERDIKT -- keine reale Charakteristik-gegen-reale-Folgewochenrendite-IC "
@@ -646,12 +686,35 @@ def _to_markdown(report: dict[str, Any]) -> str:
                          f"gemessen (reine Rauschen) = {sc_m['ceiling_ic_mean']:.5f} "
                          f"(n_replicates={sc_m['n_replicates']})")
             fp = w["factor_preserving_null"]
-            lines.append(f"- Faktorerhaltende Decke (mean-of-max, n_reps={fp['n_reps']}) = "
-                         f"{fp['selection_ceiling_mean_of_max']:.5f}")
+            drifting, driftfree = fp["drifting"], fp["driftfree"]
+            lines.append(f"- Faktorerhaltende Null v3 (DEC-76), n_reps={drifting['n_reps']}: "
+                         f"sigma_e gesamt={drifting['sigma_e_median_symbol_weekly']:.5f}, "
+                         f"sigma_e idiosynkratisch (verwendet)="
+                         f"{drifting['sigma_e_median_symbol_weekly_idiosyncratic']:.5f}")
+            lines.append(f"- GL-012-bindende Decke (driftfree, residualisiert) = "
+                         f"{_fmt5(driftfree['selection_ceiling_mean_of_max_residualized'])} "
+                         f"(driftfree roh, report-only = {_fmt5(driftfree['selection_ceiling_mean_of_max'])}; "
+                         f"drifting roh, report-only = {_fmt5(drifting['selection_ceiling_mean_of_max'])}; "
+                         f"drifting residualisiert, report-only = "
+                         f"{_fmt5(drifting['selection_ceiling_mean_of_max_residualized'])})")
+            lines.append("")
+            lines.append("| Variante | E_t[1/sqrt(K-1)] | c_rho_corrected | IC_min_capped | "
+                         "Decke driftfree roh (Fenster, report-only) | "
+                         "Decke driftfree res (Fenster, bindend GL-012) | "
+                         "Quantil drifting res (bindend Beta-Kontrolle) | "
+                         "Mittel drifting roh (Beta-Prognostizierbarkeit, report-only) |")
+            lines.append("|---|---|---|---|---|---|---|---|")
+            ceiling_driftfree_raw = driftfree["selection_ceiling_mean_of_max"]
+            ceiling_driftfree_res = driftfree["selection_ceiling_mean_of_max_residualized"]
             for v in report["variants"]:
-                fpv = fp["variants"][v]
-                lines.append(f"  - {v}: factor_SD={fpv['factor_sd']:.5f}, "
-                              f"Quantil({fpv['quantile_level']:.4f})={fpv['quantile_one_sided']:.5f}")
+                pv = nf["persistence_null"]["variants"][v]
+                dv = drifting["variants"][v]
+                lines.append(
+                    f"| {v} | {nf['floor']['e_floor']:.5f} | {pv['c_rho_corrected']:.4f} | "
+                    f"{nf['ic_min_capped_per_variant'][v]:.5f} | "
+                    f"{_fmt5(ceiling_driftfree_raw)} | {_fmt5(ceiling_driftfree_res)} | "
+                    f"{_fmt5(dv['quantile_one_sided_residualized'])} | {_fmt5(dv['mean_ic_draws_mean'])} |")
+            lines.append("")
             sv = w["survivorship_fixture"]
             lines.append(f"- Survivorship-Fixture: mom1 Diff={sv['mom1_diff']:.5f} "
                          f"({sv['mom1_diff_in_ic_min_units']:.3f} IC_min-Einheiten), "

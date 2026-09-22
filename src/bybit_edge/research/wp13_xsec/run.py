@@ -55,15 +55,35 @@ __all__ = [
     "REGISTERED_SCHEMA_HINT", "load_registered_yaml", "sha256_of_file",
     "build_all_characteristics_full_panel", "se_of_mean_ic",
     "moving_block_bootstrap_ci", "max_p_over_windows", "liquidity_decile_sensitivity",
-    "bounce_fixture_ic", "lag_profile", "benjamini_hochberg",
+    "bounce_fixture_ic", "lag_profile", "benjamini_hochberg", "assert_null_calibration",
+    "NullCalibrationError", "NULL_CALIBRATION_REL_TOL",
     "variant_window_payload", "run_hypothesis", "run_full", "write_run_artifacts",
 ]
 
+#: DEC-76 Entscheidung 1 (b)/Task A item 3: +/-10% tolerance between the
+#: run's own recomputed null constant (real K series, real W_judged) and
+#: the value FROZEN in the registered YAML.
+NULL_CALIBRATION_REL_TOL = 0.10
+
 REGISTERED_SCHEMA_HINT = (
-    "hypotheses: {H-xx: {variant: str, direction: positive|negative}}; "
-    "windows: {W1: {start, end, ic_min_capped: {variant: float}}, W2: {...}}; "
-    "rules: {seed, n_reps_bootstrap, n_reps_permutation, block_size_weeks, ci_level, "
-    "liquidity_label_factor, bh_alpha}"
+    "hypotheses: {H-xx: {variant: str, direction: positive|negative, outcome?: vol_weighted}}; "
+    "windows: {W1: {start, end, ic_min_capped: {variant: float}, w_judged: int, "
+    "res_quantile_drifting: {variant: float}, ceiling_driftfree_res: float}, W2: {...}, L?: {start, end}}; "
+    "rules: {seed: 53, n_reps: >=1000 (bootstrap/permutation/factor-null reps; legacy "
+    "n_reps_bootstrap/n_reps_permutation/n_reps_factor_null still read if n_reps is absent), "
+    "block_len: 4 (DEC-75 Entscheidung 1 (1): a FIXED registered constant, recorded here "
+    "for audit -- run_full's block-bootstrap/-permutation helpers hardcode block_size=4 "
+    "directly, per DEC-75, rather than reading this key back), "
+    "level: 0.9936, bh_alpha: 0.10}. "
+    "DEC-76 Entscheidung 1(b)/(c): windows.<W>.res_quantile_drifting[variant] and "
+    "windows.<W>.ceiling_driftfree_res are the FROZEN Drittfassung constants -- run_full "
+    "recomputes both on the real K series/W_judged (seed 53, rules.n_reps reps) and asserts "
+    "they are within +/-NULL_CALIBRATION_REL_TOL of these frozen values, else loud fail "
+    "('Null-Kalibrierung weicht ab', NullCalibrationError, no verdict); the gate itself always "
+    "judges against the FROZEN (registered) value, never the recomputed one. Both keys are "
+    "OPTIONAL for backward compatibility with a pre-DEC-76 registered file -- if absent for a "
+    "window, run_full falls back to the recomputed value with no calibration check (documented, "
+    "not a registered Drittfassung run)."
 )
 
 
@@ -85,6 +105,47 @@ def load_registered_yaml(path: Path | str) -> dict[str, Any]:
         raise ValueError(f"registered YAML at {path} missing required top-level keys "
                           f"(expected shape: {REGISTERED_SCHEMA_HINT})")
     return payload
+
+
+class NullCalibrationError(RuntimeError):
+    """DEC-76 Entscheidung 1 (b)/Task A item 3, C.14 loud fail: the run's
+    own recomputed null constant (real K series/W_judged, seed 53) drifted
+    more than :data:`NULL_CALIBRATION_REL_TOL` from the value frozen in the
+    registered YAML -- raised BEFORE any ``gates.evaluate`` call, so no
+    hypothesis in the run gets a verdict."""
+
+
+def assert_null_calibration(recomputed: float, registered: float | None, *, label: str,
+                             rel_tol: float = NULL_CALIBRATION_REL_TOL,
+                             abs_tol_if_zero: float = 1e-4) -> None:
+    """DEC-76 Entscheidung 1 (b)/Task A item 3: asserts ``recomputed`` (this
+    run's own re-derivation of a DEC-76 null constant, real K series/real
+    W_judged, seed 53, ``rules.n_reps`` reps) is within ``rel_tol`` of
+    ``registered`` (the Drittfassung's FROZEN value for the SAME constant)
+    -- a documented safeguard: a real run's panel can differ from the
+    Vorlauf's (more symbols delisted since, a later ``as_of``), and this
+    assertion is what catches a registration that has quietly gone stale
+    BEFORE it can silently gate a verdict. ``registered is None`` is a
+    no-op (a pre-DEC-76 registered file that never carried this key --
+    documented backward-compat, see :data:`REGISTERED_SCHEMA_HINT`) --
+    only a PRESENT-but-drifted value raises. ``registered == 0`` (or very
+    close to it) uses an ABSOLUTE tolerance (``abs_tol_if_zero``) instead
+    of a relative one, since a relative tolerance around exactly 0 is
+    degenerate."""
+    if registered is None:
+        return
+    if recomputed is None or math.isnan(recomputed) or math.isnan(registered):
+        raise NullCalibrationError(
+            f"Null-Kalibrierung weicht ab ({label}): recomputed={recomputed!r}, "
+            f"registered={registered!r} -- nicht vergleichbar (NaN/None), kein Verdikt.")
+    if abs(registered) < 1e-12:
+        ok = abs(recomputed - registered) <= abs_tol_if_zero
+    else:
+        ok = abs(recomputed - registered) <= rel_tol * abs(registered)
+    if not ok:
+        raise NullCalibrationError(
+            f"Null-Kalibrierung weicht ab ({label}): recomputed={recomputed:.6f} vs. "
+            f"registered={registered:.6f} (Toleranz +/-{rel_tol:.0%}) -- kein Verdikt.")
 
 
 # ----------------------------------------------------------------------------
@@ -342,6 +403,7 @@ def variant_window_payload(
     block_size: int = 4, ci_level: float = 1.0 - 0.0064,
     report_drop_convention: bool = True, report_lag_profile: bool = True,
     report_beta_calibration: bool = True,
+    res_quantile_drifting: float | None = None,
 ) -> dict[str, Any]:
     """Assembles ONE window's numbers for ``gates.evaluate`` -- the real
     IC series, SE (item 1), bootstrap CI bound (item 1), block-permutation
@@ -355,7 +417,20 @@ def variant_window_payload(
     a symbol's beta ALONE would explain). This is the REAL
     characteristic-vs-REAL-outcome computation THE SEAL forbids in
     ``--prelaunch`` -- this function is run-mode-only, never called from
-    ``prelaunch.py``."""
+    ``prelaunch.py``.
+
+    ``res_quantile_drifting`` (DEC-76 Entscheidung 1 (b), additive): the
+    FROZEN registered-YAML constant for THIS hypothesis/window -- the
+    drifting factor null's residualised-mean-IC one-sided quantile
+    (``nulls.factor_preserving_null(..., drift_f=nulls.DRIFT_F_DRIFTING)``'s
+    ``variants[variant]["quantile_one_sided_residualized"]``). This
+    function does NOT compute it (that is :func:`run_full`'s job, ONCE per
+    window, shared across all 7 variants, plus the +/-10% calibration
+    assertion against the registered value) -- it only carries the number
+    through into the payload ``gates.evaluate`` reads. ``None`` (the
+    default) means "not supplied" -- ``gates._window_pass`` treats that as
+    the component being trivially satisfied (backward compatible with
+    every pre-DEC-76 caller of this function)."""
     res = ic.weekly_ic_series(characteristic, returns, alive, convention=convention)
     ic_weekly = np.array([w["ic"] for w in res["weekly"]], dtype=np.float64)
     se_info = se_of_mean_ic(ic_weekly, floor, w_judged)
@@ -388,6 +463,7 @@ def variant_window_payload(
         "se_detail": se_info, "ci_bound_toward_sign": ci_info["ci_bound_toward_sign"], "ci_detail": ci_info,
         "block_permutation_p": perm["p_value"], "block_permutation_detail": perm,
         "ic_min_capped": ic_min_capped, "residualized_mean_ic": residualized_mean_ic,
+        "res_quantile_drifting": res_quantile_drifting,      # DEC-76 Entscheidung 1 (b), frozen registered value
         "mean_ic_drop_convention": mean_ic_drop_convention, "lag_profile": lag_profile_result,
         "beta_calibration_mean_ic": beta_calibration_mean_ic,
         "selection_ceiling_mean_of_max": selection_ceiling_mean_of_max,
@@ -406,20 +482,26 @@ def run_hypothesis(
     persistence_null_pass: bool | None = None, bh_fdr_pass: bool | None = None,
     convention: ic.Convention = "close_at_last",
     n_reps_bootstrap: int = 1000, n_reps_permutation: int = 1000, seed: int = 53,
+    res_quantile_drifting_by_window: dict[str, float] | None = None,
 ) -> dict[str, Any]:
     """One hypothesis, BOTH judgement windows (C.10 hard) -> the full
     ``gates.evaluate`` payload + verdict. Windows are keyed ``"W1"``/
-    ``"W2"`` throughout."""
+    ``"W2"`` throughout. ``res_quantile_drifting_by_window`` (DEC-76
+    Entscheidung 1 (b), additive, ``None`` by default) carries the FROZEN
+    registered per-window beta-control quantile through to each window's
+    payload -- see :func:`variant_window_payload`'s docstring."""
     windows_payload: dict[str, Any] = {}
     for wname in ("W1", "W2"):
         beta_8w = beta_8w_pit_by_window.get(wname) if beta_8w_pit_by_window else None
+        rqd = res_quantile_drifting_by_window.get(wname) if res_quantile_drifting_by_window else None
         windows_payload[wname] = variant_window_payload(
             char_by_window[wname], returns_by_window[wname], alive_by_window[wname], symbols,
             variant=variant, direction=direction, ic_min_capped=ic_min_capped_by_window[wname],
             w_judged=w_judged_by_window[wname], floor=floor_by_window[wname],
             selection_ceiling_mean_of_max=selection_ceiling_by_window[wname],
             beta_8w_pit=beta_8w, convention=convention,
-            n_reps_bootstrap=n_reps_bootstrap, n_reps_permutation=n_reps_permutation, seed=seed)
+            n_reps_bootstrap=n_reps_bootstrap, n_reps_permutation=n_reps_permutation, seed=seed,
+            res_quantile_drifting=rqd)
 
     payload = {
         "hypothesis": hypothesis, "variant": variant, "direction": direction,
@@ -441,18 +523,27 @@ def run_full(
 ) -> dict[str, Any]:
     """Panel + registered YAML -> every hypothesis's verdict. Builds all 7
     characteristics ONCE on the full panel (DEC-75 (8)), slices to W1/W2/L,
-    computes the factor-preserving selection ceiling ONCE per window
-    (shared across all 7 variants' GL-012 check, ``nulls.
-    factor_preserving_null`` reused unchanged), then runs each registered
-    hypothesis via :func:`run_hypothesis`. L is computed for
-    descriptive/sealed purposes only (never enters a verdict)."""
+    computes the DEC-76 factor-preserving nulls ONCE per window (shared
+    across all 7 variants: the driftfree-residualized GL-012 ceiling and
+    the drifting-residualized beta-control quantile per variant, ``nulls.
+    factor_preserving_null`` reused unchanged, called twice per window --
+    ``drift_f=nulls.DRIFT_F_DRIFTFREE`` and ``drift_f=nulls.
+    DRIFT_F_DRIFTING``), asserts both are within +/-10% of the registered
+    YAML's FROZEN values (:func:`assert_null_calibration`, loud fail
+    ``NullCalibrationError`` otherwise, BEFORE any verdict), then runs each
+    registered hypothesis via :func:`run_hypothesis` against the FROZEN
+    (registered) values. L is computed for descriptive/sealed purposes
+    only (never enters a verdict)."""
     from . import prelaunch  # local import: prelaunch.slice_window, avoids a module cycle at import time
 
     rules = registered.get("rules", {})
     seed = int(rules.get("seed", 53))
     n_reps_bootstrap = int(rules.get("n_reps_bootstrap", 1000))
     n_reps_permutation = int(rules.get("n_reps_permutation", 1000))
-    n_reps_factor_null = int(rules.get("n_reps_factor_null", 1000))
+    # DEC-76 Task A item 4: the canonical rules key is `n_reps` (>= 1000); the legacy
+    # `n_reps_factor_null` (DEC-75) is still read as a fallback for a pre-DEC-76 registered file.
+    n_reps_factor_null = int(rules.get("n_reps", rules.get("n_reps_factor_null", 1000)))
+    null_quantile_level = float(rules.get("level", nulls.SELECTION_CEILING_ONE_SIDED_QUANTILE))
     bh_alpha = float(rules.get("bh_alpha", 0.10))
 
     weeks = weekly["weeks"]
@@ -476,15 +567,54 @@ def run_full(
         windows[wname] = window
 
     floor_by_window, wjudged_by_window, ceiling_by_window = {}, {}, {}
+    res_quantile_drifting_by_window: dict[str, dict[str, float]] = {}
+    null_calibration_report: dict[str, Any] = {}
     for wname in ("W1", "W2"):
         w = windows[wname]
         f = nulls.analytic_permutation_floor(w["alive"], w["weeks"])
         floor_by_window[wname] = f["e_floor"]
         wjudged_by_window[wname] = f["w_judged"]
-        fp = nulls.factor_preserving_null(w["returns"], w["alive"], symbols,
-                                           variants=characteristics.VARIANT_NAMES,
-                                           n_reps=n_reps_factor_null, seed=seed)
-        ceiling_by_window[wname] = fp["selection_ceiling_mean_of_max"]
+
+        # DEC-76 Entscheidung 1 (c): GL-012 binds to the DRIFTFREE, RESIDUALIZED ceiling
+        # (real K series/W_judged); DEC-76 Entscheidung 1 (b): the beta-control PASS quantile
+        # is the DRIFTING, RESIDUALIZED per-variant quantile. Both computed ONCE per window,
+        # shared across all 7 variants (same discipline as the DEC-75 ceiling this replaces).
+        fp_driftfree = nulls.factor_preserving_null(
+            w["returns"], w["alive"], symbols, variants=characteristics.VARIANT_NAMES,
+            convention=convention, n_reps=n_reps_factor_null, seed=seed,
+            quantile=null_quantile_level, drift_f=nulls.DRIFT_F_DRIFTFREE)
+        fp_drifting = nulls.factor_preserving_null(
+            w["returns"], w["alive"], symbols, variants=characteristics.VARIANT_NAMES,
+            convention=convention, n_reps=n_reps_factor_null, seed=seed,
+            quantile=null_quantile_level, drift_f=nulls.DRIFT_F_DRIFTING)
+
+        recomputed_ceiling_res = fp_driftfree["selection_ceiling_mean_of_max_residualized"]
+        recomputed_quantiles = {v: fp_drifting["variants"][v]["quantile_one_sided_residualized"]
+                                 for v in characteristics.VARIANT_NAMES}
+
+        reg_window_cfg = registered["windows"].get(wname, {})
+        reg_ceiling_res = reg_window_cfg.get("ceiling_driftfree_res")
+        reg_quantiles = reg_window_cfg.get("res_quantile_drifting") or {}
+
+        # C.14 loud fail: a present-but-drifted registered constant aborts the WHOLE run,
+        # before any hypothesis gets a verdict -- see assert_null_calibration's docstring.
+        assert_null_calibration(recomputed_ceiling_res, reg_ceiling_res,
+                                 label=f"ceiling_driftfree_res[{wname}]")
+        ceiling_by_window[wname] = reg_ceiling_res if reg_ceiling_res is not None else recomputed_ceiling_res
+
+        res_quantile_drifting_by_window[wname] = {}
+        for v in characteristics.VARIANT_NAMES:
+            reg_q = reg_quantiles.get(v) if isinstance(reg_quantiles, dict) else None
+            assert_null_calibration(recomputed_quantiles[v], reg_q,
+                                     label=f"res_quantile_drifting[{wname}][{v}]")
+            res_quantile_drifting_by_window[wname][v] = reg_q if reg_q is not None else recomputed_quantiles[v]
+
+        null_calibration_report[wname] = {
+            "ceiling_driftfree_res_recomputed": recomputed_ceiling_res,
+            "ceiling_driftfree_res_registered": reg_ceiling_res,
+            "res_quantile_drifting_recomputed": recomputed_quantiles,
+            "res_quantile_drifting_registered": dict(reg_quantiles) if isinstance(reg_quantiles, dict) else {},
+        }
 
     results: dict[str, Any] = {}
     p_by_variant: dict[str, float] = {}
@@ -533,13 +663,14 @@ def run_full(
         q = pnull["variants"][variant]["quantile95_registered_direction"]
         persistence_pass = (real_mean_ic_w1 > q) if direction == "positive" else (real_mean_ic_w1 < q)
 
+        rqd_by_window = {wn: res_quantile_drifting_by_window[wn][variant] for wn in ("W1", "W2")}
         run_res = run_hypothesis(
             hyp, variant, direction, char_by_window, returns_by_window, alive_by_window, symbols,
             ic_min_by_window, wjudged_by_window, floor_by_window, ceiling_by_window,
             beta_8w_pit_by_window=beta_by_window, liquidity_ic_without_d1=liquidity, bounce_ic=bounce_ic_val,
             persistence_null_pass=bool(persistence_pass), bh_fdr_pass=None,
             convention=convention, n_reps_bootstrap=n_reps_bootstrap, n_reps_permutation=n_reps_permutation,
-            seed=seed)
+            seed=seed, res_quantile_drifting_by_window=rqd_by_window)
         results[hyp] = run_res
         p_by_variant[variant] = max_p_over_windows({
             wn: run_res["payload"]["windows"][wn]["block_permutation_p"] for wn in ("W1", "W2")})
@@ -561,6 +692,7 @@ def run_full(
         "seed": seed, "convention": convention,
         "n_reps_bootstrap": n_reps_bootstrap, "n_reps_permutation": n_reps_permutation,
         "n_reps_factor_null": n_reps_factor_null,
+        "null_calibration": null_calibration_report,   # DEC-76 Task A item 3: recomputed vs. registered
     }
 
 

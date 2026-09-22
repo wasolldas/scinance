@@ -105,10 +105,15 @@ def _conserved_payload():
     return {
         "hypothesis": "H-28", "variant": "mom1", "direction": "positive",
         "windows": {
+            # DEC-76 Entscheidung 1 (b): res_quantile_drifting is the FROZEN drifting-null
+            # residualized-mean-IC quantile -- both windows' residualized_mean_ic clears it
+            # here (0.045 > 0.03, 0.035 > 0.025), so the T4 baseline still PASSes.
             "W1": {"mean_ic": 0.05, "se": 0.01, "ci_bound_toward_sign": 0.02, "ic_min_capped": 0.02,
-                   "residualized_mean_ic": 0.045, "selection_ceiling_mean_of_max": 0.01},
+                   "residualized_mean_ic": 0.045, "res_quantile_drifting": 0.03,
+                   "selection_ceiling_mean_of_max": 0.01},
             "W2": {"mean_ic": 0.04, "se": 0.01, "ci_bound_toward_sign": 0.015, "ic_min_capped": 0.018,
-                   "residualized_mean_ic": 0.035, "selection_ceiling_mean_of_max": 0.01},
+                   "residualized_mean_ic": 0.035, "res_quantile_drifting": 0.025,
+                   "selection_ceiling_mean_of_max": 0.01},
         },
         "persistence_null_pass": True, "bh_fdr_pass": True,
         "liquidity_ic_without_d1": None, "bounce_ic": None,
@@ -156,6 +161,33 @@ def test_report_only_components_never_change_verdict():
     v = gates.evaluate(payload)
     assert v["verdict"] == "PASS"                     # report-only, DEC-75 Entscheidung 1 (6)
     assert any("report-only" in l for l in v["labels"])
+
+
+def test_beta_control_quantile_failure_drops_even_with_ic_min_satisfied():
+    """DEC-76 Entscheidung 1 (b), additive: a residualized IC that clears
+    the OLD ``|IC_res| >= IC_min`` bar can still fail the NEW requirement
+    of lying beyond the drifting null's own residualized quantile -- this
+    is the exact gap DEC-76 closes (a residualized IC that is "big enough"
+    in absolute terms but still within what the null itself can produce)."""
+    payload = _conserved_payload()
+    payload["windows"]["W1"]["res_quantile_drifting"] = 0.05   # > residualized_mean_ic (0.045)
+    v = gates.evaluate(payload)
+    assert v["verdict"] == "DROP"
+    assert v["per_window"]["W1"]["beta_control_magnitude_ok"] is True    # old check still passes
+    assert v["per_window"]["W1"]["beta_control_beyond_drifting_null_ok"] is False  # new check fails
+    assert v["per_window"]["W1"]["window_pass"] is False
+
+
+def test_beta_control_quantile_absent_is_backward_compatible():
+    """A payload WITHOUT ``res_quantile_drifting`` (pre-DEC-76 shape) must
+    behave exactly as before -- the new component is additive, never
+    retroactively stricter."""
+    payload = _conserved_payload()
+    for w in payload["windows"].values():
+        del w["res_quantile_drifting"]
+    v = gates.evaluate(payload)
+    assert v["verdict"] == "PASS"
+    assert v["per_window"]["W1"]["beta_control_beyond_drifting_null_ok"] is True
 
 
 def test_liquidity_and_bounce_labels_do_not_change_verdict():
@@ -262,12 +294,28 @@ def _floor_and_symbols(alive, w):
     return floor["e_floor"], floor["w_judged"]
 
 
+def _drifting_res_quantile(returns, alive, symbols, variant, *, seed=53, n_reps=60):
+    """DEC-76 Entscheidung 1 (b), test helper: the SAME recomputation
+    ``run_full`` does per window -- the drifting factor null's own
+    residualized-mean-IC quantile, sized to THIS fixture's real K
+    series/W. Used by the four end-to-end scenarios below to exercise the
+    new beta-control component with a genuine (not hand-picked) value."""
+    fp = nulls.factor_preserving_null(returns, alive, symbols, variants=(variant,),
+                                       n_reps=n_reps, seed=seed, drift_f=nulls.DRIFT_F_DRIFTING)
+    return fp["variants"][variant]["quantile_one_sided_residualized"]
+
+
 def test_positive_fixture_end_to_end_pass():
     seed, k, w = 0, 120, 52
     rng = np.random.default_rng(seed)
     symbols = [f"s{i}" for i in range(k)] + ["BTCUSDT"]
     k_full = k + 1
-    target_rho = 0.08
+    # DEC-76 (b): the beta-control PASS component must ALSO clear the drifting null's own
+    # residualized-mean-IC quantile (report-only under DEC-75, now a real gate input) -- a
+    # stronger injected signal than the pre-DEC-76 target_rho=0.08 is needed for that,
+    # since (as DEC-76's "Anlass" finding shows) even RESIDUALIZED noise has real spread at
+    # this K/W once heterogeneous beta hedging is imperfect.
+    target_rho = 0.30
     returns = rng.normal(0, 0.03, size=(w, k_full))
     characteristic = rng.normal(0, 1, size=(w, k_full))
     a = target_rho / math.sqrt(max(1 - target_rho ** 2, 1e-9))
@@ -276,6 +324,7 @@ def test_positive_fixture_end_to_end_pass():
     beta_8w = characteristics.beta_characteristic(returns, symbols, market_symbol="BTCUSDT",
                                                     trail_win=8, min_weeks=4)
     e_floor, w_judged = _floor_and_symbols(alive, w)
+    rqd = _drifting_res_quantile(returns, alive, symbols, "mom1", n_reps=300)   # DEC-76 (b)
 
     res = run_mod.run_hypothesis(
         "H-POS", "mom1", "positive",
@@ -284,8 +333,10 @@ def test_positive_fixture_end_to_end_pass():
         {"W1": 0.02, "W2": 0.02}, {"W1": w_judged, "W2": w_judged},
         {"W1": e_floor, "W2": e_floor}, {"W1": 0.005, "W2": 0.005},
         beta_8w_pit_by_window={"W1": beta_8w, "W2": beta_8w},
-        n_reps_bootstrap=200, n_reps_permutation=200, seed=53)
-    assert res["verdict"]["verdict"] == "PASS"
+        n_reps_bootstrap=200, n_reps_permutation=200, seed=53,
+        res_quantile_drifting_by_window={"W1": rqd, "W2": rqd})
+    assert res["verdict"]["verdict"] == "PASS"                      # real signal clears the null quantile too
+    assert res["payload"]["windows"]["W1"]["res_quantile_drifting"] == pytest.approx(rqd)
 
 
 def test_null_fixture_end_to_end_drop():
@@ -299,6 +350,7 @@ def test_null_fixture_end_to_end_drop():
     beta_8w = characteristics.beta_characteristic(returns, symbols, market_symbol="BTCUSDT",
                                                     trail_win=8, min_weeks=4)
     e_floor, w_judged = _floor_and_symbols(alive, w)
+    rqd = _drifting_res_quantile(returns, alive, symbols, "mom1")   # DEC-76 (b)
 
     res = run_mod.run_hypothesis(
         "H-NULL", "mom1", "positive",
@@ -307,7 +359,8 @@ def test_null_fixture_end_to_end_drop():
         {"W1": 0.02, "W2": 0.02}, {"W1": w_judged, "W2": w_judged},
         {"W1": e_floor, "W2": e_floor}, {"W1": 0.005, "W2": 0.005},
         beta_8w_pit_by_window={"W1": beta_8w, "W2": beta_8w},
-        n_reps_bootstrap=200, n_reps_permutation=200, seed=53)
+        n_reps_bootstrap=200, n_reps_permutation=200, seed=53,
+        res_quantile_drifting_by_window={"W1": rqd, "W2": rqd})
     assert res["verdict"]["verdict"] == "DROP"
 
 
@@ -334,6 +387,9 @@ def test_adversarial_beta_fixture_end_to_end_drop():
     beta_8w = characteristics.beta_characteristic(returns_full, symbols, market_symbol="BTCUSDT",
                                                     trail_win=8, min_weeks=4)
     e_floor, w_judged = _floor_and_symbols(alive, w)
+    # DEC-76 (b): the SAME drifting-null quantile a real run would recompute for this window --
+    # the adversarial fixture's own residualized IC must fail to clear it (Anlass, verbatim).
+    rqd = _drifting_res_quantile(returns_full, alive, symbols, "mom1", n_reps=100)
 
     res = run_mod.run_hypothesis(
         "H-ADV", "mom1", "positive",
@@ -342,10 +398,23 @@ def test_adversarial_beta_fixture_end_to_end_drop():
         {"W1": 0.02, "W2": 0.02}, {"W1": w_judged, "W2": w_judged},
         {"W1": e_floor, "W2": e_floor}, {"W1": 0.005, "W2": 0.005},
         beta_8w_pit_by_window={"W1": beta_8w, "W2": beta_8w},
-        n_reps_bootstrap=200, n_reps_permutation=200, seed=53)
+        n_reps_bootstrap=200, n_reps_permutation=200, seed=53,
+        res_quantile_drifting_by_window={"W1": rqd, "W2": rqd})
     assert res["verdict"]["verdict"] == "DROP"
     w1 = res["payload"]["windows"]["W1"]
     assert abs(w1["residualized_mean_ic"]) < abs(w1["mean_ic"]) or abs(w1["residualized_mean_ic"]) < w1["ic_min_capped"]
+    assert w1["res_quantile_drifting"] == pytest.approx(rqd)
+    assert v_beta_control_ok(w1) is False
+
+
+def v_beta_control_ok(w1_payload: dict) -> bool:
+    """Small local re-derivation of ``gates._window_pass``'s beta-control-
+    beyond-null component, for a direct assertion without reaching into
+    ``gates``'s private function."""
+    resid_ic, quantile = w1_payload["residualized_mean_ic"], w1_payload["res_quantile_drifting"]
+    if resid_ic is None or quantile is None:
+        return False
+    return resid_ic > quantile   # H-ADV is registered "positive"
 
 
 def test_bounce_fixture_end_to_end_label_not_verdict_change():
@@ -358,6 +427,7 @@ def test_bounce_fixture_end_to_end_label_not_verdict_change():
         w["mean_ic"] = -w["mean_ic"]
         w["ci_bound_toward_sign"] = -w["ci_bound_toward_sign"]
         w["residualized_mean_ic"] = -w["residualized_mean_ic"]
+        w["res_quantile_drifting"] = -w["res_quantile_drifting"]   # DEC-76 (b): negative-direction quantile
     bounce = run_mod.bounce_fixture_ic(60, 60, seed=53)
     payload["bounce_ic"] = max(abs(bounce["ic_bounce"]), abs(payload["windows"]["W1"]["mean_ic"]) + 0.05)
     v = gates.evaluate(payload)
@@ -454,6 +524,164 @@ def test_run_full_h30_uses_vol_weighted_outcome_not_raw_returns():
     assert weighted.shape == returns.shape
     assert not np.allclose(weighted[1:-1], returns[1:-1], equal_nan=True)
     assert np.isnan(weighted[0]).all()               # no formation week -1
+
+
+# ============================================================================
+# DEC-76 Entscheidung 1 (b)/(c) / Task A item 3: null-calibration assertion
+# ============================================================================
+
+def _build_run_fixture_tree_large(tmp_path: Path):
+    """Like :func:`_build_run_fixture_tree`, but with >= 10 SURVIVOR
+    symbols (plus BTCUSDT) so every week clears ``ic.weekly_ic_series``'s
+    ``min_universe=10`` floor and the DEC-76 null constants come out
+    FINITE (the small 4-survivor fixture above is too thin for that --
+    every week is NaN there, which is realistic for that fixture's OWN
+    purpose but useless for a calibration-value comparison)."""
+    surv_base = tmp_path / "panel_1d"
+    surv_manifest = surv_base / "panel_manifest.sqlite"
+    del_base = tmp_path / "panel_1d_delisted"
+    del_manifest = del_base / "panel_manifest.sqlite"
+
+    full_start, full_end = date(2021, 1, 1), date(2026, 6, 30)
+    symbols = ["BTCUSDT"] + [f"SYM{i:02d}USDT" for i in range(11)]
+    for i, sym in enumerate(symbols):
+        _write_full_history(surv_base, surv_manifest, sym,
+                             _closes(full_start, full_end, seed=i + 1), as_of_date=full_end)
+    delist_date = date(2025, 2, 10)
+    _write_full_history(del_base, del_manifest, "MMMUSDT",
+                         _closes(full_start, delist_date, seed=99), as_of_date=delist_date)
+    dd = delisted_panel.write_delisting_dates_json(del_base, {
+        "MMMUSDT": {"delist_date": delist_date.isoformat(), "announcement_id": "ann-mmmusdt",
+                    "source": "delisting_ms"}})
+
+    as_of = date(2027, 1, 1)
+    panel = panel_load.load_panel_union(
+        surv_base, surv_manifest, del_base, del_manifest,
+        year_start=2021, year_end=2026, as_of=as_of, delisting_dates_path=Path(dd["path"]))
+    weekly = panel_load.weekly_returns_and_mask_union(panel, panel["last_alive_day"])
+    return panel, weekly
+
+
+def _registered_for_large_fixture() -> dict:
+    ic_min_all = {v: 0.02 for v in characteristics.VARIANT_NAMES}
+    return {
+        "hypotheses": {"H-28": {"variant": "mom1", "direction": "positive"}},
+        "windows": {
+            "W1": {"start": "2024-07-01", "end": "2025-06-30", "ic_min_capped": ic_min_all},
+            "W2": {"start": "2025-07-01", "end": "2026-06-30", "ic_min_capped": ic_min_all},
+        },
+        "rules": {"seed": 53, "n_reps_bootstrap": 20, "n_reps_permutation": 20, "n_reps_factor_null": 30},
+    }
+
+
+def test_run_full_null_calibration_report_present_and_matches_recomputation(tmp_path):
+    """No frozen constants in the registered YAML (pre-DEC-76 shape,
+    backward compatible): ``run_full`` falls back to its OWN recomputed
+    DEC-76 null constants (no assertion, documented) and reports them
+    under ``report["null_calibration"]``."""
+    panel, weekly = _build_run_fixture_tree_large(tmp_path)
+    registered = _registered_for_large_fixture()
+    report = run_mod.run_full(panel, weekly, registered)
+
+    nc = report["null_calibration"]
+    assert set(nc.keys()) == {"W1", "W2"}
+    for wn in ("W1", "W2"):
+        assert nc[wn]["ceiling_driftfree_res_registered"] is None
+        assert math.isfinite(nc[wn]["ceiling_driftfree_res_recomputed"])
+        for v in characteristics.VARIANT_NAMES:
+            assert math.isfinite(nc[wn]["res_quantile_drifting_recomputed"][v])
+    # the FALLBACK (no registered value) means the payload's own res_quantile_drifting
+    # is exactly the recomputed value (no frozen constant to prefer instead).
+    h28 = report["results"]["H-28"]["payload"]["windows"]["W1"]
+    assert h28["res_quantile_drifting"] == pytest.approx(nc["W1"]["res_quantile_drifting_recomputed"]["mom1"])
+
+
+def test_run_full_uses_frozen_registered_null_constants_within_tolerance(tmp_path):
+    """A registered YAML that DOES carry ``res_quantile_drifting``/
+    ``ceiling_driftfree_res`` (values within tolerance of what the run's
+    own recomputation gets, deterministically -- same seed/panel/rules):
+    ``run_full`` must NOT raise, and every hypothesis's payload must carry
+    the FROZEN (registered) value, never the recomputed one, even though
+    here they happen to be numerically identical."""
+    panel, weekly = _build_run_fixture_tree_large(tmp_path)
+    baseline = run_mod.run_full(panel, weekly, _registered_for_large_fixture())
+    nc = baseline["null_calibration"]
+
+    registered = _registered_for_large_fixture()
+    for wn in ("W1", "W2"):
+        registered["windows"][wn]["ceiling_driftfree_res"] = nc[wn]["ceiling_driftfree_res_recomputed"]
+        registered["windows"][wn]["res_quantile_drifting"] = dict(nc[wn]["res_quantile_drifting_recomputed"])
+
+    report = run_mod.run_full(panel, weekly, registered)      # must not raise NullCalibrationError
+    h28 = report["results"]["H-28"]["payload"]["windows"]["W1"]
+    assert h28["res_quantile_drifting"] == pytest.approx(registered["windows"]["W1"]["res_quantile_drifting"]["mom1"])
+
+
+def test_run_full_raises_null_calibration_error_when_registered_has_drifted(tmp_path):
+    """A registered constant that has drifted far (>10%) from what the
+    run's own recomputation gets is a LOUD FAIL (C.14): the whole run
+    aborts with ``NullCalibrationError``, BEFORE any hypothesis gets a
+    verdict -- DEC-76 Task A item 3, verbatim."""
+    panel, weekly = _build_run_fixture_tree(tmp_path)
+    registered = _registered_for_fixture()
+    registered["windows"]["W1"]["ceiling_driftfree_res"] = 999.0    # wildly stale
+    with pytest.raises(run_mod.NullCalibrationError, match="Null-Kalibrierung weicht ab"):
+        run_mod.run_full(panel, weekly, registered)
+
+
+def test_run_full_raises_null_calibration_error_on_stale_per_variant_quantile(tmp_path):
+    panel, weekly = _build_run_fixture_tree(tmp_path)
+    registered = _registered_for_fixture()
+    registered["windows"]["W1"]["res_quantile_drifting"] = {v: 999.0 for v in characteristics.VARIANT_NAMES}
+    with pytest.raises(run_mod.NullCalibrationError, match="Null-Kalibrierung weicht ab"):
+        run_mod.run_full(panel, weekly, registered)
+
+
+def test_assert_null_calibration_pure_function():
+    run_mod.assert_null_calibration(0.05, None, label="no-op")            # registered absent -> no-op
+    run_mod.assert_null_calibration(0.05, 0.052, label="within tol")      # ~4% off, within +/-10%
+    with pytest.raises(run_mod.NullCalibrationError):
+        run_mod.assert_null_calibration(0.05, 0.10, label="drifted")      # 100% off
+    run_mod.assert_null_calibration(1e-6, 0.0, label="zero, abs tol")     # registered==0 -> absolute tolerance
+    with pytest.raises(run_mod.NullCalibrationError):
+        run_mod.assert_null_calibration(0.01, 0.0, label="zero, too far")
+
+
+# ============================================================================
+# DEC-76 Task A item 4: --emit-registered-template
+# ============================================================================
+
+def test_cli_emit_registered_template_writes_yaml_skeleton_from_prelaunch_artifact(tmp_path):
+    from bybit_edge.research.wp13_xsec import prelaunch as prelaunch_mod
+    from tests.unit.test_wp13_xsec import _build_prelaunch_fixture_tree
+
+    panel, weekly, _sb, _sm, _db, del_manifest, dd_path = _build_prelaunch_fixture_tree(tmp_path)
+    prelaunch_report = prelaunch_mod.assemble_prelaunch_report(
+        panel, weekly, delisted_manifest_path=del_manifest, delisting_dates_path=dd_path,
+        n_sims=5, n_reps_factor_null=5, seed=53)
+    artifacts = prelaunch_mod.write_prelaunch_artifacts(tmp_path / "prelaunch_out", prelaunch_report)
+    prelaunch_json = artifacts["artifacts"]["wp13a_prelaunch_json"]["path"]
+
+    out_yaml = tmp_path / "registered_template.yaml"
+    rc = WP13.cmd_emit_registered_template(prelaunch_json, str(out_yaml))
+    assert rc == 0
+    assert out_yaml.is_file()
+
+    loaded = run_mod.load_registered_yaml(out_yaml)     # round-trips through the real YAML loader
+    assert set(loaded["hypotheses"].keys()) == {"H-28", "H-29", "H-30"}
+    assert loaded["hypotheses"]["H-30"]["outcome"] == "vol_weighted"
+    for wn in ("W1", "W2"):
+        assert wn in loaded["windows"]
+        assert set(loaded["windows"][wn]["ic_min_capped"].keys()) == set(characteristics.VARIANT_NAMES)
+        assert "res_quantile_drifting" in loaded["windows"][wn]
+        assert "ceiling_driftfree_res" in loaded["windows"][wn]
+    assert loaded["rules"]["seed"] == 53 and loaded["rules"]["n_reps"] >= 1000
+
+
+def test_cli_emit_registered_template_missing_input_file_is_loud_fail(tmp_path):
+    rc = WP13.cmd_emit_registered_template(str(tmp_path / "nonexistent.json"), str(tmp_path / "out.yaml"))
+    assert rc == 1
+    assert not (tmp_path / "out.yaml").exists()
 
 
 def test_run_full_never_writes_under_data_harvest(tmp_path):

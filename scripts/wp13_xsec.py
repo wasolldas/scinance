@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
-"""WP-13 Runner: F-XSEC1 (H-28/H-29/H-30), Klasse W (PRD 5.3, DEC-73/74).
+"""WP-13 Runner: F-XSEC1 (H-28/H-29/H-30), Klasse W (PRD 5.3, DEC-73/74/75/76).
 
-**Nur ein Modus existiert bisher, per DEC-74 Entscheidung 3 (Vorlauf
-WP-13a):**
+**Zwei Modi (DEC-75 Entscheidung 2), plus ein Hilfsbefehl (DEC-76 Task A
+item 4):**
 
   python scripts/wp13_xsec.py --prelaunch \
       --panel-base data/panel_1d --delisted-base data/panel_1d_delisted \
@@ -12,23 +12,80 @@ liefert AUSSCHLIESSLICH DEC-74 Entscheidung 2 (a) (Rauschboden-
 Formel je Fenster), (b)/(c) (Persistenz-Null + c_rho + IC_min),
 (g) (Gate-(5)-Erreichbarkeit, KEIN Outcome), (h) (H-30-Feasibility auf L),
 die Delisting-Symbol-Wochen-Zaehlung + NO_HISTORY-Symbole aus (i),
-STRESS_REL/STRESS_ABS-Abdeckung und die Selektions-Decke (analytisch +
-gemessen). **Berechnet NIEMALS eine reale Charakteristik-gegen-reale-
-Folgewochenrendite-IC** (Siegel-Test, DEC-74 Entscheidung 3) -- der
-Lauf-Modus (die eigentliche H-28/H-29/H-30-Messung) wird erst gegen die
-Zweitfassung der Registrierung gebaut.
+STRESS_REL/STRESS_ABS-Abdeckung, die Selektions-Decke (analytisch +
+gemessen) und (DEC-76 Vorlauf v3, Entscheidung 2) die faktorerhaltende
+Null in ZWEI Konfigurationen (drifting/driftfree, roh + residualisiert).
+**Berechnet NIEMALS eine reale Charakteristik-gegen-reale-Folgewochen-
+rendite-IC** (Siegel-Test, DEC-74 Entscheidung 3).
+
+  python scripts/wp13_xsec.py --run \
+      --registered path/to/drittfassung.yaml --registered-sha256 <sha256> \
+      --panel-base data/panel_1d --delisted-base data/panel_1d_delisted \
+      --out scinance3-impl/state/wp13_run_YYYYMMDD
+
+der eigentliche H-28/H-29/H-30-Lauf (DEC-75 Entscheidung 1/2, DEC-76
+Entscheidung 1), mit STARTSPERRE (siehe ``cmd_run``'s Docstring). Die
+``--registered``-YAML (die Drittfassung) MUSS folgende Schluessel tragen
+(``run.REGISTERED_SCHEMA_HINT``, verbatim hier gespiegelt):
+
+    hypotheses:
+      H-xx: {variant: <einer der 7 F-XSEC1-Namen>, direction: positive|negative,
+             outcome?: vol_weighted}          # nur H-30
+    windows:
+      W1: {start: <ISO-Datum>, end: <ISO-Datum>,
+           ic_min_capped: {<variant>: <float>, ...},   # DEC-74 (a)+(d)/DEC-75 (8)
+           w_judged: <int>,                             # DEC-75 Entscheidung 1 (1)
+           res_quantile_drifting: {<variant>: <float>, ...},  # DEC-76 (b), optional*
+           ceiling_driftfree_res: <float>}              # DEC-76 (c), optional*
+      W2: {...}
+      L: {start: <ISO-Datum>, end: <ISO-Datum>}          # optional, descriptive/sealed only
+    rules:
+      seed: 53
+      n_reps: 1000            # bootstrap/permutation/factor-null reps, >= 1000 (DEC-75/76)
+      block_len: 4            # FIXED DEC-75 constant, recorded for audit only (code hardcodes 4)
+      level: 0.9936           # one-sided CI/quantile level (1 - 0.0064)
+      bh_alpha: 0.10           # report-only BH-FDR alpha (DEC-75 Entscheidung 1 (6))
+
+  * ``res_quantile_drifting``/``ceiling_driftfree_res`` are the DEC-76
+    Entscheidung 1 (b)/(c) FROZEN null constants -- ``--run`` RECOMPUTES
+    both on the real K series/``W_judged`` (seed 53, ``rules.n_reps``
+    reps) and asserts each is within +/-10% of these frozen values
+    (``run.assert_null_calibration``), else loud fail ("Null-Kalibrierung
+    weicht ab", no verdict for ANY hypothesis in the run) -- see
+    ``run.py``'s module docstring. Omitting them (a pre-DEC-76 registered
+    file) skips the assertion and falls back to the recomputed value,
+    documented, not a registered Drittfassung run.
+
+  python scripts/wp13_xsec.py --emit-registered-template \
+      scinance3-impl/state/wp13a_YYYYMMDD/wp13a_prelaunch.json \
+      scinance3-impl/state/wp13a_YYYYMMDD/registered_template.yaml
+
+liest EINEN ``--prelaunch``-Artefakt (DEC-76 Vorlauf v3 oder spaeter) und
+schreibt genau das obige YAML-Skelett (``ic_min_capped``, ``w_judged``,
+``res_quantile_drifting`` aus ``factor_preserving_null.drifting``,
+``ceiling_driftfree_res`` aus ``factor_preserving_null.driftfree``, plus
+``rules``) fuer W1/W2 -- die Drittfassung zitiert den sha256 dieser
+Ausgabedatei (geloggt) als ihren ``--registered-sha256``-Wert. Die
+``hypotheses``-Zuordnung (welche Variante zu H-28/H-29/H-30 gehoert) ist
+NICHT im Vorlauf enthalten und wird als PRD-5.3-Standardbelegung
+(H-28=mom1 positiv, H-29=rev_gap negativ, H-30=vol_rv negativ/
+vol_weighted) vorbelegt -- vom Orchestrator vor der Registrierung zu
+pruefen/anzupassen, nie automatisch scharf geschaltet.
 """
 from __future__ import annotations
 
 import argparse
+import json
 import sys
 from datetime import date
 from pathlib import Path
 
+import yaml
+
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
 from bybit_edge.research.wp7_universe import panel_load, panel_store  # noqa: E402
-from bybit_edge.research.wp13_xsec import prelaunch, run as run_mod  # noqa: E402
+from bybit_edge.research.wp13_xsec import characteristics, prelaunch, run as run_mod  # noqa: E402
 
 
 def log(msg: str) -> None:
@@ -169,6 +226,77 @@ def cmd_run(a: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_emit_registered_template(prelaunch_json_path: str, out_yaml_path: str) -> int:
+    """DEC-76 Task A item 4: reads a ``--prelaunch`` artifact (DEC-76
+    Vorlauf v3 or later -- needs ``factor_preserving_null.{drifting,
+    driftfree}``) and writes the registered-YAML SKELETON
+    (``run.REGISTERED_SCHEMA_HINT``'s shape) -- ``ic_min_capped``/
+    ``w_judged`` from ``noise_floor_and_threshold``, ``res_quantile_
+    drifting`` from ``factor_preserving_null.drifting.variants.<v>.
+    quantile_one_sided_residualized``, ``ceiling_driftfree_res`` from
+    ``factor_preserving_null.driftfree.selection_ceiling_mean_of_max_
+    residualized`` -- for W1/W2. Never registers anything itself (no
+    sha256 check here) -- the Orchestrator reviews the written file, then
+    cites ITS sha256 (logged below) in the Drittfassung."""
+    in_path = Path(prelaunch_json_path)
+    out_path_check = Path(out_yaml_path)
+    if "data/harvest" in out_path_check.as_posix():
+        log(f"FEHLER: schreibe nie unter data/harvest: {out_path_check}")
+        return 1
+    if not in_path.is_file():
+        log(f"FEHLER: kein Vorlauf-Artefakt unter {in_path}")
+        return 1
+    report = json.loads(in_path.read_text(encoding="utf-8"))
+    variants = report.get("variants", list(characteristics.VARIANT_NAMES))
+
+    windows_out: dict[str, dict] = {}
+    for wname in ("W1", "W2"):
+        w = report.get("windows", {}).get(wname)
+        if not w or not w.get("available"):
+            log(f"  Fenster {wname}: nicht verfuegbar im Vorlauf-Artefakt -- uebersprungen.")
+            continue
+        nf = w.get("noise_floor_and_threshold", {})
+        fp = w.get("factor_preserving_null", {})
+        drifting, driftfree = fp.get("drifting", {}), fp.get("driftfree", {})
+        res_quantile_drifting = {
+            v: drifting.get("variants", {}).get(v, {}).get("quantile_one_sided_residualized")
+            for v in variants
+        }
+        windows_out[wname] = {
+            "start": w["start"], "end": w["end"],
+            "ic_min_capped": nf.get("ic_min_capped_per_variant", {}),
+            "w_judged": nf.get("w_judged"),
+            "res_quantile_drifting": res_quantile_drifting,
+            "ceiling_driftfree_res": driftfree.get("selection_ceiling_mean_of_max_residualized"),
+        }
+    if "L" in report.get("windows", {}):
+        wl = report["windows"]["L"]
+        if wl.get("available") and "start" in wl and "end" in wl:
+            windows_out["L"] = {"start": wl["start"], "end": wl["end"]}
+
+    template = {
+        "hypotheses": {
+            "H-28": {"variant": "mom1", "direction": "positive"},
+            "H-29": {"variant": "rev_gap", "direction": "negative"},
+            "H-30": {"variant": "vol_rv", "direction": "negative", "outcome": "vol_weighted"},
+        },
+        "windows": windows_out,
+        "rules": {"seed": 53, "n_reps": 1000, "block_len": 4, "level": 0.9936, "bh_alpha": 0.10},
+    }
+
+    out_path = Path(out_yaml_path)
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+    out_path.write_text(
+        "# DEC-76 Task A item 4: automatisch aus einem --prelaunch-Artefakt erzeugtes Skelett.\n"
+        "# hypotheses: NICHT automatisch geprueft -- Orchestrator bestaetigt vor der Registrierung.\n"
+        + yaml.safe_dump(template, sort_keys=False, allow_unicode=True),
+        encoding="utf-8")
+    log(f"Quelle: {in_path} sha256={panel_load.sha256_file(in_path)}")
+    log(f"Registrierungs-Vorlage geschrieben: {out_path} sha256={panel_load.sha256_file(out_path)}")
+    log("Pruefung Pflicht: hypotheses-Zuordnung und alle Werte vor der Registrierung bestaetigen.")
+    return 0
+
+
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--prelaunch", action="store_true",
@@ -176,6 +304,11 @@ def main() -> int:
     ap.add_argument("--run", action="store_true",
                      help="Lauf-Modus (DEC-75 Entscheidung 2, Startsperre): braucht --registered "
                           "und --registered-sha256.")
+    ap.add_argument("--emit-registered-template", nargs=2, default=None,
+                     metavar=("PRELAUNCH_JSON", "OUT_YAML"),
+                     help="DEC-76 Task A item 4: liest einen --prelaunch-Artefakt und schreibt das "
+                          "Registrierungs-YAML-Skelett (ic_min_capped, w_judged, res_quantile_drifting, "
+                          "ceiling_driftfree_res, rules) nach OUT_YAML -- kein Panel-Zugriff, kein Lauf.")
     ap.add_argument("--registered", default="",
                      help="Pfad zur registrierten Schwellen-YAML (Drittfassung).")
     ap.add_argument("--registered-sha256", default="",
@@ -202,6 +335,12 @@ def main() -> int:
     ap.add_argument("--stress-rel", default="scinance3-impl/state/wp10_stress_canon/stress_rel.json")
     ap.add_argument("--stress-abs", default="scinance3-impl/state/wp10_stress_canon/stress_abs.json")
     a = ap.parse_args()
+
+    if a.emit_registered_template is not None:
+        if a.prelaunch or a.run:
+            ap.error("--emit-registered-template ist ein eigenstaendiger Modus, nicht mit "
+                      "--prelaunch/--run kombinierbar")
+        return cmd_emit_registered_template(*a.emit_registered_template)
 
     if a.prelaunch and a.run:
         ap.error("genau EINEN Modus waehlen: --prelaunch ODER --run, nicht beide")
