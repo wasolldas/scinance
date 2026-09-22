@@ -334,3 +334,9 @@ data_fingerprints: ["union a7e4dec7cb7475426f477c6d17359007b75026b2f8562b29e6645
 stats3_version: "wp13_xsec 94aa9e6 (Vorlauf); Lauf-Commit im GL-Eintrag"
 bedingung_welle_1: [WP-7 B2, WP-12b, WP-13a]
 ```
+
+---
+
+## Rueckzug der Zweitfassung H-28/H-29/H-30 vom 2026-09-22 - append-only, kein Lauf erfolgt
+
+**Datum:** 2026-09-22 (Orchestrator) nach dem zweiten adversarischen Opus-Review (`state/REVIEW_H28_H30_v2.md`, DEC-75). Die Zweitfassung bleibt stehen und ist **zurueckgezogen**; kein Treiber gegen sie gebaut, keine IC-Serie gelesen. Bindend fuer die Drittfassung: urteilstragende SE = max(Permutationsboden, SD der realen IC-Serie)/sqrt(W_geurteilt) mit Wochen-Block-Bootstrap (der Permutationsboden unterschaetzt die Querschnitts-Varianz bei heterogenem Beta um Faktor ~1,8); Decke und Permutations-p auf faktorerhaltender Null; Beta-Kontrolle (markt-residualisierter Outcome) als zusaetzliche PASS-Bedingung; H-30 Gewicht PIT (`vol_rv[t]`) und Drag-Definition eindeutig, Feasibility ueber rohen Dezil-Drag-Spread und Schaetzfehler; PRD-Kills (3)/(4) wieder aufgenommen mit Drawdown-Survivorship-Fixture; Gate (2)/(3) report-only (nachweislich nie bindend); vollstaendiger Gate-Text (1)-(7); T3/T4/T6; Deckelung `max(1, c_rho)` als Abweichung registriert und im Code; bias-korrigiertes rho; W = geurteilte Wochen 52/51. Unveraendert uebernehmbar: Fenster, K-Reihen, Boden 0,04849/0,04190, Delisting-Zaehlung 80/140, NO_HISTORY-Liste, Gate-(5)-Erreichbarkeit 0,159/0,142, Stress-Abdeckung, Seed 53, `close_at_last`, K = 7, Familienstruktur.
