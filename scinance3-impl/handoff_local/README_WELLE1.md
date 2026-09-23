@@ -21,3 +21,12 @@ ab, ist das ein Ergebnis (Ausgabe hochladen), kein Fehler des Nutzers.
 Was NACH Welle 1 passiert, entscheidet der Orchestrator nach den Befunden
 (PRD 3.0 Abschnitt 4 und 9.3): erst dann wird ein Alpha-Kandidat
 registriert - niemals vorher.
+
+## Regel ab 2026-09-23: EIN Befehl (Nutzer-Auflage)
+
+Der Nutzer erhaelt pro Runde genau EINEN Befehl; Reihenfolgen und
+Upload-Anweisungen entfallen. `nacht.ps1` fuehrt alle offenen Aufgaben
+nacheinander aus, kopiert die Ergebnisse (Dateien <= 5 MB) nach
+`state\runs\` und pusht sie auf den Arbeitsbranch; der Orchestrator liest
+sie aus dem Repo. Der Orchestrator pflegt die Standard-Aufgabenliste in
+`nacht.ps1` (`-Tasks`) und nennt bei Bedarf Zusatzparameter im selben Befehl.
