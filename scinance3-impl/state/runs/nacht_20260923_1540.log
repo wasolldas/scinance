@@ -1,0 +1,434 @@
+﻿**********************
+nStart der Windows PowerShell-Aufzeichnung
+Startzeit: 20260923154048
+Benutzername: PC2022\wguen
+RunAs-Benutzer: PC2022\wguen
+Konfigurationsname: 
+Computer: PC2022 (Microsoft Windows NT 10.0.26200.0)
+Hostanwendung: C:\WINDOWS\System32\WindowsPowerShell\v1.0\powershell.exe -ExecutionPolicy Bypass -File .\scinance3-impl\handoff_local\nacht.ps1
+Prozess-ID: 31044
+PSVersion: 5.1.26100.9549
+PSEdition: Desktop
+PSCompatibleVersions: 1.0, 2.0, 3.0, 4.0, 5.0, 5.1.26100.9549
+BuildVersion: 10.0.26100.9549
+CLRVersion: 4.0.30319.42000
+WSManStackVersion: 3.0
+PSRemotingProtocolVersion: 2.3
+SerializationVersion: 1.1.0.1
+**********************
+=== nacht.ps1 20260923_1540 : Tasks = wp13a, wp10b ===
+From https://github.com/wasolldas/scinance
+ * branch            claude/subagent-prd-development-T16fE -> FETCH_HEAD
+Already up to date.
+abe7738 feat(handoff): nacht.ps1 - ein Befehl fuer alle offenen Laeufe, Ergebnisse nach state/runs committen und pushen; Nutzer-Auflage dokumentiert; Duplikate 2026-08-13 bestaetigt
+
+##### START wp13a  2026-09-23 15:40:49 #####
+=== WP-13a Vorlauf (DEC-74 Entscheidung 3) -> E:\Claude\Projects\scinance\scinance3-impl\state\wp13a_20260923 ===
+[1/4] Union-Panel laden (panel_1d + panel_1d_delisted, as_of=2026-09-23)
+  1138 Symbole (877 Ueberlebende + 261 delistet), 2085 Tage.
+[2/4] Woechentliche Renditen + PIT-Alive-Maske (Union)
+  299 Wochen (2020-12-28..2026-09-14)
+[3/4] Vorlauf-Report zusammenstellen (n_sims=1000, seed=53, convention=close_at_last) -- KEINE reale Signal-Outcome-IC
+  Fenster W1: 53 Wochen, Delisting-Symbol-Wochen=80, Gate(5) erreichbar=True
+  Fenster W2: 52 Wochen, Delisting-Symbol-Wochen=140, Gate(5) erreichbar=True
+  Fenster L: 174 Wochen, Delisting-Symbol-Wochen=17, Gate(5) erreichbar=True
+[4/4] DEC-53-Artefakte schreiben
+  wp13a_prelaunch_json: E:\Claude\Projects\scinance\scinance3-impl\state\wp13a_20260923\wp13a_prelaunch.json sha256=b0ce
+fe3b535e5c1657581b477515d5251d10bac9037af90309cdb36fa14b6dc5
+  l_window_sealed_json: E:\Claude\Projects\scinance\scinance3-impl\state\wp13a_20260923\wp13a_prelaunch_L_window_sealed.
+json sha256=9ff90d2ecdc8b36a3acac1aee4f40de0d8ff179e0353c1015a503b4a95f83a05
+  wp13a_prelaunch_md: E:\Claude\Projects\scinance\scinance3-impl\state\wp13a_20260923\wp13a_prelaunch.md sha256=e007c9f0
+0e064e7289e5966dca8e6404948c74c21df82fcd9ea9851889045c1f
+Report geschrieben: E:\Claude\Projects\scinance\scinance3-impl\state\wp13a_20260923
+KEIN VERDIKT -- Vorlauf berechnet keine reale Signal-Outcome-Verknuepfung (DEC-74 Entscheidung 3).
+
+Ergebnis in: E:\Claude\Projects\scinance\scinance3-impl\state\wp13a_20260923
+Bitte wp13a_prelaunch.md und wp13a_prelaunch.json hochladen (rc=0).
+Hinweis: KEIN VERDIKT -- der Vorlauf berechnet keine reale Signal-Outcome-Verknuepfung (Siegel-Test, DEC-74 Entscheidung
+ 3).
+##### ENDE  wp13a  rc=0  Dauer=134 min #####
+
+##### START wp10b  2026-09-23 17:54:47 #####
+=== WP-10(B) Schritt 1: Positivkontrolle (PRD 3.3.8) ===
+[wp10b] Positivkontrolle (PRD 3.3.8) ...
+[wp10b]   clean_fill: OK
+[wp10b]   no_fill: OK
+{
+  "ok": true,
+  "checks": [
+    {
+      "name": "clean_fill",
+      "expect": {
+        "fifo_filled": true,
+        "fifo_fill_time_ms": 1700000015000,
+        "prorata_filled": true,
+        "prorata_fill_time_ms": 1700000015000,
+        "adv_sel_bp_approx": 50.0
+      },
+      "got": {
+        "fifo_filled": true,
+        "fifo_fill_time_ms": 1700000015000,
+        "prorata_filled": true,
+        "prorata_fill_time_ms": 1700000015000,
+        "fifo_adv_sel_bp": 50.0
+      },
+      "passed": true
+    },
+    {
+      "name": "no_fill",
+      "expect": {
+        "fifo_filled": false,
+        "fifo_fill_time_ms": null,
+        "prorata_filled": false,
+        "prorata_fill_time_ms": null
+      },
+      "got": {
+        "fifo_filled": false,
+        "fifo_fill_time_ms": null,
+        "prorata_filled": false,
+        "prorata_fill_time_ms": null
+      },
+      "passed": true
+    }
+  ]
+}
+[wp10b] Positivkontrolle bestanden.
+
+=== WP-10(B) Schritt 2: Probe (BTCUSDT,ETHUSDT, 2026-06-22..2026-09-23) ===
+[wp10b] probe BTCUSDT: ob_present=69 trade_present=82 eligible_for_placement=69
+[wp10b] probe ETHUSDT: ob_present=69 trade_present=82 eligible_for_placement=69
+{
+  "BTCUSDT": {
+    "symbol": "BTCUSDT",
+    "exchange": "bybit",
+    "range": [
+      "2026-06-22",
+      "2026-09-23"
+    ],
+    "days_in_range": 94,
+    "orderbook_days_present": 69,
+    "trade_days_present": 82,
+    "orderbook_stream_dir_exists": true,
+    "trade_stream_dir_exists": true,
+    "orderbook_days_compacted": 69,
+    "trade_days_compacted": 69,
+    "orderbook_days_done": 2,
+    "trade_days_done": 66,
+    "days_eligible_for_placement": 69,
+    "eligibility_rule": "manifest DONE oder _compacted.parquet je Strom (DEC-68)"
+  },
+  "ETHUSDT": {
+    "symbol": "ETHUSDT",
+    "exchange": "bybit",
+    "range": [
+      "2026-06-22",
+      "2026-09-23"
+    ],
+    "days_in_range": 94,
+    "orderbook_days_present": 69,
+    "trade_days_present": 82,
+    "orderbook_stream_dir_exists": true,
+    "trade_stream_dir_exists": true,
+    "orderbook_days_compacted": 69,
+    "trade_days_compacted": 69,
+    "orderbook_days_done": 2,
+    "trade_days_done": 65,
+    "days_eligible_for_placement": 69,
+    "eligibility_rule": "manifest DONE oder _compacted.parquet je Strom (DEC-68)"
+  }
+}
+
+=== WP-10(B) Schritt 3: Run -> E:\Claude\Projects\scinance\scinance3-impl\state\wp10b_20260923 ===
+[wp10b] Schritt 0: Positivkontrolle (intern, PRD 3.3.8) ...
+[wp10b] Positivkontrolle bestanden -- Lauf startet.
+[wp10b] STRESS_ABS geladen: 30 Tage (E:\Claude\Projects\scinance\scinance3-impl\state\wp10_stress_canon\stress_abs.json)
+
+[wp10b] BTCUSDT: 94 days in range
+[wp10b] BTCUSDT: 2026-06-22 -> ok, 1320 quotes, 148.3s elapsed
+[wp10b] BTCUSDT: 2026-06-23 -> ok, 2880 quotes, 236.2s elapsed
+[wp10b] BTCUSDT: 2026-06-24 -> ok, 2880 quotes, 359.4s elapsed
+[wp10b] BTCUSDT: 2026-06-25 -> ok, 2880 quotes, 459.4s elapsed
+[wp10b] BTCUSDT: 2026-06-26 -> no_raw, 0 quotes, 459.7s elapsed
+[wp10b] BTCUSDT: 2026-06-27 -> ok, 1432 quotes, 633.0s elapsed
+[wp10b] BTCUSDT: 2026-06-28 -> ok, 2880 quotes, 841.5s elapsed
+[wp10b] BTCUSDT: 2026-06-29 -> ok, 2880 quotes, 1040.7s elapsed
+[wp10b] BTCUSDT: 2026-06-30 -> ok, 2880 quotes, 1248.0s elapsed
+[wp10b] BTCUSDT: 2026-07-01 -> ok, 2880 quotes, 3 Duplikate verworfen, 1447.8s elapsed
+[wp10b] BTCUSDT: 2026-07-02 -> ok, 2880 quotes, 7 Duplikate verworfen, 1622.5s elapsed
+[wp10b] BTCUSDT: 2026-07-03 -> ok, 2880 quotes, 1784.4s elapsed
+[wp10b] BTCUSDT: 2026-07-04 -> ok, 2880 quotes, 1901.9s elapsed
+[wp10b] BTCUSDT: 2026-07-05 -> ok, 2880 quotes, 2016.5s elapsed
+[wp10b] BTCUSDT: 2026-07-06 -> no_raw, 0 quotes, 2016.6s elapsed
+[wp10b] BTCUSDT: 2026-07-07 -> no_raw, 0 quotes, 2016.7s elapsed
+[wp10b] BTCUSDT: 2026-07-08 -> no_raw, 0 quotes, 2016.9s elapsed
+[wp10b] BTCUSDT: 2026-07-09 -> no_raw, 0 quotes, 2017.1s elapsed
+[wp10b] BTCUSDT: 2026-07-10 -> no_raw, 0 quotes, 2017.3s elapsed
+[wp10b] BTCUSDT: 2026-07-11 -> no_raw, 0 quotes, 2017.4s elapsed
+[wp10b] BTCUSDT: 2026-07-12 -> no_raw, 0 quotes, 2017.5s elapsed
+[wp10b] BTCUSDT: 2026-07-13 -> no_raw, 0 quotes, 2017.6s elapsed
+[wp10b] BTCUSDT: 2026-07-14 -> no_raw, 0 quotes, 2017.7s elapsed
+[wp10b] BTCUSDT: 2026-07-15 -> no_raw, 0 quotes, 2017.8s elapsed
+[wp10b] BTCUSDT: 2026-07-16 -> no_raw, 0 quotes, 2018.0s elapsed
+[wp10b] BTCUSDT: 2026-07-17 -> ok, 1158 quotes, 1 Duplikate verworfen, 2090.4s elapsed
+[wp10b] BTCUSDT: 2026-07-18 -> ok, 2880 quotes, 2240.5s elapsed
+[wp10b] BTCUSDT: 2026-07-19 -> ok, 2880 quotes, 2416.7s elapsed
+[wp10b] BTCUSDT: 2026-07-20 -> ok, 2880 quotes, 2582.0s elapsed
+[wp10b] BTCUSDT: 2026-07-21 -> ok, 2880 quotes, 2747.9s elapsed
+[wp10b] BTCUSDT: 2026-07-22 -> ok, 2880 quotes, 11 Duplikate verworfen, 2911.2s elapsed
+[wp10b] BTCUSDT: 2026-07-23 -> ok, 2880 quotes, 3038.2s elapsed
+[wp10b] BTCUSDT: 2026-07-24 -> ok, 2880 quotes, 3108.5s elapsed
+[wp10b] BTCUSDT: 2026-07-25 -> ok, 2880 quotes, 3258.0s elapsed
+[wp10b] BTCUSDT: 2026-07-26 -> ok, 2880 quotes, 3428.7s elapsed
+[wp10b] BTCUSDT: 2026-07-27 -> ok, 2880 quotes, 3596.8s elapsed
+[wp10b] BTCUSDT: 2026-07-28 -> ok, 2880 quotes, 3789.7s elapsed
+[wp10b] BTCUSDT: 2026-07-29 -> ok, 2880 quotes, 3959.5s elapsed
+[wp10b] BTCUSDT: 2026-07-30 -> ok, 2880 quotes, 4089.8s elapsed
+[wp10b] BTCUSDT: 2026-07-31 -> ok, 2880 quotes, 4149.8s elapsed
+[wp10b] BTCUSDT: 2026-08-01 -> no_raw, 0 quotes, 4149.9s elapsed
+[wp10b] BTCUSDT: 2026-08-02 -> ok, 1062 quotes, 4294.5s elapsed
+[wp10b] BTCUSDT: 2026-08-03 -> ok, 2880 quotes, 4406.3s elapsed
+[wp10b] BTCUSDT: 2026-08-04 -> ok, 2880 quotes, 4576.2s elapsed
+[wp10b] BTCUSDT: 2026-08-05 -> ok, 2880 quotes, 4743.7s elapsed
+[wp10b] BTCUSDT: 2026-08-06 -> ok, 2880 quotes, 4915.1s elapsed
+[wp10b] BTCUSDT: 2026-08-07 -> ok, 2880 quotes, 5062.6s elapsed
+[wp10b] BTCUSDT: 2026-08-08 -> ok, 2880 quotes, 5212.0s elapsed
+[wp10b] BTCUSDT: 2026-08-09 -> ok, 2880 quotes, 5380.4s elapsed
+[wp10b] BTCUSDT: 2026-08-10 -> ok, 2880 quotes, 5 Duplikate verworfen, 5544.0s elapsed
+[wp10b] BTCUSDT: 2026-08-11 -> ok, 2880 quotes, 16 Duplikate verworfen, 5710.9s elapsed
+[wp10b] BTCUSDT: 2026-08-12 -> ok, 2880 quotes, 5826.8s elapsed
+[wp10b] BTCUSDT: 2026-08-13 -> ok, 2880 quotes, 277793 Duplikate verworfen, 5869.9s elapsed
+[wp10b] BTCUSDT: 2026-08-14 -> no_raw, 0 quotes, 5870.1s elapsed
+[wp10b] BTCUSDT: 2026-08-15 -> ok, 962 quotes, 5996.5s elapsed
+[wp10b] BTCUSDT: 2026-08-16 -> ok, 2880 quotes, 6109.2s elapsed
+[wp10b] BTCUSDT: 2026-08-17 -> ok, 2880 quotes, 6246.2s elapsed
+[wp10b] BTCUSDT: 2026-08-18 -> ok, 2880 quotes, 6424.4s elapsed
+[wp10b] BTCUSDT: 2026-08-19 -> ok, 2880 quotes, 6653.1s elapsed
+[wp10b] BTCUSDT: 2026-08-20 -> ok, 2880 quotes, 6871.8s elapsed
+[wp10b] BTCUSDT: 2026-08-21 -> ok, 2880 quotes, 7051.9s elapsed
+[wp10b] BTCUSDT: 2026-08-22 -> ok, 2880 quotes, 7241.6s elapsed
+[wp10b] BTCUSDT: 2026-08-23 -> ok, 2880 quotes, 7434.7s elapsed
+[wp10b] BTCUSDT: 2026-08-24 -> ok, 2880 quotes, 7664.2s elapsed
+[wp10b] BTCUSDT: 2026-08-25 -> ok, 2880 quotes, 7866.6s elapsed
+[wp10b] BTCUSDT: 2026-08-26 -> ok, 2880 quotes, 8002.7s elapsed
+[wp10b] BTCUSDT: 2026-08-27 -> ok, 2880 quotes, 8203.2s elapsed
+[wp10b] BTCUSDT: 2026-08-28 -> ok, 2880 quotes, 8353.9s elapsed
+[wp10b] BTCUSDT: 2026-08-29 -> ok, 2880 quotes, 8523.3s elapsed
+[wp10b] BTCUSDT: 2026-08-30 -> ok, 2880 quotes, 8710.4s elapsed
+[wp10b] BTCUSDT: 2026-08-31 -> ok, 2880 quotes, 8903.6s elapsed
+[wp10b] BTCUSDT: 2026-09-01 -> ok, 2880 quotes, 9103.4s elapsed
+[wp10b] BTCUSDT: 2026-09-02 -> ok, 2880 quotes, 9320.8s elapsed
+[wp10b] BTCUSDT: 2026-09-03 -> ok, 2880 quotes, 9522.3s elapsed
+[wp10b] BTCUSDT: 2026-09-04 -> ok, 2880 quotes, 9677.6s elapsed
+[wp10b] BTCUSDT: 2026-09-05 -> ok, 2880 quotes, 9838.7s elapsed
+[wp10b] BTCUSDT: 2026-09-06 -> ok, 2880 quotes, 10005.6s elapsed
+[wp10b] BTCUSDT: 2026-09-07 -> ok, 2880 quotes, 10127.7s elapsed
+[wp10b] BTCUSDT: 2026-09-08 -> ok, 2880 quotes, 10311.3s elapsed
+[wp10b] BTCUSDT: 2026-09-09 -> ok, 2880 quotes, 10490.2s elapsed
+[wp10b] BTCUSDT: 2026-09-10 -> ok, 2880 quotes, 10686.3s elapsed
+[wp10b] BTCUSDT: 2026-09-11 -> ok, 2880 quotes, 10831.5s elapsed
+[wp10b] BTCUSDT: 2026-09-12 -> ok, 2880 quotes, 10832.2s elapsed
+[wp10b] BTCUSDT: 2026-09-13 -> no_raw, 0 quotes, 10832.4s elapsed
+[wp10b] BTCUSDT: 2026-09-14 -> no_raw, 0 quotes, 10832.5s elapsed
+[wp10b] BTCUSDT: 2026-09-15 -> no_raw, 0 quotes, 10832.5s elapsed
+[wp10b] BTCUSDT: 2026-09-16 -> no_raw, 0 quotes, 10832.5s elapsed
+[wp10b] BTCUSDT: 2026-09-17 -> no_raw, 0 quotes, 10832.5s elapsed
+[wp10b] BTCUSDT: 2026-09-18 -> no_raw, 0 quotes, 10832.5s elapsed
+[wp10b] BTCUSDT: 2026-09-19 -> no_raw, 0 quotes, 10832.5s elapsed
+[wp10b] BTCUSDT: 2026-09-20 -> no_raw, 0 quotes, 10832.5s elapsed
+[wp10b] BTCUSDT: 2026-09-21 -> no_raw, 0 quotes, 10832.5s elapsed
+[wp10b] BTCUSDT: 2026-09-22 -> no_raw, 0 quotes, 10832.5s elapsed
+[wp10b] BTCUSDT: 2026-09-23 -> no_raw, 0 quotes, 10832.5s elapsed
+[wp10b] BTCUSDT: ok=69 discarded=0 no_raw=25 not_manifest_done=0 resumed=0 quotes=190254 fifo_filled=12216 prorata_fille
+d=70923 in 10833.2s
+[wp10b] ETHUSDT: 94 days in range
+[wp10b] ETHUSDT: 2026-06-22 -> ok, 1320 quotes, 140.5s elapsed
+[wp10b] ETHUSDT: 2026-06-23 -> ok, 2880 quotes, 221.0s elapsed
+[wp10b] ETHUSDT: 2026-06-24 -> ok, 2880 quotes, 297.1s elapsed
+[wp10b] ETHUSDT: 2026-06-25 -> ok, 2880 quotes, 389.0s elapsed
+[wp10b] ETHUSDT: 2026-06-26 -> no_raw, 0 quotes, 389.3s elapsed
+[wp10b] ETHUSDT: 2026-06-27 -> ok, 1432 quotes, 542.6s elapsed
+[wp10b] ETHUSDT: 2026-06-28 -> ok, 2880 quotes, 716.9s elapsed
+[wp10b] ETHUSDT: 2026-06-29 -> ok, 2880 quotes, 881.3s elapsed
+[wp10b] ETHUSDT: 2026-06-30 -> ok, 2880 quotes, 1052.4s elapsed
+[wp10b] ETHUSDT: 2026-07-01 -> ok, 2880 quotes, 5 Duplikate verworfen, 1224.9s elapsed
+[wp10b] ETHUSDT: 2026-07-02 -> ok, 2880 quotes, 9 Duplikate verworfen, 1391.7s elapsed
+[wp10b] ETHUSDT: 2026-07-03 -> ok, 2880 quotes, 1546.9s elapsed
+[wp10b] ETHUSDT: 2026-07-04 -> ok, 2880 quotes, 1658.3s elapsed
+[wp10b] ETHUSDT: 2026-07-05 -> ok, 2880 quotes, 1784.6s elapsed
+[wp10b] ETHUSDT: 2026-07-06 -> no_raw, 0 quotes, 1784.8s elapsed
+[wp10b] ETHUSDT: 2026-07-07 -> no_raw, 0 quotes, 1785.0s elapsed
+[wp10b] ETHUSDT: 2026-07-08 -> no_raw, 0 quotes, 1785.3s elapsed
+[wp10b] ETHUSDT: 2026-07-09 -> no_raw, 0 quotes, 1785.5s elapsed
+[wp10b] ETHUSDT: 2026-07-10 -> no_raw, 0 quotes, 1785.7s elapsed
+[wp10b] ETHUSDT: 2026-07-11 -> no_raw, 0 quotes, 1785.9s elapsed
+[wp10b] ETHUSDT: 2026-07-12 -> no_raw, 0 quotes, 1786.1s elapsed
+[wp10b] ETHUSDT: 2026-07-13 -> no_raw, 0 quotes, 1786.2s elapsed
+[wp10b] ETHUSDT: 2026-07-14 -> no_raw, 0 quotes, 1786.2s elapsed
+[wp10b] ETHUSDT: 2026-07-15 -> no_raw, 0 quotes, 1786.4s elapsed
+[wp10b] ETHUSDT: 2026-07-16 -> no_raw, 0 quotes, 1786.6s elapsed
+[wp10b] ETHUSDT: 2026-07-17 -> ok, 1158 quotes, 3 Duplikate verworfen, 1857.2s elapsed
+[wp10b] ETHUSDT: 2026-07-18 -> ok, 2880 quotes, 2005.3s elapsed
+[wp10b] ETHUSDT: 2026-07-19 -> ok, 2880 quotes, 2178.6s elapsed
+[wp10b] ETHUSDT: 2026-07-20 -> ok, 2880 quotes, 2337.9s elapsed
+[wp10b] ETHUSDT: 2026-07-21 -> ok, 2880 quotes, 2500.8s elapsed
+[wp10b] ETHUSDT: 2026-07-22 -> ok, 2880 quotes, 13 Duplikate verworfen, 2658.2s elapsed
+[wp10b] ETHUSDT: 2026-07-23 -> ok, 2880 quotes, 2779.6s elapsed
+[wp10b] ETHUSDT: 2026-07-24 -> ok, 2880 quotes, 2846.4s elapsed
+[wp10b] ETHUSDT: 2026-07-25 -> ok, 2880 quotes, 2992.6s elapsed
+[wp10b] ETHUSDT: 2026-07-26 -> ok, 2880 quotes, 3159.4s elapsed
+[wp10b] ETHUSDT: 2026-07-27 -> ok, 2880 quotes, 3326.0s elapsed
+[wp10b] ETHUSDT: 2026-07-28 -> ok, 2880 quotes, 3506.3s elapsed
+[wp10b] ETHUSDT: 2026-07-29 -> ok, 2880 quotes, 24 Duplikate verworfen, 3667.6s elapsed
+[wp10b] ETHUSDT: 2026-07-30 -> ok, 2880 quotes, 3784.8s elapsed
+[wp10b] ETHUSDT: 2026-07-31 -> ok, 2880 quotes, 3841.9s elapsed
+[wp10b] ETHUSDT: 2026-08-01 -> no_raw, 0 quotes, 3842.0s elapsed
+[wp10b] ETHUSDT: 2026-08-02 -> ok, 1062 quotes, 3975.8s elapsed
+[wp10b] ETHUSDT: 2026-08-03 -> ok, 2880 quotes, 4076.9s elapsed
+[wp10b] ETHUSDT: 2026-08-04 -> ok, 2880 quotes, 4231.7s elapsed
+[wp10b] ETHUSDT: 2026-08-05 -> ok, 2880 quotes, 4382.4s elapsed
+[wp10b] ETHUSDT: 2026-08-06 -> ok, 2880 quotes, 4535.3s elapsed
+[wp10b] ETHUSDT: 2026-08-07 -> ok, 2880 quotes, 4670.5s elapsed
+[wp10b] ETHUSDT: 2026-08-08 -> ok, 2880 quotes, 4808.8s elapsed
+[wp10b] ETHUSDT: 2026-08-09 -> ok, 2880 quotes, 4960.9s elapsed
+[wp10b] ETHUSDT: 2026-08-10 -> ok, 2880 quotes, 7 Duplikate verworfen, 5107.8s elapsed
+[wp10b] ETHUSDT: 2026-08-11 -> ok, 2880 quotes, 19 Duplikate verworfen, 5259.0s elapsed
+[wp10b] ETHUSDT: 2026-08-12 -> ok, 2880 quotes, 1 Duplikate verworfen, 5363.3s elapsed
+[wp10b] ETHUSDT: 2026-08-13 -> ok, 2880 quotes, 277599 Duplikate verworfen, 5404.1s elapsed
+[wp10b] ETHUSDT: 2026-08-14 -> no_raw, 0 quotes, 5404.2s elapsed
+[wp10b] ETHUSDT: 2026-08-15 -> ok, 962 quotes, 5520.3s elapsed
+[wp10b] ETHUSDT: 2026-08-16 -> ok, 2880 quotes, 5620.5s elapsed
+[wp10b] ETHUSDT: 2026-08-17 -> ok, 2880 quotes, 5743.2s elapsed
+[wp10b] ETHUSDT: 2026-08-18 -> ok, 2880 quotes, 5903.8s elapsed
+[wp10b] ETHUSDT: 2026-08-19 -> ok, 2880 quotes, 6093.4s elapsed
+[wp10b] ETHUSDT: 2026-08-20 -> ok, 2880 quotes, 6254.4s elapsed
+[wp10b] ETHUSDT: 2026-08-21 -> ok, 2880 quotes, 6416.3s elapsed
+[wp10b] ETHUSDT: 2026-08-22 -> ok, 2880 quotes, 6591.4s elapsed
+[wp10b] ETHUSDT: 2026-08-23 -> ok, 2880 quotes, 6756.0s elapsed
+[wp10b] ETHUSDT: 2026-08-24 -> ok, 2880 quotes, 6932.4s elapsed
+[wp10b] ETHUSDT: 2026-08-25 -> ok, 2880 quotes, 7099.6s elapsed
+[wp10b] ETHUSDT: 2026-08-26 -> ok, 2880 quotes, 7211.4s elapsed
+[wp10b] ETHUSDT: 2026-08-27 -> ok, 2880 quotes, 7375.4s elapsed
+[wp10b] ETHUSDT: 2026-08-28 -> ok, 2880 quotes, 1 Duplikate verworfen, 7514.5s elapsed
+[wp10b] ETHUSDT: 2026-08-29 -> ok, 2880 quotes, 7672.2s elapsed
+[wp10b] ETHUSDT: 2026-08-30 -> ok, 2880 quotes, 7836.2s elapsed
+[wp10b] ETHUSDT: 2026-08-31 -> ok, 2880 quotes, 7995.6s elapsed
+[wp10b] ETHUSDT: 2026-09-01 -> ok, 2880 quotes, 8157.7s elapsed
+[wp10b] ETHUSDT: 2026-09-02 -> ok, 2880 quotes, 8323.7s elapsed
+[wp10b] ETHUSDT: 2026-09-03 -> ok, 2880 quotes, 8486.3s elapsed
+[wp10b] ETHUSDT: 2026-09-04 -> ok, 2880 quotes, 8628.3s elapsed
+[wp10b] ETHUSDT: 2026-09-05 -> ok, 2880 quotes, 8781.3s elapsed
+[wp10b] ETHUSDT: 2026-09-06 -> ok, 2880 quotes, 8936.2s elapsed
+[wp10b] ETHUSDT: 2026-09-07 -> ok, 2880 quotes, 9046.8s elapsed
+[wp10b] ETHUSDT: 2026-09-08 -> ok, 2880 quotes, 9207.4s elapsed
+[wp10b] ETHUSDT: 2026-09-09 -> ok, 2880 quotes, 9367.2s elapsed
+[wp10b] ETHUSDT: 2026-09-10 -> ok, 2880 quotes, 9548.9s elapsed
+[wp10b] ETHUSDT: 2026-09-11 -> ok, 2880 quotes, 9691.2s elapsed
+[wp10b] ETHUSDT: 2026-09-12 -> ok, 2880 quotes, 9691.9s elapsed
+[wp10b] ETHUSDT: 2026-09-13 -> no_raw, 0 quotes, 9692.2s elapsed
+[wp10b] ETHUSDT: 2026-09-14 -> no_raw, 0 quotes, 9692.3s elapsed
+[wp10b] ETHUSDT: 2026-09-15 -> no_raw, 0 quotes, 9692.3s elapsed
+[wp10b] ETHUSDT: 2026-09-16 -> no_raw, 0 quotes, 9692.3s elapsed
+[wp10b] ETHUSDT: 2026-09-17 -> no_raw, 0 quotes, 9692.3s elapsed
+[wp10b] ETHUSDT: 2026-09-18 -> no_raw, 0 quotes, 9692.3s elapsed
+[wp10b] ETHUSDT: 2026-09-19 -> no_raw, 0 quotes, 9692.4s elapsed
+[wp10b] ETHUSDT: 2026-09-20 -> no_raw, 0 quotes, 9692.4s elapsed
+[wp10b] ETHUSDT: 2026-09-21 -> no_raw, 0 quotes, 9692.4s elapsed
+[wp10b] ETHUSDT: 2026-09-22 -> no_raw, 0 quotes, 9692.4s elapsed
+[wp10b] ETHUSDT: 2026-09-23 -> no_raw, 0 quotes, 9692.4s elapsed
+[wp10b] ETHUSDT: ok=69 discarded=0 no_raw=25 not_manifest_done=0 resumed=0 quotes=190254 fifo_filled=11067 prorata_fille
+d=60991 in 9693.4s
+{
+  "windows": [
+    {
+      "symbol": "BTCUSDT",
+      "exchange": "bybit",
+      "range": [
+        "2026-06-22",
+        "2026-09-23"
+      ],
+      "days_in_range": 94,
+      "ok": 69,
+      "discarded": 0,
+      "no_raw": 25,
+      "not_manifest_done": 0,
+      "resumed": 0,
+      "n_quotes_total": 190254,
+      "n_fifo_filled_total": 12216,
+      "n_prorata_filled_total": 70923,
+      "horizon_s": 60.0,
+      "adv_sel_horizon_s": 60.0,
+      "quote_size_fraction": 0.1,
+      "seconds": 10833.2
+    },
+    {
+      "symbol": "ETHUSDT",
+      "exchange": "bybit",
+      "range": [
+        "2026-06-22",
+        "2026-09-23"
+      ],
+      "days_in_range": 94,
+      "ok": 69,
+      "discarded": 0,
+      "no_raw": 25,
+      "not_manifest_done": 0,
+      "resumed": 0,
+      "n_quotes_total": 190254,
+      "n_fifo_filled_total": 11067,
+      "n_prorata_filled_total": 60991,
+      "horizon_s": 60.0,
+      "adv_sel_horizon_s": 60.0,
+      "quote_size_fraction": 0.1,
+      "seconds": 9693.4
+    }
+  ],
+  "day_status": {
+    "BTCUSDT": {
+      "counts": {
+        "ok": 69,
+        "no_raw": 25
+      },
+      "top_reasons": [
+        [
+          "(kein Grund)",
+          25
+        ]
+      ]
+    },
+    "ETHUSDT": {
+      "counts": {
+        "ok": 69,
+        "no_raw": 25
+      },
+      "top_reasons": [
+        [
+          "(kein Grund)",
+          25
+        ]
+      ]
+    }
+  },
+  "report": {
+    "summary_path": "E:\\Claude\\Projects\\scinance\\scinance3-impl\\state\\wp10b_20260923\\wp10b_summary.json",
+    "markdown_path": "E:\\Claude\\Projects\\scinance\\scinance3-impl\\state\\wp10b_20260923\\wp10b_report.md"
+  }
+}
+[wp10b] Bericht: E:\Claude\Projects\scinance\scinance3-impl\state\wp10b_20260923\wp10b_report.md
+
+Ergebnis in: E:\Claude\Projects\scinance\scinance3-impl\state\wp10b_20260923
+Bitte wp10b_summary.json und wp10b_report.md hochladen (rc=0).
+Teil B ist kapitalfrei -- kein PASS/FAIL; adv_sel <= 1,75 bp ist ein Etikett, keine Schwelle.
+##### ENDE  wp10b  rc=0  Dauer=342 min #####
+
+=== Ergebnisse einsammeln (neuer als Start, Dateien <= 5 MB) ===
+  (nicht committet, > 5 MB) E:\Claude\Projects\scinance\scinance3-impl\state\wp10b_20260923\wp10b_quote_outcomes.csv
+  -> E:\Claude\Projects\scinance\scinance3-impl\state\runs\wp10b_20260923
+  -> E:\Claude\Projects\scinance\scinance3-impl\state\runs\wp13a_20260923
+
+=== Zusammenfassung ===
+  wp13a rc=0 dauer_min=134
+  wp10b rc=0 dauer_min=342
+**********************
+Ende der Windows PowerShell-Aufzeichnung
+Endzeit: 20260923233708
+**********************

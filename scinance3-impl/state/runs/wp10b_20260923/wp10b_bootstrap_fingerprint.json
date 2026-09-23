@@ -1,0 +1,93 @@
+{
+  "entries": [
+    {
+      "convention": "fifo",
+      "group": {
+        "side": "buy",
+        "symbol": "BTCUSDT"
+      },
+      "metric": "p_fill",
+      "n_bootstrap": 1000,
+      "n_days": 69,
+      "seed": 53
+    },
+    {
+      "convention": "fifo",
+      "group": {
+        "side": "sell",
+        "symbol": "BTCUSDT"
+      },
+      "metric": "p_fill",
+      "n_bootstrap": 1000,
+      "n_days": 69,
+      "seed": 53
+    },
+    {
+      "convention": "fifo",
+      "group": {
+        "side": "buy",
+        "symbol": "ETHUSDT"
+      },
+      "metric": "p_fill",
+      "n_bootstrap": 1000,
+      "n_days": 69,
+      "seed": 53
+    },
+    {
+      "convention": "fifo",
+      "group": {
+        "side": "sell",
+        "symbol": "ETHUSDT"
+      },
+      "metric": "p_fill",
+      "n_bootstrap": 1000,
+      "n_days": 69,
+      "seed": 53
+    },
+    {
+      "convention": "fifo",
+      "group": {
+        "side": "buy",
+        "symbol": "BTCUSDT"
+      },
+      "metric": "adv_sel",
+      "n_bootstrap": 1000,
+      "n_days": 69,
+      "seed": 53
+    },
+    {
+      "convention": "fifo",
+      "group": {
+        "side": "sell",
+        "symbol": "BTCUSDT"
+      },
+      "metric": "adv_sel",
+      "n_bootstrap": 1000,
+      "n_days": 69,
+      "seed": 53
+    },
+    {
+      "convention": "fifo",
+      "group": {
+        "side": "buy",
+        "symbol": "ETHUSDT"
+      },
+      "metric": "adv_sel",
+      "n_bootstrap": 1000,
+      "n_days": 69,
+      "seed": 53
+    },
+    {
+      "convention": "fifo",
+      "group": {
+        "side": "sell",
+        "symbol": "ETHUSDT"
+      },
+      "metric": "adv_sel",
+      "n_bootstrap": 1000,
+      "n_days": 69,
+      "seed": 53
+    }
+  ],
+  "generator": "numpy.random.default_rng"
+}

@@ -1,0 +1,72 @@
+{
+ "windows": [
+  {
+   "symbol": "BTCUSDT",
+   "exchange": "bybit",
+   "range": [
+    "2026-06-22",
+    "2026-09-23"
+   ],
+   "days_in_range": 94,
+   "ok": 69,
+   "discarded": 0,
+   "no_raw": 25,
+   "not_manifest_done": 0,
+   "resumed": 0,
+   "n_quotes_total": 190254,
+   "n_fifo_filled_total": 12216,
+   "n_prorata_filled_total": 70923,
+   "horizon_s": 60.0,
+   "adv_sel_horizon_s": 60.0,
+   "quote_size_fraction": 0.1,
+   "seconds": 10833.2
+  },
+  {
+   "symbol": "ETHUSDT",
+   "exchange": "bybit",
+   "range": [
+    "2026-06-22",
+    "2026-09-23"
+   ],
+   "days_in_range": 94,
+   "ok": 69,
+   "discarded": 0,
+   "no_raw": 25,
+   "not_manifest_done": 0,
+   "resumed": 0,
+   "n_quotes_total": 190254,
+   "n_fifo_filled_total": 11067,
+   "n_prorata_filled_total": 60991,
+   "horizon_s": 60.0,
+   "adv_sel_horizon_s": 60.0,
+   "quote_size_fraction": 0.1,
+   "seconds": 9693.4
+  }
+ ],
+ "day_status": {
+  "BTCUSDT": {
+   "counts": {
+    "ok": 69,
+    "no_raw": 25
+   },
+   "top_reasons": [
+    [
+     "(kein Grund)",
+     25
+    ]
+   ]
+  },
+  "ETHUSDT": {
+   "counts": {
+    "ok": 69,
+    "no_raw": 25
+   },
+   "top_reasons": [
+    [
+     "(kein Grund)",
+     25
+    ]
+   ]
+  }
+ }
+}
