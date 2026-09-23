@@ -69,7 +69,7 @@ from . import queue_model as qm
 #    interleaved copies of the same stream, EXACTLY doubling frame count and sequence
 #    breaks); `n_duplicates_dropped` is now a manifest field; `discarded` partitions are
 #    no longer resume-final (re-evaluated on a resumed run, like `not_manifest_done`).
-SCHEMA_VERSION = 3
+SCHEMA_VERSION = 4  # 4: trades DISTINCT over full raw rows (doubled 2026-08-13 partitions)
 
 MS_PER_MINUTE = 60_000
 MS_PER_DAY = 86_400_000
@@ -184,8 +184,12 @@ def probe(base_dir: Path | str, symbol: str, start: str, end: str, *,
 # ----------------------------------------------------------------------------
 
 def _trades_sql(glob: str) -> str:
+    # DISTINCT over the full raw row: the 2026-08-13 partitions hold every
+    # row exactly twice (robocopy pass 2 + compaction, Registrar 2026-09-23,
+    # DEC-76 Nachtrag) -- an exact, lossless clean-up for ALL live streams,
+    # not a heuristic (identical ts_local_ns/topic/payload_json).
     trade_rows = trade_rows_sql(
-        f"(SELECT * FROM read_parquet('{glob}', hive_partitioning=0,"
+        f"(SELECT DISTINCT * FROM read_parquet('{glob}', hive_partitioning=0,"
         f" union_by_name=1)) AS src")
     return f"""
         SELECT ts_exchange_ms AS ts, {_SIDE_SQL} AS side,

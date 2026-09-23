@@ -627,7 +627,9 @@ def test_resume_reevaluates_discarded_days_once_the_raw_data_is_fixed(tmp_path):
 
 
 def test_schema_version_bumped_to_3_for_dedup():
-    assert rp.SCHEMA_VERSION == 3
+    # 3: orderbook frame dedupe (DEC-76); 4: trades DISTINCT over full rows
+    # (DEC-76 Nachtrag, publicTrade on 2026-08-13 doubled as well)
+    assert rp.SCHEMA_VERSION == 4
 
 
 def test_adv_sel_is_measured_for_fills_anywhere_inside_the_horizon():
@@ -993,3 +995,32 @@ def test_load_quote_rows_tags_stress_regime(tmp_path):
     assert rows_quiet and all(r["regime"] == "quiet" for r in rows_quiet)
     rows_none = rpt.load_quote_rows(out, "bybit", ["TSTUSDT"], d1, d1)
     assert rows_none and all(r["regime"] is None for r in rows_none)
+
+
+def test_duplicated_trade_rows_do_not_double_fills(tmp_path):
+    """DEC-76 Nachtrag: on 2026-08-13 every raw row (orderbook AND publicTrade)
+    exists exactly twice. Trades are read DISTINCT over the full row, so a
+    day with doubled trade rows yields byte-identical quote outcomes to the
+    clean day."""
+    import shutil
+    import pyarrow.parquet as pq
+    import pyarrow as pa
+    base_clean = tmp_path / "h_clean"
+    base_dup = tmp_path / "h_dup"
+    d1 = "2026-06-22"
+    _build_day_fixture(base_clean, d1)
+    shutil.copytree(base_clean, base_dup)
+    tr_dir = base_dup / "raw" / "bybit" / "publicTrade" / "symbol=TSTUSDT" / f"date={d1}"
+    src = next(tr_dir.glob("*.parquet"))
+    tbl = pq.read_table(src)
+    doubled = pa.concat_tables([tbl, tbl])
+    pq.write_table(doubled, src)
+    s_clean = rp.run_window(base_clean, tmp_path / "o1", "TSTUSDT", d1, d1)
+    s_dup = rp.run_window(base_dup, tmp_path / "o2", "TSTUSDT", d1, d1)
+    assert s_clean["n_quotes_total"] == s_dup["n_quotes_total"] > 0
+    assert s_clean["n_fifo_filled_total"] == s_dup["n_fifo_filled_total"]
+    m1 = json.loads((tmp_path / "o1" / "fillshadow_1min" / "exchange=bybit" / "symbol=TSTUSDT"
+                     / f"date={d1}" / "manifest.json").read_text())
+    m2 = json.loads((tmp_path / "o2" / "fillshadow_1min" / "exchange=bybit" / "symbol=TSTUSDT"
+                     / f"date={d1}" / "manifest.json").read_text())
+    assert m1["sha256_values"] == m2["sha256_values"]

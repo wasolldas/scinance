@@ -73,7 +73,7 @@ foreach ($t in $Tasks) {
             if ($Registered -eq "" -or $RegisteredSha256 -eq "") { Write-Host "wp13run uebersprungen: -Registered und -RegisteredSha256 fehlen."; $results += "wp13run uebersprungen" }
             else { Run-Task $t { powershell -ExecutionPolicy Bypass -File "$hl\run_wp13_run.ps1" -Registered $Registered -RegisteredSha256 $RegisteredSha256 } }
         }
-        "diag"   { Run-Task $t { python "$hl\wp10b_store_status.py"; python "$hl\harvest_manifest_status.py"; python "$hl\wp7_manifest_partial.py" } }
+        "diag"   { Run-Task $t { python "$hl\wp10b_store_status.py"; python "$hl\harvest_manifest_status.py"; python "$hl\wp7_manifest_partial.py"; python "$hl\wp10b_dup_check.py" BTCUSDT 2026-08-13 2026-08-12; python "$hl\wp10b_dup_check.py" ETHUSDT 2026-08-13 } }
         default  { Write-Host "Unbekannte Aufgabe: $t"; $results += "$t unbekannt" }
     }
 }
