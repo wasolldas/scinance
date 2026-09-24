@@ -61,6 +61,9 @@ function Run-Task($name, $cmd) {
     $script:results += "$name rc=$rc dauer_min=$([int]$sw.Elapsed.TotalMinutes)"
 }
 
+# "powershell -File ... -Tasks a,b" uebergibt EIN Argument "a,b" -> hier splitten
+$Tasks = @($Tasks | ForEach-Object { $_ -split "[,; ]+" } | Where-Object { $_ -ne "" })
+Write-Host "Aufgaben (aufgeloest): $($Tasks -join ', ')"
 foreach ($t in $Tasks) {
     switch ($t) {
         "wp13a"  { Run-Task $t { powershell -ExecutionPolicy Bypass -File "$hl\run_wp13_prelaunch.ps1" -AllowPartial } }
