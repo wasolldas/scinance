@@ -1,0 +1,33 @@
+﻿**********************
+nStart der Windows PowerShell-Aufzeichnung
+Startzeit: 20260924094527
+Benutzername: PC2022\wguen
+RunAs-Benutzer: PC2022\wguen
+Konfigurationsname: 
+Computer: PC2022 (Microsoft Windows NT 10.0.26200.0)
+Hostanwendung: C:\WINDOWS\System32\WindowsPowerShell\v1.0\powershell.exe -ExecutionPolicy Bypass -File .\scinance3-impl\handoff_local\nacht.ps1 -Tasks diag,wp10b
+Prozess-ID: 26176
+PSVersion: 5.1.26100.9549
+PSEdition: Desktop
+PSCompatibleVersions: 1.0, 2.0, 3.0, 4.0, 5.0, 5.1.26100.9549
+BuildVersion: 10.0.26100.9549
+CLRVersion: 4.0.30319.42000
+WSManStackVersion: 3.0
+PSRemotingProtocolVersion: 2.3
+SerializationVersion: 1.1.0.1
+**********************
+=== nacht.ps1 20260924_0945 : Tasks = diag,wp10b ===
+From https://github.com/wasolldas/scinance
+ * branch            claude/subagent-prd-development-T16fE -> FETCH_HEAD
+Already up to date.
+0d2433b results(nacht 20260923_1540): wp13a rc=0 dauer_min=134; wp10b rc=0 dauer_min=342
+Unbekannte Aufgabe: diag,wp10b
+
+=== Ergebnisse einsammeln (neuer als Start, Dateien <= 5 MB) ===
+
+=== Zusammenfassung ===
+  diag,wp10b unbekannt
+**********************
+Ende der Windows PowerShell-Aufzeichnung
+Endzeit: 20260924094528
+**********************
