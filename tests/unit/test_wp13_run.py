@@ -481,6 +481,7 @@ def _registered_for_fixture() -> dict:
             "W2": {"start": "2025-07-01", "end": "2026-06-30", "ic_min_capped": ic_min_all},
             "L": {"start": "2021-03-01", "end": "2024-06-30"},
         },
+        "beta_control": {"method": "ts_resid_8w", "beta_window_weeks": 8},   # DEC-77 Entscheidung 2
         "rules": {"seed": 53, "n_reps_bootstrap": 20, "n_reps_permutation": 20, "n_reps_factor_null": 20},
     }
 
@@ -570,6 +571,7 @@ def _registered_for_large_fixture() -> dict:
             "W1": {"start": "2024-07-01", "end": "2025-06-30", "ic_min_capped": ic_min_all},
             "W2": {"start": "2025-07-01", "end": "2026-06-30", "ic_min_capped": ic_min_all},
         },
+        "beta_control": {"method": "ts_resid_8w", "beta_window_weeks": 8},   # DEC-77 Entscheidung 2
         "rules": {"seed": 53, "n_reps_bootstrap": 20, "n_reps_permutation": 20, "n_reps_factor_null": 30},
     }
 
@@ -658,7 +660,7 @@ def test_cli_emit_registered_template_writes_yaml_skeleton_from_prelaunch_artifa
     panel, weekly, _sb, _sm, _db, del_manifest, dd_path = _build_prelaunch_fixture_tree(tmp_path)
     prelaunch_report = prelaunch_mod.assemble_prelaunch_report(
         panel, weekly, delisted_manifest_path=del_manifest, delisting_dates_path=dd_path,
-        n_sims=5, n_reps_factor_null=5, seed=53)
+        n_sims=5, n_reps_factor_null=5, n_reps_beta_control_study=5, n_reps_beta_control_winner=5, seed=53)
     artifacts = prelaunch_mod.write_prelaunch_artifacts(tmp_path / "prelaunch_out", prelaunch_report)
     prelaunch_json = artifacts["artifacts"]["wp13a_prelaunch_json"]["path"]
 
@@ -676,6 +678,11 @@ def test_cli_emit_registered_template_writes_yaml_skeleton_from_prelaunch_artifa
         assert "res_quantile_drifting" in loaded["windows"][wn]
         assert "ceiling_driftfree_res" in loaded["windows"][wn]
     assert loaded["rules"]["seed"] == 53 and loaded["rules"]["n_reps"] >= 1000
+    # DEC-77 Entscheidung 2: beta_control is present but EMPTY -- never auto-filled, the
+    # orchestrator must choose it deliberately before a real --run (run_full loud-fails on empty).
+    assert loaded["beta_control"] == {"method": "", "beta_window_weeks": None}
+    with pytest.raises(ValueError, match="beta_control"):
+        run_mod.run_full({"symbols": []}, {"weeks": [], "returns": None, "alive": None}, loaded)
 
 
 def test_cli_emit_registered_template_missing_input_file_is_loud_fail(tmp_path):
@@ -690,3 +697,133 @@ def test_run_full_never_writes_under_data_harvest(tmp_path):
     report = run_mod.run_full(panel, weekly, registered)
     with pytest.raises(ValueError):
         run_mod.write_run_artifacts(Path("data/harvest/wp13_run_should_not_write_here"), report)
+
+
+# ============================================================================
+# DEC-77 Entscheidung 2 -- Vorlauf v4: registered beta_control (run.py)
+# ============================================================================
+
+def test_run_full_missing_beta_control_is_loud_fail(tmp_path):
+    panel, weekly = _build_run_fixture_tree(tmp_path)
+    registered = _registered_for_fixture()
+    del registered["beta_control"]
+    with pytest.raises(ValueError, match="beta_control"):
+        run_mod.run_full(panel, weekly, registered)
+
+
+def test_run_full_empty_beta_control_method_is_loud_fail(tmp_path):
+    panel, weekly = _build_run_fixture_tree(tmp_path)
+    registered = _registered_for_fixture()
+    registered["beta_control"] = {"method": "", "beta_window_weeks": None}
+    with pytest.raises(ValueError, match="beta_control"):
+        run_mod.run_full(panel, weekly, registered)
+
+
+def test_run_full_unknown_beta_control_method_is_loud_fail(tmp_path):
+    panel, weekly = _build_run_fixture_tree(tmp_path)
+    registered = _registered_for_fixture()
+    registered["beta_control"] = {"method": "not_a_real_method", "beta_window_weeks": 8}
+    with pytest.raises(ValueError):
+        run_mod.run_full(panel, weekly, registered)
+
+
+def test_run_full_mismatched_beta_window_weeks_is_loud_fail(tmp_path):
+    panel, weekly = _build_run_fixture_tree(tmp_path)
+    registered = _registered_for_fixture()
+    registered["beta_control"] = {"method": "ts_resid_8w", "beta_window_weeks": 13}   # mismatch
+    with pytest.raises(ValueError, match="beta_window_weeks"):
+        run_mod.run_full(panel, weekly, registered)
+
+
+def test_run_full_none_beta_control_method_needs_no_window(tmp_path):
+    panel, weekly = _build_run_fixture_tree(tmp_path)
+    registered = _registered_for_fixture()
+    registered["beta_control"] = {"method": "none", "beta_window_weeks": None}
+    report = run_mod.run_full(panel, weekly, registered)     # must not raise
+    assert report["beta_control"] == {"method": "none", "beta_window_weeks": None}
+    for hyp, res in report["results"].items():
+        for wn in ("W1", "W2"):
+            assert res["payload"]["windows"][wn]["beta_control_method"] == "none"
+            assert res["payload"]["windows"][wn]["residualized_mean_ic"] is None
+
+
+def test_run_full_uses_registered_beta_control_method_end_to_end(tmp_path):
+    """DEC-77 Entscheidung 2: run_full applies EXACTLY the registered
+    method -- the payload carries it, and a non-'none' method reports a
+    finite coverage fraction on the large (>= 10 survivor) fixture."""
+    panel, weekly = _build_run_fixture_tree_large(tmp_path)
+    registered = _registered_for_large_fixture()
+    registered["beta_control"] = {"method": "fm_neutral_13w", "beta_window_weeks": 13}
+    report = run_mod.run_full(panel, weekly, registered)
+    assert report["beta_control"] == {"method": "fm_neutral_13w", "beta_window_weeks": 13}
+    w1 = report["results"]["H-28"]["payload"]["windows"]["W1"]
+    assert w1["beta_control_method"] == "fm_neutral_13w"
+    if w1["beta_control_coverage"] is not None:
+        assert 0.0 <= w1["beta_control_coverage"]["coverage_fraction"] <= 1.0
+
+
+# ============================================================================
+# DEC-77 Entscheidung 2 -- Vorlauf v4: variant_window_payload's beta_control
+# dispatch (backward-compatible default None)
+# ============================================================================
+
+def test_variant_window_payload_beta_control_method_explicit_dispatch():
+    seed, k, w = 5, 60, 40
+    rng = np.random.default_rng(seed)
+    symbols = [f"s{i}" for i in range(k)] + ["BTCUSDT"]
+    k_full = k + 1
+    returns = rng.normal(0, 0.03, size=(w, k_full))
+    characteristic = rng.normal(0, 1, size=(w, k_full))
+    alive = np.ones((w, k_full), dtype=bool)
+    beta_13w = characteristics.beta_characteristic(returns, symbols, market_symbol="BTCUSDT",
+                                                     trail_win=13, min_weeks=13)
+    payload = run_mod.variant_window_payload(
+        characteristic, returns, alive, symbols, variant="mom1", direction="positive",
+        ic_min_capped=0.02, w_judged=w - 1, floor=0.05, selection_ceiling_mean_of_max=0.01,
+        n_reps_bootstrap=20, n_reps_permutation=20, seed=53,
+        beta_control_method="ts_resid_13w", beta_control_pit=beta_13w)
+    assert payload["beta_control_method"] == "ts_resid_13w"
+    assert payload["residualized_mean_ic"] is not None and math.isfinite(payload["residualized_mean_ic"])
+    assert payload["beta_control_coverage"] is not None
+
+
+def test_variant_window_payload_beta_control_method_none_disables_residualization():
+    seed, k, w = 5, 40, 30
+    rng = np.random.default_rng(seed)
+    symbols = [f"s{i}" for i in range(k)] + ["BTCUSDT"]
+    k_full = k + 1
+    returns = rng.normal(0, 0.03, size=(w, k_full))
+    characteristic = rng.normal(0, 1, size=(w, k_full))
+    alive = np.ones((w, k_full), dtype=bool)
+    payload = run_mod.variant_window_payload(
+        characteristic, returns, alive, symbols, variant="mom1", direction="positive",
+        ic_min_capped=0.02, w_judged=w - 1, floor=0.05, selection_ceiling_mean_of_max=0.01,
+        n_reps_bootstrap=20, n_reps_permutation=20, seed=53, beta_control_method="none")
+    assert payload["residualized_mean_ic"] is None
+    assert payload["beta_control_coverage"] is None
+
+
+def test_variant_window_payload_default_none_method_is_backward_compatible():
+    """Leaving beta_control_method at its default None must give EXACTLY
+    the pre-DEC-77 behaviour: residualisation via beta_8w_pit +
+    ic.residualize_outcome directly."""
+    seed, k, w = 5, 60, 40
+    rng = np.random.default_rng(seed)
+    symbols = [f"s{i}" for i in range(k)] + ["BTCUSDT"]
+    k_full = k + 1
+    returns = rng.normal(0, 0.03, size=(w, k_full))
+    characteristic = rng.normal(0, 1, size=(w, k_full))
+    alive = np.ones((w, k_full), dtype=bool)
+    beta_8w = characteristics.beta_characteristic(returns, symbols, market_symbol="BTCUSDT",
+                                                    trail_win=8, min_weeks=4)
+    payload = run_mod.variant_window_payload(
+        characteristic, returns, alive, symbols, variant="mom1", direction="positive",
+        ic_min_capped=0.02, w_judged=w - 1, floor=0.05, selection_ceiling_mean_of_max=0.01,
+        beta_8w_pit=beta_8w, n_reps_bootstrap=20, n_reps_permutation=20, seed=53)
+    r_btc = returns[:, symbols.index("BTCUSDT")]
+    expected_resid = ic.residualize_outcome(returns, beta_8w, r_btc)
+    expected_mean_ic = ic.weekly_ic_series(characteristic, expected_resid, alive,
+                                            convention="close_at_last")["mean_ic"]
+    assert payload["residualized_mean_ic"] == pytest.approx(expected_mean_ic, nan_ok=True)
+    assert payload["beta_control_method"] is None
+    assert payload["beta_control_coverage"] is None

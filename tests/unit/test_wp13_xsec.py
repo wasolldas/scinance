@@ -357,7 +357,7 @@ def test_seal_prelaunch_never_calls_ic_with_real_returns(tmp_path, monkeypatch):
 
     report = prelaunch.assemble_prelaunch_report(
         panel, weekly, delisted_manifest_path=del_manifest, delisting_dates_path=dd_path,
-        n_sims=5, n_reps_factor_null=5, seed=53)
+        n_sims=5, n_reps_factor_null=5, n_reps_beta_control_study=5, n_reps_beta_control_winner=5, seed=53)
     assert report["windows"]["W1"]["available"]
 
     assert calls, "expected ic.weekly_ic_series to be called by the persistence null"
@@ -382,7 +382,7 @@ def test_seal_prelaunch_report_json_no_real_ic_key(tmp_path):
     panel, weekly, _sb, _sm, _db, del_manifest, dd_path = _build_prelaunch_fixture_tree(tmp_path)
     report = prelaunch.assemble_prelaunch_report(
         panel, weekly, delisted_manifest_path=del_manifest, delisting_dates_path=dd_path,
-        n_sims=5, n_reps_factor_null=5, seed=53)
+        n_sims=5, n_reps_factor_null=5, n_reps_beta_control_study=5, n_reps_beta_control_winner=5, seed=53)
     artifacts = prelaunch.write_prelaunch_artifacts(tmp_path / "out", report)
     payload = __import__("json").loads(
         Path(artifacts["artifacts"]["wp13a_prelaunch_json"]["path"]).read_text(encoding="utf-8"))
@@ -406,7 +406,9 @@ def _ns_prelaunch(**overrides) -> argparse.Namespace:
     base = dict(
         panel_base="", delisted_base="", delisted_manifest="", delisting_dates="",
         start_year=2021, end_year=2026, as_of="2027-01-01", out="",
-        seed=53, n_sims=5, n_reps_factor_null=5, convention="close_at_last", allow_partial=False,
+        seed=53, n_sims=5, n_reps_factor_null=5,
+        n_reps_beta_control_study=5, n_reps_beta_control_winner=5,
+        convention="close_at_last", allow_partial=False,
         stress_rel="scinance3-impl/state/wp10_stress_canon/stress_rel.json",
         stress_abs="scinance3-impl/state/wp10_stress_canon/stress_abs.json",
     )
@@ -860,3 +862,414 @@ def test_cli_prelaunch_end_to_end_synthetic_union_tree(tmp_path):
     assert payload["windows"]["W1"]["delisting"]["n_symbol_weeks_delisting"] >= 1
     assert payload["reversal_gap_design_deviation"]
     assert payload["selection_ceiling_scale_factor_interpretation"]
+    # DEC-77 Entscheidung 1 -- Vorlauf v4: the calibration table is present for both
+    # judged windows (never for L), with the decision table and recommendation attached.
+    for wn in ("W1", "W2"):
+        w1 = payload["windows"][wn]
+        assert "factor_calibration" in w1 and "beta_control_method_study" in w1
+        assert "beta_control_decision" in w1
+        assert set(w1["beta_control_method_study"]["calibrations"].keys()) == set(nulls.FACTOR_NULL_CALIBRATIONS)
+        assert set(w1["beta_control_method_study"]["methods"]) == set(ic.BETA_CONTROL_METHODS)
+        assert len(w1["beta_control_decision"]["rows"]) == len(ic.BETA_CONTROL_METHODS)
+    assert "beta_control_recommendation" in payload
+
+
+# ============================================================================
+# DEC-77 Entscheidung 1 -- Vorlauf v4: beta-control METHODS (ic.py, pure)
+# ============================================================================
+
+def test_beta_control_trail_weeks_known_methods_and_unknown_loud_fail():
+    assert ic.beta_control_trail_weeks("none") is None
+    assert ic.beta_control_trail_weeks("ts_resid_8w") == 8
+    assert ic.beta_control_trail_weeks("fm_neutral_13w") == 13
+    assert ic.beta_control_trail_weeks("double_sort_26w") == 26
+    with pytest.raises(ValueError):
+        ic.beta_control_trail_weeks("nonexistent_method")
+
+
+def test_trailing_beta_coverage_counts_alive_and_finite():
+    alive = np.array([[True, True, False], [True, True, True]])
+    beta = np.array([[1.0, np.nan, 0.5], [np.nan, 2.0, 1.5]])
+    cov = ic.trailing_beta_coverage(beta, alive)
+    assert cov["n_alive_symbol_weeks"] == 5           # 5 of the 6 symbol-weeks are alive
+    # alive AND finite-beta: (0,0)=1.0, (1,1)=2.0, (1,2)=1.5 -> 3 (the (0,1)/(1,0) alive
+    # positions have NaN beta and do not count).
+    expected = int((alive & ~np.isnan(beta)).sum())
+    assert expected == 3
+    assert cov["n_covered_symbol_weeks"] == 3
+    assert cov["n_covered_symbol_weeks"] == expected
+    assert cov["coverage_fraction"] == pytest.approx(expected / 5)
+
+
+def test_apply_beta_control_none_is_passthrough():
+    w, k = 10, 5
+    rng = np.random.default_rng(1)
+    char = rng.normal(size=(w, k))
+    returns = rng.normal(size=(w, k))
+    alive = np.ones((w, k), dtype=bool)
+    out = ic.apply_beta_control("none", char, returns, alive)
+    assert out["characteristic"] is char
+    assert out["returns"] is returns
+    assert out["coverage"] is None
+
+
+def test_apply_beta_control_unknown_method_loud_fail():
+    w, k = 10, 5
+    char = np.zeros((w, k))
+    returns = np.zeros((w, k))
+    alive = np.ones((w, k), dtype=bool)
+    with pytest.raises(ValueError):
+        ic.apply_beta_control("bogus_method", char, returns, alive)
+
+
+def test_apply_beta_control_missing_beta_pit_loud_fail():
+    w, k = 10, 5
+    char = np.zeros((w, k))
+    returns = np.zeros((w, k))
+    alive = np.ones((w, k), dtype=bool)
+    with pytest.raises(ValueError, match="beta_pit"):
+        ic.apply_beta_control("ts_resid_8w", char, returns, alive, symbols=[f"s{i}" for i in range(k)])
+
+
+def test_ts_resid_via_apply_beta_control_true_beta_removes_factor_exactly():
+    """DEC-77 item 6: ts_resid with the TRUE beta removes the factor
+    exactly (same property as ic.residualize_outcome's own unit test,
+    exercised here through the apply_beta_control dispatcher, the code
+    path the simulation/run actually use)."""
+    w, k = 80, 40
+    rng = np.random.default_rng(4)
+    beta_true = rng.uniform(0.5, 2.0, size=k)
+    r_btc = rng.normal(0.0, 0.04, size=w)
+    returns = beta_true[None, :] * r_btc[:, None]          # zero idio noise
+    symbols = [f"s{i}" for i in range(k)] + ["BTCUSDT"]
+    returns_full = np.concatenate([returns, r_btc[:, None]], axis=1)
+    alive = np.ones((w, k + 1), dtype=bool)
+    beta_8w = characteristics.beta_characteristic(returns_full, symbols, market_symbol="BTCUSDT",
+                                                    trail_win=8, min_weeks=8)
+    char = np.zeros((w, k + 1))     # characteristic is irrelevant to this property
+    out = ic.apply_beta_control("ts_resid_8w", char, returns_full, alive, beta_pit=beta_8w, symbols=symbols)
+    finite = out["returns"][~np.isnan(out["returns"])]
+    assert np.max(np.abs(finite)) < 1e-6
+
+
+def test_fm_neutralize_outcome_residuals_orthogonal_to_beta():
+    """DEC-77 item 6: FM residuals have (near) zero cross-sectional
+    correlation with beta -- structural OLS property, checked per outcome
+    week directly (not just in aggregate)."""
+    w, k = 40, 60
+    rng = np.random.default_rng(6)
+    beta_pit = np.tile(rng.uniform(0.5, 2.0, size=k), (w, 1))
+    returns = rng.normal(0, 0.03, size=(w, k)) + beta_pit * rng.normal(0, 0.05, size=(w, 1))
+    alive = np.ones((w, k), dtype=bool)
+    resid = ic.fm_neutralize_outcome(returns, beta_pit, alive, min_universe=5)
+    for t in range(w - 1):
+        row = resid[t + 1]
+        valid = ~np.isnan(row)
+        if int(valid.sum()) < 5:
+            continue
+        x = beta_pit[t, valid] - beta_pit[t, valid].mean()
+        y = row[valid]
+        corr_num = float(np.dot(x, y))
+        assert abs(corr_num) < 1e-6 * max(1.0, float(np.abs(y).max()))
+
+
+def test_double_sort_characteristic_within_quintile_permutation():
+    """DEC-77 item 6: for every week, each beta-quintile's output values
+    are an EXACT permutation of 1..bucket_size."""
+    w, k = 12, 47   # deliberately not a multiple of 5
+    rng = np.random.default_rng(8)
+    beta_pit = rng.uniform(0.5, 2.0, size=(w, k))
+    characteristic = rng.normal(size=(w, k))
+    alive = np.ones((w, k), dtype=bool)
+    out = ic.double_sort_characteristic(characteristic, beta_pit, alive, n_quintiles=5)
+
+    for t in range(w):
+        order = np.argsort(beta_pit[t], kind="mergesort")
+        n = k
+        for q in range(5):
+            lo, hi = (n * q) // 5, (n * (q + 1)) // 5
+            members = order[lo:hi]
+            vals = sorted(out[t, members].tolist())
+            assert vals == list(range(1, len(members) + 1)), (t, q, vals)
+
+
+def test_double_sort_characteristic_skips_thin_weeks():
+    w, k = 3, 3        # fewer than n_quintiles=5 alive symbols every week
+    beta_pit = np.random.default_rng(0).uniform(0.5, 2.0, size=(w, k))
+    characteristic = np.random.default_rng(1).normal(size=(w, k))
+    alive = np.ones((w, k), dtype=bool)
+    out = ic.double_sort_characteristic(characteristic, beta_pit, alive, n_quintiles=5)
+    assert np.isnan(out).all()
+
+
+# ============================================================================
+# DEC-77 Entscheidung 1 (a) -- Vorlauf v4: factor-null calibration (nulls.py)
+# ============================================================================
+
+def test_trailing_pit_beta_excluding_current_week_shifts_by_one_and_excludes_week_t():
+    w, k = 60, 20
+    rng = np.random.default_rng(2)
+    r_btc = rng.normal(0.0, 0.04, size=w)
+    beta_true = rng.uniform(0.5, 2.0, size=k)
+    returns = beta_true[None, :] * r_btc[:, None]
+    symbols = [f"s{i}" for i in range(k)] + ["BTCUSDT"]
+    returns_full = np.concatenate([returns, r_btc[:, None]], axis=1)
+
+    beta_all = characteristics.beta_characteristic(returns_full, symbols, market_symbol="BTCUSDT",
+                                                     trail_win=26, min_weeks=26)
+    beta_prev = nulls.trailing_pit_beta_excluding_current_week(returns_full, symbols, market_symbol="BTCUSDT",
+                                                                trail_win=26)
+    assert np.isnan(beta_prev[0]).all()
+    assert np.allclose(beta_prev[1:], beta_all[:-1], equal_nan=True)
+
+
+def test_measure_market_factor_recovers_known_rho_f_and_sigma_f():
+    w = 400
+    rho_f, sigma_f = 0.35, 0.04
+    rng = np.random.default_rng(3)
+    f = np.empty(w)
+    f[0] = sigma_f * rng.standard_normal()
+    for t in range(1, w):
+        f[t] = rho_f * f[t - 1] + sigma_f * rng.standard_normal()
+    symbols = ["AAAUSDT", "BTCUSDT"]
+    returns = np.column_stack([rng.normal(0, 0.03, size=w), f])
+    res = nulls.measure_market_factor(returns, symbols, market_symbol="BTCUSDT")
+    assert res["rho_f_measured"] == pytest.approx(rho_f, abs=0.12)
+    assert res["sigma_f"] == pytest.approx(sigma_f, rel=0.15)
+    assert res["n_weeks_used"] == w
+
+
+def test_measure_market_factor_nan_when_market_absent():
+    returns = np.zeros((10, 3))
+    res = nulls.measure_market_factor(returns, ["a", "b", "c"], market_symbol="BTCUSDT")
+    assert math.isnan(res["rho_f_measured"]) and math.isnan(res["sigma_f"])
+
+
+def test_factor_share_from_trailing_beta_high_for_pure_beta_panel():
+    """A near-pure-beta panel (small idio noise): the median cross-
+    sectional R^2 of return on the (previous-week) trailing beta must be
+    close to 1 -- beta alone almost fully explains the cross-section."""
+    w, k = 120, 60
+    rng = np.random.default_rng(5)
+    beta_true = rng.uniform(0.5, 2.0, size=k)
+    r_btc = rng.normal(0.0, 0.05, size=w)
+    idio = rng.normal(0.0, 0.001, size=(w, k))
+    returns = beta_true[None, :] * r_btc[:, None] + idio
+    symbols = [f"s{i}" for i in range(k)] + ["BTCUSDT"]
+    returns_full = np.concatenate([returns, r_btc[:, None]], axis=1)
+    alive = np.ones((w, k + 1), dtype=bool)
+    beta_prev = nulls.trailing_pit_beta_excluding_current_week(returns_full, symbols, market_symbol="BTCUSDT",
+                                                                 trail_win=26)
+    share = nulls.factor_share_from_trailing_beta(returns_full, alive, beta_prev, min_universe=10)
+    assert share["factor_share_median"] > 0.9
+    assert share["n_weeks_used"] > 0
+
+
+def test_beta_dispersion_from_trailing_beta_matches_pooled_stats():
+    beta_prev = np.array([[1.0, 2.0, np.nan], [3.0, np.nan, 4.0]])
+    alive = np.array([[True, True, True], [True, True, True]])
+    disp = nulls.beta_dispersion_from_trailing_beta(beta_prev, alive)
+    pooled = nulls.pooled_finite_beta(beta_prev, alive)
+    assert sorted(pooled.tolist()) == [1.0, 2.0, 3.0, 4.0]
+    assert disp["n_pooled"] == 4
+    assert disp["mean"] == pytest.approx(pooled.mean())
+    assert disp["quantiles"]["0.5"] == pytest.approx(float(np.quantile(pooled, 0.5)))
+
+
+def test_factor_calibration_report_assembles_all_three_plus_analytic_line():
+    w, k = 60, 30
+    rng = np.random.default_rng(9)
+    returns = rng.normal(0, 0.03, size=(w, k))
+    symbols = [f"s{i}" for i in range(k - 1)] + ["BTCUSDT"]
+    alive = np.ones((w, k), dtype=bool)
+    beta_prev = nulls.trailing_pit_beta_excluding_current_week(returns, symbols, market_symbol="BTCUSDT",
+                                                                 trail_win=26)
+    report = nulls.factor_calibration_report(returns, alive, symbols, beta_prev, market_symbol="BTCUSDT")
+    assert set(report.keys()) >= {"market_factor", "factor_share", "beta_dispersion",
+                                    "analytic_mechanical_momentum", "beta_trail_weeks"}
+    assert report["beta_trail_weeks"] == 26
+    assert "KEIN Verdikt" in report["analytic_mechanical_momentum"]["label"]
+
+
+# ============================================================================
+# DEC-77 Entscheidung 1 (b) -- Vorlauf v4: beta-controlled factor null + the
+# full method study grid (nulls.py)
+# ============================================================================
+
+def test_beta_controlled_factor_null_unknown_method_loud_fail():
+    w, k = 20, 15
+    returns = np.zeros((w, k))
+    alive = np.ones((w, k), dtype=bool)
+    symbols = [f"s{i}" for i in range(k)]
+    with pytest.raises(ValueError):
+        nulls.beta_controlled_factor_null(returns, alive, symbols, method="not_a_method", n_reps=2, seed=53)
+
+
+def test_beta_controlled_factor_null_determinism_same_seed():
+    w, k = 40, 30
+    rng = np.random.default_rng(10)
+    returns = rng.normal(0, 0.03, size=(w, k))
+    alive = np.ones((w, k), dtype=bool)
+    symbols = [f"s{i}" for i in range(k - 1)] + ["BTCUSDT"]
+    r1 = nulls.beta_controlled_factor_null(returns, alive, symbols, method="ts_resid_8w",
+                                            variants=("mom1",), n_reps=15, seed=53)
+    r2 = nulls.beta_controlled_factor_null(returns, alive, symbols, method="ts_resid_8w",
+                                            variants=("mom1",), n_reps=15, seed=53)
+    assert r1["variants"] == r2["variants"]
+    assert r1["ceiling_mean_of_max"] == r2["ceiling_mean_of_max"]
+    r3 = nulls.beta_controlled_factor_null(returns, alive, symbols, method="ts_resid_8w",
+                                            variants=("mom1",), n_reps=15, seed=999)
+    assert r3["variants"] != r1["variants"]
+
+
+def test_beta_controlled_factor_null_none_method_reports_no_coverage():
+    w, k = 30, 20
+    rng = np.random.default_rng(11)
+    returns = rng.normal(0, 0.03, size=(w, k))
+    alive = np.ones((w, k), dtype=bool)
+    symbols = [f"s{i}" for i in range(k)]
+    res = nulls.beta_controlled_factor_null(returns, alive, symbols, method="none",
+                                             variants=("mom1", "rev_gap"), n_reps=10, seed=53)
+    assert res["coverage_mean"] is None
+    assert res["beta_window_weeks"] is None
+    for v in ("mom1", "rev_gap"):
+        assert math.isfinite(res["variants"][v]["factor_sd"])
+
+
+def test_beta_controlled_factor_null_double_sort_reports_coverage():
+    w, k = 60, 40
+    rng = np.random.default_rng(12)
+    returns = rng.normal(0, 0.03, size=(w, k))
+    alive = np.ones((w, k), dtype=bool)
+    symbols = [f"s{i}" for i in range(k - 1)] + ["BTCUSDT"]
+    res = nulls.beta_controlled_factor_null(returns, alive, symbols, method="double_sort_13w",
+                                             variants=("mom1",), n_reps=10, seed=53)
+    assert res["coverage_mean"] is not None
+    assert 0.0 <= res["coverage_mean"] <= 1.0
+    assert res["beta_window_weeks"] == 13
+
+
+def test_beta_control_method_study_grid_shape_and_resampled_betas_used():
+    w, k = 40, 30
+    rng = np.random.default_rng(13)
+    returns = rng.normal(0, 0.03, size=(w, k))
+    alive = np.ones((w, k), dtype=bool)
+    symbols = [f"s{i}" for i in range(k - 1)] + ["BTCUSDT"]
+    beta_pool = rng.uniform(0.5, 2.0, size=200)
+    study = nulls.beta_control_method_study(
+        returns, alive, symbols, rho_f_measured=0.3, beta_pool_measured=beta_pool,
+        variants=("mom1", "rev_gap"), methods=("none", "ts_resid_8w", "double_sort_13w"),
+        n_reps=6, seed=53)
+    assert set(study["calibrations"].keys()) == {"measured", "stress", "zero"}
+    for cal in ("measured", "stress", "zero"):
+        assert set(study["calibrations"][cal]["methods"].keys()) == {"none", "ts_resid_8w", "double_sort_13w"}
+        for method, m in study["calibrations"][cal]["methods"].items():
+            assert set(m["variants"].keys()) == {"mom1", "rev_gap"}
+    assert study["calibrations"]["stress"]["rho_f"] == pytest.approx(0.2)
+    assert study["calibrations"]["measured"]["rho_f"] == pytest.approx(0.3)
+    assert study["calibrations"]["zero"]["rho_f"] == 0.0
+    assert study["calibrations"]["measured"]["uses_measured_betas"] is True
+    assert study["calibrations"]["stress"]["uses_measured_betas"] is False
+
+
+# ============================================================================
+# DEC-77 Entscheidung 1 (b)/(c) -- Vorlauf v4: the decision rule (prelaunch.py)
+# ============================================================================
+
+def _fake_method_entry(mean_ic: float, sd: float, ceiling: float, *, variants=("mom1", "rev_gap")) -> dict:
+    return {"variants": {v: {"mean_ic_draws_mean": mean_ic, "mean_ic_draws_sd": sd} for v in variants},
+            "ceiling_mean_of_max": ceiling}
+
+
+def _fake_study(methods_config: dict[str, dict[str, tuple]]) -> dict:
+    """``methods_config[method] = {"measured": (mean, sd, ceiling), "stress": (...)}``."""
+    variants = ("mom1", "rev_gap")
+    calibrations = {}
+    for cal in ("measured", "stress", "zero"):
+        methods_out = {}
+        for method, cfg in methods_config.items():
+            mean, sd, ceiling = cfg.get(cal, cfg.get("measured"))
+            methods_out[method] = _fake_method_entry(mean, sd, ceiling, variants=variants)
+        calibrations[cal] = {"methods": methods_out}
+    return {"calibrations": calibrations, "methods": list(methods_config.keys()), "variants": list(variants)}
+
+
+def test_beta_control_pass_table_pass_and_fail_boundaries():
+    floor, w_judged, pure_noise_ceiling = 0.05, 52, 0.01
+    null_mean_bound = 0.25 * floor / math.sqrt(w_judged)
+    ceiling_bound = 1.5 * pure_noise_ceiling
+    study = _fake_study({
+        "good": {"measured": (null_mean_bound * 0.5, 0.02, ceiling_bound * 0.5),
+                 "stress": (null_mean_bound * 0.5, 0.02, ceiling_bound * 0.5)},
+        "bad_mean": {"measured": (null_mean_bound * 2.0, 0.02, ceiling_bound * 0.5),
+                     "stress": (null_mean_bound * 0.5, 0.02, ceiling_bound * 0.5)},
+        "bad_ceiling": {"measured": (null_mean_bound * 0.5, 0.02, ceiling_bound * 2.0),
+                        "stress": (null_mean_bound * 0.5, 0.02, ceiling_bound * 0.5)},
+    })
+    dec = prelaunch.beta_control_pass_table(study, floor=floor, w_judged=w_judged,
+                                             pure_noise_ceiling=pure_noise_ceiling,
+                                             variants=("mom1", "rev_gap"))
+    assert dec["passing_methods"] == ["good"]
+    assert dec["note"] is None
+    by_method = {r["method"]: r for r in dec["rows"]}
+    assert by_method["bad_mean"]["pass"] is False
+    assert by_method["bad_mean"]["measured"]["null_mean_ok"] is False
+    assert by_method["bad_ceiling"]["pass"] is False
+    assert by_method["bad_ceiling"]["measured"]["ceiling_ok"] is False
+
+
+def test_beta_control_pass_table_no_method_passes_message():
+    floor, w_judged, pure_noise_ceiling = 0.05, 52, 0.001
+    study = _fake_study({"m1": {"measured": (1.0, 0.02, 1.0), "stress": (1.0, 0.02, 1.0)}})
+    dec = prelaunch.beta_control_pass_table(study, floor=floor, w_judged=w_judged,
+                                             pure_noise_ceiling=pure_noise_ceiling,
+                                             variants=("mom1", "rev_gap"))
+    assert dec["passing_methods"] == []
+    assert dec["note"] == "KEINE METHODE ERFUELLT DIE KRITERIEN (GL-012-Kandidat)"
+
+
+def test_beta_control_recommendation_picks_smallest_avg_sd_with_tiebreak():
+    windows_out = {}
+    for wn in ("W1", "W2"):
+        study = _fake_study({
+            "ts_resid_26w": {"measured": (0.0, 0.05, 0.0), "stress": (0.0, 0.05, 0.0)},
+            "ts_resid_8w": {"measured": (0.0, 0.03, 0.0), "stress": (0.0, 0.03, 0.0)},
+        })
+        decision = {"passing_methods": ["ts_resid_26w", "ts_resid_8w"], "rows": [], "note": None,
+                    "null_mean_bound": 0.0, "ceiling_bound": 0.0}
+        windows_out[wn] = {"available": True, "beta_control_method_study": study,
+                            "beta_control_decision": decision}
+    rec = prelaunch.beta_control_recommendation(windows_out)
+    assert rec["recommended_method"] == "ts_resid_8w"     # smaller SD wins
+    assert rec["beta_window_weeks"] == 8
+    assert set(rec["eligible_methods"]) == {"ts_resid_26w", "ts_resid_8w"}
+
+
+def test_beta_control_recommendation_tie_prefers_shorter_window():
+    windows_out = {}
+    for wn in ("W1", "W2"):
+        study = _fake_study({
+            "ts_resid_26w": {"measured": (0.0, 0.04, 0.0), "stress": (0.0, 0.04, 0.0)},
+            "fm_neutral_13w": {"measured": (0.0, 0.04, 0.0), "stress": (0.0, 0.04, 0.0)},
+        })
+        decision = {"passing_methods": ["ts_resid_26w", "fm_neutral_13w"], "rows": [], "note": None,
+                    "null_mean_bound": 0.0, "ceiling_bound": 0.0}
+        windows_out[wn] = {"available": True, "beta_control_method_study": study,
+                            "beta_control_decision": decision}
+    rec = prelaunch.beta_control_recommendation(windows_out)
+    assert rec["recommended_method"] == "fm_neutral_13w"   # tie -> shorter beta window (13 < 26)
+
+
+def test_beta_control_recommendation_none_when_no_method_passes_everywhere():
+    windows_out = {
+        "W1": {"available": True, "beta_control_method_study": _fake_study({}),
+               "beta_control_decision": {"passing_methods": ["ts_resid_8w"], "rows": [], "note": None,
+                                          "null_mean_bound": 0.0, "ceiling_bound": 0.0}},
+        "W2": {"available": True, "beta_control_method_study": _fake_study({}),
+               "beta_control_decision": {"passing_methods": [], "rows": [],
+                                          "note": "KEINE METHODE ERFUELLT DIE KRITERIEN (GL-012-Kandidat)",
+                                          "null_mean_bound": 0.0, "ceiling_bound": 0.0}},
+    }
+    rec = prelaunch.beta_control_recommendation(windows_out)
+    assert rec["recommended_method"] is None
+    assert "GL-012" in rec["note"]

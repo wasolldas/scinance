@@ -41,7 +41,8 @@ __all__ = [
     "analytic_bailey_ldp_ceiling", "analytic_selection_ceiling",
     "measured_selection_ceiling", "assemble_prelaunch_report",
     "write_prelaunch_artifacts", "factor_preserving_report",
-    "survivorship_drawdown_fixture",
+    "survivorship_drawdown_fixture", "beta_control_pass_table",
+    "beta_control_recommendation",
 ]
 
 #: PRD 5.3 / DEC-74: judgement-bearing windows W1/W2, descriptive-only L.
@@ -89,7 +90,8 @@ def slice_window(weeks: list[str], start_iso: str, end_iso: str,
     lo, hi = idx[0], idx[-1] + 1
     out: dict[str, Any] = {"weeks": weeks[lo:hi], "lo": lo, "hi": hi,
                             "start_iso": start_iso, "end_iso": end_iso}
-    for name, arr in zip(("returns", "alive", "vol_rv", "turnover_trail", "day_count")[:len(arrays)], arrays):
+    names = ("returns", "alive", "vol_rv", "turnover_trail", "day_count", "beta_prev_26w")
+    for name, arr in zip(names[:len(arrays)], arrays):
         out[name] = arr[lo:hi]
     return out
 
@@ -390,6 +392,111 @@ def measured_selection_ceiling(alive_window: np.ndarray, *, k: int = SELECTION_K
 
 
 # ----------------------------------------------------------------------------
+# DEC-77 Entscheidung 1 (b)/(c) -- Vorlauf v4: the beta-control method
+# decision rule (pre-fixed, applied by code) + the cross-window
+# recommendation.
+# ----------------------------------------------------------------------------
+
+def beta_control_pass_table(
+    study: dict[str, Any], *, floor: float, w_judged: int, pure_noise_ceiling: float,
+    variants: tuple[str, ...] = characteristics.VARIANT_NAMES,
+    null_mean_tol_factor: float = 0.25, ceiling_tol_factor: float = 1.5,
+) -> dict[str, Any]:
+    """DEC-77 Entscheidung 1 (b)/(c), the PRE-FIXED decision rule, applied
+    by CODE (never eyeballed): a method PASSES iff, for BOTH the
+    ``"measured"`` AND ``"stress"`` calibrations, over ALL ``variants``:
+    (a) the WORST (max over variants of ``|mean-of-mean-IC|``) null mean
+    is ``<= 0.25 * floor / sqrt(W_judged)``, AND (b) the ceiling
+    (mean-of-max over variants) is ``<= 1.5 * pure_noise_ceiling`` (the
+    window's EXISTING measured pure-noise selection ceiling,
+    :func:`measured_selection_ceiling`'s ``ceiling_ic_mean``). One row per
+    method (:data:`ic.BETA_CONTROL_METHODS`, in ``study``'s own order);
+    ``note`` is the EXACT required string (task brief, verbatim) if NO
+    method passes -- a fact, never a verdict (DEC-77 Entscheidung 1 (c):
+    "erfuellt keine, ist Klasse W auf diesem Panel nicht testbar (B1-analog,
+    GL-012) -- dann keine Registrierung, kein Zurueckskalieren")."""
+    null_mean_bound = (null_mean_tol_factor * floor / math.sqrt(w_judged)) if w_judged > 0 else float("nan")
+    ceiling_bound = (ceiling_tol_factor * pure_noise_ceiling
+                      if pure_noise_ceiling is not None and not math.isnan(pure_noise_ceiling) else float("nan"))
+    rows: list[dict[str, Any]] = []
+    passing: list[str] = []
+    for method in study["methods"]:
+        per_cal: dict[str, Any] = {}
+        ok_all = True
+        for cal in ("measured", "stress"):
+            m = study["calibrations"][cal]["methods"][method]
+            null_means = [m["variants"][v]["mean_ic_draws_mean"] for v in variants]
+            finite_abs = [abs(x) for x in null_means if x is not None and not math.isnan(x)]
+            worst = max(finite_abs) if finite_abs else float("nan")
+            ceiling = m["ceiling_mean_of_max"]
+            mean_ok = (not math.isnan(worst)) and (not math.isnan(null_mean_bound)) and worst <= null_mean_bound
+            ceiling_ok = (ceiling is not None and not math.isnan(ceiling)
+                          and not math.isnan(ceiling_bound) and ceiling <= ceiling_bound)
+            per_cal[cal] = {
+                "worst_abs_null_mean": worst, "null_mean_bound": null_mean_bound, "null_mean_ok": mean_ok,
+                "ceiling": ceiling, "ceiling_bound": ceiling_bound, "ceiling_ok": ceiling_ok,
+            }
+            ok_all = ok_all and mean_ok and ceiling_ok
+        rows.append({"method": method, "measured": per_cal["measured"], "stress": per_cal["stress"], "pass": ok_all})
+        if ok_all:
+            passing.append(method)
+    return {
+        "rows": rows, "passing_methods": passing, "null_mean_bound": null_mean_bound,
+        "ceiling_bound": ceiling_bound,
+        "note": None if passing else "KEINE METHODE ERFUELLT DIE KRITERIEN (GL-012-Kandidat)",
+    }
+
+
+def beta_control_recommendation(
+    windows_out: dict[str, Any], *, window_names: tuple[str, ...] = ("W1", "W2"),
+) -> dict[str, Any]:
+    """DEC-77 Entscheidung 1 (c): among the methods that PASS
+    :func:`beta_control_pass_table` in EVERY judged window with a
+    decision table, the recommendation is the one with the SMALLEST
+    residualised SD (``mean_ic_draws_sd`` under the ``"measured"``
+    calibration, averaged over ``variants``, then averaged over windows)
+    -- tie -> the SHORTER beta window (:func:`ic.beta_control_trail_weeks`;
+    ``"none"`` has no window, sorts as 0, so it would win a tie against
+    any beta-controlled method -- documented, never expected to matter in
+    practice since ``"none"`` is the uncontrolled reference DEC-77 exists
+    to move past). A number, never a hand-picked choice: no real-data
+    signal enters this function, only the already-computed calibration/
+    decision numbers (THE SEAL holds transitively). If no method passes
+    in EVERY window, the recommendation is ``None`` -- each window's own
+    ``beta_control_decision.note`` already carries the GL-012-candidate
+    string, no verdict is added here either."""
+    decisions = {wn: windows_out[wn]["beta_control_decision"] for wn in window_names
+                 if windows_out.get(wn, {}).get("available") and "beta_control_decision" in windows_out[wn]}
+    if not decisions:
+        return {"recommended_method": None, "beta_window_weeks": None, "eligible_methods": [],
+                "note": "keine Fenster mit Beta-Kontroll-Entscheidung verfuegbar"}
+    passing_sets = [set(d["passing_methods"]) for d in decisions.values()]
+    eligible = set.intersection(*passing_sets) if passing_sets else set()
+    if not eligible:
+        return {"recommended_method": None, "beta_window_weeks": None, "eligible_methods": [],
+                "note": "KEINE METHODE ERFUELLT DIE KRITERIEN IN JEDEM FENSTER (GL-012-Kandidat)"}
+
+    def _avg_sd(method: str) -> float:
+        window_sds: list[float] = []
+        for wn in decisions:
+            m = windows_out[wn]["beta_control_method_study"]["calibrations"]["measured"]["methods"][method]
+            variant_sds = [v["mean_ic_draws_sd"] for v in m["variants"].values()
+                           if v["mean_ic_draws_sd"] is not None and not math.isnan(v["mean_ic_draws_sd"])]
+            if variant_sds:
+                window_sds.append(float(np.mean(variant_sds)))
+        return float(np.mean(window_sds)) if window_sds else float("inf")
+
+    ranked = sorted(eligible, key=lambda m: (_avg_sd(m), ic.beta_control_trail_weeks(m) or 0))
+    best = ranked[0]
+    return {
+        "recommended_method": best, "beta_window_weeks": ic.beta_control_trail_weeks(best),
+        "eligible_methods": sorted(eligible), "avg_residualized_sd": _avg_sd(best),
+        "note": f"Empfehlung: {best} (kleinste residualisierte SD ueber Fenster gemittelt, "
+                "Tie -> kuerzeres Beta-Fenster).",
+    }
+
+
+# ----------------------------------------------------------------------------
 # DEC-75 Entscheidung 1 (2)/(3): factor-preserving null report wrapper
 # ----------------------------------------------------------------------------
 
@@ -548,6 +655,8 @@ def assemble_prelaunch_report(
     stress_abs_path: Path | str | None = None,
     n_sims: int = nulls.PERSISTENCE_NULL_N_SIMS_DEFAULT,
     n_reps_factor_null: int = nulls.FACTOR_NULL_N_REPS_DEFAULT,
+    n_reps_beta_control_study: int = 100,
+    n_reps_beta_control_winner: int = 1000,
     seed: int = nulls.PERSISTENCE_NULL_SEED,
     convention: ic.Convention = "close_at_last",
 ) -> dict[str, Any]:
@@ -568,6 +677,46 @@ def assemble_prelaunch_report(
     ``ic.vol_weighted_outcome_with_drag``'s drag arithmetic -- neither
     call is an IC). ``ic.weekly_ic_series`` itself is never called from
     this module.
+
+    **DEC-77 Entscheidung 1 (a)/(b)/(c) -- Vorlauf v4, additive.** For
+    W1/W2 (never L): the factor-null CALIBRATION (:func:`nulls.
+    factor_calibration_report` -- ``rho_f_measured``/``sigma_f`` from the
+    real BTCUSDT weekly series, ``factor_share``/beta-dispersion from the
+    real 26-week trailing PIT beta -- single-series and returns-vs-beta
+    relations ONLY, THE SEAL's allowed category), the beta-control METHOD
+    STUDY (:func:`nulls.beta_control_method_study` -- 3 calibrations x 9
+    methods x 7 variants, EVERY cell simulated-characteristic-vs-simulated-
+    outcome), the PRE-FIXED decision table (:func:`beta_control_pass_table`)
+    and, if a method passes in BOTH windows, a HIGH-REP (``n_reps_beta_
+    control_winner``) re-run of the recommended method's ``"measured"``/
+    ``"stress"`` cells for the final report table.
+
+    **Runtime, measured, VOM ORCHESTRATOR ZU BESTAETIGEN (documented
+    deviation from the task brief's own "300 reps" fallback number).** A
+    synthetic-panel microbenchmark (``K=100``/``K=400``, ``W=52``, this
+    exact code path, non-profiled) gives ~0.020s/rep-cell at ``K=100`` and
+    ~0.066s/rep-cell at ``K=400``; a two-point power-law extrapolation to
+    the production scale (``K~1138``, ``W~52``) gives ~0.165s per
+    (calibration, method, variant) replicate. The full grid is 3
+    calibrations x 9 methods x 7 variants = 189 cells/replicate, so 300
+    reps/cell (the task brief's own stated fallback) extrapolates to
+    ``189*300*0.165s ~= 2.6h PER WINDOW`` (~5.2h for W1+W2 together) --
+    ALREADY past the task brief's "~2h" ceiling at 300 reps on this
+    measured hardware. Profiling attributes ~68% of that cost to
+    ``characteristics.beta_characteristic``'s per-week/per-symbol Python
+    loop (called fresh, once per replicate, for every method that needs a
+    beta -- never shared across methods with the SAME trailing window
+    within one replicate, a genuine, un-implemented optimisation
+    opportunity: sharing the simulated panel/beta array across
+    same-trail-window methods within a replicate would cut this by
+    roughly a third). Given this, the DEFAULT here is 100 (not 300) --
+    ``189*100*0.165s ~= 52 min/window (~1h45 both)``, safely inside the
+    ~2h budget on hardware AT LEAST as fast as the measurement above; the
+    orchestrator can raise it via ``--n-reps-beta-control-study`` once the
+    ACTUAL runner PC's speed is known (a faster desktop may comfortably
+    afford 300-500). The winner re-run (``n_reps_beta_control_winner``,
+    default 1000, ONE method x 2 calibrations x 7 variants = 14 cells) is
+    cheap regardless (~14*1000*0.165s ~= 39 min/window).
     """
     # DEC-75 (8) / task brief item 8: characteristics/day-counts are built on the FULL
     # panel FIRST, then sliced to windows -- the SAME path the future run mode uses
@@ -579,11 +728,17 @@ def assemble_prelaunch_report(
     turnover_weekly = characteristics.weekly_turnover(panel, weeks)
     turnover_trail = characteristics.trailing_median_turnover(turnover_weekly)
     day_count = characteristics.weekly_valid_day_count(panel, weeks)
+    # DEC-77 Entscheidung 1 (a)(b): the calibration beta -- 26-week trailing, STRICTLY
+    # excluding week t itself (module docstring of nulls.trailing_pit_beta_excluding_
+    # current_week) -- built on the FULL panel first, DEC-75 (8) discipline, then sliced.
+    beta_prev_26w = nulls.trailing_pit_beta_excluding_current_week(
+        returns, symbols, market_symbol="BTCUSDT", trail_win=nulls.CALIBRATION_BETA_TRAIL_WEEKS)
 
     windows_out: dict[str, Any] = {}
     for name, (start, end) in WINDOWS.items():
         try:
-            window = slice_window(weeks, start, end, returns, alive, vol_rv, turnover_trail, day_count)
+            window = slice_window(weeks, start, end, returns, alive, vol_rv, turnover_trail, day_count,
+                                   beta_prev_26w)
         except ValueError as exc:
             windows_out[name] = {"available": False, "note": str(exc)}
             continue
@@ -604,6 +759,24 @@ def assemble_prelaunch_report(
             entry["selection_ceiling_measured"] = measured_selection_ceiling(window["alive"], seed=seed)
             entry["factor_preserving_null"] = factor_preserving_report(
                 window, symbols, convention=convention, n_reps=n_reps_factor_null, seed=seed)
+
+            # DEC-77 Entscheidung 1 (a)/(b)/(c) -- Vorlauf v4.
+            calib = nulls.factor_calibration_report(
+                window["returns"], window["alive"], symbols, window["beta_prev_26w"],
+                market_symbol="BTCUSDT")
+            beta_pool_measured = nulls.pooled_finite_beta(window["beta_prev_26w"], window["alive"])
+            study = nulls.beta_control_method_study(
+                window["returns"], window["alive"], symbols,
+                rho_f_measured=calib["market_factor"]["rho_f_measured"],
+                beta_pool_measured=beta_pool_measured, convention=convention,
+                n_reps=n_reps_beta_control_study, seed=seed)
+            decision = beta_control_pass_table(
+                study, floor=e_floor, w_judged=w_judged,
+                pure_noise_ceiling=entry["selection_ceiling_measured"]["ceiling_ic_mean"])
+            entry["factor_calibration"] = calib
+            entry["beta_control_method_study"] = study
+            entry["beta_control_decision"] = decision
+
             entry["survivorship_fixture"] = survivorship_drawdown_fixture(
                 window, ic_min_mom1=nf["ic_min_capped_per_variant"]["mom1"],
                 ic_min_rev_gap=nf["ic_min_capped_per_variant"]["rev_gap"], seed=seed)
@@ -612,6 +785,31 @@ def assemble_prelaunch_report(
         if stress_abs_path is not None:
             entry["stress_abs"] = stress_coverage(stress_abs_path, start, end)
         windows_out[name] = entry
+
+    # DEC-77 Entscheidung 1 (c): the cross-window recommendation, THEN (if one exists) a
+    # HIGH-REP re-run of just that one method's measured/stress cells for the final table
+    # (task brief item 2: ">= 1000 for the recommended method in the final table").
+    recommendation = beta_control_recommendation(windows_out)
+    if recommendation.get("recommended_method"):
+        best = recommendation["recommended_method"]
+        for wn in ("W1", "W2"):
+            w = windows_out.get(wn, {})
+            if not w.get("available") or "beta_control_method_study" not in w:
+                continue
+            window = slice_window(weeks, *WINDOWS[wn], returns, alive, vol_rv, turnover_trail, day_count,
+                                   beta_prev_26w)
+            calib = w["factor_calibration"]
+            beta_pool_measured = nulls.pooled_finite_beta(window["beta_prev_26w"], window["alive"])
+            high_rep = {
+                cal: nulls.beta_controlled_factor_null(
+                    window["returns"], window["alive"], symbols, method=best, convention=convention,
+                    n_reps=n_reps_beta_control_winner, seed=seed,
+                    rho_f=(calib["market_factor"]["rho_f_measured"] if cal == "measured" else 0.2),
+                    drift_f=nulls.DRIFT_F_DRIFTFREE,
+                    beta_pool=(beta_pool_measured if cal in ("measured", "zero") else None))
+                for cal in ("measured", "stress")
+            }
+            w["beta_control_recommended_high_rep"] = high_rep
 
     no_history: dict[str, Any] | None = None
     if delisted_manifest_path is not None and delisting_dates_path is not None:
@@ -626,7 +824,10 @@ def assemble_prelaunch_report(
                  "(Siegel-Test).",
         "windows": windows_out,
         "no_history_symbols": no_history,
+        "beta_control_recommendation": recommendation,
         "seed": seed, "n_sims": n_sims, "n_reps_factor_null": n_reps_factor_null,
+        "n_reps_beta_control_study": n_reps_beta_control_study,
+        "n_reps_beta_control_winner": n_reps_beta_control_winner,
         "convention": convention, "variants": list(characteristics.VARIANT_NAMES),
         "reversal_gap_design_deviation": (
             "PRD 5.3 verlangt einen EIN-TAGES-Gap zwischen Formation und Halteperiode; WP-13 "
@@ -647,6 +848,57 @@ def _fmt5(v: float | None) -> str:
     ``nulls.factor_preserving_null``'s docstring) without crashing the
     report; ``NaN`` still renders as the literal ``"nan"`` (unchanged)."""
     return "n/a (kein Marktsymbol)" if v is None else f"{v:.5f}"
+
+
+def _beta_control_calibration_markdown(w: dict[str, Any]) -> list[str]:
+    """DEC-77 Entscheidung 1/task brief item 7: ONE window's calibration
+    block (``rho_f_measured``, ``sigma_f``, ``factor_share``, beta
+    quantiles, the analytic mechanical-momentum plausibility line) plus
+    the PASS/FAIL table (rows = methods, columns = measured/stress null
+    mean + ceiling + PASS/FAIL). ``[]`` if this window has no DEC-77 data
+    (older artifact, or L)."""
+    if "factor_calibration" not in w:
+        return []
+    lines: list[str] = []
+    calib = w["factor_calibration"]
+    mkt, share, disp = calib["market_factor"], calib["factor_share"], calib["beta_dispersion"]
+    mom = calib["analytic_mechanical_momentum"]
+    q = disp.get("quantiles", {})
+    lines.append(f"- **DEC-77 Kalibrierung** ({calib['beta_trail_weeks']}-Wochen-PIT-Beta, 'vorherige Wochen'): "
+                 f"rho_f_gemessen={mkt['rho_f_measured']:.4f}, sigma_f={mkt['sigma_f']:.5f} "
+                 f"(n={mkt['n_weeks_used']} Wochen); Faktoranteil (Median Querschnitts-R^2)="
+                 f"{share['factor_share_median']:.4f} (n={share['n_weeks_used']} Wochen); "
+                 f"Beta-Dispersion: SD={disp.get('sd', float('nan')):.4f}, "
+                 f"Quantile[0.05/0.25/0.5/0.75/0.95]="
+                 f"[{q.get('0.05', float('nan')):.3f}/{q.get('0.25', float('nan')):.3f}/"
+                 f"{q.get('0.5', float('nan')):.3f}/{q.get('0.75', float('nan')):.3f}/"
+                 f"{q.get('0.95', float('nan')):.3f}] (n_gepoolt={disp.get('n_pooled', 0)})")
+    lines.append(f"  - {mom['label']} {mom['formula']} = {_fmt5(mom['value'])}")
+
+    if "beta_control_decision" in w:
+        dec = w["beta_control_decision"]
+        lines.append(f"- Beta-Kontroll-Kriterium: |Null-Mittel| <= {dec['null_mean_bound']:.5f} UND "
+                     f"Decke <= {dec['ceiling_bound']:.5f} (measured UND stress)")
+        lines.append("")
+        lines.append("| Methode | measured Null-Mittel | measured Decke | stress Null-Mittel | "
+                     "stress Decke | PASS |")
+        lines.append("|---|---|---|---|---|---|")
+        for row in dec["rows"]:
+            m, s = row["measured"], row["stress"]
+            lines.append(
+                f"| {row['method']} | {_fmt5(m['worst_abs_null_mean'])} | {_fmt5(m['ceiling'])} | "
+                f"{_fmt5(s['worst_abs_null_mean'])} | {_fmt5(s['ceiling'])} | "
+                f"{'PASS' if row['pass'] else 'FAIL'} |")
+        lines.append("")
+        if dec.get("note"):
+            lines.append(f"- {dec['note']}")
+    hr = w.get("beta_control_recommended_high_rep")
+    if hr:
+        m, s = hr["measured"]["variants"], hr["stress"]["variants"]
+        lines.append(f"- Gewinner-Methode, hoehere Replikatzahl (n_reps={hr['measured']['n_reps']}): "
+                     f"measured Decke={_fmt5(hr['measured']['ceiling_mean_of_max'])}, "
+                     f"stress Decke={_fmt5(hr['stress']['ceiling_mean_of_max'])}")
+    return lines
 
 
 def _to_markdown(report: dict[str, Any]) -> str:
@@ -721,6 +973,8 @@ def _to_markdown(report: dict[str, Any]) -> str:
                          f"rev_gap Diff={sv['rev_gap_diff']:.5f} "
                          f"({sv['rev_gap_diff_in_ic_min_units']:.3f} IC_min-Einheiten), "
                          f"n_deleted={sv['n_deleted']}/{sv['k']} (kein Verdikt)")
+            lines.append("")
+            lines.extend(_beta_control_calibration_markdown(w))
         if "stress_rel" in w:
             sr = w["stress_rel"]
             lines.append(f"- STRESS_REL: {'nicht vorhanden' if not sr.get('available') else sr.get('n_days_in_window')}")
@@ -733,6 +987,15 @@ def _to_markdown(report: dict[str, Any]) -> str:
         lines.append(f"## NO_HISTORY-Symbole ({nh.get('n_no_history')})")
         for row in nh.get("symbols", []):
             lines.append(f"- {row['symbol']}: delistet {row['delist_date']} (Woche {row['delist_week']})")
+        lines.append("")
+    rec = report.get("beta_control_recommendation")
+    if rec:
+        lines.append("## DEC-77 Beta-Kontroll-Empfehlung")
+        if rec.get("recommended_method"):
+            lines.append(f"- {rec['note']} (Fenster {rec['beta_window_weeks']}, "
+                         f"zulaessige Methoden: {', '.join(rec['eligible_methods'])})")
+        else:
+            lines.append(f"- {rec['note']}")
         lines.append("")
     lines.append("## Abweichungen (zur Bestaetigung durch den Orchestrator)")
     lines.append(f"- {report['reversal_gap_design_deviation']}")

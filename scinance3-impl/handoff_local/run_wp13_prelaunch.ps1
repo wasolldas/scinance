@@ -26,6 +26,8 @@ param(
     [string]$OutDir = "",
     [string]$Seed = "53",
     [string]$NSims = "1000",
+    [string]$NRepsBetaStudy = "100",
+    [string]$NRepsBetaWinner = "1000",
     [string]$Convention = "close_at_last",
     [string]$StressRel = "",
     [string]$StressAbs = "",
@@ -76,6 +78,7 @@ python scripts\wp13_xsec.py --prelaunch `
     --panel-base $PanelBase --delisted-base $DelistedBase `
     --start-year $StartYear --end-year $EndYear --as-of $AsOf `
     --out $OutDir --seed $Seed --n-sims $NSims --convention $Convention `
+    --n-reps-beta-control-study $NRepsBetaStudy --n-reps-beta-control-winner $NRepsBetaWinner `
     --stress-rel $StressRel --stress-abs $StressAbs @extraArgs
 $rc = $LASTEXITCODE
 

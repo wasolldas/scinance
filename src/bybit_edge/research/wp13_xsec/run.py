@@ -69,21 +69,24 @@ REGISTERED_SCHEMA_HINT = (
     "hypotheses: {H-xx: {variant: str, direction: positive|negative, outcome?: vol_weighted}}; "
     "windows: {W1: {start, end, ic_min_capped: {variant: float}, w_judged: int, "
     "res_quantile_drifting: {variant: float}, ceiling_driftfree_res: float}, W2: {...}, L?: {start, end}}; "
+    "beta_control: {method: str (one of ic.BETA_CONTROL_METHODS, REQUIRED, non-empty -- DEC-77 "
+    "Entscheidung 2, loud fail otherwise), beta_window_weeks: int|None (must match the trailing "
+    "window ic.beta_control_trail_weeks(method) implies)}; "
     "rules: {seed: 53, n_reps: >=1000 (bootstrap/permutation/factor-null reps; legacy "
     "n_reps_bootstrap/n_reps_permutation/n_reps_factor_null still read if n_reps is absent), "
     "block_len: 4 (DEC-75 Entscheidung 1 (1): a FIXED registered constant, recorded here "
     "for audit -- run_full's block-bootstrap/-permutation helpers hardcode block_size=4 "
     "directly, per DEC-75, rather than reading this key back), "
     "level: 0.9936, bh_alpha: 0.10}. "
-    "DEC-76 Entscheidung 1(b)/(c): windows.<W>.res_quantile_drifting[variant] and "
-    "windows.<W>.ceiling_driftfree_res are the FROZEN Drittfassung constants -- run_full "
-    "recomputes both on the real K series/W_judged (seed 53, rules.n_reps reps) and asserts "
-    "they are within +/-NULL_CALIBRATION_REL_TOL of these frozen values, else loud fail "
-    "('Null-Kalibrierung weicht ab', NullCalibrationError, no verdict); the gate itself always "
-    "judges against the FROZEN (registered) value, never the recomputed one. Both keys are "
-    "OPTIONAL for backward compatibility with a pre-DEC-76 registered file -- if absent for a "
-    "window, run_full falls back to the recomputed value with no calibration check (documented, "
-    "not a registered Drittfassung run)."
+    "DEC-76 Entscheidung 1(b)/(c) / DEC-77 Entscheidung 2: windows.<W>.res_quantile_drifting[variant] "
+    "and windows.<W>.ceiling_driftfree_res are the FROZEN Drittfassung constants -- run_full "
+    "recomputes both via nulls.beta_controlled_factor_null (registered beta_control.method, rho_f=0.2, "
+    "driftfree, seed 53, rules.n_reps reps) and asserts they are within +/-NULL_CALIBRATION_REL_TOL of "
+    "these frozen values, else loud fail ('Null-Kalibrierung weicht ab', NullCalibrationError, no "
+    "verdict); the gate itself always judges against the FROZEN (registered) value, never the "
+    "recomputed one. Both keys are OPTIONAL for backward compatibility with a pre-DEC-76 registered "
+    "file -- if absent for a window, run_full falls back to the recomputed value with no calibration "
+    "check (documented, not a registered Drittfassung run)."
 )
 
 
@@ -404,6 +407,7 @@ def variant_window_payload(
     report_drop_convention: bool = True, report_lag_profile: bool = True,
     report_beta_calibration: bool = True,
     res_quantile_drifting: float | None = None,
+    beta_control_method: str | None = None, beta_control_pit: np.ndarray | None = None,
 ) -> dict[str, Any]:
     """Assembles ONE window's numbers for ``gates.evaluate`` -- the real
     IC series, SE (item 1), bootstrap CI bound (item 1), block-permutation
@@ -418,6 +422,18 @@ def variant_window_payload(
     characteristic-vs-REAL-outcome computation THE SEAL forbids in
     ``--prelaunch`` -- this function is run-mode-only, never called from
     ``prelaunch.py``.
+
+    **DEC-77 Entscheidung 2, additive:** ``beta_control_method`` (one of
+    :data:`ic.BETA_CONTROL_METHODS`, ``None`` by default) selects HOW
+    ``residualized_mean_ic`` is computed, via :func:`ic.apply_beta_control`
+    -- the SAME dispatcher the calibration study uses, so a real run's
+    beta control behaves IDENTICALLY to how it was calibrated.
+    ``beta_control_pit`` must be the matching trailing-window PIT beta
+    (unused for ``method in (None, "none")``). **Backward compatible:**
+    leaving ``beta_control_method`` at its default ``None`` falls back to
+    the EXACT pre-DEC-77 behaviour (``ic.residualize_outcome`` with
+    ``beta_8w_pit`` directly, fixed 8-week) -- every caller that predates
+    DEC-77 is unaffected.
 
     ``res_quantile_drifting`` (DEC-76 Entscheidung 1 (b), additive): the
     FROZEN registered-YAML constant for THIS hypothesis/window -- the
@@ -441,11 +457,20 @@ def variant_window_payload(
                                            block_size=block_size, n_reps=n_reps_permutation, seed=seed)
 
     residualized_mean_ic = None
-    if beta_8w_pit is not None and market_symbol in symbols:
-        r_btc = returns[:, symbols.index(market_symbol)]
-        resid = ic.residualize_outcome(returns, beta_8w_pit, r_btc)
-        res_resid = ic.weekly_ic_series(characteristic, resid, alive, convention=convention)
+    beta_control_coverage = None
+    if beta_control_method is None:
+        # Pre-DEC-77 fallback, UNCHANGED: fixed 8-week ic.residualize_outcome.
+        if beta_8w_pit is not None and market_symbol in symbols:
+            r_btc = returns[:, symbols.index(market_symbol)]
+            resid = ic.residualize_outcome(returns, beta_8w_pit, r_btc)
+            res_resid = ic.weekly_ic_series(characteristic, resid, alive, convention=convention)
+            residualized_mean_ic = res_resid["mean_ic"]
+    elif beta_control_method != "none":
+        applied = ic.apply_beta_control(beta_control_method, characteristic, returns, alive,
+                                         beta_pit=beta_control_pit, symbols=symbols, market_symbol=market_symbol)
+        res_resid = ic.weekly_ic_series(applied["characteristic"], applied["returns"], alive, convention=convention)
         residualized_mean_ic = res_resid["mean_ic"]
+        beta_control_coverage = applied["coverage"]
 
     mean_ic_drop_convention = None
     if report_drop_convention and convention != "drop":
@@ -464,6 +489,7 @@ def variant_window_payload(
         "block_permutation_p": perm["p_value"], "block_permutation_detail": perm,
         "ic_min_capped": ic_min_capped, "residualized_mean_ic": residualized_mean_ic,
         "res_quantile_drifting": res_quantile_drifting,      # DEC-76 Entscheidung 1 (b), frozen registered value
+        "beta_control_method": beta_control_method, "beta_control_coverage": beta_control_coverage,
         "mean_ic_drop_convention": mean_ic_drop_convention, "lag_profile": lag_profile_result,
         "beta_calibration_mean_ic": beta_calibration_mean_ic,
         "selection_ceiling_mean_of_max": selection_ceiling_mean_of_max,
@@ -483,17 +509,24 @@ def run_hypothesis(
     convention: ic.Convention = "close_at_last",
     n_reps_bootstrap: int = 1000, n_reps_permutation: int = 1000, seed: int = 53,
     res_quantile_drifting_by_window: dict[str, float] | None = None,
+    beta_control_method: str | None = None,
+    beta_control_pit_by_window: dict[str, np.ndarray] | None = None,
 ) -> dict[str, Any]:
     """One hypothesis, BOTH judgement windows (C.10 hard) -> the full
     ``gates.evaluate`` payload + verdict. Windows are keyed ``"W1"``/
     ``"W2"`` throughout. ``res_quantile_drifting_by_window`` (DEC-76
     Entscheidung 1 (b), additive, ``None`` by default) carries the FROZEN
     registered per-window beta-control quantile through to each window's
-    payload -- see :func:`variant_window_payload`'s docstring."""
+    payload -- see :func:`variant_window_payload`'s docstring.
+    ``beta_control_method``/``beta_control_pit_by_window`` (DEC-77
+    Entscheidung 2, additive, ``None`` by default -- exact pre-DEC-77
+    fallback via ``beta_8w_pit_by_window``) select the registered
+    beta-control method, see :func:`variant_window_payload`'s docstring."""
     windows_payload: dict[str, Any] = {}
     for wname in ("W1", "W2"):
         beta_8w = beta_8w_pit_by_window.get(wname) if beta_8w_pit_by_window else None
         rqd = res_quantile_drifting_by_window.get(wname) if res_quantile_drifting_by_window else None
+        beta_control_pit = beta_control_pit_by_window.get(wname) if beta_control_pit_by_window else None
         windows_payload[wname] = variant_window_payload(
             char_by_window[wname], returns_by_window[wname], alive_by_window[wname], symbols,
             variant=variant, direction=direction, ic_min_capped=ic_min_capped_by_window[wname],
@@ -501,7 +534,8 @@ def run_hypothesis(
             selection_ceiling_mean_of_max=selection_ceiling_by_window[wname],
             beta_8w_pit=beta_8w, convention=convention,
             n_reps_bootstrap=n_reps_bootstrap, n_reps_permutation=n_reps_permutation, seed=seed,
-            res_quantile_drifting=rqd)
+            res_quantile_drifting=rqd,
+            beta_control_method=beta_control_method, beta_control_pit=beta_control_pit)
 
     payload = {
         "hypothesis": hypothesis, "variant": variant, "direction": direction,
@@ -523,17 +557,26 @@ def run_full(
 ) -> dict[str, Any]:
     """Panel + registered YAML -> every hypothesis's verdict. Builds all 7
     characteristics ONCE on the full panel (DEC-75 (8)), slices to W1/W2/L,
-    computes the DEC-76 factor-preserving nulls ONCE per window (shared
-    across all 7 variants: the driftfree-residualized GL-012 ceiling and
-    the drifting-residualized beta-control quantile per variant, ``nulls.
-    factor_preserving_null`` reused unchanged, called twice per window --
-    ``drift_f=nulls.DRIFT_F_DRIFTFREE`` and ``drift_f=nulls.
-    DRIFT_F_DRIFTING``), asserts both are within +/-10% of the registered
-    YAML's FROZEN values (:func:`assert_null_calibration`, loud fail
-    ``NullCalibrationError`` otherwise, BEFORE any verdict), then runs each
-    registered hypothesis via :func:`run_hypothesis` against the FROZEN
-    (registered) values. L is computed for descriptive/sealed purposes
-    only (never enters a verdict)."""
+    computes the DEC-77 beta-controlled null ONCE per window (shared
+    across all 7 variants: the GL-012 ceiling and the beta-control PASS
+    quantile per variant, :func:`nulls.beta_controlled_factor_null`, ONE
+    call per window under the REGISTERED ``beta_control.method``, ``rho_f
+    = 0.2`` "stress" calibration, driftfree -- DEC-77 Entscheidung 1 (c)'s
+    "rho 0.2 als Stress-Variante behalten"), asserts it is within +/-10% of
+    the registered YAML's FROZEN values (:func:`assert_null_calibration`,
+    loud fail ``NullCalibrationError`` otherwise, BEFORE any verdict), then
+    runs each registered hypothesis via :func:`run_hypothesis` against the
+    FROZEN (registered) values. L is computed for descriptive/sealed
+    purposes only (never enters a verdict).
+
+    **DEC-77 Entscheidung 2, C.14 loud fail:** ``registered["beta_control"]``
+    (``{"method": <one of ic.BETA_CONTROL_METHODS>, "beta_window_weeks":
+    <int|None>}``) is REQUIRED -- a missing key, an empty/unrecognised
+    ``method``, or a ``beta_window_weeks`` that does not match the
+    method's own implied trailing window all raise :class:`ValueError`
+    BEFORE any panel arithmetic runs, so a registered file emitted by
+    ``--emit-registered-template`` (``method: ""``) can never silently
+    reach a verdict without the orchestrator filling it in."""
     from . import prelaunch  # local import: prelaunch.slice_window, avoids a module cycle at import time
 
     rules = registered.get("rules", {})
@@ -546,6 +589,23 @@ def run_full(
     null_quantile_level = float(rules.get("level", nulls.SELECTION_CEILING_ONE_SIDED_QUANTILE))
     bh_alpha = float(rules.get("bh_alpha", 0.10))
 
+    # DEC-77 Entscheidung 2: the registered beta-control method -- C.14 loud fail, no fallback.
+    beta_control_cfg = registered.get("beta_control")
+    if not isinstance(beta_control_cfg, dict) or not beta_control_cfg.get("method"):
+        raise ValueError(
+            "registered YAML fehlt beta_control.method (DEC-77 Entscheidung 2) oder es ist leer -- "
+            "kein Lauf ohne vom Orchestrator gewaehlte Beta-Kontroll-Methode (loud fail, kein "
+            "Verdikt). --emit-registered-template schreibt method:\"\" als Platzhalter; die "
+            "Drittfassung muss ihn vor der Registrierung fuellen.")
+    beta_control_method = beta_control_cfg["method"]
+    beta_control_trail_win = ic.beta_control_trail_weeks(beta_control_method)   # raises on an unknown method
+    reg_beta_window = beta_control_cfg.get("beta_window_weeks")
+    if beta_control_trail_win is not None and reg_beta_window != beta_control_trail_win:
+        raise ValueError(
+            f"registered beta_control.beta_window_weeks ({reg_beta_window!r}) passt nicht zum "
+            f"von beta_control.method={beta_control_method!r} implizierten Fenster "
+            f"({beta_control_trail_win}) -- loud fail, kein Verdikt.")
+
     weeks = weekly["weeks"]
     symbols = panel["symbols"]
     returns, alive = weekly["returns"], weekly["alive"]
@@ -553,6 +613,13 @@ def run_full(
     turnover_weekly = characteristics.weekly_turnover(panel, weeks)
     turnover_trail = characteristics.trailing_median_turnover(turnover_weekly)
     beta_8w_pit = all_char["vol_beta"]
+    # DEC-77 Entscheidung 2: the registered method's OWN trailing-window PIT beta, built on the
+    # FULL panel first (DEC-75 (8) discipline), sliced per window below -- "none" needs none.
+    beta_control_pit_full = None
+    if beta_control_trail_win is not None:
+        beta_control_pit_full = characteristics.beta_characteristic(
+            returns, symbols, market_symbol="BTCUSDT", trail_win=beta_control_trail_win,
+            min_weeks=beta_control_trail_win)
 
     windows: dict[str, dict[str, Any]] = {}
     for wname in ("W1", "W2", "L"):
@@ -564,32 +631,32 @@ def run_full(
         window["characteristics"] = {v: arr[lo:hi] for v, arr in all_char.items()}
         window["turnover_trail"] = turnover_trail[lo:hi]
         window["symbols"] = symbols
+        window["beta_control_pit"] = beta_control_pit_full[lo:hi] if beta_control_pit_full is not None else None
         windows[wname] = window
 
     floor_by_window, wjudged_by_window, ceiling_by_window = {}, {}, {}
     res_quantile_drifting_by_window: dict[str, dict[str, float]] = {}
+    beta_control_pit_by_window: dict[str, np.ndarray | None] = {}
     null_calibration_report: dict[str, Any] = {}
     for wname in ("W1", "W2"):
         w = windows[wname]
         f = nulls.analytic_permutation_floor(w["alive"], w["weeks"])
         floor_by_window[wname] = f["e_floor"]
         wjudged_by_window[wname] = f["w_judged"]
+        beta_control_pit_by_window[wname] = w["beta_control_pit"]
 
-        # DEC-76 Entscheidung 1 (c): GL-012 binds to the DRIFTFREE, RESIDUALIZED ceiling
-        # (real K series/W_judged); DEC-76 Entscheidung 1 (b): the beta-control PASS quantile
-        # is the DRIFTING, RESIDUALIZED per-variant quantile. Both computed ONCE per window,
-        # shared across all 7 variants (same discipline as the DEC-75 ceiling this replaces).
-        fp_driftfree = nulls.factor_preserving_null(
-            w["returns"], w["alive"], symbols, variants=characteristics.VARIANT_NAMES,
-            convention=convention, n_reps=n_reps_factor_null, seed=seed,
-            quantile=null_quantile_level, drift_f=nulls.DRIFT_F_DRIFTFREE)
-        fp_drifting = nulls.factor_preserving_null(
-            w["returns"], w["alive"], symbols, variants=characteristics.VARIANT_NAMES,
-            convention=convention, n_reps=n_reps_factor_null, seed=seed,
-            quantile=null_quantile_level, drift_f=nulls.DRIFT_F_DRIFTING)
+        # DEC-77 Entscheidung 2: ONE beta-controlled null per window (registered method, rho_f=0.2
+        # "stress" calibration -- DEC-77 Entscheidung 1 (c), driftfree -- DEC-77's own "Anlass":
+        # rho_f alone, no drift, already produces the artifact) gives BOTH the GL-012 ceiling and
+        # the per-variant beta-control PASS quantile, shared across all 7 variants.
+        bcn = nulls.beta_controlled_factor_null(
+            w["returns"], w["alive"], symbols, method=beta_control_method,
+            variants=characteristics.VARIANT_NAMES, convention=convention,
+            n_reps=n_reps_factor_null, seed=seed, quantile=null_quantile_level,
+            rho_f=0.2, drift_f=nulls.DRIFT_F_DRIFTFREE, beta_pool=None)
 
-        recomputed_ceiling_res = fp_driftfree["selection_ceiling_mean_of_max_residualized"]
-        recomputed_quantiles = {v: fp_drifting["variants"][v]["quantile_one_sided_residualized"]
+        recomputed_ceiling_res = bcn["ceiling_mean_of_max"]
+        recomputed_quantiles = {v: bcn["variants"][v]["quantile_one_sided"]
                                  for v in characteristics.VARIANT_NAMES}
 
         reg_window_cfg = registered["windows"].get(wname, {})
@@ -670,7 +737,8 @@ def run_full(
             beta_8w_pit_by_window=beta_by_window, liquidity_ic_without_d1=liquidity, bounce_ic=bounce_ic_val,
             persistence_null_pass=bool(persistence_pass), bh_fdr_pass=None,
             convention=convention, n_reps_bootstrap=n_reps_bootstrap, n_reps_permutation=n_reps_permutation,
-            seed=seed, res_quantile_drifting_by_window=rqd_by_window)
+            seed=seed, res_quantile_drifting_by_window=rqd_by_window,
+            beta_control_method=beta_control_method, beta_control_pit_by_window=beta_control_pit_by_window)
         results[hyp] = run_res
         p_by_variant[variant] = max_p_over_windows({
             wn: run_res["payload"]["windows"][wn]["block_permutation_p"] for wn in ("W1", "W2")})
@@ -693,6 +761,7 @@ def run_full(
         "n_reps_bootstrap": n_reps_bootstrap, "n_reps_permutation": n_reps_permutation,
         "n_reps_factor_null": n_reps_factor_null,
         "null_calibration": null_calibration_report,   # DEC-76 Task A item 3: recomputed vs. registered
+        "beta_control": {"method": beta_control_method, "beta_window_weeks": beta_control_trail_win},
     }
 
 

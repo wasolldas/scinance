@@ -167,6 +167,10 @@ __all__ = [
     "factor_preserving_null", "block_permute_week_index", "block_permutation_null_draws",
     "block_permutation_pvalue", "idiosyncratic_vol_from_beta_regression",
     "DRIFT_F_DRIFTING", "DRIFT_F_DRIFTFREE",
+    "window_sigma_f_sigma_e", "CALIBRATION_BETA_TRAIL_WEEKS", "measure_market_factor",
+    "factor_share_from_trailing_beta", "beta_dispersion_from_trailing_beta", "pooled_finite_beta",
+    "factor_calibration_report", "FACTOR_NULL_CALIBRATIONS", "beta_controlled_factor_null",
+    "beta_control_method_study",
 ]
 
 #: DEC-51/DEC-74 (d): per-window critical value (alpha 0.05 one-sided).
@@ -465,6 +469,7 @@ DRIFT_F_DRIFTFREE = 0.0
 def simulate_factor_panel(
     n_weeks: int, n_symbols: int, *, sigma_f: float, sigma_e: float,
     rho_f: float = 0.2, drift_f: float = 0.002, rng: np.random.Generator,
+    beta_pool: np.ndarray | None = None,
 ) -> dict[str, Any]:
     """Task brief item 3, verbatim construction: ``returns = beta_i * f_t +
     e_it`` -- ``beta_i ~ U(0.5, 2.0)`` drawn ONCE (fixed per symbol for
@@ -472,7 +477,16 @@ def simulate_factor_panel(
     panel -- the caller redraws ``beta`` too if it wants a fresh draw per
     replicate; :func:`factor_preserving_null` deliberately draws it ONCE
     for the whole window, not once per replicate, per the task brief:
-    "beta_i ~ U(0.5, 2.0) (fixed per symbol, seed)"), ``f_t`` an AR(1) with
+    "beta_i ~ U(0.5, 2.0) (fixed per symbol, seed)").
+
+    **DEC-77 Entscheidung 1 (a), additive:** ``beta_pool`` (default
+    ``None``, unchanged ``U(0.5, 2.0)`` draw) -- when given a non-empty
+    1-D array of REAL, measured PIT-beta values (:func:`pooled_finite_beta`
+    resamples them WITH replacement, one draw per simulated symbol
+    (``rng.choice(beta_pool, size=n_symbols, replace=True)``) instead of
+    the uniform draw -- the "measured"/"zero" factor-null calibrations'
+    "betas drawn from the measured PIT-beta distribution" (DEC-77 task
+    brief item 1). ``f_t`` an AR(1) with
     drift (``f[0]`` starts at the stationary mean ``drift_f/(1-rho_f)``,
     ``f[t] = drift_f + rho_f*f[t-1] + sigma_f*eps_t`` for ``t >= 1`` --
     standard AR(1)-with-intercept, unconditional mean ``drift_f/(1-rho_f)``
@@ -487,7 +501,10 @@ def simulate_factor_panel(
     Returns ``{"returns", "beta", "f"}`` -- ``returns`` is ``[n_weeks,
     n_symbols]``, ``beta`` is ``[n_symbols]``, ``f`` is ``[n_weeks]``.
     """
-    beta = rng.uniform(0.5, 2.0, size=n_symbols)
+    if beta_pool is not None and beta_pool.size > 0:
+        beta = rng.choice(beta_pool, size=n_symbols, replace=True)
+    else:
+        beta = rng.uniform(0.5, 2.0, size=n_symbols)
     f = np.empty(n_weeks, dtype=np.float64)
     stationary_mean = drift_f / (1.0 - rho_f) if abs(1.0 - rho_f) > 1e-9 else 0.0
     f[0] = stationary_mean + sigma_f * rng.standard_normal()
@@ -554,6 +571,55 @@ def idiosyncratic_vol_from_beta_regression(
             "market_symbol": market_symbol, "n_symbols_used": int(finite.size)}
 
 
+def _mean_of_max(draws: dict[str, list[float]], variants: tuple[str, ...], n_reps: int) -> float:
+    """Shared helper (:func:`factor_preserving_null`/
+    :func:`beta_controlled_factor_null`): mean, over replicates, of that
+    replicate's MAX window-mean-IC across ``variants`` -- a direct
+    Monte-Carlo selection-ceiling estimate. Pulled out to module scope so
+    both callers share ONE implementation (never two parallel copies)."""
+    max_per_rep = np.full(n_reps, np.nan, dtype=np.float64)
+    for rep_i in range(n_reps):
+        vals = [draws[v][rep_i] for v in variants if not math.isnan(draws[v][rep_i])]
+        if vals:
+            max_per_rep[rep_i] = max(vals)
+    finite_max = max_per_rep[~np.isnan(max_per_rep)]
+    return float(finite_max.mean()) if finite_max.size else float("nan")
+
+
+def window_sigma_f_sigma_e(
+    window_returns: np.ndarray, symbols: list[str], *, market_symbol: str = "BTCUSDT",
+) -> dict[str, Any]:
+    """Shared descriptive-scalar helper (:func:`factor_preserving_null`/
+    :func:`beta_controlled_factor_null`): ``sigma_f`` (the window's REAL
+    market-symbol weekly-return SD, or -- if ``market_symbol`` is absent --
+    the median per-symbol SD as a fallback) and ``sigma_e_used`` (DEC-76
+    Entscheidung 1 (e): the median IDIOSYNCRATIC weekly vol via
+    :func:`idiosyncratic_vol_from_beta_regression`, falling back to the
+    TOTAL median per-symbol vol if the idiosyncratic estimate is not
+    finite). Pulled out to module scope so both simulation entry points
+    compute these REAL-data descriptive scalars IDENTICALLY, never two
+    subtly different re-derivations."""
+    n_weeks, n_symbols = window_returns.shape
+    if market_symbol in symbols:
+        btc_col = window_returns[:, symbols.index(market_symbol)]
+        sigma_f = float(np.nanstd(btc_col[~np.isnan(btc_col)], ddof=1)) if np.isfinite(btc_col).sum() > 1 else 0.05
+    else:
+        per_symbol_sd = np.nanstd(window_returns, axis=0, ddof=1)
+        sigma_f = float(np.nanmedian(per_symbol_sd[np.isfinite(per_symbol_sd)])) if np.isfinite(per_symbol_sd).any() else 0.05
+    per_symbol_sd = np.array([
+        np.nanstd(window_returns[:, j][~np.isnan(window_returns[:, j])], ddof=1)
+        if int((~np.isnan(window_returns[:, j])).sum()) > 1 else np.nan
+        for j in range(n_symbols)
+    ])
+    finite_sd = per_symbol_sd[~np.isnan(per_symbol_sd)]
+    sigma_e_total = float(np.median(finite_sd)) if finite_sd.size else 0.03
+    idio_report = idiosyncratic_vol_from_beta_regression(window_returns, symbols, market_symbol=market_symbol)
+    sigma_e_idio = idio_report["sigma_e_idiosyncratic"]
+    sigma_e_used = sigma_e_idio if math.isfinite(sigma_e_idio) else sigma_e_total
+    return {"sigma_f": sigma_f, "sigma_e_total": sigma_e_total, "sigma_e_idiosyncratic": sigma_e_idio,
+            "sigma_e_used": sigma_e_used}
+
+
 def factor_preserving_null(
     window_returns: np.ndarray, window_alive: np.ndarray, symbols: list[str], *,
     variants: tuple[str, ...] = characteristics.VARIANT_NAMES,
@@ -612,24 +678,9 @@ def factor_preserving_null(
           the 7 variants.
     """
     n_weeks, n_symbols = window_returns.shape
-    if market_symbol in symbols:
-        btc_col = window_returns[:, symbols.index(market_symbol)]
-        sigma_f = float(np.nanstd(btc_col[~np.isnan(btc_col)], ddof=1)) if np.isfinite(btc_col).sum() > 1 else 0.05
-    else:
-        per_symbol_sd = np.nanstd(window_returns, axis=0, ddof=1)
-        sigma_f = float(np.nanmedian(per_symbol_sd[np.isfinite(per_symbol_sd)])) if np.isfinite(per_symbol_sd).any() else 0.05
-    per_symbol_sd = np.array([
-        np.nanstd(window_returns[:, j][~np.isnan(window_returns[:, j])], ddof=1)
-        if int((~np.isnan(window_returns[:, j])).sum()) > 1 else np.nan
-        for j in range(n_symbols)
-    ])
-    finite_sd = per_symbol_sd[~np.isnan(per_symbol_sd)]
-    sigma_e_total = float(np.median(finite_sd)) if finite_sd.size else 0.03
-    idio_report = idiosyncratic_vol_from_beta_regression(window_returns, symbols, market_symbol=market_symbol)
-    sigma_e_idio = idio_report["sigma_e_idiosyncratic"]
-    # DEC-76 (e): the simulation USES the idiosyncratic value; falls back to the total
-    # vol (documented, never silent) only if the idiosyncratic estimate is unavailable.
-    sigma_e_used = sigma_e_idio if math.isfinite(sigma_e_idio) else sigma_e_total
+    sigmas = window_sigma_f_sigma_e(window_returns, symbols, market_symbol=market_symbol)
+    sigma_f, sigma_e_total, sigma_e_idio, sigma_e_used = (
+        sigmas["sigma_f"], sigmas["sigma_e_total"], sigmas["sigma_e_idiosyncratic"], sigmas["sigma_e_used"])
 
     has_market = market_symbol in symbols
     market_idx = symbols.index(market_symbol) if has_market else None
@@ -665,17 +716,9 @@ def factor_preserving_null(
             else:
                 mean_ic_draws_res[variant].append(float("nan"))
 
-    def _mean_of_max(draws: dict[str, list[float]]) -> float:
-        max_per_rep = np.full(n_reps, np.nan, dtype=np.float64)
-        for rep_i in range(n_reps):
-            vals = [draws[v][rep_i] for v in variants if not math.isnan(draws[v][rep_i])]
-            if vals:
-                max_per_rep[rep_i] = max(vals)
-        finite_max = max_per_rep[~np.isnan(max_per_rep)]
-        return float(finite_max.mean()) if finite_max.size else float("nan")
-
-    selection_ceiling_mean_of_max = _mean_of_max(mean_ic_draws)
-    selection_ceiling_mean_of_max_residualized = _mean_of_max(mean_ic_draws_res) if has_market else None
+    selection_ceiling_mean_of_max = _mean_of_max(mean_ic_draws, variants, n_reps)
+    selection_ceiling_mean_of_max_residualized = (
+        _mean_of_max(mean_ic_draws_res, variants, n_reps) if has_market else None)
 
     def _variant_stats(pool: list[float], draws_list: list[float], direction: str) -> dict[str, Any]:
         pool_arr = np.array(pool, dtype=np.float64)
@@ -728,6 +771,314 @@ def factor_preserving_null(
         "label": ("faktorerhaltende Null (DEC-75 (2)/DEC-76 (1)/(2)): returns = beta_i*f_t + e_it, "
                   f"signalfrei; rho_f={rho_f}, drift_f={drift_f} "
                   f"({'drifting' if drift_f != 0.0 else 'driftfree'})."),
+    }
+
+
+# ----------------------------------------------------------------------------
+# DEC-77 Entscheidung 1 -- Vorlauf v4: calibrate the factor null from
+# descriptive real quantities (THE SEAL: single-series + returns-vs-beta
+# relations only, NEVER a characteristic-vs-outcome relation), then run the
+# beta-control METHOD study (ic.BETA_CONTROL_METHODS) inside the simulation
+# for three rho_f/beta-draw calibrations.
+# ----------------------------------------------------------------------------
+
+#: DEC-77 Entscheidung 1 (a): the trailing PIT-beta window the factor-share/
+#: beta-dispersion CALIBRATION measurement uses -- deliberately DIFFERENT
+#: from ``characteristics.VOL_BETA_TRAIL_WEEKS`` (8, the A3-V characteristic's
+#: own window): 26 weeks gives a materially less noisy beta estimate for a
+#: purely DESCRIPTIVE dispersion/R^2 statistic, never fed to a judged IC.
+CALIBRATION_BETA_TRAIL_WEEKS = 26
+
+
+def measure_market_factor(window_returns: np.ndarray, symbols: list[str], *,
+                           market_symbol: str = "BTCUSDT") -> dict[str, Any]:
+    """DEC-77 Entscheidung 1 (a)(a): ``rho_f_measured`` (lag-1 autocorrelation
+    of ``market_symbol``'s OWN weekly log returns within the window,
+    :func:`_lag_autocorr` reused unchanged) and ``sigma_f`` (its SD) --
+    THE SEAL's explicitly allowed "single series" category: no
+    characteristic, no outcome pairing, just one real column's own
+    descriptive statistics. ``NaN``/``None`` (never a fabricated 0) if
+    ``market_symbol`` is absent or the window is too short for a lag-1
+    estimate (:func:`_lag_autocorr`'s own >= 5-pairs floor)."""
+    if market_symbol not in symbols:
+        return {"rho_f_measured": float("nan"), "sigma_f": float("nan"), "n_weeks_used": 0,
+                "market_symbol": market_symbol}
+    btc = window_returns[:, symbols.index(market_symbol)]
+    finite = btc[~np.isnan(btc)]
+    sigma_f = float(finite.std(ddof=1)) if finite.size > 1 else float("nan")
+    rho1 = _lag_autocorr(btc, 1)
+    return {"rho_f_measured": rho1 if rho1 is not None else float("nan"), "sigma_f": sigma_f,
+            "n_weeks_used": int(finite.size), "market_symbol": market_symbol}
+
+
+def trailing_pit_beta_excluding_current_week(
+    returns: np.ndarray, symbols: list[str], *, market_symbol: str = "BTCUSDT",
+    trail_win: int = CALIBRATION_BETA_TRAIL_WEEKS,
+) -> np.ndarray:
+    """DEC-77 Entscheidung 1 (a)(b), "beta estimated over the PREVIOUS
+    ``trail_win`` weeks": :func:`characteristics.beta_characteristic`'s own
+    trailing window ENDS AT (and includes) week ``t`` -- fine for a PIT
+    signal meant to predict week ``t+1``, but circular for measuring
+    ``factor_share[t]`` = R^2 of week ``t``'s OWN return on its beta
+    (regressing a week's return against a beta partly estimated FROM that
+    same week's return would mechanically inflate R^2). This shifts
+    :func:`characteristics.beta_characteristic`'s output forward by one
+    week (``out[t] = beta_all[t-1]``, ``out[0] = NaN``) so ``out[t]`` uses
+    ONLY weeks strictly before ``t`` -- built on the FULL panel (DEC-75
+    (8) discipline), sliced afterward by the caller, exactly like every
+    other characteristic in this package."""
+    beta_all = characteristics.beta_characteristic(
+        returns, symbols, market_symbol=market_symbol, trail_win=trail_win, min_weeks=trail_win)
+    out = np.full_like(beta_all, np.nan)
+    out[1:] = beta_all[:-1]
+    return out
+
+
+def factor_share_from_trailing_beta(
+    window_returns: np.ndarray, window_alive: np.ndarray, beta_prev: np.ndarray, *,
+    min_universe: int = 10,
+) -> dict[str, Any]:
+    """DEC-77 Entscheidung 1 (a)(b): per week ``t``, the cross-sectional R^2
+    of ``window_returns[t]`` on ``beta_prev[t]`` (a simple-OLS R^2 equals
+    the squared Pearson correlation for a single predictor) -- a
+    returns-vs-beta relation, THE SEAL's explicitly allowed category
+    (never a characteristic-vs-outcome IC: no ``t -> t+1`` lookup here,
+    same week on both sides). ``factor_share_median`` is the median over
+    weeks with >= ``min_universe`` valid (alive, finite beta, finite
+    return) symbols."""
+    n_weeks = window_returns.shape[0]
+    per_week: list[dict[str, Any]] = []
+    for t in range(n_weeks):
+        mask = window_alive[t] & ~np.isnan(beta_prev[t]) & ~np.isnan(window_returns[t])
+        k = int(mask.sum())
+        if k < min_universe:
+            per_week.append({"t": t, "r2": None, "k": k})
+            continue
+        x, y = beta_prev[t, mask], window_returns[t, mask]
+        if x.std() == 0.0 or y.std() == 0.0:
+            per_week.append({"t": t, "r2": None, "k": k})
+            continue
+        r = float(np.corrcoef(x, y)[0, 1])
+        per_week.append({"t": t, "r2": (r * r) if not math.isnan(r) else None, "k": k})
+    finite = np.array([w["r2"] for w in per_week if w["r2"] is not None], dtype=np.float64)
+    return {"per_week": per_week, "factor_share_median": float(np.median(finite)) if finite.size else float("nan"),
+            "n_weeks_used": int(finite.size)}
+
+
+def beta_dispersion_from_trailing_beta(beta_prev: np.ndarray, window_alive: np.ndarray) -> dict[str, Any]:
+    """DEC-77 Entscheidung 1 (a)(c): cross-sectional dispersion of the
+    (alive, finite) pooled ``beta_prev`` values -- mean/SD/quantiles, a
+    plain descriptive summary of one array (THE SEAL's "single series"
+    category), never touching an outcome. Reports summary statistics only
+    (the raw pooled array a caller needs for RESAMPLING -- DEC-77's
+    "measured" calibration -- comes from :func:`pooled_finite_beta`
+    instead, kept OUT of this JSON-bound summary so the artifact does not
+    balloon with one float per alive symbol-week)."""
+    pooled = pooled_finite_beta(beta_prev, window_alive)
+    if pooled.size == 0:
+        return {"n_pooled": 0, "mean": float("nan"), "sd": float("nan"), "quantiles": {}}
+    quantiles = {str(q): float(np.quantile(pooled, q)) for q in (0.05, 0.25, 0.5, 0.75, 0.95)}
+    return {"n_pooled": int(pooled.size), "mean": float(pooled.mean()),
+            "sd": float(pooled.std(ddof=1)) if pooled.size > 1 else float("nan"),
+            "quantiles": quantiles}
+
+
+def pooled_finite_beta(beta_prev: np.ndarray, window_alive: np.ndarray) -> np.ndarray:
+    """The flat array of every (alive, finite) ``beta_prev`` entry in the
+    window -- the empirical distribution :func:`simulate_factor_panel`'s
+    ``beta_pool`` resamples from for the "measured"/"zero" calibrations
+    (DEC-77 Entscheidung 1 (1): "betas drawn from the measured PIT-beta
+    distribution -- resample the real betas")."""
+    mask = window_alive & ~np.isnan(beta_prev)
+    return beta_prev[mask].astype(np.float64)
+
+
+def factor_calibration_report(
+    window_returns: np.ndarray, window_alive: np.ndarray, symbols: list[str], beta_prev: np.ndarray, *,
+    market_symbol: str = "BTCUSDT", min_universe: int = 10,
+) -> dict[str, Any]:
+    """DEC-77 Entscheidung 1 (a), assembled: :func:`measure_market_factor`
+    + :func:`factor_share_from_trailing_beta` +
+    :func:`beta_dispersion_from_trailing_beta`, plus DEC-77 task brief item
+    4's ANALYTIC PLAUSIBILITY line (label says so, explicitly NOT a
+    verdict-bearing number): the mechanical cross-sectional momentum the
+    measured market persistence alone implies, ``(2/pi)*arcsin(rho_f) *
+    factor_share`` (DEC-77 "Anlass", verbatim: "IC_t ~ sign(f_t*f_t+1) *
+    Faktoranteil, E[sign] = (2/pi)*arcsin(rho_f)")."""
+    mkt = measure_market_factor(window_returns, symbols, market_symbol=market_symbol)
+    share = factor_share_from_trailing_beta(window_returns, window_alive, beta_prev, min_universe=min_universe)
+    disp = beta_dispersion_from_trailing_beta(beta_prev, window_alive)
+    rho_f, fshare = mkt["rho_f_measured"], share["factor_share_median"]
+    # math.asin's domain is [-1, 1]; a Pearson correlation is mathematically bounded there but
+    # floating-point rounding can push a near-perfect-correlation estimate a hair past +/-1 --
+    # clip defensively (never a real-data phenomenon, just an IEEE-754 rounding guard).
+    rho_f_clipped = max(-1.0, min(1.0, rho_f)) if not math.isnan(rho_f) else float("nan")
+    analytic_mom = ((2.0 / math.pi) * math.asin(rho_f_clipped) * fshare
+                    if not (math.isnan(rho_f_clipped) or math.isnan(fshare)) else float("nan"))
+    return {
+        "market_factor": mkt, "factor_share": share, "beta_dispersion": disp,
+        "beta_trail_weeks": CALIBRATION_BETA_TRAIL_WEEKS,
+        "analytic_mechanical_momentum": {
+            "value": analytic_mom,
+            "formula": "(2/pi)*arcsin(rho_f_measured) * factor_share_median",
+            "label": "Analytische Approximation (Plausibilitaetszeile, DEC-77 item 4) -- KEIN Verdikt.",
+        },
+    }
+
+
+# ----------------------------------------------------------------------------
+# DEC-77 Entscheidung 1 (b)/(c): the beta-control METHOD study, three rho_f/
+# beta-draw calibrations x ic.BETA_CONTROL_METHODS x the 7 F-XSEC1 variants.
+# ----------------------------------------------------------------------------
+
+#: DEC-77 Entscheidung 1 (1): the three factor-null calibrations. sigma_f is
+#: the SAME measured window value in all three (never itself a calibration
+#: axis) -- only rho_f and the beta-draw source vary. drift_f is ALWAYS
+#: DRIFT_F_DRIFTFREE (0.0): DEC-77's own "Anlass" finding is that rho_f
+#: (AR(1) persistence) alone, with NO drift, already produces the mechanical
+#: momentum artifact -- drift plays no role in this study.
+FACTOR_NULL_CALIBRATIONS: tuple[str, ...] = ("measured", "stress", "zero")
+
+
+def beta_controlled_factor_null(
+    window_returns: np.ndarray, window_alive: np.ndarray, symbols: list[str], *, method: str,
+    variants: tuple[str, ...] = characteristics.VARIANT_NAMES,
+    convention: ic.Convention = "close_at_last",
+    n_reps: int = FACTOR_NULL_N_REPS_DEFAULT, seed: int = FACTOR_NULL_SEED,
+    quantile: float = SELECTION_CEILING_ONE_SIDED_QUANTILE, market_symbol: str = "BTCUSDT",
+    rho_f: float = 0.2, drift_f: float = DRIFT_F_DRIFTFREE, beta_pool: np.ndarray | None = None,
+) -> dict[str, Any]:
+    """DEC-77 Entscheidung 1 (b)/Entscheidung 2: the factor-preserving null
+    under ONE ``(rho_f, beta_pool)`` configuration, with the REGISTERED
+    beta-control ``method`` (:data:`ic.BETA_CONTROL_METHODS`) applied
+    INSIDE the simulation via :func:`ic.apply_beta_control` -- this is what
+    BOTH :func:`beta_control_method_study` (the calibration grid) AND
+    ``run.py``'s real-run null-calibration recomputation call (ONE method,
+    the registered one, DEC-77 Entscheidung 2) share, so a method behaves
+    IDENTICALLY in the calibration study and in a real run. C.14 loud fail
+    on an unrecognised ``method`` (:func:`ic.beta_control_trail_weeks`
+    raises before any simulation runs).
+
+    Per replicate: :func:`simulate_factor_panel` draws a fresh panel (this
+    call's ``rho_f``/``drift_f``/``beta_pool``), the SIMULATED beta at
+    ``method``'s trailing window is estimated from the SIMULATED panel's
+    OWN "BTC column" (never the real one -- THE SEAL), with
+    ``min_weeks = trail_win`` (DEC-77 item 2(i)'s "exclude symbols with
+    fewer than the window's weeks"), then ``method`` is applied per
+    variant. Reports the SAME per-variant shape as
+    :func:`factor_preserving_null` (``factor_sd``, ``quantile_one_sided``,
+    ``mean_ic_draws_mean``/``_sd``) plus ``ceiling_mean_of_max`` (mean,
+    over replicates, of the max mean-IC across ``variants`` -- the GL-012
+    selection ceiling under this method/calibration) and ``coverage_mean``
+    (mean, over replicates and variants, of
+    :func:`ic.trailing_beta_coverage`'s fraction -- ``None`` for
+    ``"none"``, which has no beta at all)."""
+    n_weeks, n_symbols = window_returns.shape
+    trail_win = ic.beta_control_trail_weeks(method)     # raises on an unknown method, BEFORE any simulation
+    sigmas = window_sigma_f_sigma_e(window_returns, symbols, market_symbol=market_symbol)
+    sigma_f, sigma_e_used = sigmas["sigma_f"], sigmas["sigma_e_used"]
+
+    rng = np.random.default_rng(seed)
+    per_week_ic_pool: dict[str, list[float]] = {v: [] for v in variants}
+    mean_ic_draws: dict[str, list[float]] = {v: [] for v in variants}
+    coverage_fractions: list[float] = []
+
+    for _rep in range(n_reps):
+        sim = simulate_factor_panel(n_weeks, n_symbols, sigma_f=sigma_f, sigma_e=sigma_e_used,
+                                     rho_f=rho_f, drift_f=drift_f, rng=rng, beta_pool=beta_pool)
+        sim_returns = sim["returns"]
+        beta_pit = None
+        if trail_win is not None:
+            beta_pit = characteristics.beta_characteristic(
+                sim_returns, symbols, market_symbol=market_symbol, trail_win=trail_win, min_weeks=trail_win)
+        for variant in variants:
+            char = characteristics.weekly_only_proxy_characteristic(variant, sim_returns)
+            applied = ic.apply_beta_control(method, char, sim_returns, window_alive, beta_pit=beta_pit,
+                                             symbols=symbols, market_symbol=market_symbol)
+            res = ic.weekly_ic_series(applied["characteristic"], applied["returns"], window_alive,
+                                       convention=convention)
+            mean_ic_draws[variant].append(res["mean_ic"])
+            per_week_ic_pool[variant].extend(w["ic"] for w in res["weekly"] if not math.isnan(w["ic"]))
+            if applied["coverage"] is not None:
+                coverage_fractions.append(applied["coverage"]["coverage_fraction"])
+
+    ceiling_mean_of_max = _mean_of_max(mean_ic_draws, variants, n_reps)
+    coverage_mean = float(np.mean(coverage_fractions)) if coverage_fractions else None
+
+    per_variant: dict[str, Any] = {}
+    for variant in variants:
+        direction = REGISTERED_DIRECTION[variant]
+        pool_arr = np.array(per_week_ic_pool[variant], dtype=np.float64)
+        factor_sd = float(pool_arr.std(ddof=1)) if pool_arr.size > 1 else float("nan")
+        draws = np.array([d for d in mean_ic_draws[variant] if not math.isnan(d)], dtype=np.float64)
+        if draws.size == 0:
+            q = float("nan")
+        elif direction == "positive":
+            q = float(np.quantile(draws, quantile))
+        else:
+            q = float(np.quantile(draws, 1.0 - quantile))
+        per_variant[variant] = {
+            "direction": direction, "factor_sd": factor_sd, "n_ic_pooled": int(pool_arr.size),
+            "quantile_one_sided": q, "quantile_level": quantile,
+            "mean_ic_draws_mean": float(draws.mean()) if draws.size else float("nan"),
+            "mean_ic_draws_sd": float(draws.std(ddof=1)) if draws.size > 1 else float("nan"),
+            "n_reps_finite": int(draws.size),
+        }
+
+    return {
+        "variants": per_variant, "ceiling_mean_of_max": ceiling_mean_of_max,
+        "coverage_mean": coverage_mean, "method": method, "beta_window_weeks": trail_win,
+        "rho_f": rho_f, "drift_f": drift_f, "sigma_f": sigma_f, "sigma_e_used": sigma_e_used,
+        "n_reps": n_reps, "seed": seed, "convention": convention, "market_symbol": market_symbol,
+        "n_weeks": n_weeks, "n_symbols": n_symbols,
+    }
+
+
+def beta_control_method_study(
+    window_returns: np.ndarray, window_alive: np.ndarray, symbols: list[str], *,
+    rho_f_measured: float, beta_pool_measured: np.ndarray,
+    variants: tuple[str, ...] = characteristics.VARIANT_NAMES,
+    methods: tuple[str, ...] = ic.BETA_CONTROL_METHODS,
+    convention: ic.Convention = "close_at_last", market_symbol: str = "BTCUSDT",
+    n_reps: int = 300, seed: int = FACTOR_NULL_SEED,
+    quantile: float = SELECTION_CEILING_ONE_SIDED_QUANTILE,
+) -> dict[str, Any]:
+    """DEC-77 Entscheidung 1 (b): the full grid -- :data:`FACTOR_NULL_
+    CALIBRATIONS` (3) x ``methods`` (9, :data:`ic.BETA_CONTROL_METHODS`) x
+    ``variants`` (7) -- each cell one :func:`beta_controlled_factor_null`
+    call. ``n_reps`` DEFAULTS to 300 (task brief: ">= 500 reps/cell is
+    acceptable for the grid, document; use >= 1000 for the recommended
+    method in the final table" -- the CALLER passes a higher ``n_reps`` for
+    a single re-run of the winning method once :func:`
+    beta_control_pass_table`/the recommendation have picked it, this
+    function itself always runs the SAME ``n_reps`` across the whole grid).
+    ``rho_f_measured``/``beta_pool_measured`` come from
+    :func:`factor_calibration_report`/:func:`pooled_finite_beta` (the
+    caller's job -- keeps this function's signature independent of the
+    calibration-measurement machinery)."""
+    calibrations: dict[str, dict[str, float | np.ndarray | None]] = {
+        "measured": {"rho_f": rho_f_measured, "beta_pool": beta_pool_measured},
+        "stress": {"rho_f": 0.2, "beta_pool": None},
+        "zero": {"rho_f": 0.0, "beta_pool": beta_pool_measured},
+    }
+    out: dict[str, Any] = {}
+    for cal_name in FACTOR_NULL_CALIBRATIONS:
+        cfg = calibrations[cal_name]
+        methods_out: dict[str, Any] = {}
+        for method in methods:
+            methods_out[method] = beta_controlled_factor_null(
+                window_returns, window_alive, symbols, method=method, variants=variants,
+                convention=convention, n_reps=n_reps, seed=seed, quantile=quantile,
+                market_symbol=market_symbol, rho_f=cfg["rho_f"], drift_f=DRIFT_F_DRIFTFREE,
+                beta_pool=cfg["beta_pool"])
+        out[cal_name] = {"rho_f": cfg["rho_f"], "uses_measured_betas": cfg["beta_pool"] is not None,
+                          "methods": methods_out}
+    return {
+        "calibrations": out, "n_reps": n_reps, "seed": seed, "quantile_level": quantile,
+        "methods": list(methods), "variants": list(variants),
+        "label": ("DEC-77 Entscheidung 1 (b): 3 Kalibrierungen (measured/stress/zero) x "
+                  f"{len(methods)} Beta-Kontroll-Methoden x {len(variants)} Varianten, driftfrei "
+                  "(rho_f allein erzeugt den Artefakt, DEC-77 Anlass)."),
     }
 
 

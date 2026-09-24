@@ -45,5 +45,25 @@ Modules:
     LOCK and all I/O.
   - ``gates.py`` -- pure gate arithmetic (``evaluate(payload) -> verdict``)
     on an already-computed payload, no I/O, no randomness.
+
+**DEC-77 -- Vorlauf v4 (additive, all in ``nulls.py``/``ic.py``/
+``prelaunch.py``/``run.py``).** The Vorlauf v3 finding (DEC-77 "Anlass"):
+market persistence ALONE (``rho_f``, no drift needed) already produces a
+mechanical cross-sectional momentum artifact the 8-week beta
+residualisation does not remove. Vorlauf v4 (a) CALIBRATES the
+factor-null's ``rho_f``/``sigma_f`` (single-series) and ``factor_share``/
+beta-dispersion (returns-vs-beta, ``ic.py``'s "THE SEAL" allowed
+category) from the real panel (``nulls.factor_calibration_report``), (b)
+runs NINE beta-control METHODS (``ic.BETA_CONTROL_METHODS`` --
+time-series/Fama-MacBeth residualisation and double-sort characteristic
+neutralisation at 8/13/26 weeks, plus ``"none"``) x THREE rho_f/beta-draw
+calibrations (``measured``/``stress``/``zero``, ``nulls.
+beta_control_method_study``) x the 7 F-XSEC1 variants, and (c) applies
+DEC-77's PRE-FIXED PASS/FAIL rule (``prelaunch.beta_control_pass_table``)
+to recommend a method (``prelaunch.beta_control_recommendation``). Run
+mode reads the REGISTERED ``beta_control: {method, beta_window_weeks}``
+(``run.py``'s ``run_full``, C.14 loud fail if missing/empty/unknown) and
+applies EXACTLY that method via ``ic.apply_beta_control`` -- the SAME
+dispatcher the calibration study uses.
 """
 from __future__ import annotations

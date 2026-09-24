@@ -42,6 +42,43 @@ signal. This is the DEFAULT (``demean_outcome=True``) for every caller in
 this package, not an opt-in -- Gate (2)'s Querschnitts-Permutations-Null
 and every DEC-39 fixture in the test suite rely on it being on by
 default.
+**DEC-77 Entscheidung 1 (b) / Vorlauf v4 -- beta-control METHODS, pure.**
+Nine methods total (:data:`BETA_CONTROL_METHODS`, ``"none"`` = the raw
+reference plus eight beta-controlled variants), dispatched by
+:func:`apply_beta_control` -- the SINGLE entry point both the calibration
+simulation (``nulls.beta_controlled_factor_null``) and the real run
+(``run.py``'s ``variant_window_payload``) call, so a method behaves
+IDENTICALLY whether it is being calibrated on a simulated panel or applied
+to the real one:
+
+  - ``ts_resid_{8,13,26}w`` -- time-series residualisation (DEC-75 (3)'s
+    ``residualize_outcome``, generalised from its old fixed 8-week window):
+    ``r_i - beta_i^{Nw,PIT} * r_BTC``. :func:`residualize_outcome` itself is
+    UNCHANGED (still just ``returns - beta*r_btc``); only the ``N`` the PIT
+    beta is estimated over varies.
+  - ``fm_neutral_{8,13,26}w`` -- Fama-MacBeth: EVERY outcome week ``t+1``,
+    an OLS cross-sectional regression of that week's realised return on
+    the PIT beta known as of week ``t`` (:func:`fm_neutralize_outcome`);
+    the residual of THAT regression (not a fixed-loading subtraction) is
+    the beta-neutralised outcome. Structurally orthogonal to beta BY
+    CONSTRUCTION (OLS residuals sum to zero against their own regressor),
+    so this method needs no fixed assumption about what the realised
+    market factor return "was" that week.
+  - ``double_sort_{13,26}w`` -- neutralises the CHARACTERISTIC, not the
+    outcome (:func:`double_sort_characteristic`): each week, symbols are
+    bucketed into beta quintiles (equal-count, ascending beta), and the
+    characteristic is RE-RANKED within its own quintile only; the outcome
+    stays the raw next-week return. A characteristic that is a pure proxy
+    for beta gets an (approximately) flat within-quintile rank everywhere,
+    same effect as the outcome-side methods, from the other direction.
+  - ``"none"`` -- pure passthrough, the raw (uncontrolled) reference.
+
+Every method with a trailing window (all but ``"none"``) requires the PIT
+beta array to have been estimated with ``min_weeks = trail_win`` (DEC-77
+item 2(i): "exclude symbols with fewer than the window's weeks") -- a
+symbol-week without a FULL ``N``-week trailing history gets NaN, never a
+partial-window estimate; :func:`trailing_beta_coverage` reports what
+fraction of alive symbol-weeks that leaves.
 """
 from __future__ import annotations
 
@@ -53,7 +90,9 @@ from ..wp7_universe.pit_universe import spearman_rank_ic
 
 __all__ = [
     "DELISTING_CONVENTIONS", "weekly_ic_series", "mean_ic", "vol_weighted_outcome_with_drag",
-    "residualize_outcome",
+    "residualize_outcome", "BETA_CONTROL_METHODS", "beta_control_trail_weeks",
+    "trailing_beta_coverage", "fm_neutralize_outcome", "double_sort_characteristic",
+    "apply_beta_control",
 ]
 
 DELISTING_CONVENTIONS: tuple[str, ...] = ("drop", "close_at_last")
@@ -203,3 +242,168 @@ def residualize_outcome(returns: np.ndarray, beta_8w_pit: np.ndarray, r_btc: np.
     propagates from either input (a symbol-week with no trailing beta yet
     gets no residual)."""
     return returns - beta_8w_pit * r_btc[:, None]
+
+
+# ----------------------------------------------------------------------------
+# DEC-77 Entscheidung 1 (b) / Vorlauf v4 -- beta-control METHODS
+# ----------------------------------------------------------------------------
+
+#: The K=9 beta-control method cohort ("none" = raw reference).
+BETA_CONTROL_METHODS: tuple[str, ...] = (
+    "none",
+    "ts_resid_8w", "ts_resid_13w", "ts_resid_26w",
+    "fm_neutral_8w", "fm_neutral_13w", "fm_neutral_26w",
+    "double_sort_13w", "double_sort_26w",
+)
+
+_BETA_CONTROL_TRAIL_WEEKS: dict[str, int | None] = {
+    "none": None,
+    "ts_resid_8w": 8, "ts_resid_13w": 13, "ts_resid_26w": 26,
+    "fm_neutral_8w": 8, "fm_neutral_13w": 13, "fm_neutral_26w": 26,
+    "double_sort_13w": 13, "double_sort_26w": 26,
+}
+
+
+def beta_control_trail_weeks(method: str) -> int | None:
+    """The trailing PIT-beta window (weeks) a :data:`BETA_CONTROL_METHODS`
+    name implies -- ``None`` for ``"none"`` (no beta control at all). C.14
+    loud fail (:class:`ValueError`) on an unrecognised name -- never a
+    silent ``None``/default fallback, since a mistyped method name must
+    never quietly become "no beta control"."""
+    if method not in _BETA_CONTROL_TRAIL_WEEKS:
+        raise ValueError(f"unknown beta_control method {method!r} -- expected one of {BETA_CONTROL_METHODS}")
+    return _BETA_CONTROL_TRAIL_WEEKS[method]
+
+
+def trailing_beta_coverage(beta_pit: np.ndarray, alive: np.ndarray) -> dict[str, Any]:
+    """DEC-77 item 2(i): the fraction of ALIVE symbol-weeks that carry a
+    finite PIT beta at ``beta_pit``'s trailing window -- the "exclude
+    symbols with fewer than the window's weeks; report coverage"
+    requirement, as a plain descriptive ratio (never a gate input by
+    itself)."""
+    denom = int(alive.sum())
+    numer = int((alive & ~np.isnan(beta_pit)).sum())
+    return {"n_alive_symbol_weeks": denom, "n_covered_symbol_weeks": numer,
+            "coverage_fraction": (numer / denom) if denom else float("nan")}
+
+
+def fm_neutralize_outcome(returns: np.ndarray, beta_pit: np.ndarray, alive: np.ndarray, *,
+                           min_universe: int = 5) -> np.ndarray:
+    """DEC-77 item 2(ii): Fama-MacBeth beta-neutralised outcome. For every
+    outcome week ``t+1`` (``t in [0, n_weeks-2]``), an OLS cross-sectional
+    regression (intercept + slope) of ``returns[t+1]`` on the PIT beta
+    known as of week ``t`` (``beta_pit[t]``) is fit over the symbols alive
+    at BOTH ``t`` and ``t+1`` with a finite beta and outcome (at least
+    ``min_universe``, else that week's row stays all-NaN -- an
+    under-powered week's cross-section is worse than an honest gap, same
+    discipline as :func:`weekly_ic_series`'s own ``min_universe``); the
+    residual (``y - (intercept + slope*x)``) REPLACES ``returns[t+1]`` for
+    those symbols. Returned array is ``returns``-shaped, ready for
+    :func:`weekly_ic_series` (row ``t+1`` = that week's neutralised
+    outcome, EXACTLY :func:`residualize_outcome`'s output convention --
+    the delisting-convention handling (``"drop"``/``"close_at_last"``)
+    still happens downstream, in ``weekly_ic_series`` itself, on whatever
+    value lands here; a delisted symbol's ``close_at_last`` 0.0 outcome is
+    substituted there regardless of this function's own value at that
+    position). Structurally orthogonal to ``beta_pit[t]`` BY CONSTRUCTION:
+    an OLS residual has EXACTLY zero (Pearson) correlation with its own
+    regressor, to floating-point precision -- the "FM residuals have zero
+    cross-sectional correlation with beta" property DEC-77 item 6 asks for
+    a test of.
+    """
+    n_weeks, n_symbols = returns.shape
+    resid = np.full_like(returns, np.nan)
+    for t in range(n_weeks - 1):
+        mask = alive[t] & alive[t + 1] & ~np.isnan(beta_pit[t]) & ~np.isnan(returns[t + 1])
+        k = int(mask.sum())
+        if k < min_universe:
+            continue
+        x = beta_pit[t, mask]
+        y = returns[t + 1, mask]
+        x_c = x - x.mean()
+        var_x = float(np.dot(x_c, x_c))
+        if var_x <= 0.0:
+            continue
+        slope = float(np.dot(x_c, y - y.mean()) / var_x)
+        intercept = float(y.mean() - slope * x.mean())
+        resid[t + 1, mask] = y - (intercept + slope * x)
+    return resid
+
+
+def double_sort_characteristic(characteristic: np.ndarray, beta_pit: np.ndarray, alive: np.ndarray, *,
+                                n_quintiles: int = 5) -> np.ndarray:
+    """DEC-77 item 2(iii): the characteristic, RE-RANKED WITHIN its own
+    beta quintile each week (outcome stays raw -- the caller hands this
+    output, not a residualised ``returns`` array, to
+    :func:`weekly_ic_series`). Per week ``t``: symbols alive with a finite
+    ``beta_pit[t]`` and ``characteristic[t]`` are sorted ascending by beta
+    and split into ``n_quintiles`` equal(-ish) buckets (same
+    "``(n*q)//n_quintiles``" split :func:`characteristics.decile_bucket`
+    already uses, generalised from 10 buckets to ``n_quintiles``); WITHIN
+    each bucket, the characteristic values are converted to plain ranks
+    ``1..bucket_size`` (ties broken by stable sort order, matching
+    :func:`characteristics.decile_bucket`'s ``mergesort`` discipline) --
+    so the OUTPUT for every week is, bucket by bucket, an exact
+    PERMUTATION of ``1..bucket_size`` (DEC-77 item 6's "double-sort ranks
+    are within-quintile permutations" property). A week with fewer than
+    ``n_quintiles`` valid symbols is skipped entirely (NaN row -- no
+    meaningful quintile split possible)."""
+    n_weeks, n_symbols = characteristic.shape
+    out = np.full_like(characteristic, np.nan)
+    for t in range(n_weeks):
+        mask = alive[t] & ~np.isnan(beta_pit[t]) & ~np.isnan(characteristic[t])
+        idx = np.flatnonzero(mask)
+        n = idx.size
+        if n < n_quintiles:
+            continue
+        beta_vals = beta_pit[t, idx]
+        order = idx[np.argsort(beta_vals, kind="mergesort")]
+        for q in range(n_quintiles):
+            lo, hi = (n * q) // n_quintiles, (n * (q + 1)) // n_quintiles
+            members = order[lo:hi]
+            if members.size == 0:
+                continue
+            vals = characteristic[t, members]
+            ranks = np.argsort(np.argsort(vals, kind="mergesort"), kind="mergesort").astype(np.float64) + 1.0
+            out[t, members] = ranks
+    return out
+
+
+def apply_beta_control(
+    method: str, characteristic: np.ndarray, returns: np.ndarray, alive: np.ndarray, *,
+    beta_pit: np.ndarray | None = None, symbols: list[str] | None = None,
+    market_symbol: str = "BTCUSDT", min_universe: int = 5,
+) -> dict[str, Any]:
+    """DEC-77 item 2, THE single dispatcher every caller (calibration
+    simulation AND real run) uses for ONE :data:`BETA_CONTROL_METHODS`
+    name -- returns ``{"characteristic", "returns", "coverage"}`` ready to
+    hand straight to :func:`weekly_ic_series` (``"none"`` is a pure
+    passthrough, ``coverage=None``). C.14 loud fail on an unrecognised
+    method (via :func:`beta_control_trail_weeks`) or a missing
+    ``beta_pit``/``symbols`` a non-``"none"`` method needs -- NEVER a
+    silent fallback to raw/uncontrolled. ``beta_pit`` must already be the
+    CORRECT trailing-window PIT beta for ``method`` (computed with
+    ``min_weeks = beta_control_trail_weeks(method)`` -- the caller's job,
+    so this function can stay a cheap dispatcher, reusable per-replicate
+    inside a simulation loop without recomputing beta from scratch for
+    every method that happens to share a window)."""
+    trail_win = beta_control_trail_weeks(method)     # raises on an unknown method name
+    if method == "none":
+        return {"characteristic": characteristic, "returns": returns, "coverage": None}
+    if beta_pit is None:
+        raise ValueError(f"apply_beta_control({method!r}) requires a precomputed beta_pit array "
+                          f"(trail_win={trail_win}, min_weeks={trail_win})")
+    coverage = trailing_beta_coverage(beta_pit, alive)
+    if method.startswith("ts_resid_"):
+        if symbols is None or market_symbol not in symbols:
+            raise ValueError(f"apply_beta_control({method!r}) requires symbols containing {market_symbol!r}")
+        r_btc = returns[:, symbols.index(market_symbol)]
+        resid_returns = residualize_outcome(returns, beta_pit, r_btc)
+        return {"characteristic": characteristic, "returns": resid_returns, "coverage": coverage}
+    if method.startswith("fm_neutral_"):
+        resid_returns = fm_neutralize_outcome(returns, beta_pit, alive, min_universe=min_universe)
+        return {"characteristic": characteristic, "returns": resid_returns, "coverage": coverage}
+    if method.startswith("double_sort_"):
+        ds_char = double_sort_characteristic(characteristic, beta_pit, alive)
+        return {"characteristic": ds_char, "returns": returns, "coverage": coverage}
+    raise AssertionError(f"unhandled beta_control method {method!r}")  # unreachable: BETA_CONTROL_METHODS is exhaustive

@@ -39,6 +39,9 @@ Entscheidung 1), mit STARTSPERRE (siehe ``cmd_run``'s Docstring). Die
            ceiling_driftfree_res: <float>}              # DEC-76 (c), optional*
       W2: {...}
       L: {start: <ISO-Datum>, end: <ISO-Datum>}          # optional, descriptive/sealed only
+    beta_control:
+      method: <einer der 9 ic.BETA_CONTROL_METHODS-Namen>   # DEC-77 Entscheidung 2, PFLICHT, nicht leer
+      beta_window_weeks: <int|null>                          # muss zu 'method' passen, sonst loud fail
     rules:
       seed: 53
       n_reps: 1000            # bootstrap/permutation/factor-null reps, >= 1000 (DEC-75/76)
@@ -132,8 +135,10 @@ def cmd_prelaunch(a: argparse.Namespace) -> int:
         panel, weekly, delisted_manifest_path=delisted_manifest,
         delisting_dates_path=delisting_dates_path,
         stress_rel_path=a.stress_rel, stress_abs_path=a.stress_abs,
-        n_sims=a.n_sims, n_reps_factor_null=a.n_reps_factor_null, seed=a.seed,
-        convention=a.convention)
+        n_sims=a.n_sims, n_reps_factor_null=a.n_reps_factor_null,
+        n_reps_beta_control_study=a.n_reps_beta_control_study,
+        n_reps_beta_control_winner=a.n_reps_beta_control_winner,
+        seed=a.seed, convention=a.convention)
 
     for name in ("W1", "W2", "L"):
         w = report["windows"].get(name, {})
@@ -274,6 +279,12 @@ def cmd_emit_registered_template(prelaunch_json_path: str, out_yaml_path: str) -
         if wl.get("available") and "start" in wl and "end" in wl:
             windows_out["L"] = {"start": wl["start"], "end": wl["end"]}
 
+    # DEC-77 Entscheidung 2: beta_control.method/beta_window_weeks are EMPTY (never
+    # auto-filled from the prelaunch artifact's own recommendation) -- the orchestrator
+    # must read the artifact's beta_control_recommendation and fill these in deliberately;
+    # run.run_full loud-fails if either is still empty at --run time.
+    rec = report.get("beta_control_recommendation", {})
+    recommended = rec.get("recommended_method")
     template = {
         "hypotheses": {
             "H-28": {"variant": "mom1", "direction": "positive"},
@@ -281,19 +292,28 @@ def cmd_emit_registered_template(prelaunch_json_path: str, out_yaml_path: str) -
             "H-30": {"variant": "vol_rv", "direction": "negative", "outcome": "vol_weighted"},
         },
         "windows": windows_out,
+        "beta_control": {"method": "", "beta_window_weeks": None},
         "rules": {"seed": 53, "n_reps": 1000, "block_len": 4, "level": 0.9936, "bh_alpha": 0.10},
     }
 
     out_path = Path(out_yaml_path)
     out_path.parent.mkdir(parents=True, exist_ok=True)
+    rec_comment = (f"# DEC-77 Hinweis (kein Auto-Fuellen): Vorlauf-Empfehlung war {recommended!r} "
+                   f"(beta_window_weeks={rec.get('beta_window_weeks')!r}).\n"
+                   if recommended else
+                   "# DEC-77 Hinweis: der Vorlauf hat KEINE Methode empfohlen (siehe Artefakt) -- "
+                   "beta_control.method bleibt leer, kein Lauf ohne Orchestrator-Entscheidung.\n")
     out_path.write_text(
         "# DEC-76 Task A item 4: automatisch aus einem --prelaunch-Artefakt erzeugtes Skelett.\n"
         "# hypotheses: NICHT automatisch geprueft -- Orchestrator bestaetigt vor der Registrierung.\n"
+        "# beta_control.method/beta_window_weeks: LEER, Orchestrator-Pflicht vor der Registrierung "
+        "(DEC-77 Entscheidung 2) -- run.py schlaegt laut fehl, wenn method beim --run leer ist.\n"
+        + rec_comment
         + yaml.safe_dump(template, sort_keys=False, allow_unicode=True),
         encoding="utf-8")
     log(f"Quelle: {in_path} sha256={panel_load.sha256_file(in_path)}")
     log(f"Registrierungs-Vorlage geschrieben: {out_path} sha256={panel_load.sha256_file(out_path)}")
-    log("Pruefung Pflicht: hypotheses-Zuordnung und alle Werte vor der Registrierung bestaetigen.")
+    log("Pruefung Pflicht: hypotheses-Zuordnung, beta_control und alle Werte vor der Registrierung bestaetigen.")
     return 0
 
 
@@ -329,6 +349,18 @@ def main() -> int:
     ap.add_argument("--n-reps-factor-null", type=int, default=1000,
                      help="Faktorerhaltende-Null-Replikate je Variante (DEC-75 Entscheidung 1 "
                           "(2)/(3): >= 1.000).")
+    ap.add_argument("--n-reps-beta-control-study", type=int, default=100,
+                     help="DEC-77 Entscheidung 1 (b): Replikate je Zelle des Beta-Kontroll-"
+                          "Methoden-Rasters (3 Kalibrierungen x 9 Methoden x 7 Varianten) -- "
+                          ">= 500 akzeptabel; Default 100, NICHT 300, weil ein gemessenes "
+                          "Mikro-Benchmark (siehe prelaunch.assemble_prelaunch_report's "
+                          "Docstring) 300 Replikate auf K~1138/W~52 auf ~2,6 h/Fenster "
+                          "hochrechnet (ueber der 2-h-Vorgabe) -- vom Orchestrator gegen die "
+                          "tatsaechliche Runner-PC-Geschwindigkeit zu erhoehen.")
+    ap.add_argument("--n-reps-beta-control-winner", type=int, default=1000,
+                     help="DEC-77 Entscheidung 1 (b): Replikate fuer den erneuten Lauf der "
+                          "EMPFOHLENEN Methode allein (measured/stress), fuer die finale "
+                          "Tabelle -- >= 1.000.")
     ap.add_argument("--convention", default="close_at_last", choices=["drop", "close_at_last"],
                      help="Delisting-Konvention (DEC-74 (i): close_at_last ist urteilstragend).")
     ap.add_argument("--allow-partial", action="store_true")
