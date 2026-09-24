@@ -35,6 +35,15 @@ Set-Location $RepoRoot
 $stamp = Get-Date -Format "yyyyMMdd_HHmm"
 $runsDir = Join-Path $RepoRoot "scinance3-impl\state\runs"
 if (-not (Test-Path $runsDir)) { New-Item -ItemType Directory -Path $runsDir | Out-Null }
+$lock = Join-Path $RepoRoot "scinance3-impl\state\nacht.lock"
+if (Test-Path $lock) {
+    $old = Get-Content $lock -ErrorAction SilentlyContinue
+    $alive = $false
+    if ($old -match '^\d+$') { $alive = [bool](Get-Process -Id ([int]$old) -ErrorAction SilentlyContinue) }
+    if ($alive) { Write-Host "nacht.ps1 laeuft bereits (PID $old) - dieser Start wird abgebrochen, damit sich zwei Laeufe nicht denselben Store teilen."; exit 2 }
+    Remove-Item $lock -Force
+}
+Set-Content -Path $lock -Value $PID
 $log = Join-Path $runsDir "nacht_$stamp.log"
 Start-Transcript -Path $log -Append | Out-Null
 $t0 = Get-Date
@@ -117,4 +126,5 @@ if (-not $NoPush) {
     }
     if ($pushed) { Write-Host "Ergebnisse gepusht: $msg" } else { Write-Host "PUSH FEHLGESCHLAGEN - bitte 'git push origin $Branch' manuell." }
 }
+Remove-Item $lock -Force -ErrorAction SilentlyContinue
 Write-Host "Fertig. Protokoll: $log"
