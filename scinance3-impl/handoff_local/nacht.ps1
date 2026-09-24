@@ -42,7 +42,7 @@ $hl = Join-Path $RepoRoot "scinance3-impl\handoff_local"
 $results = @()
 
 Write-Host "=== nacht.ps1 $stamp : Tasks = $($Tasks -join ', ') ==="
-git pull origin $Branch 2>&1 | Write-Host
+git pull --rebase --autostash origin $Branch 2>&1 | Write-Host
 git log -1 --oneline 2>&1 | Write-Host
 
 function Run-Task($name, $cmd) {
@@ -108,7 +108,7 @@ if (-not $NoPush) {
     git commit -q -m $msg 2>&1 | Write-Host
     $pushed = $false
     for ($i = 1; $i -le 4 -and -not $pushed; $i++) {
-        git pull --rebase origin $Branch 2>&1 | Write-Host
+        git pull --rebase --autostash origin $Branch 2>&1 | Write-Host
         git push origin $Branch 2>&1 | Write-Host
         if ($LASTEXITCODE -eq 0) { $pushed = $true } else { Start-Sleep -Seconds (10 * $i) }
     }
