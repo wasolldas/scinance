@@ -1470,11 +1470,12 @@ def test_beta_control_method_study_grid_shape_and_calibration_construction():
     assert study["calibrations"]["measured"]["target_factor_share"] == pytest.approx(0.02)
     assert study["calibrations"]["stress"]["target_factor_share"] == pytest.approx(0.04)  # 2 * 0.02
     assert study["calibrations"]["zero"]["target_factor_share"] == pytest.approx(0.02)
-    # "zero" reuses "measured"'s ENTIRE calibration search (DEC-78: "'zero' bleibt", only
-    # rho_f changes -- no separate search) -- exact object-level reuse, never recomputed.
-    assert study["calibrations"]["zero"]["beta_sd_calibrated"] == \
-        study["calibrations"]["measured"]["beta_sd_calibrated"]
-    assert study["calibrations"]["zero"]["calibration_search"] is study["calibrations"]["measured"]["calibration_search"]
+    # "zero" has its OWN calibration search at rho_f = 0 (real run 2026-09-25:
+    # reusing "measured"'s beta_sd shifted the simulated share by +30 % and
+    # failed the Gegenprobe) -- a separate, converged search object.
+    assert study["calibrations"]["zero"]["calibration_search"] is not \
+        study["calibrations"]["measured"]["calibration_search"]
+    assert math.isfinite(study["calibrations"]["zero"]["beta_sd_calibrated"])
     # the analytic first guess is the SAME closed-form value the (now-superseded) DEC-78
     # Entscheidung 1 construction used -- still exact, still report-only.
     expected_analytic = nulls.true_beta_sd_from_factor_share(0.02, study["sigma_e_used"], study["sigma_f"])

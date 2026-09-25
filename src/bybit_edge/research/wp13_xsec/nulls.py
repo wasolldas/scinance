@@ -1421,8 +1421,8 @@ def beta_control_method_study(
         never itself measured; replaces DEC-75's ad hoc ``rho_f=0.2``) --
         ``beta_sd`` searched SEPARATELY (a different target share needs
         its OWN calibrated ``beta_sd``).
-      - ``"zero"``: ``rho_f = 0.0``, ``beta_sd`` = the SAME calibrated
-        value as ``"measured"`` (DEC-78: "'zero' bleibt", only ``rho_f``
+      - ``"zero"``: ``rho_f = 0.0``, ``beta_sd`` searched separately
+        against the measured share (DEC-78: "'zero' bleibt"; own search, since rho_f
         changes -- no separate search).
 
     ``rho_f_measured``/``factor_share_measured`` come from
@@ -1460,8 +1460,19 @@ def beta_control_method_study(
         n_weeks=n_weeks, n_symbols=n_symbols, symbols=symbols, market_symbol=market_symbol,
         seed=seed, n_reps=calibration_search_n_reps, rel_tol=calibration_search_rel_tol,
         max_iter=calibration_search_max_iter)
+    # "zero" (rho_f = 0) gets its OWN search against the measured share:
+    # reusing "measured"'s beta_sd shifted the simulated share by +30 % on
+    # the real W1 numbers (Lauf 2026-09-25) because the persistent factor
+    # contributes to the measured R^2 -- the Gegenprobe then fails by
+    # construction. Every calibration is searched with its own rho_f.
+    search_zero = calibrate_beta_sd_to_observed_share(
+        factor_share_measured, rho_f=0.0, sigma_f=sigma_f, sigma_e=sigma_e_used,
+        n_weeks=n_weeks, n_symbols=n_symbols, symbols=symbols, market_symbol=market_symbol,
+        seed=seed, n_reps=calibration_search_n_reps, rel_tol=calibration_search_rel_tol,
+        max_iter=calibration_search_max_iter)
     beta_sd_measured = search_measured["beta_sd_calibrated"]
     beta_sd_stress = search_stress["beta_sd_calibrated"]
+    beta_sd_zero = search_zero["beta_sd_calibrated"]
     # Report-only analytic first guesses (never fed to the simulation) -- see
     # true_beta_sd_from_factor_share's docstring for its demoted role.
     analytic_measured = true_beta_sd_from_factor_share(factor_share_measured, sigma_e_used, sigma_f)
@@ -1475,8 +1486,8 @@ def beta_control_method_study(
                    "beta_sd": beta_sd_stress, "beta_sd_analytic_first_guess": analytic_stress,
                    "calibration_search": search_stress},
         "zero": {"rho_f": 0.0, "target_share": factor_share_measured,
-                 "beta_sd": beta_sd_measured, "beta_sd_analytic_first_guess": analytic_measured,
-                 "calibration_search": search_measured},   # "zero" reuses "measured"'s search
+                 "beta_sd": beta_sd_zero, "beta_sd_analytic_first_guess": analytic_measured,
+                 "calibration_search": search_zero},
     }
     out: dict[str, Any] = {}
     for cal_name in FACTOR_NULL_CALIBRATIONS:
