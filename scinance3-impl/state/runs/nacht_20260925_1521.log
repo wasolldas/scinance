@@ -1,0 +1,72 @@
+﻿**********************
+nStart der Windows PowerShell-Aufzeichnung
+Startzeit: 20260925152116
+Benutzername: PC2022\wguen
+RunAs-Benutzer: PC2022\wguen
+Konfigurationsname: 
+Computer: PC2022 (Microsoft Windows NT 10.0.26200.0)
+Hostanwendung: C:\WINDOWS\System32\WindowsPowerShell\v1.0\powershell.exe -ExecutionPolicy Bypass -File .\scinance3-impl\handoff_local\nacht.ps1 -Tasks wp13a
+Prozess-ID: 45760
+PSVersion: 5.1.26100.9549
+PSEdition: Desktop
+PSCompatibleVersions: 1.0, 2.0, 3.0, 4.0, 5.0, 5.1.26100.9549
+BuildVersion: 10.0.26100.9549
+CLRVersion: 4.0.30319.42000
+WSManStackVersion: 3.0
+PSRemotingProtocolVersion: 2.3
+SerializationVersion: 1.1.0.1
+**********************
+=== nacht.ps1 20260925_1521 : Tasks = wp13a ===
+From https://github.com/wasolldas/scinance
+ * branch            claude/subagent-prd-development-T16fE -> FETCH_HEAD
+Already up to date.
+55656fa feat(wp13a): Kalibrierung v5 (DEC-78) - Beta-Streuung per Bisektion an den beobachteten Faktoranteil (gleicher Schaetzer) gebunden, Gegenprobe laut; Grid none/FM 8-13-26/Doppelsortierung 13-26; stress = 2x gemessen; Registrierungs-YAML mit calibration-Block; 121 Tests gruen
+Aufgaben (aufgeloest): wp13a
+
+##### START wp13a  2026-09-25 15:21:17 #####
+=== WP-13a Vorlauf (DEC-74 Entscheidung 3) -> E:\Claude\Projects\scinance\scinance3-impl\state\wp13a_20260925 ===
+[1/4] Union-Panel laden (panel_1d + panel_1d_delisted, as_of=2026-09-25)
+  1138 Symbole (877 Ueberlebende + 261 delistet), 2085 Tage.
+[2/4] Woechentliche Renditen + PIT-Alive-Maske (Union)
+  299 Wochen (2020-12-28..2026-09-14)
+[3/4] Vorlauf-Report zusammenstellen (n_sims=1000, seed=53, convention=close_at_last) -- KEINE reale Signal-Outcome-IC
+Traceback (most recent call last):
+  File "E:\Claude\Projects\scinance\scripts\wp13_xsec.py", line 475, in <module>
+    raise SystemExit(main())
+                     ^^^^^^
+  File "E:\Claude\Projects\scinance\scripts\wp13_xsec.py", line 468, in main
+    return cmd_prelaunch(a)
+           ^^^^^^^^^^^^^^^^
+  File "E:\Claude\Projects\scinance\scripts\wp13_xsec.py", line 166, in cmd_prelaunch
+    report = prelaunch.assemble_prelaunch_report(
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "E:\Claude\Projects\scinance\src\bybit_edge\research\wp13_xsec\prelaunch.py", line 822, in assemble_prelaunch_rep
+ort
+    study = nulls.beta_control_method_study(
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "E:\Claude\Projects\scinance\src\bybit_edge\research\wp13_xsec\nulls.py", line 1485, in beta_control_method_study
+
+    gegenprobe = factor_share_gegenprobe(
+                 ^^^^^^^^^^^^^^^^^^^^^^^^
+  File "E:\Claude\Projects\scinance\src\bybit_edge\research\wp13_xsec\nulls.py", line 1167, in factor_share_gegenprobe
+    raise FactorShareCalibrationError(
+bybit_edge.research.wp13_xsec.nulls.FactorShareCalibrationError: Gegenprobe fehlgeschlagen (DEC-78 Entscheidung 1/Nachtr
+ag): simulierter Faktoranteil 0.021176045402046755 weicht vom Ziel 0.01624541031421776 um mehr als +/-25% ab (rel_diff=0
+.3035094215819079) -- sigma_f=0.06685192489159383, sigma_e=0.05695454811887075, rho_f=0.0, beta_sd=0.24738918267886076,
+n_reps=30. Ein Fehlschlag hier ist jetzt ein ECHTER BUG (die Kalibrierungssuche sollte diesen Fall per Konstruktion verm
+eiden), kein akzeptiertes Ergebnis.
+
+Ergebnis in: E:\Claude\Projects\scinance\scinance3-impl\state\wp13a_20260925
+Bitte wp13a_prelaunch.md und wp13a_prelaunch.json hochladen (rc=1).
+Hinweis: KEIN VERDIKT -- der Vorlauf berechnet keine reale Signal-Outcome-Verknuepfung (Siegel-Test, DEC-74 Entscheidung
+ 3).
+##### ENDE  wp13a  rc=1  Dauer=123 min #####
+
+=== Ergebnisse einsammeln (neuer als Start, Dateien <= 5 MB) ===
+
+=== Zusammenfassung ===
+  wp13a rc=1 dauer_min=123
+**********************
+Ende der Windows PowerShell-Aufzeichnung
+Endzeit: 20260925172418
+**********************
