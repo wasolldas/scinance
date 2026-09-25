@@ -72,21 +72,41 @@ REGISTERED_SCHEMA_HINT = (
     "beta_control: {method: str (one of ic.BETA_CONTROL_METHODS, REQUIRED, non-empty -- DEC-77 "
     "Entscheidung 2, loud fail otherwise), beta_window_weeks: int|None (must match the trailing "
     "window ic.beta_control_trail_weeks(method) implies)}; "
+    "calibration?: {sigma_f: float, sigma_e: float, stress_multiplier: float (default 2), "
+    "measured: {rho_f: float, factor_share: float, beta_sd_analytic_first_guess: float, "
+    "beta_sd_calibrated: float, achieved_share: float, true_share: float, converged: bool}, "
+    "stress: {rho_f: float, factor_share: float, beta_sd_analytic_first_guess: float, "
+    "beta_sd_calibrated: float, achieved_share: float, true_share: float, converged: bool}} "
+    "(DEC-78 Entscheidung 1, revised by its Nachtrag: OPTIONAL for backward compatibility with "
+    "a pre-DEC-78 registered file -- the SINGLE, global block --emit-registered-template takes "
+    "from the prelaunch artifact's W1 factor_calibration/beta_control_method_study, applied "
+    "identically to BOTH windows' null recomputation below, the SAME single-global-constant "
+    "convention DEC-75's own rho_f=0.2 used. `beta_sd_calibrated` is the BISECTION-CALIBRATED "
+    "value (nulls.calibrate_beta_sd_to_observed_share, DEC-78 Nachtrag) that made the Gegenprobe "
+    "pass in the prelaunch artifact -- run_full reads it DIRECTLY, NO re-search at run time; "
+    "`beta_sd_analytic_first_guess` (the OLD closed-form nulls.true_beta_sd_from_factor_share "
+    "value) is carried along report-only, never used); "
     "rules: {seed: 53, n_reps: >=1000 (bootstrap/permutation/factor-null reps; legacy "
     "n_reps_bootstrap/n_reps_permutation/n_reps_factor_null still read if n_reps is absent), "
     "block_len: 4 (DEC-75 Entscheidung 1 (1): a FIXED registered constant, recorded here "
     "for audit -- run_full's block-bootstrap/-permutation helpers hardcode block_size=4 "
     "directly, per DEC-75, rather than reading this key back), "
     "level: 0.9936, bh_alpha: 0.10}. "
-    "DEC-76 Entscheidung 1(b)/(c) / DEC-77 Entscheidung 2: windows.<W>.res_quantile_drifting[variant] "
-    "and windows.<W>.ceiling_driftfree_res are the FROZEN Drittfassung constants -- run_full "
-    "recomputes both via nulls.beta_controlled_factor_null (registered beta_control.method, rho_f=0.2, "
-    "driftfree, seed 53, rules.n_reps reps) and asserts they are within +/-NULL_CALIBRATION_REL_TOL of "
-    "these frozen values, else loud fail ('Null-Kalibrierung weicht ab', NullCalibrationError, no "
-    "verdict); the gate itself always judges against the FROZEN (registered) value, never the "
-    "recomputed one. Both keys are OPTIONAL for backward compatibility with a pre-DEC-76 registered "
-    "file -- if absent for a window, run_full falls back to the recomputed value with no calibration "
-    "check (documented, not a registered Drittfassung run)."
+    "DEC-76 Entscheidung 1(b)/(c) / DEC-77 Entscheidung 2 / DEC-78 Entscheidung 1/Nachtrag: "
+    "windows.<W>.res_quantile_drifting[variant] and windows.<W>.ceiling_driftfree_res are the "
+    "FROZEN Drittfassung constants -- run_full recomputes both via nulls.beta_controlled_"
+    "factor_null (registered beta_control.method, driftfree, seed 53, rules.n_reps reps) under "
+    "the 'stress' null: rho_f = calibration.stress.rho_f, beta_sd = calibration.stress."
+    "beta_sd_calibrated -- READ DIRECTLY, no re-search/re-derivation at run time -- IF "
+    "`calibration` is present; absent (pre-DEC-78 file) falls back to the OLD hardcoded stress "
+    "null (rho_f=0.2, beta drawn U(0.5, 2.0), documented, not a registered Drittfassung run) -- "
+    "and asserts the recomputed values are within +/-NULL_CALIBRATION_REL_TOL of the FROZEN "
+    "res_quantile_drifting/ceiling_driftfree_res values, else loud fail ('Null-Kalibrierung "
+    "weicht ab', NullCalibrationError, no verdict); the gate itself always judges against the "
+    "FROZEN (registered) value, never the recomputed one. res_quantile_drifting/"
+    "ceiling_driftfree_res are OPTIONAL for backward compatibility with a pre-DEC-76 registered "
+    "file -- if absent for a window, run_full falls back to the recomputed value with no "
+    "calibration check (documented, not a registered Drittfassung run)."
 )
 
 
@@ -557,17 +577,33 @@ def run_full(
 ) -> dict[str, Any]:
     """Panel + registered YAML -> every hypothesis's verdict. Builds all 7
     characteristics ONCE on the full panel (DEC-75 (8)), slices to W1/W2/L,
-    computes the DEC-77 beta-controlled null ONCE per window (shared
+    computes the DEC-77/DEC-78 beta-controlled null ONCE per window (shared
     across all 7 variants: the GL-012 ceiling and the beta-control PASS
     quantile per variant, :func:`nulls.beta_controlled_factor_null`, ONE
-    call per window under the REGISTERED ``beta_control.method``, ``rho_f
-    = 0.2`` "stress" calibration, driftfree -- DEC-77 Entscheidung 1 (c)'s
-    "rho 0.2 als Stress-Variante behalten"), asserts it is within +/-10% of
-    the registered YAML's FROZEN values (:func:`assert_null_calibration`,
-    loud fail ``NullCalibrationError`` otherwise, BEFORE any verdict), then
-    runs each registered hypothesis via :func:`run_hypothesis` against the
-    FROZEN (registered) values. L is computed for descriptive/sealed
-    purposes only (never enters a verdict).
+    call per window under the REGISTERED ``beta_control.method``, driftfree
+    -- DEC-77 Entscheidung 1 (c)'s "rho als Stress-Variante behalten").
+
+    **DEC-78 Entscheidung 1, revised by its Nachtrag, "stress" null's
+    construction:** ``rho_f``/``beta_sd`` for this null come DIRECTLY from
+    ``registered["calibration"]["stress"]`` (see :data:`REGISTERED_
+    SCHEMA_HINT`) -- ``rho_f = calibration.stress.rho_f``, ``beta_sd =
+    calibration.stress.beta_sd_calibrated`` -- the SAME pair for BOTH
+    windows (a single global calibration, same convention as DEC-75's own
+    ``rho_f=0.2``). **No re-search/re-derivation happens at run time**
+    (DEC-78 Nachtrag, orchestrator decision): ``beta_sd_calibrated`` is
+    read exactly as the prelaunch artifact's bisection search
+    (:func:`nulls.calibrate_beta_sd_to_observed_share`) already produced
+    it. ``registered["calibration"]`` ABSENT (a pre-DEC-78 registered
+    file) falls back to the OLD hardcoded stress null (``rho_f=0.2``,
+    beta drawn ``U(0.5, 2.0)`` via ``beta_sd=None``), documented, not a
+    registered Drittfassung run -- the used pair and its source are
+    echoed in the return value's ``calibration_used_for_stress_null``.
+    Either way, the recomputed null is asserted within +/-10% of the
+    registered YAML's FROZEN values (:func:`assert_null_calibration`,
+    loud fail ``NullCalibrationError`` otherwise, BEFORE any verdict),
+    then runs each registered hypothesis via :func:`run_hypothesis`
+    against the FROZEN (registered) values. L is computed for
+    descriptive/sealed purposes only (never enters a verdict).
 
     **DEC-77 Entscheidung 2, C.14 loud fail:** ``registered["beta_control"]``
     (``{"method": <one of ic.BETA_CONTROL_METHODS>, "beta_window_weeks":
@@ -634,6 +670,24 @@ def run_full(
         window["beta_control_pit"] = beta_control_pit_full[lo:hi] if beta_control_pit_full is not None else None
         windows[wname] = window
 
+    # DEC-78 Entscheidung 1/Nachtrag: the "stress" null's (rho_f, beta_sd_calibrated) -- a
+    # SINGLE global pair, read DIRECTLY from registered["calibration"]["stress"] (--emit-
+    # registered-template's W1-sourced block, REGISTERED_SCHEMA_HINT) when present, applied
+    # IDENTICALLY to both windows below (the same single-global-constant convention DEC-75's
+    # own rho_f=0.2 used). NO re-search/re-derivation at run time (DEC-78 Nachtrag): beta_sd is
+    # whatever the prelaunch artifact's bisection search already calibrated. Absent (pre-DEC-78
+    # registered file): falls back to the OLD hardcoded stress null (rho_f=0.2, beta drawn
+    # U(0.5, 2.0) via beta_sd=None) -- documented, not a registered Drittfassung run.
+    calibration_cfg = registered.get("calibration")
+    if isinstance(calibration_cfg, dict) and isinstance(calibration_cfg.get("stress"), dict):
+        stress_block = calibration_cfg["stress"]
+        stress_rho_f = float(stress_block["rho_f"])
+        stress_beta_sd = float(stress_block["beta_sd_calibrated"])
+        calibration_source = "registered.calibration.stress (DEC-78 Nachtrag, bisection-calibrated, kein Re-Search)"
+    else:
+        stress_rho_f, stress_beta_sd = 0.2, None
+        calibration_source = "pre-DEC-78-Nachtrag Fallback (rho_f=0.2, beta ~ U(0.5, 2.0), kein calibration-Block)"
+
     floor_by_window, wjudged_by_window, ceiling_by_window = {}, {}, {}
     res_quantile_drifting_by_window: dict[str, dict[str, float]] = {}
     beta_control_pit_by_window: dict[str, np.ndarray | None] = {}
@@ -645,15 +699,17 @@ def run_full(
         wjudged_by_window[wname] = f["w_judged"]
         beta_control_pit_by_window[wname] = w["beta_control_pit"]
 
-        # DEC-77 Entscheidung 2: ONE beta-controlled null per window (registered method, rho_f=0.2
-        # "stress" calibration -- DEC-77 Entscheidung 1 (c), driftfree -- DEC-77's own "Anlass":
-        # rho_f alone, no drift, already produces the artifact) gives BOTH the GL-012 ceiling and
-        # the per-variant beta-control PASS quantile, shared across all 7 variants.
+        # DEC-77 Entscheidung 2, "stress" calibration revised by DEC-78 Entscheidung 1: ONE
+        # beta-controlled null per window (registered method, driftfree -- DEC-77's own
+        # "Anlass": rho_f alone, no drift, already produces the artifact) gives BOTH the
+        # GL-012 ceiling and the per-variant beta-control PASS quantile, shared across all 7
+        # variants. rho_f/beta_sd come from calibration_source above (SAME pair for both
+        # windows).
         bcn = nulls.beta_controlled_factor_null(
             w["returns"], w["alive"], symbols, method=beta_control_method,
             variants=characteristics.VARIANT_NAMES, convention=convention,
             n_reps=n_reps_factor_null, seed=seed, quantile=null_quantile_level,
-            rho_f=0.2, drift_f=nulls.DRIFT_F_DRIFTFREE, beta_pool=None)
+            rho_f=stress_rho_f, drift_f=nulls.DRIFT_F_DRIFTFREE, beta_sd=stress_beta_sd)
 
         recomputed_ceiling_res = bcn["ceiling_mean_of_max"]
         recomputed_quantiles = {v: bcn["variants"][v]["quantile_one_sided"]
@@ -762,6 +818,8 @@ def run_full(
         "n_reps_factor_null": n_reps_factor_null,
         "null_calibration": null_calibration_report,   # DEC-76 Task A item 3: recomputed vs. registered
         "beta_control": {"method": beta_control_method, "beta_window_weeks": beta_control_trail_win},
+        "calibration_used_for_stress_null": {   # DEC-78 Entscheidung 1/Nachtrag: audit trail
+            "rho_f": stress_rho_f, "beta_sd_calibrated": stress_beta_sd, "source": calibration_source},
     }
 
 

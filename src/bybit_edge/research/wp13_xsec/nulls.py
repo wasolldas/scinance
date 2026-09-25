@@ -170,7 +170,11 @@ __all__ = [
     "window_sigma_f_sigma_e", "CALIBRATION_BETA_TRAIL_WEEKS", "measure_market_factor",
     "factor_share_from_trailing_beta", "beta_dispersion_from_trailing_beta", "pooled_finite_beta",
     "factor_calibration_report", "FACTOR_NULL_CALIBRATIONS", "beta_controlled_factor_null",
-    "beta_control_method_study",
+    "beta_control_method_study", "true_beta_sd_from_factor_share", "BETA_CONTROL_METHODS_GRID",
+    "STRESS_MULTIPLIER", "GEGENPROBE_REL_TOL", "FactorShareCalibrationError",
+    "factor_share_gegenprobe", "calibrate_beta_sd_to_observed_share",
+    "CALIBRATION_SEARCH_N_REPS_DEFAULT", "CALIBRATION_SEARCH_REL_TOL_DEFAULT",
+    "CALIBRATION_SEARCH_MAX_ITER_DEFAULT",
 ]
 
 #: DEC-51/DEC-74 (d): per-window critical value (alpha 0.05 one-sided).
@@ -469,7 +473,7 @@ DRIFT_F_DRIFTFREE = 0.0
 def simulate_factor_panel(
     n_weeks: int, n_symbols: int, *, sigma_f: float, sigma_e: float,
     rho_f: float = 0.2, drift_f: float = 0.002, rng: np.random.Generator,
-    beta_pool: np.ndarray | None = None,
+    beta_pool: np.ndarray | None = None, beta_sd: float | None = None,
 ) -> dict[str, Any]:
     """Task brief item 3, verbatim construction: ``returns = beta_i * f_t +
     e_it`` -- ``beta_i ~ U(0.5, 2.0)`` drawn ONCE (fixed per symbol for
@@ -479,14 +483,35 @@ def simulate_factor_panel(
     for the whole window, not once per replicate, per the task brief:
     "beta_i ~ U(0.5, 2.0) (fixed per symbol, seed)").
 
-    **DEC-77 Entscheidung 1 (a), additive:** ``beta_pool`` (default
-    ``None``, unchanged ``U(0.5, 2.0)`` draw) -- when given a non-empty
-    1-D array of REAL, measured PIT-beta values (:func:`pooled_finite_beta`
-    resamples them WITH replacement, one draw per simulated symbol
-    (``rng.choice(beta_pool, size=n_symbols, replace=True)``) instead of
-    the uniform draw -- the "measured"/"zero" factor-null calibrations'
-    "betas drawn from the measured PIT-beta distribution" (DEC-77 task
-    brief item 1). ``f_t`` an AR(1) with
+    **DEC-77 Entscheidung 1 (a), additive, VERALTET/report-only seit
+    DEC-78 (kept only for a caller that still passes it explicitly --
+    ``nulls.beta_control_method_study``/``prelaunch.assemble_prelaunch_
+    report`` no longer do, DEC-78 Entscheidung 1's "Befund"):**
+    ``beta_pool`` (default ``None``, unchanged ``U(0.5, 2.0)`` draw) --
+    when given a non-empty 1-D array of REAL, measured PIT-beta values
+    (:func:`pooled_finite_beta` resamples them WITH replacement, one draw
+    per simulated symbol (``rng.choice(beta_pool, size=n_symbols,
+    replace=True)``) instead of the uniform draw. DEC-78 "Befund": this
+    pool is mostly 26-week ESTIMATION NOISE (SD 0.69-0.83), not true beta
+    dispersion, and drawing betas from it overstates the simulated factor
+    share by roughly a factor 25 against the real, measured one (state/
+    decisions.md DEC-78) -- superseded by ``beta_sd`` below for every
+    factor-null calibration this package registers.
+
+    **DEC-78 Entscheidung 1, additive:** ``beta_sd`` (default ``None``) --
+    when given, ``beta_i = 1 + beta_sd * z_i``, ``z_i ~ N(0, 1)`` drawn
+    ONCE per symbol for THIS panel's draw of ``rng`` (same "fixed per
+    symbol, redrawn per replicate by the caller" discipline as the
+    ``U(0.5, 2.0)``/``beta_pool`` draws above) -- the TRUE cross-sectional
+    beta dispersion :func:`true_beta_sd_from_factor_share` derives from a
+    MEASURED factor share, replacing both older draws for every
+    calibration this package's beta-control method study/real-run null
+    recomputation now use. **Precedence** when more than one is given
+    (never silently ambiguous): ``beta_sd`` (if not ``None``) takes
+    priority over ``beta_pool`` (if non-empty), which takes priority over
+    the default ``U(0.5, 2.0)`` draw.
+
+    ``f_t`` an AR(1) with
     drift (``f[0]`` starts at the stationary mean ``drift_f/(1-rho_f)``,
     ``f[t] = drift_f + rho_f*f[t-1] + sigma_f*eps_t`` for ``t >= 1`` --
     standard AR(1)-with-intercept, unconditional mean ``drift_f/(1-rho_f)``
@@ -501,7 +526,9 @@ def simulate_factor_panel(
     Returns ``{"returns", "beta", "f"}`` -- ``returns`` is ``[n_weeks,
     n_symbols]``, ``beta`` is ``[n_symbols]``, ``f`` is ``[n_weeks]``.
     """
-    if beta_pool is not None and beta_pool.size > 0:
+    if beta_sd is not None:
+        beta = 1.0 + beta_sd * rng.standard_normal(size=n_symbols)
+    elif beta_pool is not None and beta_pool.size > 0:
         beta = rng.choice(beta_pool, size=n_symbols, replace=True)
     else:
         beta = rng.uniform(0.5, 2.0, size=n_symbols)
@@ -893,6 +920,48 @@ def pooled_finite_beta(beta_prev: np.ndarray, window_alive: np.ndarray) -> np.nd
     return beta_prev[mask].astype(np.float64)
 
 
+def true_beta_sd_from_factor_share(share: float, sigma_e: float, sigma_f: float) -> float:
+    """DEC-78 Entscheidung 1, verbatim: ``SD(beta_true) = sqrt(share/(1-
+    share)) * sigma_e/sigma_f`` -- inverts ``factor_share =
+    (beta_sd*sigma_f)^2 / ((beta_sd*sigma_f)^2 + sigma_e^2)`` for
+    ``beta_sd``, the TRUE cross-sectional beta dispersion a MEASURED
+    factor share (median weekly cross-sectional R^2 of return on trailing
+    PIT beta, :func:`factor_share_from_trailing_beta`) implies -- DEC-78
+    "Befund" (state/decisions.md): the measured 26-week PIT-beta POOL's
+    own dispersion (SD 0.69/0.83) is mostly ESTIMATION NOISE, not this
+    true value (0.109/~0.07 for W1/W2).
+
+    **DEC-78 Nachtrag, role change (orchestrator decision, additive,
+    non-breaking):** this closed-form value is no longer what actually
+    feeds :func:`simulate_factor_panel`'s ``beta_sd`` argument for the
+    "measured"/"stress" calibrations -- it systematically comes out too
+    SMALL once remeasured the same way the real ``factor_share_measured``
+    is (beta-estimation attenuation PLUS the median-vs-mean gap of a
+    per-week R^2 series, neither of which this population-level formula
+    models). It is now a report-only "analytic first guess"
+    (:func:`factor_calibration_report`'s ``beta_sd_true`` field, and
+    :func:`beta_control_method_study`'s per-calibration ``beta_sd_
+    analytic_first_guess``) -- the value actually used is :func:`
+    calibrate_beta_sd_to_observed_share`'s BISECTION-CALIBRATED
+    ``beta_sd_calibrated``, searched so the SAME "median weekly R^2 on a
+    re-estimated trailing PIT beta" estimator reproduces the target share
+    by construction. This function itself is UNCHANGED, still exact for
+    the population relationship it algebraically inverts (see :func:`
+    test_true_beta_sd_from_factor_share_identity_reproduced_in_large_
+    panel` in the test suite).
+
+    ``share`` is clipped to ``[0, 0.999]`` before the formula is applied
+    (a measured R^2 can exceed 1, or sit exactly at 1, only through
+    sampling noise on a small/degenerate cross-section -- ``1.0`` itself
+    makes the denominator 0); ``NaN``/non-positive ``sigma_f``/negative
+    ``sigma_e`` propagate to ``NaN``, never a fabricated 0 (C.14)."""
+    if (math.isnan(share) or math.isnan(sigma_e) or math.isnan(sigma_f)
+            or sigma_f <= 0.0 or sigma_e < 0.0):
+        return float("nan")
+    share_clipped = max(0.0, min(0.999, share))
+    return math.sqrt(share_clipped / (1.0 - share_clipped)) * sigma_e / sigma_f
+
+
 def factor_calibration_report(
     window_returns: np.ndarray, window_alive: np.ndarray, symbols: list[str], beta_prev: np.ndarray, *,
     market_symbol: str = "BTCUSDT", min_universe: int = 10,
@@ -904,7 +973,18 @@ def factor_calibration_report(
     verdict-bearing number): the mechanical cross-sectional momentum the
     measured market persistence alone implies, ``(2/pi)*arcsin(rho_f) *
     factor_share`` (DEC-77 "Anlass", verbatim: "IC_t ~ sign(f_t*f_t+1) *
-    Faktoranteil, E[sign] = (2/pi)*arcsin(rho_f)")."""
+    Faktoranteil, E[sign] = (2/pi)*arcsin(rho_f)").
+
+    **DEC-78 Entscheidung 1, additive:** ``sigma_e_used``
+    (:func:`window_sigma_f_sigma_e`'s idiosyncratic-vol-preferred value,
+    the SAME one :func:`beta_control_method_study`/:func:`beta_controlled_
+    factor_null` feed the simulation) and ``beta_sd_true`` (:func:`true_
+    beta_sd_from_factor_share` applied to this window's OWN measured
+    ``rho_f_measured``-paired ``sigma_f``/``sigma_e_used``/
+    ``factor_share_median``) -- the "measured" calibration's TRUE beta
+    dispersion, reported here purely descriptively (the value the study
+    itself derives independently, for the SAME window, is what actually
+    feeds the simulation)."""
     mkt = measure_market_factor(window_returns, symbols, market_symbol=market_symbol)
     share = factor_share_from_trailing_beta(window_returns, window_alive, beta_prev, min_universe=min_universe)
     disp = beta_dispersion_from_trailing_beta(beta_prev, window_alive)
@@ -915,9 +995,18 @@ def factor_calibration_report(
     rho_f_clipped = max(-1.0, min(1.0, rho_f)) if not math.isnan(rho_f) else float("nan")
     analytic_mom = ((2.0 / math.pi) * math.asin(rho_f_clipped) * fshare
                     if not (math.isnan(rho_f_clipped) or math.isnan(fshare)) else float("nan"))
+    sigmas = window_sigma_f_sigma_e(window_returns, symbols, market_symbol=market_symbol)
+    sigma_e_used = sigmas["sigma_e_used"]
+    beta_sd_true = true_beta_sd_from_factor_share(fshare, sigma_e_used, mkt["sigma_f"])
     return {
         "market_factor": mkt, "factor_share": share, "beta_dispersion": disp,
-        "beta_trail_weeks": CALIBRATION_BETA_TRAIL_WEEKS,
+        "beta_trail_weeks": CALIBRATION_BETA_TRAIL_WEEKS, "sigma_e_used": sigma_e_used,
+        "beta_sd_true": {
+            "value": beta_sd_true,
+            "formula": "sqrt(share/(1-share)) * sigma_e_used/sigma_f",
+            "label": "DEC-78 Entscheidung 1: wahre Beta-Dispersion aus dem gemessenen Faktoranteil "
+                     "(ersetzt den PIT-Beta-Pool, ueberwiegend Schaetzrauschen -- DEC-78 Befund).",
+        },
         "analytic_mechanical_momentum": {
             "value": analytic_mom,
             "formula": "(2/pi)*arcsin(rho_f_measured) * factor_share_median",
@@ -931,13 +1020,256 @@ def factor_calibration_report(
 # beta-draw calibrations x ic.BETA_CONTROL_METHODS x the 7 F-XSEC1 variants.
 # ----------------------------------------------------------------------------
 
-#: DEC-77 Entscheidung 1 (1): the three factor-null calibrations. sigma_f is
-#: the SAME measured window value in all three (never itself a calibration
-#: axis) -- only rho_f and the beta-draw source vary. drift_f is ALWAYS
-#: DRIFT_F_DRIFTFREE (0.0): DEC-77's own "Anlass" finding is that rho_f
-#: (AR(1) persistence) alone, with NO drift, already produces the mechanical
-#: momentum artifact -- drift plays no role in this study.
+#: DEC-77 Entscheidung 1 (1)/DEC-78 Entscheidung 1: the three factor-null
+#: calibrations. sigma_f/sigma_e are the SAME measured window values in all
+#: three (never themselves a calibration axis) -- only rho_f and beta_sd
+#: vary. drift_f is ALWAYS DRIFT_F_DRIFTFREE (0.0): DEC-77's own "Anlass"
+#: finding is that rho_f (AR(1) persistence) alone, with NO drift, already
+#: produces the mechanical momentum artifact -- drift plays no role here.
 FACTOR_NULL_CALIBRATIONS: tuple[str, ...] = ("measured", "stress", "zero")
+
+#: DEC-78 Entscheidung 1: the method-study grid's restricted method set --
+#: TS-residualisation (``ts_resid_*w``) DROPPED from the grid (DEC-78
+#: Entscheidung 2, verbatim: "die TS-Residualisierung ist bei 8-26 Wochen
+#: belegt unbrauchbar", DEC-77 Vorlauf v4 finding) -- the ts_resid_* FUNCTIONS
+#: themselves stay (``ic.apply_beta_control``/``ic.residualize_outcome``): a
+#: real run may still register ``ts_resid_*w`` via ``ic.BETA_CONTROL_METHODS``
+#: (unchanged, all 9), only the STUDY's own default grid narrows.
+BETA_CONTROL_METHODS_GRID: tuple[str, ...] = (
+    "none", "fm_neutral_8w", "fm_neutral_13w", "fm_neutral_26w",
+    "double_sort_13w", "double_sort_26w",
+)
+
+#: DEC-78 Entscheidung 1: the "stress" calibration's multiplier on BOTH
+#: rho_f_measured AND factor_share_measured (pre-fixed, never itself
+#: measured) -- replaces DEC-75's ad hoc rho_f=0.2 constant.
+STRESS_MULTIPLIER = 2.0
+
+#: DEC-78 Entscheidung 1, Gegenprobe: the relative tolerance band the
+#: SIMULATED factor share (measured identically to the real one) must fall
+#: within, around each calibration's OWN target factor share.
+GEGENPROBE_REL_TOL = 0.25
+
+
+class FactorShareCalibrationError(RuntimeError):
+    """DEC-78 Entscheidung 1, Gegenprobe (C.14 loud fail): a calibration's
+    SIMULATED factor share (:func:`factor_share_gegenprobe`, measured
+    IDENTICALLY to the real one -- median weekly cross-sectional R^2 of
+    the simulated return on the simulated trailing PIT beta) drifted more
+    than :data:`GEGENPROBE_REL_TOL` from that calibration's OWN target
+    share -- raised BEFORE any beta-control method cell runs under this
+    calibration, naming both numbers. Never a silent report (the whole
+    point of a Gegenprobe, per DEC-78's own "Anlass": the OLD DEC-77
+    construction silently overstated the simulated factor share ~25x
+    against the real, measured one)."""
+
+
+def _measure_simulated_share(
+    n_weeks: int, n_symbols: int, symbols: list[str], *, sigma_f: float, sigma_e: float,
+    rho_f: float, beta_sd: float, market_symbol: str = "BTCUSDT",
+    drift_f: float = DRIFT_F_DRIFTFREE, beta_trail_win: int = CALIBRATION_BETA_TRAIL_WEEKS,
+    n_reps: int = 30, seed: int = FACTOR_NULL_SEED, min_universe: int = 10,
+) -> dict[str, Any]:
+    """Shared simulate+measure core for :func:`factor_share_gegenprobe`
+    AND :func:`calibrate_beta_sd_to_observed_share` (DEC-78 Nachtrag) --
+    ONE implementation, never two parallel copies. Simulates ``n_reps``
+    ``(sigma_f, sigma_e, rho_f, beta_sd)`` panels (:func:`simulate_
+    factor_panel`) and reports TWO shares:
+
+      - ``simulated_share`` -- measured EXACTLY the way the real
+        ``factor_share_measured`` is: :func:`trailing_pit_beta_excluding_
+        current_week` (the simulated panel's OWN "BTC column", never the
+        real one -- THE SEAL) followed by :func:`factor_share_from_
+        trailing_beta`, POOLING every replicate's per-week R^2 values
+        before taking ONE median (a short single window has too few
+        weeks for a stable median on its own; pooling ``n_reps``
+        independent replicates' weeks gives a stable estimate of the
+        SAME quantity the real, single-window measurement targets).
+      - ``true_share`` -- report-only, NEVER fed back into a calibration
+        decision: the MEAN weekly R^2 of the return on the panel's TRUE
+        (population, noise-free) ``beta`` -- the "clean" share the
+        closed-form :func:`true_beta_sd_from_factor_share` formula's own
+        algebra is exact for (DEC-78 Nachtrag: reported alongside
+        ``simulated_share`` so the estimation-noise/median-vs-mean gap
+        between the two is visible in the artifact, never hidden)."""
+    rng = np.random.default_rng(seed)
+    alive = np.ones((n_weeks, n_symbols), dtype=bool)
+    pooled_r2: list[float] = []
+    true_r2: list[float] = []
+    for _ in range(n_reps):
+        sim = simulate_factor_panel(n_weeks, n_symbols, sigma_f=sigma_f, sigma_e=sigma_e,
+                                     rho_f=rho_f, drift_f=drift_f, rng=rng, beta_sd=beta_sd)
+        beta_prev = trailing_pit_beta_excluding_current_week(
+            sim["returns"], symbols, market_symbol=market_symbol, trail_win=beta_trail_win)
+        share = factor_share_from_trailing_beta(sim["returns"], alive, beta_prev, min_universe=min_universe)
+        pooled_r2.extend(row["r2"] for row in share["per_week"] if row["r2"] is not None)
+        beta_true = sim["beta"]
+        if beta_true.std() > 0.0:
+            for t in range(n_weeks):
+                y = sim["returns"][t]
+                if y.std() == 0.0:
+                    continue
+                r = float(np.corrcoef(beta_true, y)[0, 1])
+                if not math.isnan(r):
+                    true_r2.append(r * r)
+    simulated_share = float(np.median(pooled_r2)) if pooled_r2 else float("nan")
+    true_share = float(np.mean(true_r2)) if true_r2 else float("nan")
+    return {"simulated_share": simulated_share, "true_share": true_share,
+            "n_r2_pooled": len(pooled_r2), "n_true_r2_pooled": len(true_r2)}
+
+
+def factor_share_gegenprobe(
+    n_weeks: int, n_symbols: int, symbols: list[str], *, sigma_f: float, sigma_e: float,
+    rho_f: float, beta_sd: float, target_share: float, market_symbol: str = "BTCUSDT",
+    drift_f: float = DRIFT_F_DRIFTFREE, beta_trail_win: int = CALIBRATION_BETA_TRAIL_WEEKS,
+    n_reps: int = 30, seed: int = FACTOR_NULL_SEED, rel_tol: float = GEGENPROBE_REL_TOL,
+    min_universe: int = 10,
+) -> dict[str, Any]:
+    """DEC-78 Entscheidung 1, Gegenprobe (task brief item 2, verbatim,
+    LITERAL per the DEC-78 Nachtrag -- never loosened): measures the
+    simulated factor share via :func:`_measure_simulated_share` (the SAME
+    estimator the real ``factor_share_measured`` uses -- median weekly
+    cross-sectional R^2 on the simulated trailing PIT beta) and asserts
+    it is within ``rel_tol`` (default 25%) of ``target_share``.
+
+    **DEC-78 Nachtrag (orchestrator decision, supersedes the closed-form-
+    only construction): ``beta_sd`` is now expected to be the BISECTION-
+    CALIBRATED value from :func:`calibrate_beta_sd_to_observed_share`
+    (searched so THIS SAME estimator reproduces ``target_share`` by
+    construction), not the closed-form :func:`true_beta_sd_from_factor_
+    share` value -- so this Gegenprobe is expected to PASS for a
+    correctly calibrated ``beta_sd``.** Raises :class:`FactorShare
+    CalibrationError` (C.14 loud fail, naming both the simulated and
+    target share) if it does not -- called ONCE per calibration, AFTER
+    that calibration's ``beta_sd`` has been searched, BEFORE its
+    beta-control method grid runs (:func:`beta_control_method_study`). A
+    failure here is now a REAL BUG (a stale/inconsistent calibration
+    search, a wrong ``sigma_e``/``sigma_f``, ...) -- :func:`prelaunch.
+    assemble_prelaunch_report` does NOT catch it; the whole ``--prelaunch``
+    run aborts, loud, exactly as C.14 requires."""
+    measured = _measure_simulated_share(
+        n_weeks, n_symbols, symbols, sigma_f=sigma_f, sigma_e=sigma_e, rho_f=rho_f, beta_sd=beta_sd,
+        market_symbol=market_symbol, drift_f=drift_f, beta_trail_win=beta_trail_win,
+        n_reps=n_reps, seed=seed, min_universe=min_universe)
+    simulated_share = measured["simulated_share"]
+    if math.isnan(simulated_share) or math.isnan(target_share) or target_share == 0.0:
+        rel_diff = float("nan")
+    else:
+        rel_diff = abs(simulated_share - target_share) / target_share
+    ok = (not math.isnan(rel_diff)) and rel_diff <= rel_tol
+    result = {
+        "simulated_factor_share": simulated_share, "target_factor_share": target_share,
+        "true_share": measured["true_share"],
+        "rel_diff": rel_diff, "rel_tol": rel_tol, "n_reps": n_reps, "n_r2_pooled": measured["n_r2_pooled"],
+        "ok": ok, "sigma_f": sigma_f, "sigma_e": sigma_e, "rho_f": rho_f, "beta_sd": beta_sd,
+    }
+    if not ok:
+        raise FactorShareCalibrationError(
+            "Gegenprobe fehlgeschlagen (DEC-78 Entscheidung 1/Nachtrag): simulierter Faktoranteil "
+            f"{simulated_share!r} weicht vom Ziel {target_share!r} um mehr als "
+            f"+/-{rel_tol:.0%} ab (rel_diff={rel_diff!r}) -- sigma_f={sigma_f!r}, "
+            f"sigma_e={sigma_e!r}, rho_f={rho_f!r}, beta_sd={beta_sd!r}, n_reps={n_reps}. "
+            "Ein Fehlschlag hier ist jetzt ein ECHTER BUG (die Kalibrierungssuche sollte diesen "
+            "Fall per Konstruktion vermeiden), kein akzeptiertes Ergebnis.")
+    return result
+
+
+#: DEC-78 Nachtrag defaults, verbatim from the orchestrator's task text
+#: ("n_reps=40, rel_tol=0.10, max_iter=25").
+CALIBRATION_SEARCH_N_REPS_DEFAULT = 40
+CALIBRATION_SEARCH_REL_TOL_DEFAULT = 0.10
+CALIBRATION_SEARCH_MAX_ITER_DEFAULT = 25
+
+
+def calibrate_beta_sd_to_observed_share(
+    target_share_median: float, *, rho_f: float, sigma_f: float, sigma_e: float,
+    n_weeks: int, n_symbols: int, symbols: list[str] | None = None,
+    market_symbol: str = "BTCUSDT", drift_f: float = DRIFT_F_DRIFTFREE,
+    beta_trail_win: int = CALIBRATION_BETA_TRAIL_WEEKS,
+    seed: int = FACTOR_NULL_SEED, n_reps: int = CALIBRATION_SEARCH_N_REPS_DEFAULT,
+    rel_tol: float = CALIBRATION_SEARCH_REL_TOL_DEFAULT,
+    max_iter: int = CALIBRATION_SEARCH_MAX_ITER_DEFAULT,
+    beta_sd_bounds: tuple[float, float] = (0.01, 3.0),
+) -> dict[str, Any]:
+    """DEC-78 Nachtrag (orchestrator decision, replaces the closed-form
+    inversion AS THE CALIBRATION itself -- :func:`true_beta_sd_from_
+    factor_share` is kept, but demoted to a report-only "analytic first
+    guess", see that function's docstring; DEC-78's own "Befund" already
+    found the closed-form value systematically too small once REMEASURED
+    the same way the real ``factor_share_measured`` is: beta-estimation
+    attenuation (a 26-week trailing OLS beta's own estimation noise) and
+    the median-vs-mean gap of a per-week R^2 series BOTH push the naive
+    formula's implied share below what gets measured back out).
+
+    **Bisection on ``log(beta_sd)`` in ``beta_sd_bounds``** (monotonicity
+    assumed -- a larger ``beta_sd`` gives a larger simulated share in
+    expectation, documented, not separately proven here, so plain
+    bisection is used rather than a slower general root-finder) until
+    :func:`_measure_simulated_share`'s ``simulated_share`` -- the SAME
+    estimator :func:`factor_share_gegenprobe`/the real measurement use --
+    is within ``rel_tol`` (default 10%) of ``target_share_median``, or
+    ``max_iter`` iterations are exhausted (the LAST tried ``beta_sd`` is
+    still returned, with ``converged: False`` -- never a crash, never a
+    silently-accepted mismatch: the caller decides what to do with an
+    unconverged search). Every iteration draws a FRESH, but deterministic,
+    simulated panel (``seed + iteration index`` -- never reuses the SAME
+    draws across different ``beta_sd`` guesses, which would bias the
+    search toward whatever that one draw happened to show).
+
+    ``symbols`` defaults to a synthetic ``n_symbols``-long list ending in
+    ``market_symbol`` (the caller's real window's symbol list works
+    fine too -- only its LENGTH and the position of ``market_symbol``
+    matter, per :func:`simulate_factor_panel`'s "simulated BTC column"
+    convention).
+
+    Returns ``{"beta_sd_calibrated", "achieved_share", "true_share",
+    "target_share", "converged", "n_iter", "trace", ...}`` -- ``trace`` is
+    the full per-iteration record (DEC-53-artifact material: every guess,
+    its achieved/true share, its ``rel_diff``), ``achieved_share``/
+    ``true_share`` are the LAST iteration's values (the ones a subsequent
+    :func:`factor_share_gegenprobe` call, run with the SAME parameters,
+    is expected to reproduce)."""
+    if symbols is None:
+        symbols = [f"sim{i}" for i in range(n_symbols - 1)] + [market_symbol]
+    if math.isnan(target_share_median) or target_share_median <= 0.0:
+        return {"beta_sd_calibrated": float("nan"), "achieved_share": float("nan"),
+                "true_share": float("nan"), "target_share": target_share_median,
+                "converged": False, "n_iter": 0, "trace": [], "rel_tol": rel_tol,
+                "n_reps": n_reps, "seed": seed}
+
+    lo_log, hi_log = math.log(beta_sd_bounds[0]), math.log(beta_sd_bounds[1])
+    trace: list[dict[str, Any]] = []
+    beta_sd = math.exp(0.5 * (lo_log + hi_log))
+    achieved_share = true_share = float("nan")
+    converged = False
+    for it in range(max_iter):
+        mid_log = 0.5 * (lo_log + hi_log)
+        beta_sd = math.exp(mid_log)
+        measured = _measure_simulated_share(
+            n_weeks, n_symbols, symbols, sigma_f=sigma_f, sigma_e=sigma_e, rho_f=rho_f,
+            beta_sd=beta_sd, market_symbol=market_symbol, drift_f=drift_f,
+            beta_trail_win=beta_trail_win, n_reps=n_reps, seed=seed + it)
+        achieved_share, true_share = measured["simulated_share"], measured["true_share"]
+        rel_diff = (abs(achieved_share - target_share_median) / target_share_median
+                    if not math.isnan(achieved_share) else float("nan"))
+        trace.append({"iter": it, "beta_sd": beta_sd, "achieved_share": achieved_share,
+                       "true_share": true_share, "rel_diff": rel_diff})
+        if not math.isnan(rel_diff) and rel_diff <= rel_tol:
+            converged = True
+            break
+        if math.isnan(achieved_share) or achieved_share < target_share_median:
+            lo_log = mid_log          # need MORE dispersion -> search the upper half
+        else:
+            hi_log = mid_log          # too much dispersion -> search the lower half
+    return {
+        "beta_sd_calibrated": beta_sd, "achieved_share": achieved_share, "true_share": true_share,
+        "target_share": target_share_median, "converged": converged, "n_iter": len(trace),
+        "trace": trace, "rel_tol": rel_tol, "n_reps": n_reps, "seed": seed, "max_iter": max_iter,
+        "beta_sd_bounds": list(beta_sd_bounds),
+        "label": "DEC-78 Nachtrag: beta_sd bisektionell auf den beobachteten (median-gemessenen) "
+                 "Faktoranteil kalibriert -- ersetzt die geschlossene Formel als Kalibrierung "
+                 "(diese bleibt als analytische Erstschaetzung, report-only).",
+    }
 
 
 def beta_controlled_factor_null(
@@ -947,9 +1279,10 @@ def beta_controlled_factor_null(
     n_reps: int = FACTOR_NULL_N_REPS_DEFAULT, seed: int = FACTOR_NULL_SEED,
     quantile: float = SELECTION_CEILING_ONE_SIDED_QUANTILE, market_symbol: str = "BTCUSDT",
     rho_f: float = 0.2, drift_f: float = DRIFT_F_DRIFTFREE, beta_pool: np.ndarray | None = None,
+    beta_sd: float | None = None,
 ) -> dict[str, Any]:
     """DEC-77 Entscheidung 1 (b)/Entscheidung 2: the factor-preserving null
-    under ONE ``(rho_f, beta_pool)`` configuration, with the REGISTERED
+    under ONE ``(rho_f, beta_pool/beta_sd)`` configuration, with the REGISTERED
     beta-control ``method`` (:data:`ic.BETA_CONTROL_METHODS`) applied
     INSIDE the simulation via :func:`ic.apply_beta_control` -- this is what
     BOTH :func:`beta_control_method_study` (the calibration grid) AND
@@ -957,10 +1290,13 @@ def beta_controlled_factor_null(
     the registered one, DEC-77 Entscheidung 2) share, so a method behaves
     IDENTICALLY in the calibration study and in a real run. C.14 loud fail
     on an unrecognised ``method`` (:func:`ic.beta_control_trail_weeks`
-    raises before any simulation runs).
+    raises before any simulation runs). ``beta_sd`` (DEC-78 Entscheidung 1,
+    additive) is forwarded to :func:`simulate_factor_panel` unchanged --
+    see that function's docstring for the ``beta_sd``/``beta_pool``
+    precedence.
 
     Per replicate: :func:`simulate_factor_panel` draws a fresh panel (this
-    call's ``rho_f``/``drift_f``/``beta_pool``), the SIMULATED beta at
+    call's ``rho_f``/``drift_f``/``beta_pool``/``beta_sd``), the SIMULATED beta at
     ``method``'s trailing window is estimated from the SIMULATED panel's
     OWN "BTC column" (never the real one -- THE SEAL), with
     ``min_weeks = trail_win`` (DEC-77 item 2(i)'s "exclude symbols with
@@ -985,7 +1321,8 @@ def beta_controlled_factor_null(
 
     for _rep in range(n_reps):
         sim = simulate_factor_panel(n_weeks, n_symbols, sigma_f=sigma_f, sigma_e=sigma_e_used,
-                                     rho_f=rho_f, drift_f=drift_f, rng=rng, beta_pool=beta_pool)
+                                     rho_f=rho_f, drift_f=drift_f, rng=rng, beta_pool=beta_pool,
+                                     beta_sd=beta_sd)
         sim_returns = sim["returns"]
         beta_pit = None
         if trail_win is not None:
@@ -1029,6 +1366,7 @@ def beta_controlled_factor_null(
         "variants": per_variant, "ceiling_mean_of_max": ceiling_mean_of_max,
         "coverage_mean": coverage_mean, "method": method, "beta_window_weeks": trail_win,
         "rho_f": rho_f, "drift_f": drift_f, "sigma_f": sigma_f, "sigma_e_used": sigma_e_used,
+        "beta_sd": beta_sd,
         "n_reps": n_reps, "seed": seed, "convention": convention, "market_symbol": market_symbol,
         "n_weeks": n_weeks, "n_symbols": n_symbols,
     }
@@ -1036,15 +1374,24 @@ def beta_controlled_factor_null(
 
 def beta_control_method_study(
     window_returns: np.ndarray, window_alive: np.ndarray, symbols: list[str], *,
-    rho_f_measured: float, beta_pool_measured: np.ndarray,
+    rho_f_measured: float, factor_share_measured: float,
     variants: tuple[str, ...] = characteristics.VARIANT_NAMES,
-    methods: tuple[str, ...] = ic.BETA_CONTROL_METHODS,
+    methods: tuple[str, ...] = BETA_CONTROL_METHODS_GRID,
     convention: ic.Convention = "close_at_last", market_symbol: str = "BTCUSDT",
     n_reps: int = 300, seed: int = FACTOR_NULL_SEED,
     quantile: float = SELECTION_CEILING_ONE_SIDED_QUANTILE,
+    stress_multiplier: float = STRESS_MULTIPLIER,
+    gegenprobe_n_reps: int = 30, gegenprobe_rel_tol: float = GEGENPROBE_REL_TOL,
+    calibration_search_n_reps: int = CALIBRATION_SEARCH_N_REPS_DEFAULT,
+    calibration_search_rel_tol: float = CALIBRATION_SEARCH_REL_TOL_DEFAULT,
+    calibration_search_max_iter: int = CALIBRATION_SEARCH_MAX_ITER_DEFAULT,
 ) -> dict[str, Any]:
-    """DEC-77 Entscheidung 1 (b): the full grid -- :data:`FACTOR_NULL_
-    CALIBRATIONS` (3) x ``methods`` (9, :data:`ic.BETA_CONTROL_METHODS`) x
+    """DEC-78 Entscheidung 1, calibration construction revised by the
+    DEC-78 Nachtrag (supersedes DEC-77 Entscheidung 1 (b)'s calibration
+    construction; the PASS rule/grid ASSEMBLY shape are unchanged): the
+    full grid -- :data:`FACTOR_NULL_CALIBRATIONS` (3: measured/stress/
+    zero) x ``methods`` (:data:`BETA_CONTROL_METHODS_GRID`, 6 -- DEC-78
+    Entscheidung 2: TS-residualisation dropped from the grid) x
     ``variants`` (7) -- each cell one :func:`beta_controlled_factor_null`
     call. ``n_reps`` DEFAULTS to 300 (task brief: ">= 500 reps/cell is
     acceptable for the grid, document; use >= 1000 for the recommended
@@ -1052,33 +1399,116 @@ def beta_control_method_study(
     a single re-run of the winning method once :func:`
     beta_control_pass_table`/the recommendation have picked it, this
     function itself always runs the SAME ``n_reps`` across the whole grid).
-    ``rho_f_measured``/``beta_pool_measured`` come from
-    :func:`factor_calibration_report`/:func:`pooled_finite_beta` (the
-    caller's job -- keeps this function's signature independent of the
-    calibration-measurement machinery)."""
-    calibrations: dict[str, dict[str, float | np.ndarray | None]] = {
-        "measured": {"rho_f": rho_f_measured, "beta_pool": beta_pool_measured},
-        "stress": {"rho_f": 0.2, "beta_pool": None},
-        "zero": {"rho_f": 0.0, "beta_pool": beta_pool_measured},
+
+    **Calibration construction (DEC-78 Nachtrag, orchestrator decision --
+    OBSERVABLE-MATCHING, not closed-form).** ``sigma_f``/``sigma_e``
+    (:func:`window_sigma_f_sigma_e`) are the SAME measured window values
+    in ALL three calibrations, computed ONCE here. Each calibration's
+    ``beta_sd`` is BISECTION-CALIBRATED (:func:`calibrate_beta_sd_to_
+    observed_share`) so that the SAME estimator the real measurement uses
+    (median weekly cross-sectional R^2 on a re-estimated trailing PIT
+    beta) reproduces its target share BY CONSTRUCTION -- never the
+    closed-form :func:`true_beta_sd_from_factor_share` value directly (the
+    OLD DEC-78 Entscheidung 1 construction, kept ONLY as a report-only
+    "analytic first guess", ``beta_sd_analytic_first_guess`` below,
+    stored for comparison but never fed to the simulation):
+
+      - ``"measured"``: ``rho_f = rho_f_measured``, target share =
+        ``factor_share_measured`` -- ``beta_sd`` searched.
+      - ``"stress"``: ``rho_f = stress_multiplier * rho_f_measured``,
+        target share = ``stress_multiplier * factor_share_measured`` --
+        BOTH multiplied (pre-fixed ``stress_multiplier``, default 2,
+        never itself measured; replaces DEC-75's ad hoc ``rho_f=0.2``) --
+        ``beta_sd`` searched SEPARATELY (a different target share needs
+        its OWN calibrated ``beta_sd``).
+      - ``"zero"``: ``rho_f = 0.0``, ``beta_sd`` = the SAME calibrated
+        value as ``"measured"`` (DEC-78: "'zero' bleibt", only ``rho_f``
+        changes -- no separate search).
+
+    ``rho_f_measured``/``factor_share_measured`` come from
+    :func:`factor_calibration_report` (the caller's job -- keeps this
+    function's signature independent of the calibration-measurement
+    machinery).
+
+    **Gegenprobe (DEC-78 Entscheidung 1/Nachtrag, task brief item 2,
+    LOUD, LITERAL, never caught).** After each calibration's ``beta_sd``
+    is searched, :func:`factor_share_gegenprobe` re-simulates that
+    calibration's OWN ``(rho_f, beta_sd)`` with the SAME estimator and
+    asserts the resulting factor share is within ``gegenprobe_rel_tol``
+    of that calibration's OWN target share -- expected to PASS BY
+    CONSTRUCTION now that ``beta_sd`` was searched against this exact
+    estimator; :class:`FactorShareCalibrationError` (C.14 loud fail,
+    naming both numbers) aborts the WHOLE study, and the caller
+    (:func:`prelaunch.assemble_prelaunch_report`) does NOT catch it -- a
+    failure here is a REAL BUG (a stale/inconsistent search), not an
+    accepted outcome. Both numbers are also carried through into this
+    function's own return value (``calibrations[cal]["gegenprobe"]``)."""
+    sigmas = window_sigma_f_sigma_e(window_returns, symbols, market_symbol=market_symbol)
+    sigma_f, sigma_e_used = sigmas["sigma_f"], sigmas["sigma_e_used"]
+    n_weeks, n_symbols = window_returns.shape
+
+    stress_rho_f = stress_multiplier * rho_f_measured
+    stress_share = stress_multiplier * factor_share_measured
+
+    search_measured = calibrate_beta_sd_to_observed_share(
+        factor_share_measured, rho_f=rho_f_measured, sigma_f=sigma_f, sigma_e=sigma_e_used,
+        n_weeks=n_weeks, n_symbols=n_symbols, symbols=symbols, market_symbol=market_symbol,
+        seed=seed, n_reps=calibration_search_n_reps, rel_tol=calibration_search_rel_tol,
+        max_iter=calibration_search_max_iter)
+    search_stress = calibrate_beta_sd_to_observed_share(
+        stress_share, rho_f=stress_rho_f, sigma_f=sigma_f, sigma_e=sigma_e_used,
+        n_weeks=n_weeks, n_symbols=n_symbols, symbols=symbols, market_symbol=market_symbol,
+        seed=seed, n_reps=calibration_search_n_reps, rel_tol=calibration_search_rel_tol,
+        max_iter=calibration_search_max_iter)
+    beta_sd_measured = search_measured["beta_sd_calibrated"]
+    beta_sd_stress = search_stress["beta_sd_calibrated"]
+    # Report-only analytic first guesses (never fed to the simulation) -- see
+    # true_beta_sd_from_factor_share's docstring for its demoted role.
+    analytic_measured = true_beta_sd_from_factor_share(factor_share_measured, sigma_e_used, sigma_f)
+    analytic_stress = true_beta_sd_from_factor_share(stress_share, sigma_e_used, sigma_f)
+
+    calibrations: dict[str, dict[str, Any]] = {
+        "measured": {"rho_f": rho_f_measured, "target_share": factor_share_measured,
+                     "beta_sd": beta_sd_measured, "beta_sd_analytic_first_guess": analytic_measured,
+                     "calibration_search": search_measured},
+        "stress": {"rho_f": stress_rho_f, "target_share": stress_share,
+                   "beta_sd": beta_sd_stress, "beta_sd_analytic_first_guess": analytic_stress,
+                   "calibration_search": search_stress},
+        "zero": {"rho_f": 0.0, "target_share": factor_share_measured,
+                 "beta_sd": beta_sd_measured, "beta_sd_analytic_first_guess": analytic_measured,
+                 "calibration_search": search_measured},   # "zero" reuses "measured"'s search
     }
     out: dict[str, Any] = {}
     for cal_name in FACTOR_NULL_CALIBRATIONS:
         cfg = calibrations[cal_name]
+        # Loud, LITERAL, never caught (DEC-78 Nachtrag) -- see FactorShareCalibrationError's docstring.
+        gegenprobe = factor_share_gegenprobe(
+            n_weeks, n_symbols, symbols, sigma_f=sigma_f, sigma_e=sigma_e_used,
+            rho_f=cfg["rho_f"], beta_sd=cfg["beta_sd"], target_share=cfg["target_share"],
+            market_symbol=market_symbol, n_reps=gegenprobe_n_reps, seed=seed, rel_tol=gegenprobe_rel_tol)
         methods_out: dict[str, Any] = {}
         for method in methods:
             methods_out[method] = beta_controlled_factor_null(
                 window_returns, window_alive, symbols, method=method, variants=variants,
                 convention=convention, n_reps=n_reps, seed=seed, quantile=quantile,
                 market_symbol=market_symbol, rho_f=cfg["rho_f"], drift_f=DRIFT_F_DRIFTFREE,
-                beta_pool=cfg["beta_pool"])
-        out[cal_name] = {"rho_f": cfg["rho_f"], "uses_measured_betas": cfg["beta_pool"] is not None,
-                          "methods": methods_out}
+                beta_sd=cfg["beta_sd"])
+        out[cal_name] = {
+            "rho_f": cfg["rho_f"], "beta_sd_calibrated": cfg["beta_sd"],
+            "beta_sd_analytic_first_guess": cfg["beta_sd_analytic_first_guess"],
+            "target_factor_share": cfg["target_share"], "calibration_search": cfg["calibration_search"],
+            "gegenprobe": gegenprobe, "methods": methods_out,
+        }
     return {
         "calibrations": out, "n_reps": n_reps, "seed": seed, "quantile_level": quantile,
         "methods": list(methods), "variants": list(variants),
-        "label": ("DEC-77 Entscheidung 1 (b): 3 Kalibrierungen (measured/stress/zero) x "
-                  f"{len(methods)} Beta-Kontroll-Methoden x {len(variants)} Varianten, driftfrei "
-                  "(rho_f allein erzeugt den Artefakt, DEC-77 Anlass)."),
+        "sigma_f": sigma_f, "sigma_e_used": sigma_e_used, "stress_multiplier": stress_multiplier,
+        "label": ("DEC-78 Entscheidung 1/Nachtrag: 3 Kalibrierungen (measured/stress/zero) x "
+                  f"{len(methods)} Beta-Kontroll-Methoden x {len(variants)} Varianten, driftfrei, "
+                  "beta_sd bisektionell auf den beobachteten (median-gemessenen) Faktoranteil "
+                  "kalibriert (nicht mehr die geschlossene Formel direkt -- diese bleibt als "
+                  "analytische Erstschaetzung, report-only), Gegenprobe je Kalibrierung "
+                  "bestanden (literal, ungefangen -- ein Fehlschlag ist ein echter Bug)."),
     }
 
 

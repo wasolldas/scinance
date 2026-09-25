@@ -659,6 +659,10 @@ def assemble_prelaunch_report(
     n_reps_beta_control_winner: int = 1000,
     seed: int = nulls.PERSISTENCE_NULL_SEED,
     convention: ic.Convention = "close_at_last",
+    gegenprobe_n_reps: int = 30, gegenprobe_rel_tol: float = nulls.GEGENPROBE_REL_TOL,
+    calibration_search_n_reps: int = nulls.CALIBRATION_SEARCH_N_REPS_DEFAULT,
+    calibration_search_rel_tol: float = nulls.CALIBRATION_SEARCH_REL_TOL_DEFAULT,
+    calibration_search_max_iter: int = nulls.CALIBRATION_SEARCH_MAX_ITER_DEFAULT,
 ) -> dict[str, Any]:
     """Assemble the full ``--prelaunch`` report (DEC-74 Entscheidung 2/3),
     given an ALREADY LOADED union panel (``panel`` from
@@ -678,18 +682,42 @@ def assemble_prelaunch_report(
     call is an IC). ``ic.weekly_ic_series`` itself is never called from
     this module.
 
-    **DEC-77 Entscheidung 1 (a)/(b)/(c) -- Vorlauf v4, additive.** For
-    W1/W2 (never L): the factor-null CALIBRATION (:func:`nulls.
-    factor_calibration_report` -- ``rho_f_measured``/``sigma_f`` from the
-    real BTCUSDT weekly series, ``factor_share``/beta-dispersion from the
-    real 26-week trailing PIT beta -- single-series and returns-vs-beta
-    relations ONLY, THE SEAL's allowed category), the beta-control METHOD
-    STUDY (:func:`nulls.beta_control_method_study` -- 3 calibrations x 9
-    methods x 7 variants, EVERY cell simulated-characteristic-vs-simulated-
-    outcome), the PRE-FIXED decision table (:func:`beta_control_pass_table`)
-    and, if a method passes in BOTH windows, a HIGH-REP (``n_reps_beta_
-    control_winner``) re-run of the recommended method's ``"measured"``/
-    ``"stress"`` cells for the final report table.
+    **DEC-77 Entscheidung 1 (a)/(b)/(c), revised by DEC-78 Entscheidung 1
+    and its Nachtrag -- Vorlauf v5, additive.** For W1/W2 (never L): the
+    factor-null CALIBRATION (:func:`nulls.factor_calibration_report` --
+    ``rho_f_measured``/``sigma_f`` from the real BTCUSDT weekly series,
+    ``factor_share``/beta-dispersion from the real 26-week trailing PIT
+    beta, plus DEC-78's ``beta_sd_true`` (now a report-only "analytic
+    first guess", see that field's docstring) -- single-series and
+    returns-vs-beta relations ONLY, THE SEAL's allowed category), the
+    beta-control METHOD STUDY (:func:`nulls.beta_control_method_study` --
+    3 calibrations (measured/stress/zero, DEC-78 Nachtrag's OBSERVABLE-
+    MATCHING ``beta_sd`` construction: bisection-CALIBRATED, :func:`nulls.
+    calibrate_beta_sd_to_observed_share`, each preceded by its own loud
+    Gegenprobe, expected to PASS BY CONSTRUCTION) x 6 methods
+    (:data:`nulls.BETA_CONTROL_METHODS_GRID`, DEC-78 Entscheidung 2: TS-
+    residualisation dropped from the grid) x 7 variants, EVERY cell
+    simulated-characteristic-vs-simulated-outcome), the PRE-FIXED decision
+    table (:func:`beta_control_pass_table`) and, if a method passes in
+    BOTH windows, a HIGH-REP (``n_reps_beta_control_winner``) re-run of
+    the recommended method's ``"measured"``/``"stress"`` cells for the
+    final report table. **DEC-78 Nachtrag: a Gegenprobe failure
+    (:class:`nulls.FactorShareCalibrationError`) is NOT caught here** --
+    it is now a REAL BUG (the calibration search should avoid this case
+    by construction), so it aborts the WHOLE ``--prelaunch`` run, loud,
+    exactly like every other C.14 loud fail in this package.
+    ``gegenprobe_n_reps``/``gegenprobe_rel_tol``/``calibration_search_
+    n_reps``/``calibration_search_rel_tol``/``calibration_search_
+    max_iter`` are passed straight through to :func:`nulls.beta_
+    control_method_study` (defaults match that function's own, i.e. the
+    REAL, literal 25%/10% -- ``scripts/wp13_xsec.py``'s ``--prelaunch``
+    CLI never overrides them, so a real run always uses the strict
+    defaults; a caller such as a unit test that deliberately exercises
+    this pipeline on a TINY, statistically underpowered synthetic panel
+    -- where the Gegenprobe's own sampling noise, not a real calibration
+    bug, would otherwise make it fail -- may widen ``gegenprobe_rel_tol``
+    to isolate what it is actually testing, same discipline as this
+    function's existing ``n_sims``/``n_reps_*`` knobs).
 
     **Runtime, measured, VOM ORCHESTRATOR ZU BESTAETIGEN (documented
     deviation from the task brief's own "300 reps" fallback number).** A
@@ -697,26 +725,48 @@ def assemble_prelaunch_report(
     exact code path, non-profiled) gives ~0.020s/rep-cell at ``K=100`` and
     ~0.066s/rep-cell at ``K=400``; a two-point power-law extrapolation to
     the production scale (``K~1138``, ``W~52``) gives ~0.165s per
-    (calibration, method, variant) replicate. The full grid is 3
-    calibrations x 9 methods x 7 variants = 189 cells/replicate, so 300
-    reps/cell (the task brief's own stated fallback) extrapolates to
-    ``189*300*0.165s ~= 2.6h PER WINDOW`` (~5.2h for W1+W2 together) --
-    ALREADY past the task brief's "~2h" ceiling at 300 reps on this
-    measured hardware. Profiling attributes ~68% of that cost to
-    ``characteristics.beta_characteristic``'s per-week/per-symbol Python
-    loop (called fresh, once per replicate, for every method that needs a
-    beta -- never shared across methods with the SAME trailing window
-    within one replicate, a genuine, un-implemented optimisation
-    opportunity: sharing the simulated panel/beta array across
-    same-trail-window methods within a replicate would cut this by
-    roughly a third). Given this, the DEFAULT here is 100 (not 300) --
-    ``189*100*0.165s ~= 52 min/window (~1h45 both)``, safely inside the
-    ~2h budget on hardware AT LEAST as fast as the measurement above; the
-    orchestrator can raise it via ``--n-reps-beta-control-study`` once the
-    ACTUAL runner PC's speed is known (a faster desktop may comfortably
-    afford 300-500). The winner re-run (``n_reps_beta_control_winner``,
+    (calibration, method, variant) replicate. The grid is 3 calibrations x
+    6 methods x 7 variants = 126 cells/replicate (DEC-78: down from
+    DEC-77's 189, TS-residualisation dropped), so 300 reps/cell (the task
+    brief's own stated fallback) extrapolates to ``126*300*0.165s ~=
+    1.7h PER WINDOW`` (~3.5h for W1+W2 together) -- still past the task
+    brief's "~2h" ceiling at 300 reps on this measured hardware.
+    Profiling attributes ~68% of that cost to ``characteristics.
+    beta_characteristic``'s per-week/per-symbol Python loop (called
+    fresh, once per replicate, for every method that needs a beta --
+    never shared across methods with the SAME trailing window within one
+    replicate, a genuine, un-implemented optimisation opportunity:
+    sharing the simulated panel/beta array across same-trail-window
+    methods within a replicate would cut this by roughly a third). Given
+    this, the DEFAULT here is 100 (not 300) -- ``126*100*0.165s ~= 35
+    min/window (~1h10 both)``, safely inside the ~2h budget on hardware
+    AT LEAST as fast as the measurement above; the orchestrator can raise
+    it via ``--n-reps-beta-control-study`` once the ACTUAL runner PC's
+    speed is known (a faster desktop may comfortably afford 300-500). The
+    Gegenprobe itself (``gegenprobe_n_reps``, default 30, x 3
+    calibrations) is cheap regardless -- no beta-control method involved,
+    just :func:`nulls.simulate_factor_panel` + a cross-sectional R^2. The
+    winner re-run (``n_reps_beta_control_winner``,
     default 1000, ONE method x 2 calibrations x 7 variants = 14 cells) is
     cheap regardless (~14*1000*0.165s ~= 39 min/window).
+
+    **Extra cost of the DEC-78 Nachtrag's calibration SEARCH, measured.**
+    :func:`nulls.calibrate_beta_sd_to_observed_share` runs TWICE per
+    window ("measured" + "stress"; "zero" reuses "measured"'s search, no
+    extra search), each up to ``calibration_search_max_iter`` (default
+    25) bisection iterations x ``calibration_search_n_reps`` (default 40)
+    simulate+measure reps -- ONE method cell's worth of work per
+    iteration (:func:`nulls._measure_simulated_share`, no beta-control
+    method dispatch at all, cheaper than a full grid cell). Measured on
+    this exact code path at the PRODUCTION scale (``K=1138``, ``W=53``):
+    ~0.34s/rep, and the "measured" search on the real W1 numbers
+    (rho_f=0.046, share=0.0162) converged in 4 iterations (~54s); WORST
+    CASE (25 iterations, never converging) is ``25*40*0.34s ~= 5.7 min``
+    per search, so up to ``~11.4 min/window`` (~23 min for W1+W2) added
+    to the grid's own runtime above -- typically much less (single-digit
+    iterations observed). The subsequent Gegenprobe re-verification
+    (``gegenprobe_n_reps=30``, ONE call per calibration) is the ~10s/call
+    already counted above.
     """
     # DEC-75 (8) / task brief item 8: characteristics/day-counts are built on the FULL
     # panel FIRST, then sliced to windows -- the SAME path the future run mode uses
@@ -760,16 +810,24 @@ def assemble_prelaunch_report(
             entry["factor_preserving_null"] = factor_preserving_report(
                 window, symbols, convention=convention, n_reps=n_reps_factor_null, seed=seed)
 
-            # DEC-77 Entscheidung 1 (a)/(b)/(c) -- Vorlauf v4.
+            # DEC-77 Entscheidung 1 (a)/(b)/(c), revised by DEC-78 Entscheidung 1/Nachtrag -- Vorlauf v5.
             calib = nulls.factor_calibration_report(
                 window["returns"], window["alive"], symbols, window["beta_prev_26w"],
                 market_symbol="BTCUSDT")
-            beta_pool_measured = nulls.pooled_finite_beta(window["beta_prev_26w"], window["alive"])
+            # DEC-78 Nachtrag (orchestrator decision): beta_sd is now BISECTION-CALIBRATED so the
+            # Gegenprobe passes BY CONSTRUCTION -- its own C.14 loud fail (FactorShareCalibration
+            # Error) is therefore NOT caught here any more; a failure is a real bug (a stale/
+            # inconsistent search), so it aborts the WHOLE --prelaunch run, exactly like every
+            # other loud fail in this package.
             study = nulls.beta_control_method_study(
                 window["returns"], window["alive"], symbols,
                 rho_f_measured=calib["market_factor"]["rho_f_measured"],
-                beta_pool_measured=beta_pool_measured, convention=convention,
-                n_reps=n_reps_beta_control_study, seed=seed)
+                factor_share_measured=calib["factor_share"]["factor_share_median"],
+                convention=convention, n_reps=n_reps_beta_control_study, seed=seed,
+                gegenprobe_n_reps=gegenprobe_n_reps, gegenprobe_rel_tol=gegenprobe_rel_tol,
+                calibration_search_n_reps=calibration_search_n_reps,
+                calibration_search_rel_tol=calibration_search_rel_tol,
+                calibration_search_max_iter=calibration_search_max_iter)
             decision = beta_control_pass_table(
                 study, floor=e_floor, w_judged=w_judged,
                 pure_noise_ceiling=entry["selection_ceiling_measured"]["ceiling_ic_mean"])
@@ -798,15 +856,16 @@ def assemble_prelaunch_report(
                 continue
             window = slice_window(weeks, *WINDOWS[wn], returns, alive, vol_rv, turnover_trail, day_count,
                                    beta_prev_26w)
-            calib = w["factor_calibration"]
-            beta_pool_measured = nulls.pooled_finite_beta(window["beta_prev_26w"], window["alive"])
+            # DEC-78 Entscheidung 1/Nachtrag: reuse the STUDY's own (rho_f, beta_sd_calibrated)
+            # per calibration -- never a fresh re-derivation/re-search -- so the winner re-run is
+            # EXACTLY the same calibration the grid/decision table already validated (Gegenprobe
+            # included).
             high_rep = {
                 cal: nulls.beta_controlled_factor_null(
                     window["returns"], window["alive"], symbols, method=best, convention=convention,
                     n_reps=n_reps_beta_control_winner, seed=seed,
-                    rho_f=(calib["market_factor"]["rho_f_measured"] if cal == "measured" else 0.2),
-                    drift_f=nulls.DRIFT_F_DRIFTFREE,
-                    beta_pool=(beta_pool_measured if cal in ("measured", "zero") else None))
+                    rho_f=study["calibrations"][cal]["rho_f"], drift_f=nulls.DRIFT_F_DRIFTFREE,
+                    beta_sd=study["calibrations"][cal]["beta_sd_calibrated"])
                 for cal in ("measured", "stress")
             }
             w["beta_control_recommended_high_rep"] = high_rep
@@ -851,12 +910,14 @@ def _fmt5(v: float | None) -> str:
 
 
 def _beta_control_calibration_markdown(w: dict[str, Any]) -> list[str]:
-    """DEC-77 Entscheidung 1/task brief item 7: ONE window's calibration
-    block (``rho_f_measured``, ``sigma_f``, ``factor_share``, beta
-    quantiles, the analytic mechanical-momentum plausibility line) plus
-    the PASS/FAIL table (rows = methods, columns = measured/stress null
-    mean + ceiling + PASS/FAIL). ``[]`` if this window has no DEC-77 data
-    (older artifact, or L)."""
+    """DEC-77 Entscheidung 1/task brief item 7, extended by DEC-78
+    Entscheidung 1: ONE window's calibration block (``rho_f_measured``,
+    ``sigma_f``, ``factor_share``, beta quantiles, the analytic
+    mechanical-momentum plausibility line, DEC-78's ``beta_sd_true``) plus
+    the per-calibration Gegenprobe table and the PASS/FAIL method table
+    (rows = methods, columns = measured/stress null mean + ceiling +
+    PASS/FAIL). ``[]`` if this window has no DEC-77/78 data (older
+    artifact, or L)."""
     if "factor_calibration" not in w:
         return []
     lines: list[str] = []
@@ -868,17 +929,42 @@ def _beta_control_calibration_markdown(w: dict[str, Any]) -> list[str]:
                  f"rho_f_gemessen={mkt['rho_f_measured']:.4f}, sigma_f={mkt['sigma_f']:.5f} "
                  f"(n={mkt['n_weeks_used']} Wochen); Faktoranteil (Median Querschnitts-R^2)="
                  f"{share['factor_share_median']:.4f} (n={share['n_weeks_used']} Wochen); "
-                 f"Beta-Dispersion: SD={disp.get('sd', float('nan')):.4f}, "
+                 f"Beta-Dispersion (PIT-Pool, ueberwiegend Schaetzrauschen -- DEC-78 Befund): "
+                 f"SD={disp.get('sd', float('nan')):.4f}, "
                  f"Quantile[0.05/0.25/0.5/0.75/0.95]="
                  f"[{q.get('0.05', float('nan')):.3f}/{q.get('0.25', float('nan')):.3f}/"
                  f"{q.get('0.5', float('nan')):.3f}/{q.get('0.75', float('nan')):.3f}/"
                  f"{q.get('0.95', float('nan')):.3f}] (n_gepoolt={disp.get('n_pooled', 0)})")
     lines.append(f"  - {mom['label']} {mom['formula']} = {_fmt5(mom['value'])}")
+    bst = calib.get("beta_sd_true", {})
+    if bst:
+        lines.append(f"  - {bst['label']} {bst['formula']} = {_fmt5(bst['value'])}")
+
+    study = w.get("beta_control_method_study")
+    if study is not None and "calibrations" in study:
+        lines.append("")
+        lines.append("| Kalibrierung | rho_f | beta_sd (analyt. Erstschaetzung) | "
+                      "beta_sd (kalibriert) | Ziel-Faktoranteil | erreichter Faktoranteil "
+                      "(Suche) | wahrer Faktoranteil (Suche) | Iterationen | konvergiert | "
+                      "Gegenprobe simuliert | Gegenprobe rel. Abw. | Gegenprobe |")
+        lines.append("|---|---|---|---|---|---|---|---|---|---|---|---|")
+        for cal in ("measured", "stress", "zero"):
+            c = study["calibrations"][cal]
+            g = c["gegenprobe"]
+            s = c["calibration_search"]
+            lines.append(
+                f"| {cal} | {_fmt5(c['rho_f'])} | {_fmt5(c['beta_sd_analytic_first_guess'])} | "
+                f"{_fmt5(c['beta_sd_calibrated'])} | {_fmt5(c['target_factor_share'])} | "
+                f"{_fmt5(s['achieved_share'])} | {_fmt5(s['true_share'])} | {s['n_iter']} | "
+                f"{'ja' if s['converged'] else 'nein'} | "
+                f"{_fmt5(g['simulated_factor_share'])} | {_fmt5(g['rel_diff'])} | "
+                f"{'OK' if g['ok'] else 'FAIL'} |")
+        lines.append("")
 
     if "beta_control_decision" in w:
         dec = w["beta_control_decision"]
-        lines.append(f"- Beta-Kontroll-Kriterium: |Null-Mittel| <= {dec['null_mean_bound']:.5f} UND "
-                     f"Decke <= {dec['ceiling_bound']:.5f} (measured UND stress)")
+        lines.append(f"- Beta-Kontroll-Kriterium: |Null-Mittel| <= {_fmt5(dec['null_mean_bound'])} UND "
+                     f"Decke <= {_fmt5(dec['ceiling_bound'])} (measured UND stress)")
         lines.append("")
         lines.append("| Methode | measured Null-Mittel | measured Decke | stress Null-Mittel | "
                      "stress Decke | PASS |")

@@ -598,6 +598,44 @@ def test_run_full_null_calibration_report_present_and_matches_recomputation(tmp_
     assert h28["res_quantile_drifting"] == pytest.approx(nc["W1"]["res_quantile_drifting_recomputed"]["mom1"])
 
 
+def test_run_full_calibration_block_derives_stress_null(tmp_path):
+    """DEC-78 Entscheidung 1/Nachtrag: a registered YAML WITH a
+    ``calibration`` block reads the "stress" null's ``rho_f``/
+    ``beta_sd_calibrated`` DIRECTLY from ``calibration.stress`` -- NO
+    re-search/re-derivation at run time -- never the old hardcoded
+    ``rho_f=0.2``/``U(0.5, 2.0)`` beta -- echoed in the report's
+    ``calibration_used_for_stress_null``."""
+    panel, weekly = _build_run_fixture_tree_large(tmp_path)
+    registered = _registered_for_large_fixture()
+    registered["calibration"] = {
+        "sigma_f": 0.06, "sigma_e": 0.05, "stress_multiplier": 2.0,
+        "measured": {"rho_f": 0.05, "factor_share": 0.02,
+                     "beta_sd_calibrated": 0.09, "beta_sd_analytic_first_guess": 0.08},
+        "stress": {"rho_f": 0.10, "factor_share": 0.04,
+                   "beta_sd_calibrated": 0.135, "beta_sd_analytic_first_guess": 0.12},
+    }
+    report = run_mod.run_full(panel, weekly, registered)
+    used = report["calibration_used_for_stress_null"]
+    assert used["rho_f"] == pytest.approx(0.10)
+    assert used["beta_sd_calibrated"] == pytest.approx(0.135)
+    assert "registered.calibration.stress" in used["source"]
+
+
+def test_run_full_without_calibration_block_falls_back_to_old_stress_null(tmp_path):
+    """A pre-DEC-78 registered file (no ``calibration`` key) falls back to
+    the OLD hardcoded stress null (``rho_f=0.2``, ``beta_sd_calibrated=
+    None`` -> ``U(0.5, 2.0)``), documented, not a registered Drittfassung
+    run."""
+    panel, weekly = _build_run_fixture_tree_large(tmp_path)
+    registered = _registered_for_large_fixture()
+    assert "calibration" not in registered
+    report = run_mod.run_full(panel, weekly, registered)
+    used = report["calibration_used_for_stress_null"]
+    assert used["rho_f"] == pytest.approx(0.2)
+    assert used["beta_sd_calibrated"] is None
+    assert "pre-DEC-78" in used["source"]
+
+
 def test_run_full_uses_frozen_registered_null_constants_within_tolerance(tmp_path):
     """A registered YAML that DOES carry ``res_quantile_drifting``/
     ``ceiling_driftfree_res`` (values within tolerance of what the run's
@@ -658,9 +696,12 @@ def test_cli_emit_registered_template_writes_yaml_skeleton_from_prelaunch_artifa
     from tests.unit.test_wp13_xsec import _build_prelaunch_fixture_tree
 
     panel, weekly, _sb, _sm, _db, del_manifest, dd_path = _build_prelaunch_fixture_tree(tmp_path)
+    # DEC-78 Nachtrag: gegenprobe_rel_tol widened -- see test_wp13_xsec.py's CLI e2e test
+    # comment (this fixture's small K is too statistically underpowered for the strict default).
     prelaunch_report = prelaunch_mod.assemble_prelaunch_report(
         panel, weekly, delisted_manifest_path=del_manifest, delisting_dates_path=dd_path,
-        n_sims=5, n_reps_factor_null=5, n_reps_beta_control_study=5, n_reps_beta_control_winner=5, seed=53)
+        n_sims=5, n_reps_factor_null=5, n_reps_beta_control_study=5, n_reps_beta_control_winner=5, seed=53,
+        gegenprobe_rel_tol=10.0, calibration_search_n_reps=5, calibration_search_max_iter=8)
     artifacts = prelaunch_mod.write_prelaunch_artifacts(tmp_path / "prelaunch_out", prelaunch_report)
     prelaunch_json = artifacts["artifacts"]["wp13a_prelaunch_json"]["path"]
 
@@ -683,6 +724,21 @@ def test_cli_emit_registered_template_writes_yaml_skeleton_from_prelaunch_artifa
     assert loaded["beta_control"] == {"method": "", "beta_window_weeks": None}
     with pytest.raises(ValueError, match="beta_control"):
         run_mod.run_full({"symbols": []}, {"weeks": [], "returns": None, "alive": None}, loaded)
+    # DEC-78 Entscheidung 1/Nachtrag: calibration is a SINGLE global block, taken from W1's
+    # beta_control_method_study only (the enlarged >= 10-survivor fixture makes it FINITE),
+    # nested measured/stress sub-blocks (run.py reads calibration.stress.* directly).
+    assert "calibration" in loaded
+    calib = loaded["calibration"]
+    for key in ("sigma_f", "sigma_e", "stress_multiplier", "measured", "stress"):
+        assert key in calib
+    assert calib["stress_multiplier"] == pytest.approx(2.0)
+    for sub in ("measured", "stress"):
+        for key in ("rho_f", "factor_share", "beta_sd_calibrated", "beta_sd_analytic_first_guess"):
+            assert key in calib[sub]
+    if calib["measured"]["rho_f"] is not None:   # finite calibration (usual case on this fixture)
+        assert math.isfinite(calib["measured"]["rho_f"])
+        assert math.isfinite(calib["stress"]["beta_sd_calibrated"])
+        assert calib["stress"]["rho_f"] == pytest.approx(2.0 * calib["measured"]["rho_f"])
 
 
 def test_cli_emit_registered_template_missing_input_file_is_loud_fail(tmp_path):

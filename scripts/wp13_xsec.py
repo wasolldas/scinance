@@ -42,6 +42,20 @@ Entscheidung 1), mit STARTSPERRE (siehe ``cmd_run``'s Docstring). Die
     beta_control:
       method: <einer der 9 ic.BETA_CONTROL_METHODS-Namen>   # DEC-77 Entscheidung 2, PFLICHT, nicht leer
       beta_window_weeks: <int|null>                          # muss zu 'method' passen, sonst loud fail
+    calibration:                                              # DEC-78 Entscheidung 1/Nachtrag, OPTIONAL*
+      sigma_f: <float>            # gemessene BTC-Wochenvol (W1)
+      sigma_e: <float>            # gemessene idiosynkratische Wochenvol (W1)
+      stress_multiplier: 2.0      # vorab, nie selbst gemessen
+      measured:
+        rho_f: <float>                        # gemessenes rho_f (BTC-Wochenautokorrelation, W1)
+        factor_share: <float>                 # gemessener Faktoranteil (Median Querschnitts-R^2, W1)
+        beta_sd_calibrated: <float>            # bisektionell kalibriert (nulls.calibrate_beta_sd_to_observed_share)
+        beta_sd_analytic_first_guess: <float>  # geschlossene Formel, report-only (nulls.true_beta_sd_from_factor_share)
+      stress:
+        rho_f: <float>                        # 2x measured.rho_f
+        factor_share: <float>                 # 2x measured.factor_share
+        beta_sd_calibrated: <float>            # EIGENE Kalibrierungssuche (anderes Ziel)
+        beta_sd_analytic_first_guess: <float>
     rules:
       seed: 53
       n_reps: 1000            # bootstrap/permutation/factor-null reps, >= 1000 (DEC-75/76)
@@ -59,15 +73,33 @@ Entscheidung 1), mit STARTSPERRE (siehe ``cmd_run``'s Docstring). Die
     file) skips the assertion and falls back to the recomputed value,
     documented, not a registered Drittfassung run.
 
+  * ``calibration`` (DEC-78 Entscheidung 1, revised by its Nachtrag)
+    supplies the "stress" null's ``rho_f``/``beta_sd`` for THAT
+    recomputation, READ DIRECTLY, NO re-search at run time:
+    ``rho_f = calibration.stress.rho_f``, ``beta_sd = calibration.
+    stress.beta_sd_calibrated`` -- ONE global pair (from the prelaunch
+    artifact's own bisection search, ``nulls.calibrate_beta_sd_to_
+    observed_share``), applied identically to BOTH W1 and W2 (same
+    convention as DEC-75's own single global ``rho_f=0.2``). Omitting it
+    (a pre-DEC-78 registered file) falls back to that OLD hardcoded
+    stress null (``rho_f=0.2``, beta ~ ``U(0.5, 2.0)``), documented, not
+    a registered Drittfassung run -- the pair actually used is echoed in
+    the run report's ``calibration_used_for_stress_null``.
+
   python scripts/wp13_xsec.py --emit-registered-template \
       scinance3-impl/state/wp13a_YYYYMMDD/wp13a_prelaunch.json \
       scinance3-impl/state/wp13a_YYYYMMDD/registered_template.yaml
 
-liest EINEN ``--prelaunch``-Artefakt (DEC-76 Vorlauf v3 oder spaeter) und
+liest EINEN ``--prelaunch``-Artefakt (DEC-78 Vorlauf v5 oder spaeter) und
 schreibt genau das obige YAML-Skelett (``ic_min_capped``, ``w_judged``,
 ``res_quantile_drifting`` aus ``factor_preserving_null.drifting``,
-``ceiling_driftfree_res`` aus ``factor_preserving_null.driftfree``, plus
-``rules``) fuer W1/W2 -- die Drittfassung zitiert den sha256 dieser
+``ceiling_driftfree_res`` aus ``factor_preserving_null.driftfree``,
+``calibration`` aus W1's ``beta_control_method_study.calibrations.
+{measured, stress}`` (DEC-78 Entscheidung 1/Nachtrag, ein EINZELNER
+globaler Satz fuer beide Fenster, ``beta_sd_calibrated`` = die eigene
+Bisektions-Suche des Vorlaufs, NIE hier neu berechnet, siehe ``run.
+REGISTERED_SCHEMA_HINT``), plus ``rules``) fuer W1/W2 -- die Drittfassung
+zitiert den sha256 dieser
 Ausgabedatei (geloggt) als ihren ``--registered-sha256``-Wert. Die
 ``hypotheses``-Zuordnung (welche Variante zu H-28/H-29/H-30 gehoert) ist
 NICHT im Vorlauf enthalten und wird als PRD-5.3-Standardbelegung
@@ -88,7 +120,7 @@ import yaml
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
 from bybit_edge.research.wp7_universe import panel_load, panel_store  # noqa: E402
-from bybit_edge.research.wp13_xsec import characteristics, prelaunch, run as run_mod  # noqa: E402
+from bybit_edge.research.wp13_xsec import characteristics, nulls, prelaunch, run as run_mod  # noqa: E402
 
 
 def log(msg: str) -> None:
@@ -138,7 +170,11 @@ def cmd_prelaunch(a: argparse.Namespace) -> int:
         n_sims=a.n_sims, n_reps_factor_null=a.n_reps_factor_null,
         n_reps_beta_control_study=a.n_reps_beta_control_study,
         n_reps_beta_control_winner=a.n_reps_beta_control_winner,
-        seed=a.seed, convention=a.convention)
+        seed=a.seed, convention=a.convention,
+        gegenprobe_n_reps=a.gegenprobe_n_reps, gegenprobe_rel_tol=a.gegenprobe_rel_tol,
+        calibration_search_n_reps=a.calibration_search_n_reps,
+        calibration_search_rel_tol=a.calibration_search_rel_tol,
+        calibration_search_max_iter=a.calibration_search_max_iter)
 
     for name in ("W1", "W2", "L"):
         w = report["windows"].get(name, {})
@@ -232,17 +268,25 @@ def cmd_run(a: argparse.Namespace) -> int:
 
 
 def cmd_emit_registered_template(prelaunch_json_path: str, out_yaml_path: str) -> int:
-    """DEC-76 Task A item 4: reads a ``--prelaunch`` artifact (DEC-76
-    Vorlauf v3 or later -- needs ``factor_preserving_null.{drifting,
-    driftfree}``) and writes the registered-YAML SKELETON
-    (``run.REGISTERED_SCHEMA_HINT``'s shape) -- ``ic_min_capped``/
-    ``w_judged`` from ``noise_floor_and_threshold``, ``res_quantile_
-    drifting`` from ``factor_preserving_null.drifting.variants.<v>.
-    quantile_one_sided_residualized``, ``ceiling_driftfree_res`` from
-    ``factor_preserving_null.driftfree.selection_ceiling_mean_of_max_
-    residualized`` -- for W1/W2. Never registers anything itself (no
-    sha256 check here) -- the Orchestrator reviews the written file, then
-    cites ITS sha256 (logged below) in the Drittfassung."""
+    """DEC-76 Task A item 4, extended by DEC-78 Entscheidung 1/Nachtrag:
+    reads a ``--prelaunch`` artifact (DEC-76 Vorlauf v3 or later -- needs
+    ``factor_preserving_null.{drifting, driftfree}``) and writes the
+    registered-YAML SKELETON (``run.REGISTERED_SCHEMA_HINT``'s shape) --
+    ``ic_min_capped``/``w_judged`` from ``noise_floor_and_threshold``,
+    ``res_quantile_drifting`` from ``factor_preserving_null.drifting.
+    variants.<v>.quantile_one_sided_residualized``, ``ceiling_driftfree_
+    res`` from ``factor_preserving_null.driftfree.selection_ceiling_mean_
+    of_max_residualized`` -- for W1/W2. ``calibration`` (DEC-78
+    Entscheidung 1/Nachtrag) is taken from W1's ``beta_control_method_
+    study.calibrations.{measured, stress}`` ONLY (a SINGLE global block,
+    applied identically to both windows' stress-null recomputation, the
+    same single-global-constant convention DEC-75's own ``rho_f=0.2``
+    used) -- ``beta_sd_calibrated`` is the artifact's OWN bisection-
+    search result (never re-derived here); ``{}`` if the artifact
+    predates DEC-78/its Nachtrag or W1 is unavailable. Never registers
+    anything itself (no sha256 check here) -- the Orchestrator reviews
+    the written file, then cites ITS sha256 (logged below) in the
+    Drittfassung."""
     in_path = Path(prelaunch_json_path)
     out_path_check = Path(out_yaml_path)
     if "data/harvest" in out_path_check.as_posix():
@@ -279,6 +323,30 @@ def cmd_emit_registered_template(prelaunch_json_path: str, out_yaml_path: str) -
         if wl.get("available") and "start" in wl and "end" in wl:
             windows_out["L"] = {"start": wl["start"], "end": wl["end"]}
 
+    # DEC-78 Entscheidung 1/Nachtrag: the SINGLE global calibration block, taken from W1's
+    # beta_control_method_study.calibrations.{measured, stress} only -- {} (never a fabricated
+    # value) if the artifact predates DEC-78/its Nachtrag or W1 is unavailable; run.py's
+    # calibration_cfg check treats {} the same as an absent key (falls back to the pre-DEC-78
+    # hardcoded stress null, documented). beta_sd_calibrated is the artifact's OWN bisection
+    # search result -- NEVER re-derived/re-searched here.
+    calibration_block: dict = {}
+    w1 = report.get("windows", {}).get("W1")
+    if w1 and w1.get("available") and "beta_control_method_study" in w1:
+        study = w1["beta_control_method_study"]
+        cals = study.get("calibrations", {})
+        if "measured" in cals and "stress" in cals:
+            def _cal_block(c: dict) -> dict:
+                return {
+                    "rho_f": c.get("rho_f"), "factor_share": c.get("target_factor_share"),
+                    "beta_sd_calibrated": c.get("beta_sd_calibrated"),
+                    "beta_sd_analytic_first_guess": c.get("beta_sd_analytic_first_guess"),
+                }
+            calibration_block = {
+                "sigma_f": study.get("sigma_f"), "sigma_e": study.get("sigma_e_used"),
+                "stress_multiplier": study.get("stress_multiplier", 2.0),
+                "measured": _cal_block(cals["measured"]), "stress": _cal_block(cals["stress"]),
+            }
+
     # DEC-77 Entscheidung 2: beta_control.method/beta_window_weeks are EMPTY (never
     # auto-filled from the prelaunch artifact's own recommendation) -- the orchestrator
     # must read the artifact's beta_control_recommendation and fill these in deliberately;
@@ -293,6 +361,7 @@ def cmd_emit_registered_template(prelaunch_json_path: str, out_yaml_path: str) -
         },
         "windows": windows_out,
         "beta_control": {"method": "", "beta_window_weeks": None},
+        "calibration": calibration_block,
         "rules": {"seed": 53, "n_reps": 1000, "block_len": 4, "level": 0.9936, "bh_alpha": 0.10},
     }
 
@@ -361,6 +430,21 @@ def main() -> int:
                      help="DEC-77 Entscheidung 1 (b): Replikate fuer den erneuten Lauf der "
                           "EMPFOHLENEN Methode allein (measured/stress), fuer die finale "
                           "Tabelle -- >= 1.000.")
+    ap.add_argument("--gegenprobe-n-reps", type=int, default=30,
+                     help="DEC-78 Entscheidung 1/Nachtrag: Replikate je Gegenprobe-Aufruf "
+                          "(eine je Kalibrierung) -- Default 30, literal, wie spezifiziert.")
+    ap.add_argument("--gegenprobe-rel-tol", type=float, default=nulls.GEGENPROBE_REL_TOL,
+                     help="DEC-78 Entscheidung 1/Nachtrag: Toleranz der Gegenprobe -- Default "
+                          "0,25 (literal). NUR fuer Tests auf kleinen synthetischen Panels "
+                          "lockern; ein echter Lauf soll den strikten Default behalten.")
+    ap.add_argument("--calibration-search-n-reps", type=int, default=nulls.CALIBRATION_SEARCH_N_REPS_DEFAULT,
+                     help="DEC-78 Nachtrag: Replikate je Bisektions-Iteration der beta_sd-Suche "
+                          "-- Default 40.")
+    ap.add_argument("--calibration-search-rel-tol", type=float, default=nulls.CALIBRATION_SEARCH_REL_TOL_DEFAULT,
+                     help="DEC-78 Nachtrag: Konvergenz-Toleranz der beta_sd-Suche -- Default 0,10.")
+    ap.add_argument("--calibration-search-max-iter", type=int, default=nulls.CALIBRATION_SEARCH_MAX_ITER_DEFAULT,
+                     help="DEC-78 Nachtrag: maximale Bisektions-Iterationen der beta_sd-Suche "
+                          "-- Default 25.")
     ap.add_argument("--convention", default="close_at_last", choices=["drop", "close_at_last"],
                      help="Delisting-Konvention (DEC-74 (i): close_at_last ist urteilstragend).")
     ap.add_argument("--allow-partial", action="store_true")

@@ -307,18 +307,23 @@ def test_persistence_null_determinism_same_seed():
 # ============================================================================
 
 def _build_prelaunch_fixture_tree(tmp_path: Path):
-    """3 survivors + 1 delisted symbol spanning 2021-01-01..2026-06-30
-    (covers L, W1 and W2) -- small enough to run the full
-    ``assemble_prelaunch_report`` pipeline (small ``n_sims``) in a unit
-    test, reusing ``test_wp12b_delisted_panel``'s fixture-tree writers
-    instead of a parallel implementation."""
+    """11 survivors + BTCUSDT + 1 delisted symbol spanning
+    2021-01-01..2026-06-30 (covers L, W1 and W2) -- small enough to run
+    the full ``assemble_prelaunch_report`` pipeline (small ``n_sims``) in
+    a unit test, reusing ``test_wp12b_delisted_panel``'s fixture-tree
+    writers instead of a parallel implementation. >= 10 SURVIVOR symbols
+    (DEC-78: the Gegenprobe/factor-share machinery needs >= min_universe
+    =10 alive symbols per week to produce a FINITE calibration -- same
+    reason ``test_wp13_run.py``'s ``_build_run_fixture_tree_large``
+    exists; the old 3-survivor fixture left every calibration NaN)."""
     surv_base = tmp_path / "panel_1d"
     surv_manifest = surv_base / "panel_manifest.sqlite"
     del_base = tmp_path / "panel_1d_delisted"
     del_manifest = del_base / "panel_manifest.sqlite"
 
     full_start, full_end = date(2021, 1, 1), date(2026, 6, 30)
-    for i, sym in enumerate(["AAAUSDT", "BTCUSDT", "ZZZUSDT"]):
+    survivors = ["BTCUSDT"] + [f"SYM{i:02d}USDT" for i in range(11)]
+    for i, sym in enumerate(survivors):
         _write_full_history(surv_base, surv_manifest, sym,
                              _closes(full_start, full_end, seed=i + 1), as_of_date=full_end)
 
@@ -355,9 +360,13 @@ def test_seal_prelaunch_never_calls_ic_with_real_returns(tmp_path, monkeypatch):
 
     monkeypatch.setattr(ic, "weekly_ic_series", spy)
 
+    # DEC-78 Nachtrag: gegenprobe_rel_tol widened -- this fixture's tiny (12-symbol) panel is
+    # too statistically underpowered for the Gegenprobe's own sampling noise (see the CLI e2e
+    # test's comment); this test's OWN purpose (THE SEAL) is unaffected either way.
     report = prelaunch.assemble_prelaunch_report(
         panel, weekly, delisted_manifest_path=del_manifest, delisting_dates_path=dd_path,
-        n_sims=5, n_reps_factor_null=5, n_reps_beta_control_study=5, n_reps_beta_control_winner=5, seed=53)
+        n_sims=5, n_reps_factor_null=5, n_reps_beta_control_study=5, n_reps_beta_control_winner=5, seed=53,
+        gegenprobe_rel_tol=10.0, calibration_search_n_reps=5, calibration_search_max_iter=8)
     assert report["windows"]["W1"]["available"]
 
     assert calls, "expected ic.weekly_ic_series to be called by the persistence null"
@@ -382,7 +391,8 @@ def test_seal_prelaunch_report_json_no_real_ic_key(tmp_path):
     panel, weekly, _sb, _sm, _db, del_manifest, dd_path = _build_prelaunch_fixture_tree(tmp_path)
     report = prelaunch.assemble_prelaunch_report(
         panel, weekly, delisted_manifest_path=del_manifest, delisting_dates_path=dd_path,
-        n_sims=5, n_reps_factor_null=5, n_reps_beta_control_study=5, n_reps_beta_control_winner=5, seed=53)
+        n_sims=5, n_reps_factor_null=5, n_reps_beta_control_study=5, n_reps_beta_control_winner=5, seed=53,
+        gegenprobe_rel_tol=10.0, calibration_search_n_reps=5, calibration_search_max_iter=8)
     artifacts = prelaunch.write_prelaunch_artifacts(tmp_path / "out", report)
     payload = __import__("json").loads(
         Path(artifacts["artifacts"]["wp13a_prelaunch_json"]["path"]).read_text(encoding="utf-8"))
@@ -397,6 +407,13 @@ def test_seal_prelaunch_report_json_no_real_ic_key(tmp_path):
     mean_ic_keys = [k for k in _walk_keys(payload) if k.rsplit("/", 1)[-1] == "mean_ic"]
     assert not mean_ic_keys, mean_ic_keys
 
+    # DEC-78 Entscheidung 1, seal extension: the new beta_sd_true/Gegenprobe fields are
+    # wired through this SAME seal-tested --prelaunch path (never real-outcome-derived --
+    # the regex/mean_ic checks above already cover them, this just confirms they are
+    # actually present, not silently skipped).
+    assert any(k.endswith("/beta_sd_true") for k in _walk_keys(payload))
+    assert any(k.endswith("/gegenprobe") or k.endswith("/gegenprobe_error") for k in _walk_keys(payload))
+
 
 # ============================================================================
 # end-to-end --prelaunch CLI on a synthetic union tree
@@ -408,6 +425,13 @@ def _ns_prelaunch(**overrides) -> argparse.Namespace:
         start_year=2021, end_year=2026, as_of="2027-01-01", out="",
         seed=53, n_sims=5, n_reps_factor_null=5,
         n_reps_beta_control_study=5, n_reps_beta_control_winner=5,
+        # DEC-78 Nachtrag: strict/literal defaults (match nulls.py's own) unless a test
+        # overrides them -- e.g. for a small synthetic panel too statistically underpowered
+        # for the Gegenprobe's own sampling noise, never for a real run.
+        gegenprobe_n_reps=30, gegenprobe_rel_tol=nulls.GEGENPROBE_REL_TOL,
+        calibration_search_n_reps=nulls.CALIBRATION_SEARCH_N_REPS_DEFAULT,
+        calibration_search_rel_tol=nulls.CALIBRATION_SEARCH_REL_TOL_DEFAULT,
+        calibration_search_max_iter=nulls.CALIBRATION_SEARCH_MAX_ITER_DEFAULT,
         convention="close_at_last", allow_partial=False,
         stress_rel="scinance3-impl/state/wp10_stress_canon/stress_rel.json",
         stress_abs="scinance3-impl/state/wp10_stress_canon/stress_abs.json",
@@ -847,7 +871,15 @@ def test_cli_prelaunch_end_to_end_synthetic_union_tree(tmp_path):
     _panel, _weekly, surv_base, surv_manifest, del_base, del_manifest, _dd = \
         _build_prelaunch_fixture_tree(tmp_path)
     out_dir = tmp_path / "out"
-    ns = _ns_prelaunch(panel_base=str(surv_base), delisted_base=str(del_base), out=str(out_dir))
+    # DEC-78 Nachtrag: this fixture's tiny (12-symbol) panel is far too statistically
+    # underpowered for the Gegenprobe's own sampling noise (verified: the search does not
+    # reliably converge at this K) -- this test exercises the CLI/pipeline WIRING, not the
+    # calibration search's statistical quality (that is exercised, at a realistic K, by the
+    # dedicated nulls.py tests), so it widens the tolerance/keeps the search cheap. A REAL run
+    # (scripts/wp13_xsec.py's own CLI defaults) never does this.
+    ns = _ns_prelaunch(panel_base=str(surv_base), delisted_base=str(del_base), out=str(out_dir),
+                        gegenprobe_rel_tol=10.0, calibration_search_n_reps=5,
+                        calibration_search_max_iter=8)
 
     rc = WP13.cmd_prelaunch(ns)
     assert rc == 0
@@ -862,15 +894,24 @@ def test_cli_prelaunch_end_to_end_synthetic_union_tree(tmp_path):
     assert payload["windows"]["W1"]["delisting"]["n_symbol_weeks_delisting"] >= 1
     assert payload["reversal_gap_design_deviation"]
     assert payload["selection_ceiling_scale_factor_interpretation"]
-    # DEC-77 Entscheidung 1 -- Vorlauf v4: the calibration table is present for both
-    # judged windows (never for L), with the decision table and recommendation attached.
+    # DEC-77 Entscheidung 1, revised by DEC-78 Entscheidung 1/Nachtrag -- Vorlauf v5: the
+    # calibration block/decision table/full method-study grid is present for both judged
+    # windows (never for L) -- the Gegenprobe is EXPECTED to pass (by construction, since
+    # beta_sd is bisection-calibrated) and is never caught any more, so this either completes
+    # with the full shape or the test itself fails loud (a real bug, per the Nachtrag).
     for wn in ("W1", "W2"):
         w1 = payload["windows"][wn]
         assert "factor_calibration" in w1 and "beta_control_method_study" in w1
         assert "beta_control_decision" in w1
-        assert set(w1["beta_control_method_study"]["calibrations"].keys()) == set(nulls.FACTOR_NULL_CALIBRATIONS)
-        assert set(w1["beta_control_method_study"]["methods"]) == set(ic.BETA_CONTROL_METHODS)
-        assert len(w1["beta_control_decision"]["rows"]) == len(ic.BETA_CONTROL_METHODS)
+        assert "beta_sd_true" in w1["factor_calibration"]
+        study = w1["beta_control_method_study"]
+        assert set(study["calibrations"].keys()) == set(nulls.FACTOR_NULL_CALIBRATIONS)
+        assert set(study["methods"]) == set(nulls.BETA_CONTROL_METHODS_GRID)
+        assert len(w1["beta_control_decision"]["rows"]) == len(nulls.BETA_CONTROL_METHODS_GRID)
+        for cal in nulls.FACTOR_NULL_CALIBRATIONS:
+            c = study["calibrations"][cal]
+            assert "gegenprobe" in c and c["gegenprobe"]["ok"] is True
+            assert "calibration_search" in c
     assert "beta_control_recommendation" in payload
 
 
@@ -1086,9 +1127,215 @@ def test_factor_calibration_report_assembles_all_three_plus_analytic_line():
                                                                  trail_win=26)
     report = nulls.factor_calibration_report(returns, alive, symbols, beta_prev, market_symbol="BTCUSDT")
     assert set(report.keys()) >= {"market_factor", "factor_share", "beta_dispersion",
-                                    "analytic_mechanical_momentum", "beta_trail_weeks"}
+                                    "analytic_mechanical_momentum", "beta_trail_weeks",
+                                    "sigma_e_used", "beta_sd_true"}
     assert report["beta_trail_weeks"] == 26
     assert "KEIN Verdikt" in report["analytic_mechanical_momentum"]["label"]
+    assert "DEC-78" in report["beta_sd_true"]["label"]
+
+
+# ============================================================================
+# DEC-78 Entscheidung 1 -- Vorlauf v5: true_beta_sd_from_factor_share +
+# the Gegenprobe (nulls.py, pure)
+# ============================================================================
+
+def test_true_beta_sd_from_factor_share_formula_and_guards():
+    # sqrt(0.0162/0.9838) * 0.057/0.0669 -- DEC-78 "Anlass", W1 numbers, verbatim.
+    beta_sd = nulls.true_beta_sd_from_factor_share(0.0162, 0.057, 0.0669)
+    assert beta_sd == pytest.approx(0.109, abs=0.002)
+    assert nulls.true_beta_sd_from_factor_share(0.0, 0.05, 0.05) == pytest.approx(0.0)
+    # guards: NaN/non-finite/degenerate inputs never fabricate a value.
+    assert math.isnan(nulls.true_beta_sd_from_factor_share(float("nan"), 0.05, 0.05))
+    assert math.isnan(nulls.true_beta_sd_from_factor_share(0.1, float("nan"), 0.05))
+    assert math.isnan(nulls.true_beta_sd_from_factor_share(0.1, 0.05, 0.0))
+    assert math.isnan(nulls.true_beta_sd_from_factor_share(0.1, 0.05, -0.01))
+    # share >= 1 is clipped (0.999), never a ZeroDivisionError/negative-sqrt domain error.
+    assert math.isfinite(nulls.true_beta_sd_from_factor_share(1.5, 0.05, 0.05))
+
+
+def test_true_beta_sd_from_factor_share_identity_reproduced_in_large_panel():
+    """DEC-78 task brief item 6: the share is reproduced within +/-10% in
+    a LARGE simulated panel -- this validates the FORMULA's own algebra
+    (the population relationship it inverts: factor_share =
+    (beta_sd*sigma_f)^2 / ((beta_sd*sigma_f)^2 + sigma_e^2)), checked via
+    the MEAN cross-sectional R^2 of return on the panel's TRUE (population)
+    beta over many weeks/replicates -- the quantity the formula's
+    algebraic derivation is exact for. (The SEPARATE, much noisier
+    "median of weekly R^2 on a RE-ESTIMATED trailing PIT beta" pipeline --
+    :func:`nulls.factor_share_gegenprobe`, the SAME one the real
+    ``factor_share_measured`` uses -- carries its OWN, well-documented
+    estimation-noise/median-vs-mean gap, see that function's docstring;
+    this test isolates the closed-form formula's own correctness from
+    that separate, acknowledged effect.)"""
+    sigma_f, sigma_e = 0.0669, 0.057      # DEC-78 W1 measured magnitudes
+    target_share = 0.0324                 # 2 * W1's measured factor_share (the "stress" target)
+    beta_sd = nulls.true_beta_sd_from_factor_share(target_share, sigma_e, sigma_f)
+    n_symbols, n_weeks = 400, 80
+    rng = np.random.default_rng(21)
+    pooled_r2: list[float] = []
+    for _ in range(20):
+        sim = nulls.simulate_factor_panel(n_weeks, n_symbols, sigma_f=sigma_f, sigma_e=sigma_e,
+                                           rho_f=0.05, drift_f=0.0, rng=rng, beta_sd=beta_sd)
+        beta_true = sim["beta"]
+        for t in range(n_weeks):
+            y = sim["returns"][t]
+            if beta_true.std() == 0.0 or y.std() == 0.0:
+                continue
+            r = float(np.corrcoef(beta_true, y)[0, 1])
+            pooled_r2.append(r * r)
+    mean_r2 = float(np.mean(pooled_r2))
+    assert mean_r2 == pytest.approx(target_share, rel=0.10)
+
+
+def test_factor_share_gegenprobe_wrong_sigma_e_raises_loud():
+    """DEC-78 task brief item 6: a wrong sigma_e (a large multiple of the
+    correct one, deliberately breaking the calibration's own internal
+    consistency) must raise :class:`nulls.FactorShareCalibrationError`,
+    naming both the simulated and target share (C.14 loud fail, never a
+    silent report)."""
+    sigma_f, sigma_e_correct = 0.05, 0.001
+    target_share = 0.8
+    beta_sd = nulls.true_beta_sd_from_factor_share(target_share, sigma_e_correct, sigma_f)
+    n_symbols, n_weeks = 60, 60
+    symbols = [f"s{i}" for i in range(n_symbols - 1)] + ["BTCUSDT"]
+
+    # A WRONG sigma_e (100x too large): the panel is simulated with far more idiosyncratic
+    # noise than the calibration's own beta_sd/target_share assume -- the resulting simulated
+    # share collapses well outside +/-25% of the (now-inconsistent) target.
+    with pytest.raises(nulls.FactorShareCalibrationError, match="Gegenprobe fehlgeschlagen"):
+        nulls.factor_share_gegenprobe(
+            n_weeks, n_symbols, symbols, sigma_f=sigma_f, sigma_e=sigma_e_correct * 100.0,
+            rho_f=0.05, beta_sd=beta_sd, target_share=target_share, n_reps=15, seed=53)
+
+
+def test_factor_share_gegenprobe_reports_both_numbers_on_failure():
+    sigma_f, sigma_e_correct = 0.05, 0.001
+    target_share = 0.8
+    beta_sd = nulls.true_beta_sd_from_factor_share(target_share, sigma_e_correct, sigma_f)
+    n_symbols, n_weeks = 60, 60
+    symbols = [f"s{i}" for i in range(n_symbols - 1)] + ["BTCUSDT"]
+    try:
+        nulls.factor_share_gegenprobe(
+            n_weeks, n_symbols, symbols, sigma_f=sigma_f, sigma_e=sigma_e_correct * 100.0,
+            rho_f=0.05, beta_sd=beta_sd, target_share=target_share, n_reps=15, seed=53)
+        assert False, "expected FactorShareCalibrationError"
+    except nulls.FactorShareCalibrationError as exc:
+        msg = str(exc)
+        assert str(target_share) in msg or "0.8" in msg
+        assert "rel_diff" in msg
+
+
+def test_factor_share_gegenprobe_passes_within_tolerance_for_consistent_inputs():
+    """A calibration where the Gegenprobe's OWN methodology (median of
+    weekly R^2 on a re-estimated trailing PIT beta) can reasonably
+    reproduce its target within +/-25% -- large target share, negligible
+    idiosyncratic noise (near-zero beta-estimation error) -- confirms the
+    Gegenprobe does NOT always raise, only when the calibration is
+    genuinely inconsistent (the companion 'wrong sigma_e' test above)."""
+    sigma_f, sigma_e = 0.05, 0.001
+    target_share = 0.8
+    beta_sd = nulls.true_beta_sd_from_factor_share(target_share, sigma_e, sigma_f)
+    n_symbols, n_weeks = 60, 60
+    symbols = [f"s{i}" for i in range(n_symbols - 1)] + ["BTCUSDT"]
+    result = nulls.factor_share_gegenprobe(
+        n_weeks, n_symbols, symbols, sigma_f=sigma_f, sigma_e=sigma_e,
+        rho_f=0.05, beta_sd=beta_sd, target_share=target_share, n_reps=20, seed=53)
+    assert result["ok"] is True
+    assert result["rel_diff"] <= 0.25
+
+
+def test_factor_share_gegenprobe_determinism_same_seed():
+    sigma_f, sigma_e, target_share = 0.05, 0.001, 0.8
+    beta_sd = nulls.true_beta_sd_from_factor_share(target_share, sigma_e, sigma_f)
+    kwargs = dict(sigma_f=sigma_f, sigma_e=sigma_e, rho_f=0.05, beta_sd=beta_sd,
+                  target_share=target_share, n_reps=10)
+    n_symbols, n_weeks = 60, 60
+    symbols = [f"s{i}" for i in range(n_symbols - 1)] + ["BTCUSDT"]
+    r1 = nulls.factor_share_gegenprobe(n_weeks, n_symbols, symbols, seed=53, **kwargs)
+    r2 = nulls.factor_share_gegenprobe(n_weeks, n_symbols, symbols, seed=53, **kwargs)
+    assert r1 == r2
+    r3 = nulls.factor_share_gegenprobe(n_weeks, n_symbols, symbols, seed=999, **kwargs)
+    assert r3["simulated_factor_share"] != r1["simulated_factor_share"]
+
+
+# ============================================================================
+# DEC-78 Nachtrag (orchestrator decision) -- calibrate_beta_sd_to_observed_share:
+# OBSERVABLE-MATCHING calibration replaces the closed-form beta_sd, bisection on
+# log(beta_sd), the Gegenprobe stays literal and is expected to PASS BY CONSTRUCTION.
+# ============================================================================
+
+def test_calibrate_beta_sd_to_observed_share_converges_on_synthetic_panel():
+    """A fast, moderate-K synthetic panel: the bisection search converges
+    (``rel_diff <= rel_tol``) within ``max_iter`` iterations, and a
+    SUBSEQUENT, INDEPENDENT :func:`nulls.factor_share_gegenprobe` call
+    with the searched ``beta_sd`` passes (literal, ±25%) -- the
+    round-trip property the DEC-78 Nachtrag exists for."""
+    sigma_f, sigma_e, rho_f, target_share = 0.05, 0.01, 0.05, 0.10
+    n_symbols, n_weeks = 250, 52
+    symbols = [f"s{i}" for i in range(n_symbols - 1)] + ["BTCUSDT"]
+
+    res = nulls.calibrate_beta_sd_to_observed_share(
+        target_share, rho_f=rho_f, sigma_f=sigma_f, sigma_e=sigma_e,
+        n_weeks=n_weeks, n_symbols=n_symbols, symbols=symbols, seed=7,
+        n_reps=30, rel_tol=0.10, max_iter=15)
+    assert res["converged"] is True
+    assert res["n_iter"] <= 15
+    assert math.isfinite(res["beta_sd_calibrated"])
+    assert math.isfinite(res["true_share"])
+    assert len(res["trace"]) == res["n_iter"]
+    for row in res["trace"]:
+        assert set(row.keys()) == {"iter", "beta_sd", "achieved_share", "true_share", "rel_diff"}
+
+    gp = nulls.factor_share_gegenprobe(
+        n_weeks, n_symbols, symbols, sigma_f=sigma_f, sigma_e=sigma_e, rho_f=rho_f,
+        beta_sd=res["beta_sd_calibrated"], target_share=target_share, seed=53, n_reps=30)
+    assert gp["ok"] is True
+
+
+def test_calibrate_beta_sd_to_observed_share_degenerate_target_is_nan_not_a_crash():
+    res = nulls.calibrate_beta_sd_to_observed_share(
+        0.0, rho_f=0.05, sigma_f=0.05, sigma_e=0.01, n_weeks=20, n_symbols=20, seed=1)
+    assert math.isnan(res["beta_sd_calibrated"])
+    assert res["converged"] is False
+    assert res["n_iter"] == 0
+    res_nan = nulls.calibrate_beta_sd_to_observed_share(
+        float("nan"), rho_f=0.05, sigma_f=0.05, sigma_e=0.01, n_weeks=20, n_symbols=20, seed=1)
+    assert math.isnan(res_nan["beta_sd_calibrated"])
+
+
+def test_calibrate_beta_sd_to_observed_share_determinism_same_seed():
+    kwargs = dict(rho_f=0.05, sigma_f=0.05, sigma_e=0.01, n_weeks=30, n_symbols=60,
+                  n_reps=8, rel_tol=0.10, max_iter=8)
+    r1 = nulls.calibrate_beta_sd_to_observed_share(0.10, seed=53, **kwargs)
+    r2 = nulls.calibrate_beta_sd_to_observed_share(0.10, seed=53, **kwargs)
+    assert r1 == r2
+    r3 = nulls.calibrate_beta_sd_to_observed_share(0.10, seed=999, **kwargs)
+    assert r3["trace"] != r1["trace"]
+
+
+def test_calibrate_beta_sd_to_observed_share_and_gegenprobe_pass_on_real_w1_numbers():
+    """DEC-78 Nachtrag: on the REAL W1 measured magnitudes (rho_f=0.046,
+    factor_share=0.0162, sigma_f=0.0669, sigma_e=0.057 -- state/
+    decisions.md DEC-78) the bisection search converges and the
+    SEPARATE, literal Gegenprobe passes -- a REDUCED K (300, not the
+    production ~1138) keeps this fast enough for the unit suite while
+    still exercising the real magnitudes end-to-end (verified against
+    the production K=1138 scale by hand during implementation -- also
+    converges there, ~4 iterations, ~54s, Gegenprobe rel_diff ~9%)."""
+    sigma_f, sigma_e, rho_f, target_share = 0.0669, 0.057, 0.046, 0.0162
+    n_symbols, n_weeks = 300, 53
+    symbols = [f"S{i:03d}" for i in range(n_symbols - 1)] + ["BTCUSDT"]
+
+    res = nulls.calibrate_beta_sd_to_observed_share(
+        target_share, rho_f=rho_f, sigma_f=sigma_f, sigma_e=sigma_e,
+        n_weeks=n_weeks, n_symbols=n_symbols, symbols=symbols, seed=53,
+        n_reps=40, rel_tol=0.10, max_iter=25)
+    assert res["converged"] is True, res["trace"]
+
+    gp = nulls.factor_share_gegenprobe(
+        n_weeks, n_symbols, symbols, sigma_f=sigma_f, sigma_e=sigma_e, rho_f=rho_f,
+        beta_sd=res["beta_sd_calibrated"], target_share=target_share, seed=53, n_reps=30)
+    assert gp["ok"] is True, gp
 
 
 # ============================================================================
@@ -1122,6 +1369,45 @@ def test_beta_controlled_factor_null_determinism_same_seed():
     assert r3["variants"] != r1["variants"]
 
 
+def test_beta_controlled_factor_null_beta_sd_mode_determinism_same_seed():
+    """DEC-78 Entscheidung 1: the ``beta_sd`` mode (not ``beta_pool``) is
+    just as deterministic under a fixed seed."""
+    w, k = 40, 30
+    rng = np.random.default_rng(10)
+    returns = rng.normal(0, 0.03, size=(w, k))
+    alive = np.ones((w, k), dtype=bool)
+    symbols = [f"s{i}" for i in range(k - 1)] + ["BTCUSDT"]
+    r1 = nulls.beta_controlled_factor_null(returns, alive, symbols, method="fm_neutral_8w",
+                                            variants=("mom1",), n_reps=15, seed=53, beta_sd=0.15)
+    r2 = nulls.beta_controlled_factor_null(returns, alive, symbols, method="fm_neutral_8w",
+                                            variants=("mom1",), n_reps=15, seed=53, beta_sd=0.15)
+    assert r1["variants"] == r2["variants"]
+    assert r1["beta_sd"] == r2["beta_sd"] == 0.15
+    r3 = nulls.beta_controlled_factor_null(returns, alive, symbols, method="fm_neutral_8w",
+                                            variants=("mom1",), n_reps=15, seed=53, beta_sd=0.30)
+    assert r3["variants"] != r1["variants"]
+
+
+def test_simulate_factor_panel_beta_sd_precedence_over_beta_pool():
+    """DEC-78 Entscheidung 1: ``beta_sd`` (if not ``None``) takes priority
+    over ``beta_pool`` (if non-empty), which takes priority over the
+    default ``U(0.5, 2.0)`` draw -- see the function's own docstring."""
+    n_weeks, n_symbols = 10, 5000
+    beta_pool = np.array([100.0, 200.0])   # deliberately wildly different from beta_sd's scale
+    rng = np.random.default_rng(1)
+    sim_beta_sd = nulls.simulate_factor_panel(n_weeks, n_symbols, sigma_f=0.05, sigma_e=0.03,
+                                               rng=rng, beta_pool=beta_pool, beta_sd=0.1)
+    # beta_sd wins: beta stays near 1 +/- 0.1, nowhere near the beta_pool's 100/200 scale.
+    assert abs(float(sim_beta_sd["beta"].mean()) - 1.0) < 0.05
+    assert float(sim_beta_sd["beta"].std()) < 1.0
+
+    rng2 = np.random.default_rng(1)
+    sim_pool_only = nulls.simulate_factor_panel(n_weeks, n_symbols, sigma_f=0.05, sigma_e=0.03,
+                                                 rng=rng2, beta_pool=beta_pool, beta_sd=None)
+    # beta_pool wins over the U(0.5, 2.0) default when beta_sd is None.
+    assert set(np.unique(sim_pool_only["beta"]).tolist()) <= {100.0, 200.0}
+
+
 def test_beta_controlled_factor_null_none_method_reports_no_coverage():
     w, k = 30, 20
     rng = np.random.default_rng(11)
@@ -1149,27 +1435,66 @@ def test_beta_controlled_factor_null_double_sort_reports_coverage():
     assert res["beta_window_weeks"] == 13
 
 
-def test_beta_control_method_study_grid_shape_and_resampled_betas_used():
+def test_beta_control_method_study_grid_shape_and_calibration_construction():
+    """DEC-78 Entscheidung 1/Nachtrag: the calibration construction
+    (rho_f/beta_sd_calibrated per calibration, BISECTION-searched via
+    ``nulls.calibrate_beta_sd_to_observed_share`` against
+    ``factor_share_measured``, never the old measured-PIT-beta-pool draw
+    or the closed-form value directly) and the grid's shape.
+    ``gegenprobe_rel_tol`` is set generous here -- this test checks the
+    GRID's ASSEMBLY shape, not the Gegenprobe's own statistical tolerance
+    (see the dedicated ``factor_share_gegenprobe``/``calibrate_beta_sd_
+    to_observed_share`` tests below, which DO exercise real convergence)."""
     w, k = 40, 30
     rng = np.random.default_rng(13)
     returns = rng.normal(0, 0.03, size=(w, k))
     alive = np.ones((w, k), dtype=bool)
     symbols = [f"s{i}" for i in range(k - 1)] + ["BTCUSDT"]
-    beta_pool = rng.uniform(0.5, 2.0, size=200)
     study = nulls.beta_control_method_study(
-        returns, alive, symbols, rho_f_measured=0.3, beta_pool_measured=beta_pool,
+        returns, alive, symbols, rho_f_measured=0.3, factor_share_measured=0.02,
         variants=("mom1", "rev_gap"), methods=("none", "ts_resid_8w", "double_sort_13w"),
-        n_reps=6, seed=53)
+        n_reps=6, seed=53, gegenprobe_rel_tol=10.0, calibration_search_n_reps=5,
+        calibration_search_max_iter=6)
     assert set(study["calibrations"].keys()) == {"measured", "stress", "zero"}
     for cal in ("measured", "stress", "zero"):
         assert set(study["calibrations"][cal]["methods"].keys()) == {"none", "ts_resid_8w", "double_sort_13w"}
         for method, m in study["calibrations"][cal]["methods"].items():
             assert set(m["variants"].keys()) == {"mom1", "rev_gap"}
-    assert study["calibrations"]["stress"]["rho_f"] == pytest.approx(0.2)
+        assert "gegenprobe" in study["calibrations"][cal]
+        assert "calibration_search" in study["calibrations"][cal]
+        assert math.isfinite(study["calibrations"][cal]["beta_sd_calibrated"])
+        assert math.isfinite(study["calibrations"][cal]["beta_sd_analytic_first_guess"])
+    assert study["calibrations"]["stress"]["rho_f"] == pytest.approx(0.6)      # 2 * 0.3
     assert study["calibrations"]["measured"]["rho_f"] == pytest.approx(0.3)
     assert study["calibrations"]["zero"]["rho_f"] == 0.0
-    assert study["calibrations"]["measured"]["uses_measured_betas"] is True
-    assert study["calibrations"]["stress"]["uses_measured_betas"] is False
+    assert study["calibrations"]["measured"]["target_factor_share"] == pytest.approx(0.02)
+    assert study["calibrations"]["stress"]["target_factor_share"] == pytest.approx(0.04)  # 2 * 0.02
+    assert study["calibrations"]["zero"]["target_factor_share"] == pytest.approx(0.02)
+    # "zero" reuses "measured"'s ENTIRE calibration search (DEC-78: "'zero' bleibt", only
+    # rho_f changes -- no separate search) -- exact object-level reuse, never recomputed.
+    assert study["calibrations"]["zero"]["beta_sd_calibrated"] == \
+        study["calibrations"]["measured"]["beta_sd_calibrated"]
+    assert study["calibrations"]["zero"]["calibration_search"] is study["calibrations"]["measured"]["calibration_search"]
+    # the analytic first guess is the SAME closed-form value the (now-superseded) DEC-78
+    # Entscheidung 1 construction used -- still exact, still report-only.
+    expected_analytic = nulls.true_beta_sd_from_factor_share(0.02, study["sigma_e_used"], study["sigma_f"])
+    assert study["calibrations"]["measured"]["beta_sd_analytic_first_guess"] == pytest.approx(expected_analytic)
+
+
+def test_beta_control_method_study_default_methods_is_restricted_grid():
+    """DEC-78 Entscheidung 2: the study's default grid drops TS-
+    residualisation (unbrauchbar bei 8-26 Wochen, DEC-77 Vorlauf v4
+    finding) -- but ``ic.BETA_CONTROL_METHODS`` (the real-run dispatcher,
+    ``ic.apply_beta_control``) keeps all 9, ``ts_resid_*w`` included, so a
+    registered real run may still choose it."""
+    assert nulls.BETA_CONTROL_METHODS_GRID == (
+        "none", "fm_neutral_8w", "fm_neutral_13w", "fm_neutral_26w",
+        "double_sort_13w", "double_sort_26w")
+    assert not any(m.startswith("ts_resid_") for m in nulls.BETA_CONTROL_METHODS_GRID)
+    assert set(nulls.BETA_CONTROL_METHODS_GRID) < set(ic.BETA_CONTROL_METHODS)
+    assert any(m.startswith("ts_resid_") for m in ic.BETA_CONTROL_METHODS)
+    # ts_resid's dispatch still works (the FUNCTION is kept, only dropped from the grid).
+    assert ic.beta_control_trail_weeks("ts_resid_13w") == 13
 
 
 # ============================================================================
