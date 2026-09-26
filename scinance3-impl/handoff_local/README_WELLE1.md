@@ -30,3 +30,9 @@ nacheinander aus, kopiert die Ergebnisse (Dateien <= 5 MB) nach
 `state\runs\` und pusht sie auf den Arbeitsbranch; der Orchestrator liest
 sie aus dem Repo. Der Orchestrator pflegt die Standard-Aufgabenliste in
 `nacht.ps1` (`-Tasks`) und nennt bei Bedarf Zusatzparameter im selben Befehl.
+
+## Autopilot ab 2026-09-26 (DEC-79)
+
+Einmalig: `install_autopilot.ps1`. Danach startet der Nutzer nichts mehr: der
+Orchestrator schreibt `scinance3-impl/state/queue/auftrag.json`, der Autopilot fuehrt ihn
+aus und pusht Ergebnisse und Erledigt-Marker. `nacht.ps1` bleibt fuer Handstarts nutzbar.

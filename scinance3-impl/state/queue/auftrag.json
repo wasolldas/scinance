@@ -1,0 +1,6 @@
+{
+  "id": "2026-09-26_wp13a_v5b",
+  "tasks": ["wp13a"],
+  "skip_if_done_since": "38af605",
+  "zweck": "Vorlauf v5 mit eigener Kalibrierung fuer 'zero' (DEC-78 Nachtrag)"
+}

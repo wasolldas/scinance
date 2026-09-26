@@ -27,7 +27,8 @@ param(
     [string]$RegisteredSha256 = "",
     [int]$MaxCommitFileMB = 5,
     [switch]$NoPush,
-    [switch]$Wp10bResume
+    [switch]$Wp10bResume,
+    [string]$AuftragId = ""
 )
 
 $ErrorActionPreference = "Continue"
@@ -114,9 +115,26 @@ Write-Host "=== Zusammenfassung ==="
 $results | ForEach-Object { Write-Host "  $_" }
 Stop-Transcript | Out-Null
 
+if ($AuftragId -ne "") {
+    # Erledigt-Marker fuer den Autopiloten (autopilot.py): ein Auftrag laeuft
+    # je Maschine hoechstens einmal; der Orchestrator liest diesen Marker.
+    $qDone = Join-Path $RepoRoot "scinance3-impl\state\queue\erledigt"
+    if (-not (Test-Path $qDone)) { New-Item -ItemType Directory -Path $qDone -Force | Out-Null }
+    $head = (git rev-parse --short HEAD 2>$null)
+    $marker = [ordered]@{
+        id = $AuftragId; stamp = $stamp; ergebnisse = @($results);
+        start = $t0.ToString("s"); ende = (Get-Date).ToString("s");
+        protokoll = "scinance3-impl/state/runs/nacht_$stamp.log"; head_vor_commit = "$head";
+        rechner = $env:COMPUTERNAME
+    }
+    $marker | ConvertTo-Json -Depth 4 | Set-Content -Path (Join-Path $qDone "$AuftragId.json") -Encoding ASCII
+}
+
 if (-not $NoPush) {
     git add "scinance3-impl/state/runs" 2>&1 | Write-Host
+    git add "scinance3-impl/state/queue" 2>&1 | Write-Host
     $msg = "results(nacht $stamp): " + ($results -join "; ")
+    if ($AuftragId -ne "") { $msg = $msg + " [auftrag $AuftragId]" }
     git commit -q -m $msg 2>&1 | Write-Host
     $pushed = $false
     for ($i = 1; $i -le 4 -and -not $pushed; $i++) {
