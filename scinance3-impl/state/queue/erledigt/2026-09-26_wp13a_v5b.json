@@ -1,0 +1,12 @@
+{
+    "id":  "2026-09-26_wp13a_v5b",
+    "stamp":  "20260928_1339",
+    "ergebnisse":  [
+                       "wp13a rc=1 dauer_min=93"
+                   ],
+    "start":  "2026-09-28T13:39:05",
+    "ende":  "2026-09-28T15:12:04",
+    "protokoll":  "scinance3-impl/state/runs/nacht_20260928_1339.log",
+    "head_vor_commit":  "378fc64",
+    "rechner":  "PC2022"
+}
