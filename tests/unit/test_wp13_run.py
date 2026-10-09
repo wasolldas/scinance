@@ -698,10 +698,13 @@ def test_cli_emit_registered_template_writes_yaml_skeleton_from_prelaunch_artifa
     panel, weekly, _sb, _sm, _db, del_manifest, dd_path = _build_prelaunch_fixture_tree(tmp_path)
     # DEC-78 Nachtrag: gegenprobe_rel_tol widened -- see test_wp13_xsec.py's CLI e2e test
     # comment (this fixture's small K is too statistically underpowered for the strict default).
+    # DEC-81: z-test and search precision switched off the same way (gegenprobe_z_max,
+    # calibration_search_rel_tol), probes kept small.
     prelaunch_report = prelaunch_mod.assemble_prelaunch_report(
         panel, weekly, delisted_manifest_path=del_manifest, delisting_dates_path=dd_path,
         n_sims=5, n_reps_factor_null=5, n_reps_beta_control_study=5, n_reps_beta_control_winner=5, seed=53,
-        gegenprobe_rel_tol=10.0, calibration_search_n_reps=5, calibration_search_max_iter=8)
+        gegenprobe_n_reps=10, gegenprobe_rel_tol=10.0, gegenprobe_z_max=1e9,
+        calibration_search_n_reps=5, calibration_search_rel_tol=10.0, calibration_search_max_iter=8)
     artifacts = prelaunch_mod.write_prelaunch_artifacts(tmp_path / "prelaunch_out", prelaunch_report)
     prelaunch_json = artifacts["artifacts"]["wp13a_prelaunch_json"]["path"]
 

@@ -659,7 +659,9 @@ def assemble_prelaunch_report(
     n_reps_beta_control_winner: int = 1000,
     seed: int = nulls.PERSISTENCE_NULL_SEED,
     convention: ic.Convention = "close_at_last",
-    gegenprobe_n_reps: int = 30, gegenprobe_rel_tol: float = nulls.GEGENPROBE_REL_TOL,
+    gegenprobe_n_reps: int = nulls.GEGENPROBE_N_REPS_DEFAULT,
+    gegenprobe_rel_tol: float = nulls.GEGENPROBE_REL_TOL,
+    gegenprobe_z_max: float = nulls.GEGENPROBE_Z_MAX,
     calibration_search_n_reps: int = nulls.CALIBRATION_SEARCH_N_REPS_DEFAULT,
     calibration_search_rel_tol: float = nulls.CALIBRATION_SEARCH_REL_TOL_DEFAULT,
     calibration_search_max_iter: int = nulls.CALIBRATION_SEARCH_MAX_ITER_DEFAULT,
@@ -706,21 +708,40 @@ def assemble_prelaunch_report(
     it is now a REAL BUG (the calibration search should avoid this case
     by construction), so it aborts the WHOLE ``--prelaunch`` run, loud,
     exactly like every other C.14 loud fail in this package.
-    ``gegenprobe_n_reps``/``gegenprobe_rel_tol``/``calibration_search_
-    n_reps``/``calibration_search_rel_tol``/``calibration_search_
-    max_iter`` are passed straight through to :func:`nulls.beta_
-    control_method_study` (defaults match that function's own, i.e. the
-    REAL, literal 25%/10% -- ``scripts/wp13_xsec.py``'s ``--prelaunch``
-    CLI never overrides them, so a real run always uses the strict
-    defaults; a caller such as a unit test that deliberately exercises
-    this pipeline on a TINY, statistically underpowered synthetic panel
-    -- where the Gegenprobe's own sampling noise, not a real calibration
-    bug, would otherwise make it fail -- may widen ``gegenprobe_rel_tol``
-    to isolate what it is actually testing, same discipline as this
-    function's existing ``n_sims``/``n_reps_*`` knobs).
+    ``gegenprobe_n_reps``/``gegenprobe_rel_tol``/``gegenprobe_z_max``/
+    ``calibration_search_n_reps``/``calibration_search_rel_tol``/
+    ``calibration_search_max_iter`` are passed straight through to
+    :func:`nulls.beta_control_method_study` (defaults are that module's
+    own constants -- ``scripts/wp13_xsec.py``'s ``--prelaunch`` CLI keeps
+    them unless overridden; a caller such as a unit test that deliberately
+    exercises this pipeline on a TINY, statistically underpowered
+    synthetic panel -- where the Gegenprobe's own sampling noise, not a
+    real calibration bug, would otherwise make it fail -- may widen
+    ``gegenprobe_rel_tol``/``gegenprobe_z_max`` to isolate what it is
+    actually testing, same discipline as this function's existing
+    ``n_sims``/``n_reps_*`` knobs).
 
-    **Runtime, measured, VOM ORCHESTRATOR ZU BESTAETIGEN (documented
-    deviation from the task brief's own "300 reps" fallback number).** A
+    **DEC-81 (Vorlauf v5c), calibration cross-section.** Per window the
+    calibration search and the Gegenprobe run on the SAME cross-section the
+    real share measurement uses: ``calibration_mask = alive & finite
+    beta_prev_26w & finite returns`` (the mask
+    :func:`nulls.factor_share_from_trailing_beta` builds per week on real
+    data), so the simulated weekly R^2 has the real K per week instead of
+    all ``n_symbols`` columns. The Gegenprobe is judged on a
+    standard-error basis (:func:`nulls.factor_share_gegenprobe`) and a
+    search that does not converge aborts the run.
+
+    **Runtime, measured BEFORE DEC-81 (all numbers in the two paragraphs
+    below are pre-DEC-81; DEC-81 vectorised :func:`characteristics.
+    beta_characteristic` bit-identically, ~36x faster per call, so the
+    ~68 % beta-loop share named below is gone and the grid is far
+    cheaper than extrapolated here. DEC-81 micro-run at production size
+    (``K=1138``, ``W=53``, no mask): ~20 ms per simulated replicate in the
+    search and the Gegenprobe, i.e. one 400-replicate search takes 55-80 s
+    (7-10 bisection iterations) and one 400-replicate Gegenprobe ~8 s;
+    three searches + three Gegenproben per window ~ 4-5 min).**
+    Original text (VOM ORCHESTRATOR ZU BESTAETIGEN, documented deviation
+    from the task brief's own "300 reps" fallback number): A
     synthetic-panel microbenchmark (``K=100``/``K=400``, ``W=52``, this
     exact code path, non-profiled) gives ~0.020s/rep-cell at ``K=100`` and
     ~0.066s/rep-cell at ``K=400``; a two-point power-law extrapolation to
@@ -750,9 +771,12 @@ def assemble_prelaunch_report(
     default 1000, ONE method x 2 calibrations x 7 variants = 14 cells) is
     cheap regardless (~14*1000*0.165s ~= 39 min/window).
 
-    **Extra cost of the DEC-78 Nachtrag's calibration SEARCH, measured.**
-    :func:`nulls.calibrate_beta_sd_to_observed_share` runs TWICE per
-    window ("measured" + "stress"; "zero" reuses "measured"'s search, no
+    **Extra cost of the DEC-78 Nachtrag's calibration SEARCH, measured
+    BEFORE DEC-81 (then: two searches per window, "zero" reusing
+    "measured"'s; DEC-81: three searches, "zero" has its own, with 400
+    replicates and a 1 % precision on a common-random-number function).**
+    :func:`nulls.calibrate_beta_sd_to_observed_share` ran TWICE per
+    window ("measured" + "stress"; "zero" reused "measured"'s search, no
     extra search), each up to ``calibration_search_max_iter`` (default
     25) bisection iterations x ``calibration_search_n_reps`` (default 40)
     simulate+measure reps -- ONE method cell's worth of work per
@@ -819,15 +843,21 @@ def assemble_prelaunch_report(
             # Error) is therefore NOT caught here any more; a failure is a real bug (a stale/
             # inconsistent search), so it aborts the WHOLE --prelaunch run, exactly like every
             # other loud fail in this package.
+            # DEC-81: the search/Gegenprobe cross-section is EXACTLY the one the real share
+            # measurement (nulls.factor_share_from_trailing_beta) runs over each week.
+            calibration_mask = (window["alive"] & ~np.isnan(window["beta_prev_26w"])
+                                & ~np.isnan(window["returns"]))
             study = nulls.beta_control_method_study(
                 window["returns"], window["alive"], symbols,
                 rho_f_measured=calib["market_factor"]["rho_f_measured"],
                 factor_share_measured=calib["factor_share"]["factor_share_median"],
                 convention=convention, n_reps=n_reps_beta_control_study, seed=seed,
                 gegenprobe_n_reps=gegenprobe_n_reps, gegenprobe_rel_tol=gegenprobe_rel_tol,
+                gegenprobe_z_max=gegenprobe_z_max,
                 calibration_search_n_reps=calibration_search_n_reps,
                 calibration_search_rel_tol=calibration_search_rel_tol,
-                calibration_search_max_iter=calibration_search_max_iter)
+                calibration_search_max_iter=calibration_search_max_iter,
+                calibration_mask=calibration_mask)
             decision = beta_control_pass_table(
                 study, floor=e_floor, w_judged=w_judged,
                 pure_noise_ceiling=entry["selection_ceiling_measured"]["ceiling_ic_mean"])
@@ -946,8 +976,9 @@ def _beta_control_calibration_markdown(w: dict[str, Any]) -> list[str]:
         lines.append("| Kalibrierung | rho_f | beta_sd (analyt. Erstschaetzung) | "
                       "beta_sd (kalibriert) | Ziel-Faktoranteil | erreichter Faktoranteil "
                       "(Suche) | wahrer Faktoranteil (Suche) | Iterationen | konvergiert | "
-                      "Gegenprobe simuliert | Gegenprobe rel. Abw. | Gegenprobe |")
-        lines.append("|---|---|---|---|---|---|---|---|---|---|---|---|")
+                      "Gegenprobe simuliert | Gegenprobe rel. Abw. | Gegenprobe se_diff | "
+                      "Gegenprobe z | Gegenprobe |")
+        lines.append("|---|---|---|---|---|---|---|---|---|---|---|---|---|---|")
         for cal in ("measured", "stress", "zero"):
             c = study["calibrations"][cal]
             g = c["gegenprobe"]
@@ -958,6 +989,7 @@ def _beta_control_calibration_markdown(w: dict[str, Any]) -> list[str]:
                 f"{_fmt5(s['achieved_share'])} | {_fmt5(s['true_share'])} | {s['n_iter']} | "
                 f"{'ja' if s['converged'] else 'nein'} | "
                 f"{_fmt5(g['simulated_factor_share'])} | {_fmt5(g['rel_diff'])} | "
+                f"{_fmt5(g.get('se_diff', float('nan')))} | {_fmt5(g.get('z', float('nan')))} | "
                 f"{'OK' if g['ok'] else 'FAIL'} |")
         lines.append("")
 

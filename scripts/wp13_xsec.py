@@ -172,6 +172,7 @@ def cmd_prelaunch(a: argparse.Namespace) -> int:
         n_reps_beta_control_winner=a.n_reps_beta_control_winner,
         seed=a.seed, convention=a.convention,
         gegenprobe_n_reps=a.gegenprobe_n_reps, gegenprobe_rel_tol=a.gegenprobe_rel_tol,
+        gegenprobe_z_max=a.gegenprobe_z_max,
         calibration_search_n_reps=a.calibration_search_n_reps,
         calibration_search_rel_tol=a.calibration_search_rel_tol,
         calibration_search_max_iter=a.calibration_search_max_iter)
@@ -283,7 +284,12 @@ def cmd_emit_registered_template(prelaunch_json_path: str, out_yaml_path: str) -
     same single-global-constant convention DEC-75's own ``rho_f=0.2``
     used) -- ``beta_sd_calibrated`` is the artifact's OWN bisection-
     search result (never re-derived here); ``{}`` if the artifact
-    predates DEC-78/its Nachtrag or W1 is unavailable. Never registers
+    predates DEC-78/its Nachtrag or W1 is unavailable. DEC-81: contract
+    unchanged -- only ``rho_f``/``target_factor_share``/``beta_sd_calibrated``/
+    ``beta_sd_analytic_first_guess`` and the study's sigmas are read, never
+    the Gegenprobe/search diagnostics (``z``, ``se_diff``,
+    ``achieved_share_se``, ``calibration_mask_k_median``), which stay in
+    the artifact. Never registers
     anything itself (no sha256 check here) -- the Orchestrator reviews
     the written file, then cites ITS sha256 (logged below) in the
     Drittfassung."""
@@ -420,28 +426,38 @@ def main() -> int:
                           "(2)/(3): >= 1.000).")
     ap.add_argument("--n-reps-beta-control-study", type=int, default=100,
                      help="DEC-77 Entscheidung 1 (b): Replikate je Zelle des Beta-Kontroll-"
-                          "Methoden-Rasters (3 Kalibrierungen x 9 Methoden x 7 Varianten) -- "
-                          ">= 500 akzeptabel; Default 100, NICHT 300, weil ein gemessenes "
+                          "Methoden-Rasters (3 Kalibrierungen x 6 Methoden x 7 Varianten) -- "
+                          ">= 500 akzeptabel; Default 100, weil ein VOR DEC-81 gemessenes "
                           "Mikro-Benchmark (siehe prelaunch.assemble_prelaunch_report's "
                           "Docstring) 300 Replikate auf K~1138/W~52 auf ~2,6 h/Fenster "
-                          "hochrechnet (ueber der 2-h-Vorgabe) -- vom Orchestrator gegen die "
-                          "tatsaechliche Runner-PC-Geschwindigkeit zu erhoehen.")
+                          "hochrechnete. Seit DEC-81 ist beta_characteristic vektorisiert "
+                          "(bitgleich, ~36x schneller); der Runner-PC-Wrapper "
+                          "(run_wp13_prelaunch.ps1) nimmt deshalb 300.")
     ap.add_argument("--n-reps-beta-control-winner", type=int, default=1000,
                      help="DEC-77 Entscheidung 1 (b): Replikate fuer den erneuten Lauf der "
                           "EMPFOHLENEN Methode allein (measured/stress), fuer die finale "
                           "Tabelle -- >= 1.000.")
-    ap.add_argument("--gegenprobe-n-reps", type=int, default=30,
-                     help="DEC-78 Entscheidung 1/Nachtrag: Replikate je Gegenprobe-Aufruf "
-                          "(eine je Kalibrierung) -- Default 30, literal, wie spezifiziert.")
+    ap.add_argument("--gegenprobe-n-reps", type=int, default=nulls.GEGENPROBE_N_REPS_DEFAULT,
+                     help="DEC-78 Entscheidung 1/Nachtrag, DEC-81: Replikate je Gegenprobe-Aufruf "
+                          "(eine je Kalibrierung, unabhaengiger Seed) -- Default 400 (der "
+                          "Schaetzfehler des Median-R^2 faellt wie 1/sqrt(n): ~8,5 Prozent bei 30-40, "
+                          "~3 Prozent bei 400).")
     ap.add_argument("--gegenprobe-rel-tol", type=float, default=nulls.GEGENPROBE_REL_TOL,
-                     help="DEC-78 Entscheidung 1/Nachtrag: Toleranz der Gegenprobe -- Default "
-                          "0,25 (literal). NUR fuer Tests auf kleinen synthetischen Panels "
-                          "lockern; ein echter Lauf soll den strikten Default behalten.")
+                     help="DEC-81: groesste aufloesbare Abweichung der Gegenprobe (Power-Bedingung: "
+                          "z_max * se_diff <= rel_tol * Ziel, sonst 'unterpowert') -- Default 0,25. "
+                          "NUR fuer Tests auf kleinen synthetischen Panels lockern; ein echter Lauf "
+                          "soll den strikten Default behalten.")
+    ap.add_argument("--gegenprobe-z-max", type=float, default=nulls.GEGENPROBE_Z_MAX,
+                     help="DEC-81: groesstes zulaessiges |simuliert - Ziel| / se_diff der Gegenprobe "
+                          "(se_diff aus Gegenprobe- und Suchfehler) -- Default 3,0. NUR fuer Tests "
+                          "auf kleinen synthetischen Panels lockern.")
     ap.add_argument("--calibration-search-n-reps", type=int, default=nulls.CALIBRATION_SEARCH_N_REPS_DEFAULT,
-                     help="DEC-78 Nachtrag: Replikate je Bisektions-Iteration der beta_sd-Suche "
-                          "-- Default 40.")
+                     help="DEC-78 Nachtrag, DEC-81: Replikate je Bisektions-Iteration der beta_sd-Suche "
+                          "(gemeinsame Zufallszahlen in allen Iterationen) -- Default 400.")
     ap.add_argument("--calibration-search-rel-tol", type=float, default=nulls.CALIBRATION_SEARCH_REL_TOL_DEFAULT,
-                     help="DEC-78 Nachtrag: Konvergenz-Toleranz der beta_sd-Suche -- Default 0,10.")
+                     help="DEC-78 Nachtrag, DEC-81: Praezision der Nullstelle der beta_sd-Suche auf der "
+                          "deterministischen Stichprobenfunktion -- Default 0,01. Eine nicht "
+                          "konvergierte Suche bricht den Lauf laut ab.")
     ap.add_argument("--calibration-search-max-iter", type=int, default=nulls.CALIBRATION_SEARCH_MAX_ITER_DEFAULT,
                      help="DEC-78 Nachtrag: maximale Bisektions-Iterationen der beta_sd-Suche "
                           "-- Default 25.")

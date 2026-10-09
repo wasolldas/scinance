@@ -23,6 +23,7 @@ Covers (per the task brief):
 from __future__ import annotations
 
 import argparse
+import functools
 import hashlib
 import math
 import re
@@ -89,6 +90,74 @@ def test_beta_characteristic_recovers_known_beta():
     assert beta[-1, 0] == pytest.approx(1.0, abs=0.05)   # BTC regressed on itself
     assert beta[-1, 1] == pytest.approx(2.0, abs=0.20)
     assert math.isnan(beta[0, 1])                        # not enough trailing weeks yet
+
+
+def _beta_characteristic_reference(returns: np.ndarray, symbols: list[str], *,
+                                    market_symbol: str = "BTCUSDT",
+                                    trail_win: int = characteristics.VOL_BETA_TRAIL_WEEKS,
+                                    min_weeks: int = 4) -> np.ndarray:
+    """DEC-81: the former per-symbol-loop ``characteristics.beta_characteristic``, copied
+    verbatim as the bit-exact reference for the vectorised implementation."""
+    n_weeks, n_symbols = returns.shape
+    out = np.full((n_weeks, n_symbols), np.nan, dtype=np.float64)
+    if market_symbol not in symbols:
+        return out
+    m = symbols.index(market_symbol)
+    mkt = returns[:, m]
+    for t in range(n_weeks):
+        lo = max(0, t - trail_win + 1)
+        mkt_win = mkt[lo:t + 1]
+        valid_m = ~np.isnan(mkt_win)
+        if int(valid_m.sum()) < min_weeks:
+            continue
+        mkt_v = mkt_win[valid_m]
+        var_m = float(np.var(mkt_v, ddof=1)) if mkt_v.size > 1 else 0.0
+        if var_m <= 0.0:
+            continue
+        mkt_c = mkt_v - mkt_v.mean()
+        for j in range(n_symbols):
+            sym_win = returns[lo:t + 1, j][valid_m]
+            if np.isnan(sym_win).any():
+                continue
+            n_win = sym_win.size
+            cov = float(np.sum((sym_win - sym_win.mean()) * mkt_c) / (n_win - 1))
+            out[t, j] = cov / var_m
+    return out
+
+
+@pytest.mark.parametrize("trail_win,min_weeks", [(26, 26), (13, 4), (8, 8)])
+def test_beta_characteristic_bit_identical_to_reference_loop(trail_win, min_weeks):
+    """DEC-81: the vectorised ``beta_characteristic`` reproduces the former symbol loop
+    BIT FOR BIT (``np.array_equal``, not ``allclose``) on random panels with NaN holes in
+    the symbol columns AND in the market column, for the three window/min_weeks pairs the
+    package uses (calibration 26/26, method grid 13/4, A3-V characteristic 8/8)."""
+    for seed in range(4):
+        rng = np.random.default_rng(100 + seed)
+        w, k = 100, 45
+        returns = rng.normal(0.0, 0.06, size=(w, k))
+        returns[rng.random((w, k)) < 0.03] = np.nan            # holes in the symbol columns
+        returns[[2, 5, 30, 31, 47], -1] = np.nan               # holes in the market column
+        returns[:, 3] = np.nan                                 # one symbol with no data at all
+        symbols = [f"s{i}" for i in range(k - 1)] + ["BTCUSDT"]
+        new = characteristics.beta_characteristic(returns, symbols, trail_win=trail_win, min_weeks=min_weeks)
+        ref = _beta_characteristic_reference(returns, symbols, trail_win=trail_win, min_weeks=min_weeks)
+        assert np.array_equal(new, ref, equal_nan=True), (seed, trail_win, min_weeks)
+        assert np.isfinite(new).sum() > 100                    # the comparison is not vacuous
+        assert np.isnan(new[:, 3]).all()
+
+    # degenerate branches: no market symbol, constant (zero-variance) market column
+    returns = np.random.default_rng(7).normal(0.0, 0.05, size=(30, 6))
+    syms = [f"s{i}" for i in range(5)] + ["BTCUSDT"]
+    assert np.array_equal(
+        characteristics.beta_characteristic(returns, syms[:-1] + ["XUSDT"], trail_win=trail_win,
+                                             min_weeks=min_weeks),
+        _beta_characteristic_reference(returns, syms[:-1] + ["XUSDT"], trail_win=trail_win,
+                                        min_weeks=min_weeks), equal_nan=True)
+    returns[:, -1] = 0.5                                       # exactly representable -> variance exactly 0
+    const_new = characteristics.beta_characteristic(returns, syms, trail_win=trail_win, min_weeks=min_weeks)
+    assert np.isnan(const_new).all()
+    assert np.array_equal(const_new, _beta_characteristic_reference(
+        returns, syms, trail_win=trail_win, min_weeks=min_weeks), equal_nan=True)
 
 
 def test_weekly_turnover_trailing_median_and_decile_bucket():
@@ -363,10 +432,13 @@ def test_seal_prelaunch_never_calls_ic_with_real_returns(tmp_path, monkeypatch):
     # DEC-78 Nachtrag: gegenprobe_rel_tol widened -- this fixture's tiny (12-symbol) panel is
     # too statistically underpowered for the Gegenprobe's own sampling noise (see the CLI e2e
     # test's comment); this test's OWN purpose (THE SEAL) is unaffected either way.
+    # DEC-81: the z-test and the search precision are switched off the same way
+    # (gegenprobe_z_max, calibration_search_rel_tol), the probes kept small.
     report = prelaunch.assemble_prelaunch_report(
         panel, weekly, delisted_manifest_path=del_manifest, delisting_dates_path=dd_path,
         n_sims=5, n_reps_factor_null=5, n_reps_beta_control_study=5, n_reps_beta_control_winner=5, seed=53,
-        gegenprobe_rel_tol=10.0, calibration_search_n_reps=5, calibration_search_max_iter=8)
+        gegenprobe_n_reps=10, gegenprobe_rel_tol=10.0, gegenprobe_z_max=1e9,
+        calibration_search_n_reps=5, calibration_search_rel_tol=10.0, calibration_search_max_iter=8)
     assert report["windows"]["W1"]["available"]
 
     assert calls, "expected ic.weekly_ic_series to be called by the persistence null"
@@ -392,7 +464,8 @@ def test_seal_prelaunch_report_json_no_real_ic_key(tmp_path):
     report = prelaunch.assemble_prelaunch_report(
         panel, weekly, delisted_manifest_path=del_manifest, delisting_dates_path=dd_path,
         n_sims=5, n_reps_factor_null=5, n_reps_beta_control_study=5, n_reps_beta_control_winner=5, seed=53,
-        gegenprobe_rel_tol=10.0, calibration_search_n_reps=5, calibration_search_max_iter=8)
+        gegenprobe_n_reps=10, gegenprobe_rel_tol=10.0, gegenprobe_z_max=1e9,
+        calibration_search_n_reps=5, calibration_search_rel_tol=10.0, calibration_search_max_iter=8)
     artifacts = prelaunch.write_prelaunch_artifacts(tmp_path / "out", report)
     payload = __import__("json").loads(
         Path(artifacts["artifacts"]["wp13a_prelaunch_json"]["path"]).read_text(encoding="utf-8"))
@@ -428,7 +501,9 @@ def _ns_prelaunch(**overrides) -> argparse.Namespace:
         # DEC-78 Nachtrag: strict/literal defaults (match nulls.py's own) unless a test
         # overrides them -- e.g. for a small synthetic panel too statistically underpowered
         # for the Gegenprobe's own sampling noise, never for a real run.
-        gegenprobe_n_reps=30, gegenprobe_rel_tol=nulls.GEGENPROBE_REL_TOL,
+        # DEC-81: the defaults are the nulls constants (400 replicates, z <= 3 on a standard-error basis).
+        gegenprobe_n_reps=nulls.GEGENPROBE_N_REPS_DEFAULT, gegenprobe_rel_tol=nulls.GEGENPROBE_REL_TOL,
+        gegenprobe_z_max=nulls.GEGENPROBE_Z_MAX,
         calibration_search_n_reps=nulls.CALIBRATION_SEARCH_N_REPS_DEFAULT,
         calibration_search_rel_tol=nulls.CALIBRATION_SEARCH_REL_TOL_DEFAULT,
         calibration_search_max_iter=nulls.CALIBRATION_SEARCH_MAX_ITER_DEFAULT,
@@ -877,8 +952,11 @@ def test_cli_prelaunch_end_to_end_synthetic_union_tree(tmp_path):
     # calibration search's statistical quality (that is exercised, at a realistic K, by the
     # dedicated nulls.py tests), so it widens the tolerance/keeps the search cheap. A REAL run
     # (scripts/wp13_xsec.py's own CLI defaults) never does this.
+    # DEC-81: z-test and search precision switched off the same way (gegenprobe_z_max,
+    # calibration_search_rel_tol), probes kept small.
     ns = _ns_prelaunch(panel_base=str(surv_base), delisted_base=str(del_base), out=str(out_dir),
-                        gegenprobe_rel_tol=10.0, calibration_search_n_reps=5,
+                        gegenprobe_n_reps=10, gegenprobe_rel_tol=10.0, gegenprobe_z_max=1e9,
+                        calibration_search_n_reps=5, calibration_search_rel_tol=10.0,
                         calibration_search_max_iter=8)
 
     rc = WP13.cmd_prelaunch(ns)
@@ -912,6 +990,14 @@ def test_cli_prelaunch_end_to_end_synthetic_union_tree(tmp_path):
             c = study["calibrations"][cal]
             assert "gegenprobe" in c and c["gegenprobe"]["ok"] is True
             assert "calibration_search" in c
+            # DEC-81: the search/Gegenprobe run on the real measurement's cross-section (the
+            # fixture's ~12 alive symbols per week), the standard-error fields are in the artifact.
+            assert 10 <= c["calibration_mask_k_median"] <= 13
+            assert c["calibration_search"]["crn"] is True
+            assert c["calibration_search"]["mask_k_median"] == c["calibration_mask_k_median"]
+            for key in ("se_gegenprobe", "search_se", "se_diff", "z", "z_max", "power_ok", "seed"):
+                assert key in c["gegenprobe"]
+            assert c["gegenprobe"]["seed"] == 53 + nulls.GEGENPROBE_SEED_OFFSET
     assert "beta_control_recommendation" in payload
 
 
@@ -1223,39 +1309,61 @@ def test_factor_share_gegenprobe_reports_both_numbers_on_failure():
         msg = str(exc)
         assert str(target_share) in msg or "0.8" in msg
         assert "rel_diff" in msg
+        # DEC-81: the message also names z and se_diff and which condition is violated.
+        assert "z=" in msg and "se_diff=" in msg
+        assert "Abweichung > z_max Standardfehler" in msg
+
+
+def _calibrated_closed_form_case():
+    """DEC-81 helper: the 'consistent inputs' fixture of the Gegenprobe tests (large target
+    share, negligible idiosyncratic noise), calibrated by the search so the independent
+    Gegenprobe can be run under the new standard-error contract."""
+    sigma_f, sigma_e, rho_f, target_share = 0.05, 0.001, 0.05, 0.8
+    n_symbols, n_weeks = 60, 60
+    symbols = [f"s{i}" for i in range(n_symbols - 1)] + ["BTCUSDT"]
+    search = nulls.calibrate_beta_sd_to_observed_share(
+        target_share, rho_f=rho_f, sigma_f=sigma_f, sigma_e=sigma_e, n_weeks=n_weeks,
+        n_symbols=n_symbols, symbols=symbols, seed=53, n_reps=20, rel_tol=0.02, max_iter=25)
+    assert search["converged"] is True
+    kwargs = dict(sigma_f=sigma_f, sigma_e=sigma_e, rho_f=rho_f, beta_sd=search["beta_sd_calibrated"],
+                  target_share=target_share, n_reps=20, search_se=search["achieved_share_se"])
+    return n_weeks, n_symbols, symbols, search, kwargs
 
 
 def test_factor_share_gegenprobe_passes_within_tolerance_for_consistent_inputs():
     """A calibration where the Gegenprobe's OWN methodology (median of
-    weekly R^2 on a re-estimated trailing PIT beta) can reasonably
-    reproduce its target within +/-25% -- large target share, negligible
-    idiosyncratic noise (near-zero beta-estimation error) -- confirms the
-    Gegenprobe does NOT always raise, only when the calibration is
-    genuinely inconsistent (the companion 'wrong sigma_e' test above)."""
-    sigma_f, sigma_e = 0.05, 0.001
-    target_share = 0.8
-    beta_sd = nulls.true_beta_sd_from_factor_share(target_share, sigma_e, sigma_f)
-    n_symbols, n_weeks = 60, 60
-    symbols = [f"s{i}" for i in range(n_symbols - 1)] + ["BTCUSDT"]
+    weekly R^2 on a re-estimated trailing PIT beta) can reproduce its
+    target -- large target share, negligible idiosyncratic noise
+    (near-zero beta-estimation error) -- confirms the Gegenprobe does NOT
+    always raise, only when the calibration is genuinely inconsistent
+    (the companion 'wrong sigma_e' test above).
+
+    DEC-81: the contract changed from 'closed-form beta_sd within +/-25 %'
+    to a standard-error criterion on an independent seed, so the beta_sd
+    is first calibrated by the search (which carries ``achieved_share_se``
+    into the Gegenprobe as ``search_se``) -- the closed-form value is only
+    an approximation and would fail a z-test it was never calibrated for."""
+    n_weeks, n_symbols, symbols, _search, kwargs = _calibrated_closed_form_case()
     result = nulls.factor_share_gegenprobe(
-        n_weeks, n_symbols, symbols, sigma_f=sigma_f, sigma_e=sigma_e,
-        rho_f=0.05, beta_sd=beta_sd, target_share=target_share, n_reps=20, seed=53)
+        n_weeks, n_symbols, symbols, seed=53 + nulls.GEGENPROBE_SEED_OFFSET, **kwargs)
     assert result["ok"] is True
-    assert result["rel_diff"] <= 0.25
+    assert result["power_ok"] is True
+    assert result["z"] <= nulls.GEGENPROBE_Z_MAX
+    assert result["rel_diff"] <= nulls.GEGENPROBE_REL_TOL
 
 
 def test_factor_share_gegenprobe_determinism_same_seed():
-    sigma_f, sigma_e, target_share = 0.05, 0.001, 0.8
-    beta_sd = nulls.true_beta_sd_from_factor_share(target_share, sigma_e, sigma_f)
-    kwargs = dict(sigma_f=sigma_f, sigma_e=sigma_e, rho_f=0.05, beta_sd=beta_sd,
-                  target_share=target_share, n_reps=10)
-    n_symbols, n_weeks = 60, 60
-    symbols = [f"s{i}" for i in range(n_symbols - 1)] + ["BTCUSDT"]
-    r1 = nulls.factor_share_gegenprobe(n_weeks, n_symbols, symbols, seed=53, **kwargs)
-    r2 = nulls.factor_share_gegenprobe(n_weeks, n_symbols, symbols, seed=53, **kwargs)
+    """DEC-81: the contract changed (see the 'consistent inputs' test), so the determinism
+    check runs on the calibrated beta_sd; the new result fields are deterministic too."""
+    n_weeks, n_symbols, symbols, _search, kwargs = _calibrated_closed_form_case()
+    seed = 53 + nulls.GEGENPROBE_SEED_OFFSET
+    r1 = nulls.factor_share_gegenprobe(n_weeks, n_symbols, symbols, seed=seed, **kwargs)
+    r2 = nulls.factor_share_gegenprobe(n_weeks, n_symbols, symbols, seed=seed, **kwargs)
     assert r1 == r2
-    r3 = nulls.factor_share_gegenprobe(n_weeks, n_symbols, symbols, seed=999, **kwargs)
+    assert r1["seed"] == seed
+    r3 = nulls.factor_share_gegenprobe(n_weeks, n_symbols, symbols, seed=seed + 1, **kwargs)
     assert r3["simulated_factor_share"] != r1["simulated_factor_share"]
+    assert r3["se_gegenprobe"] != r1["se_gegenprobe"]
 
 
 # ============================================================================
@@ -1268,8 +1376,13 @@ def test_calibrate_beta_sd_to_observed_share_converges_on_synthetic_panel():
     """A fast, moderate-K synthetic panel: the bisection search converges
     (``rel_diff <= rel_tol``) within ``max_iter`` iterations, and a
     SUBSEQUENT, INDEPENDENT :func:`nulls.factor_share_gegenprobe` call
-    with the searched ``beta_sd`` passes (literal, ±25%) -- the
-    round-trip property the DEC-78 Nachtrag exists for."""
+    with the searched ``beta_sd`` passes -- the round-trip property the
+    DEC-78 Nachtrag exists for.
+
+    DEC-81: the Gegenprobe criterion is now ``z <= z_max`` on a standard-
+    error basis (search SE passed in as ``search_se``) plus a power
+    condition, not a fixed +/-25 % band -- so the probes use enough
+    replicates (60 search / 150 Gegenprobe) to be resolvable at all."""
     sigma_f, sigma_e, rho_f, target_share = 0.05, 0.01, 0.05, 0.10
     n_symbols, n_weeks = 250, 52
     symbols = [f"s{i}" for i in range(n_symbols - 1)] + ["BTCUSDT"]
@@ -1277,18 +1390,20 @@ def test_calibrate_beta_sd_to_observed_share_converges_on_synthetic_panel():
     res = nulls.calibrate_beta_sd_to_observed_share(
         target_share, rho_f=rho_f, sigma_f=sigma_f, sigma_e=sigma_e,
         n_weeks=n_weeks, n_symbols=n_symbols, symbols=symbols, seed=7,
-        n_reps=30, rel_tol=0.10, max_iter=15)
+        n_reps=60, rel_tol=0.05, max_iter=15)
     assert res["converged"] is True
     assert res["n_iter"] <= 15
     assert math.isfinite(res["beta_sd_calibrated"])
     assert math.isfinite(res["true_share"])
+    assert math.isfinite(res["achieved_share_se"]) and res["achieved_share_se"] > 0.0
     assert len(res["trace"]) == res["n_iter"]
     for row in res["trace"]:
         assert set(row.keys()) == {"iter", "beta_sd", "achieved_share", "true_share", "rel_diff"}
 
     gp = nulls.factor_share_gegenprobe(
         n_weeks, n_symbols, symbols, sigma_f=sigma_f, sigma_e=sigma_e, rho_f=rho_f,
-        beta_sd=res["beta_sd_calibrated"], target_share=target_share, seed=53, n_reps=30)
+        beta_sd=res["beta_sd_calibrated"], target_share=target_share,
+        seed=7 + nulls.GEGENPROBE_SEED_OFFSET, n_reps=150, search_se=res["achieved_share_se"])
     assert gp["ok"] is True
 
 
@@ -1316,26 +1431,394 @@ def test_calibrate_beta_sd_to_observed_share_determinism_same_seed():
 def test_calibrate_beta_sd_to_observed_share_and_gegenprobe_pass_on_real_w1_numbers():
     """DEC-78 Nachtrag: on the REAL W1 measured magnitudes (rho_f=0.046,
     factor_share=0.0162, sigma_f=0.0669, sigma_e=0.057 -- state/
-    decisions.md DEC-78) the bisection search converges and the
-    SEPARATE, literal Gegenprobe passes -- a REDUCED K (300, not the
-    production ~1138) keeps this fast enough for the unit suite while
-    still exercising the real magnitudes end-to-end (verified against
-    the production K=1138 scale by hand during implementation -- also
-    converges there, ~4 iterations, ~54s, Gegenprobe rel_diff ~9%)."""
-    sigma_f, sigma_e, rho_f, target_share = 0.0669, 0.057, 0.046, 0.0162
+    decisions.md DEC-78) the bisection search converges and a SEPARATE
+    Gegenprobe passes -- a REDUCED K (300, not the production ~1138)
+    keeps this fast enough for the unit suite.
+
+    DEC-81: the Gegenprobe is judged on the standard-error criterion (with
+    the search's own SE) and needs enough replicates to resolve a 25 %
+    deviation of a 1.6 % share (the old 40/30 cannot); to keep the suite
+    fast this reuses the cached K=300 search of the regression test below
+    (same magnitudes to within rounding: 0.06685/0.05695/0.016245) and
+    runs a second, differently seeded Gegenprobe on it."""
+    res, symbols, n_weeks, n_symbols = _w1_size_search(0.046)
+    assert res["converged"] is True, res["trace"]
+    gp = nulls.factor_share_gegenprobe(
+        n_weeks, n_symbols, symbols, sigma_f=0.06685, sigma_e=0.05695, rho_f=0.046,
+        beta_sd=res["beta_sd_calibrated"], target_share=0.016245,
+        seed=53 + nulls.GEGENPROBE_SEED_OFFSET + 1, n_reps=250, search_se=res["achieved_share_se"])
+    assert gp["ok"] is True, gp
+
+
+# ============================================================================
+# DEC-81 -- Kalibrierungs-Gegenprobe auf Standardfehler-Basis (Vorlauf v5c):
+# bootstrap SE of the pooled-median share, cross-section mask, common random
+# numbers, z-test + power condition, loud non-convergence, real-size regression.
+# ============================================================================
+
+def _dec81_small_case(n_weeks: int = 40, n_symbols: int = 30):
+    symbols = [f"s{i}" for i in range(n_symbols - 1)] + ["BTCUSDT"]
+    kw = dict(sigma_f=0.05, sigma_e=0.03, rho_f=0.05, beta_sd=0.4)
+    return n_weeks, n_symbols, symbols, kw
+
+
+def _spy_factor_share(monkeypatch):
+    """Record (window_alive, result) of every ``factor_share_from_trailing_beta`` call."""
+    calls: list[tuple[np.ndarray, dict]] = []
+    orig = nulls.factor_share_from_trailing_beta
+
+    def spy(window_returns, window_alive, beta_prev, **kwargs):
+        res = orig(window_returns, window_alive, beta_prev, **kwargs)
+        calls.append((window_alive, res))
+        return res
+
+    monkeypatch.setattr(nulls, "factor_share_from_trailing_beta", spy)
+    return calls
+
+
+def test_dec81_measure_simulated_share_reports_deterministic_bootstrap_se(monkeypatch):
+    """DEC-81: ``se_bootstrap`` is finite and > 0 for n_reps >= 2, deterministic per seed,
+    NaN below 2 replicates with R^2 values; ``simulated_share`` is still the plain pooled
+    median of every replicate's weekly R^2, and the SE equals an independent slow
+    recomputation of the documented recipe (bootstrap over REPLICATES, B draws, ddof=1)."""
+    n_weeks, n_symbols, symbols, kw = _dec81_small_case()
+    calls = _spy_factor_share(monkeypatch)
+    m1 = nulls._measure_simulated_share(n_weeks, n_symbols, symbols, n_reps=12, seed=53, **kw)
+    assert math.isfinite(m1["se_bootstrap"]) and m1["se_bootstrap"] > 0.0
+    assert m1["n_reps_with_r2"] == 12
+    m2 = nulls._measure_simulated_share(n_weeks, n_symbols, symbols, n_reps=12, seed=53, **kw)
+    assert m1 == m2
+    m3 = nulls._measure_simulated_share(n_weeks, n_symbols, symbols, n_reps=12, seed=54, **kw)
+    assert m3["se_bootstrap"] != m1["se_bootstrap"]
+
+    # the first 12 spied calls belong to m1: pooled median unchanged, SE recomputed independently
+    per_rep = [np.array([w["r2"] for w in res["per_week"] if w["r2"] is not None]) for _a, res in calls[:12]]
+    assert m1["simulated_share"] == float(np.median(np.concatenate(per_rep)))
+    rng = np.random.default_rng(53 + nulls.SHARE_SE_BOOTSTRAP_SEED_OFFSET)
+    idx = rng.integers(0, len(per_rep), size=(nulls.SHARE_SE_BOOTSTRAP_B, len(per_rep)))
+    meds = [float(np.median(np.concatenate([per_rep[i] for i in row]))) for row in idx]
+    assert m1["se_bootstrap"] == pytest.approx(float(np.std(meds, ddof=1)), rel=1e-12)
+
+    one = nulls._measure_simulated_share(n_weeks, n_symbols, symbols, n_reps=1, seed=53, **kw)
+    assert math.isnan(one["se_bootstrap"]) and one["n_reps_with_r2"] == 1
+    assert math.isfinite(one["simulated_share"])
+
+
+def test_dec81_bootstrap_se_matches_empirical_sampling_sd_of_the_share():
+    """DEC-81: the bootstrap SE is a meaningful standard error -- its mean over 40 seeds
+    is within [0.6, 1.6] of the empirical SD of the share over those same 40 independent
+    seeds (each a 16-replicate estimate)."""
+    n_weeks, n_symbols, symbols, kw = _dec81_small_case(n_weeks=40, n_symbols=60)
+    shares, ses = [], []
+    for seed in range(40):
+        m = nulls._measure_simulated_share(n_weeks, n_symbols, symbols, n_reps=16, seed=1000 + seed, **kw)
+        shares.append(m["simulated_share"])
+        ses.append(m["se_bootstrap"])
+    ratio = float(np.mean(ses)) / float(np.std(shares, ddof=1))
+    assert 0.6 <= ratio <= 1.6, ratio
+
+
+def test_dec81_measure_simulated_share_mask_limits_the_cross_section(monkeypatch):
+    """DEC-81: ``mask`` replaces the all-alive mask -- each simulated week's cross-section
+    has exactly the masked size (per_week k), an all-True mask equals the default, a wrong
+    shape is a loud ValueError."""
+    n_weeks, n_symbols, symbols, kw = _dec81_small_case()
+    rng = np.random.default_rng(3)
+    mask = np.zeros((n_weeks, n_symbols), dtype=bool)
+    for t in range(n_weeks):
+        mask[t, rng.permutation(n_symbols)[:12 + (t % 7)]] = True
+
+    calls = _spy_factor_share(monkeypatch)
+    nulls._measure_simulated_share(n_weeks, n_symbols, symbols, n_reps=2, seed=5, mask=mask, **kw)
+    assert len(calls) == 2
+    for alive_arg, res in calls:
+        assert alive_arg is mask or np.array_equal(alive_arg, mask)
+        for row in res["per_week"]:
+            t = row["t"]
+            # the simulated trailing beta is finite from week 26 on (26 weeks of history)
+            assert row["k"] == (int(mask[t].sum()) if t >= 26 else 0)
+
+    calls.clear()
+    nulls._measure_simulated_share(n_weeks, n_symbols, symbols, n_reps=1, seed=5, **kw)
+    assert all(row["k"] == (n_symbols if row["t"] >= 26 else 0) for row in calls[0][1]["per_week"])
+
+    full = nulls._measure_simulated_share(n_weeks, n_symbols, symbols, n_reps=4, seed=5, **kw)
+    all_true = nulls._measure_simulated_share(n_weeks, n_symbols, symbols, n_reps=4, seed=5,
+                                              mask=np.ones((n_weeks, n_symbols), dtype=bool), **kw)
+    assert full == all_true
+    masked = nulls._measure_simulated_share(n_weeks, n_symbols, symbols, n_reps=4, seed=5, mask=mask, **kw)
+    assert masked["simulated_share"] != full["simulated_share"]
+
+    with pytest.raises(ValueError, match="mask shape"):
+        nulls._measure_simulated_share(n_weeks, n_symbols, symbols, n_reps=1, seed=5,
+                                       mask=np.ones((n_weeks, n_symbols - 1), dtype=bool), **kw)
+
+
+def test_dec81_calibration_uses_common_random_numbers_and_reproduces_achieved_share():
+    """DEC-81: every bisection iteration uses the SAME seed, so re-measuring any trace
+    entry's beta_sd with that seed/n_reps reproduces its achieved share EXACTLY (and the
+    final one reproduces ``achieved_share``/``achieved_share_se``/``true_share``); the
+    sample function beta_sd -> share is deterministic and increasing on a coarse grid."""
+    n_weeks, n_symbols, symbols, kw = _dec81_small_case(n_weeks=40, n_symbols=60)
+    kw.pop("beta_sd")
+    res = nulls.calibrate_beta_sd_to_observed_share(
+        0.10, n_weeks=n_weeks, n_symbols=n_symbols, symbols=symbols, seed=11, n_reps=10,
+        rel_tol=0.03, max_iter=14, **kw)
+    assert res["crn"] is True and len(res["trace"]) >= 3
+    assert res["mask_k_median"] == n_symbols
+    for row in res["trace"]:
+        m = nulls._measure_simulated_share(n_weeks, n_symbols, symbols, beta_sd=row["beta_sd"],
+                                           seed=11, n_reps=10, **kw)
+        assert m["simulated_share"] == row["achieved_share"]
+        assert m["true_share"] == row["true_share"]
+    m = nulls._measure_simulated_share(n_weeks, n_symbols, symbols, beta_sd=res["beta_sd_calibrated"],
+                                       seed=11, n_reps=10, **kw)
+    assert m["simulated_share"] == res["achieved_share"]
+    assert m["se_bootstrap"] == res["achieved_share_se"]
+    assert m["true_share"] == res["true_share"]
+
+    grid = [nulls._measure_simulated_share(n_weeks, n_symbols, symbols, beta_sd=b, seed=11, n_reps=10,
+                                           **kw)["simulated_share"] for b in (0.05, 0.1, 0.2, 0.4, 0.8)]
+    assert all(b > a for a, b in zip(grid, grid[1:])), grid
+
+
+def test_dec81_calibration_forwards_mask_and_reports_its_median_size():
+    """DEC-81: ``mask`` reaches the measurement (the share differs from the unmasked one),
+    ``mask_k_median`` is the median per-week cross-section size."""
+    n_weeks, n_symbols, symbols, kw = _dec81_small_case(n_weeks=40, n_symbols=60)
+    kw.pop("beta_sd")
+    rng = np.random.default_rng(8)
+    mask = rng.random((n_weeks, n_symbols)) < 0.4
+    common = dict(n_weeks=n_weeks, n_symbols=n_symbols, symbols=symbols, seed=11, n_reps=6,
+                  rel_tol=0.5, max_iter=3, **kw)
+    masked = nulls.calibrate_beta_sd_to_observed_share(0.10, mask=mask, **common)
+    plain = nulls.calibrate_beta_sd_to_observed_share(0.10, **common)
+    assert masked["mask_k_median"] == float(np.median(mask.sum(axis=1)))
+    assert plain["mask_k_median"] == n_symbols
+    assert masked["trace"][0]["achieved_share"] != plain["trace"][0]["achieved_share"]
+    degenerate = nulls.calibrate_beta_sd_to_observed_share(0.0, mask=mask, **common)
+    assert degenerate["mask_k_median"] == masked["mask_k_median"] and degenerate["crn"] is True
+
+
+@functools.lru_cache(maxsize=None)
+def _w1_size_search(rho_f: float):
+    """DEC-81: the CRN calibration search on the REAL W1 magnitudes (sigma_f 0.06685, sigma_e
+    0.05695, target 0.016245) at a reduced K = 300, W = 53 -- cached, the two tests below
+    share it (~20 s each otherwise)."""
     n_symbols, n_weeks = 300, 53
     symbols = [f"S{i:03d}" for i in range(n_symbols - 1)] + ["BTCUSDT"]
-
     res = nulls.calibrate_beta_sd_to_observed_share(
-        target_share, rho_f=rho_f, sigma_f=sigma_f, sigma_e=sigma_e,
-        n_weeks=n_weeks, n_symbols=n_symbols, symbols=symbols, seed=53,
-        n_reps=40, rel_tol=0.10, max_iter=25)
-    assert res["converged"] is True, res["trace"]
+        0.016245, rho_f=rho_f, sigma_f=0.06685, sigma_e=0.05695, n_weeks=n_weeks, n_symbols=n_symbols,
+        symbols=symbols, seed=53, n_reps=200)
+    return res, symbols, n_weeks, n_symbols
 
-    gp = nulls.factor_share_gegenprobe(
-        n_weeks, n_symbols, symbols, sigma_f=sigma_f, sigma_e=sigma_e, rho_f=rho_f,
-        beta_sd=res["beta_sd_calibrated"], target_share=target_share, seed=53, n_reps=30)
-    assert gp["ok"] is True, gp
+
+@pytest.mark.parametrize("rho_f", [0.0, 0.046])
+def test_dec81_regression_real_w1_sizes_search_converges_gegenprobe_passes_and_has_teeth(rho_f):
+    """DEC-81 regression of the wp13a failure (``zero`` calibration: simulated 0.0212 against
+    target 0.0162, both runs): the REAL W1 magnitudes (sigma_f 0.06685, sigma_e 0.05695,
+    target 0.016245) at a reduced K = 300 (W = 53). The CRN search converges, the INDEPENDENT
+    Gegenprobe (other seed, SE criterion incl. the search SE) passes for both rho_f -- and a
+    beta_sd 15 % too large is rejected (the Gegenprobe has teeth)."""
+    target = 0.016245
+    res, symbols, n_weeks, n_symbols = _w1_size_search(rho_f)
+    assert res["converged"] is True, res["trace"]
+    assert abs(res["achieved_share"] - target) / target <= nulls.CALIBRATION_SEARCH_REL_TOL_DEFAULT
+
+    common = dict(sigma_f=0.06685, sigma_e=0.05695, rho_f=rho_f, target_share=target,
+                  seed=53 + nulls.GEGENPROBE_SEED_OFFSET, search_se=res["achieved_share_se"])
+    gp = nulls.factor_share_gegenprobe(n_weeks, n_symbols, symbols, beta_sd=res["beta_sd_calibrated"],
+                                       n_reps=250, **common)
+    assert gp["ok"] is True and gp["power_ok"] is True
+    assert gp["z"] <= nulls.GEGENPROBE_Z_MAX
+
+    with pytest.raises(nulls.FactorShareCalibrationError, match="Gegenprobe fehlgeschlagen"):
+        nulls.factor_share_gegenprobe(n_weeks, n_symbols, symbols,
+                                      beta_sd=1.15 * res["beta_sd_calibrated"], n_reps=100, **common)
+
+
+def _fake_measure(monkeypatch, simulated_share: float, se: float):
+    def fake(*_a, **_k):
+        return {"simulated_share": simulated_share, "true_share": simulated_share, "n_r2_pooled": 1000,
+                "n_true_r2_pooled": 1000, "se_bootstrap": se, "n_reps_with_r2": 100}
+    monkeypatch.setattr(nulls, "_measure_simulated_share", fake)
+
+
+def _gegenprobe_stub(target: float, **kwargs):
+    symbols = [f"s{i}" for i in range(19)] + ["BTCUSDT"]
+    return nulls.factor_share_gegenprobe(
+        10, 20, symbols, sigma_f=0.05, sigma_e=0.03, rho_f=0.0, beta_sd=0.2, target_share=target, **kwargs)
+
+
+def test_dec81_gegenprobe_z_formula_with_search_se(monkeypatch):
+    """DEC-81: z = |sim - target| / sqrt(se_gegenprobe^2 + search_se^2), computed by hand:
+    sim 0.0170, target 0.0162, se 0.0003, search_se 0.0004 -> se_diff 0.0005, z 1.6."""
+    _fake_measure(monkeypatch, 0.0170, 0.0003)
+    res = _gegenprobe_stub(0.0162, search_se=0.0004)
+    assert res["se_gegenprobe"] == pytest.approx(0.0003)
+    assert res["search_se"] == pytest.approx(0.0004)
+    assert res["se_diff"] == pytest.approx(0.0005)
+    assert res["z"] == pytest.approx(0.0008 / 0.0005)
+    assert res["z_max"] == nulls.GEGENPROBE_Z_MAX
+    assert res["power_ok"] is True and res["ok"] is True
+    assert res["rel_diff"] == pytest.approx(0.0008 / 0.0162)
+
+    res0 = _gegenprobe_stub(0.0162)                         # search_se defaults to 0
+    assert res0["se_diff"] == pytest.approx(0.0003) and res0["z"] == pytest.approx(0.0008 / 0.0003)
+
+    # z above z_max: raises naming the violated condition, z, se_diff and both shares
+    _fake_measure(monkeypatch, 0.0180, 0.0003)
+    with pytest.raises(nulls.FactorShareCalibrationError) as exc:
+        _gegenprobe_stub(0.0162, search_se=0.0004)
+    msg = str(exc.value)
+    assert msg.startswith("Gegenprobe fehlgeschlagen")
+    assert "Abweichung > z_max Standardfehler" in msg and "unterpowert" not in msg
+    assert float(re.search(r"z=([0-9.]+)", msg).group(1)) == pytest.approx(3.6)
+    assert float(re.search(r"se_diff=([0-9.e-]+)", msg).group(1)) == pytest.approx(0.0005)
+    assert "0.018" in msg and "0.0162" in msg
+    # ... and the very same numbers pass with a larger z_max
+    assert _gegenprobe_stub(0.0162, search_se=0.0004, z_max=4.0)["ok"] is True
+
+
+def test_dec81_gegenprobe_power_condition_and_nan(monkeypatch):
+    """DEC-81: z = 0 but 3 * se_diff > rel_tol * target -> 'unterpowert: n_reps erhoehen';
+    NaN share or NaN SE is never ok."""
+    _fake_measure(monkeypatch, 0.0162, 0.003)                 # exact hit, but a hopelessly noisy probe
+    with pytest.raises(nulls.FactorShareCalibrationError) as exc:
+        _gegenprobe_stub(0.0162)
+    msg = str(exc.value)
+    assert "unterpowert: n_reps erhoehen" in msg and "Abweichung > z_max" not in msg
+    # the same probe is fine when the resolvable deviation is widened (rel_tol * target >= 3 * se_diff)
+    res = _gegenprobe_stub(0.0162, rel_tol=1.0)
+    assert res["ok"] is True and res["z"] == 0.0 and res["power_ok"] is True
+
+    _fake_measure(monkeypatch, float("nan"), 0.0003)
+    with pytest.raises(nulls.FactorShareCalibrationError, match="Gegenprobe fehlgeschlagen"):
+        _gegenprobe_stub(0.0162)
+    _fake_measure(monkeypatch, 0.0162, float("nan"))
+    with pytest.raises(nulls.FactorShareCalibrationError, match="nicht berechenbar"):
+        _gegenprobe_stub(0.0162)
+
+
+@pytest.mark.parametrize("rel_dev", [0.26, 0.5, -0.3])
+@pytest.mark.parametrize("se", [1e-7, 1e-4, 1e-3, 3e-3, 1e-2])
+def test_dec81_gegenprobe_is_never_looser_than_the_old_band(monkeypatch, rel_dev, se):
+    """DEC-81: whatever the standard error, a deviation beyond the old +/-25 % band never
+    passes -- a tiny SE trips the z-test, a large SE the power condition."""
+    target = 0.0162
+    _fake_measure(monkeypatch, target * (1.0 + rel_dev), se)
+    with pytest.raises(nulls.FactorShareCalibrationError, match="Gegenprobe fehlgeschlagen"):
+        _gegenprobe_stub(target)
+
+
+def test_dec81_gegenprobe_underpowered_with_tiny_n_reps_raises_unterpowert():
+    """DEC-81: a probe with 3 replicates cannot resolve a 25 % miscalibration. The target is
+    set to the probe's own share (z == 0), so ONLY the power condition can fail."""
+    n_weeks, n_symbols, symbols, kw = _dec81_small_case()
+    own = nulls._measure_simulated_share(n_weeks, n_symbols, symbols, n_reps=3, seed=5, **kw)
+    with pytest.raises(nulls.FactorShareCalibrationError, match="unterpowert") as exc:
+        nulls.factor_share_gegenprobe(n_weeks, n_symbols, symbols, target_share=own["simulated_share"],
+                                      n_reps=3, seed=5, **kw)
+    assert "Abweichung > z_max" not in str(exc.value)
+    # with a widened resolvable deviation the very same probe passes at z == 0
+    res = nulls.factor_share_gegenprobe(n_weeks, n_symbols, symbols, target_share=own["simulated_share"],
+                                        n_reps=3, seed=5, rel_tol=10.0, **kw)
+    assert res["ok"] is True and res["z"] == 0.0
+
+
+def test_dec81_study_raises_loud_when_a_search_does_not_converge():
+    """DEC-81: ``converged is False`` aborts the study at once, naming the calibration, the
+    target and the last trace entry (formerly the last value was silently taken over)."""
+    w, k = 40, 30
+    rng = np.random.default_rng(13)
+    returns = rng.normal(0, 0.03, size=(w, k))
+    alive = np.ones((w, k), dtype=bool)
+    symbols = [f"s{i}" for i in range(k - 1)] + ["BTCUSDT"]
+    with pytest.raises(nulls.FactorShareCalibrationError, match="nicht konvergiert") as exc:
+        nulls.beta_control_method_study(
+            returns, alive, symbols, rho_f_measured=0.3, factor_share_measured=0.02,
+            variants=("mom1",), methods=("none",), n_reps=2, seed=53, gegenprobe_n_reps=5,
+            calibration_search_n_reps=4, calibration_search_rel_tol=1e-6, calibration_search_max_iter=1)
+    msg = str(exc.value)
+    assert "'measured'" in msg and "0.02" in msg and "'iter': 0" in msg
+    # a degenerate (NaN) target has no trace at all but is just as loud
+    with pytest.raises(nulls.FactorShareCalibrationError, match="nicht konvergiert"):
+        nulls.beta_control_method_study(
+            returns, alive, symbols, rho_f_measured=0.3, factor_share_measured=float("nan"),
+            variants=("mom1",), methods=("none",), n_reps=2, seed=53, gegenprobe_n_reps=5)
+
+
+def test_dec81_study_forwards_calibration_mask_to_searches_and_gegenproben(monkeypatch):
+    """DEC-81: ``calibration_mask`` reaches all three searches and all three Gegenproben;
+    each calibration reports ``calibration_mask_k_median``; the Gegenprobe draws from
+    ``seed + GEGENPROBE_SEED_OFFSET`` with the search's own SE and ``gegenprobe_z_max``."""
+    w, k = 40, 30
+    rng = np.random.default_rng(13)
+    returns = rng.normal(0, 0.03, size=(w, k))
+    alive = np.ones((w, k), dtype=bool)
+    symbols = [f"s{i}" for i in range(k - 1)] + ["BTCUSDT"]
+    mask = np.zeros((w, k), dtype=bool)
+    mask[:, :18] = True
+    seen: list[tuple[str, np.ndarray, dict]] = []
+    orig_search, orig_gp = nulls.calibrate_beta_sd_to_observed_share, nulls.factor_share_gegenprobe
+
+    def spy_search(*a, **kw):
+        seen.append(("search", kw.get("mask"), kw))
+        return orig_search(*a, **kw)
+
+    def spy_gp(*a, **kw):
+        seen.append(("gegenprobe", kw.get("mask"), kw))
+        return orig_gp(*a, **kw)
+
+    monkeypatch.setattr(nulls, "calibrate_beta_sd_to_observed_share", spy_search)
+    monkeypatch.setattr(nulls, "factor_share_gegenprobe", spy_gp)
+    study = nulls.beta_control_method_study(
+        returns, alive, symbols, rho_f_measured=0.3, factor_share_measured=0.02,
+        variants=("mom1",), methods=("none",), n_reps=2, seed=53, gegenprobe_n_reps=10,
+        gegenprobe_rel_tol=10.0, gegenprobe_z_max=1e9, calibration_search_n_reps=5,
+        calibration_search_rel_tol=10.0, calibration_search_max_iter=4, calibration_mask=mask)
+    assert [kind for kind, _m, _kw in seen].count("search") == 3
+    assert [kind for kind, _m, _kw in seen].count("gegenprobe") == 3
+    for kind, m, kw in seen:
+        assert m is mask
+        if kind == "gegenprobe":
+            assert kw["seed"] == 53 + nulls.GEGENPROBE_SEED_OFFSET and kw["z_max"] == 1e9
+            assert kw["n_reps"] == 10
+    for cal in nulls.FACTOR_NULL_CALIBRATIONS:
+        assert study["calibrations"][cal]["calibration_mask_k_median"] == 18.0
+        assert (study["calibrations"][cal]["gegenprobe"]["search_se"]
+                == study["calibrations"][cal]["calibration_search"]["achieved_share_se"])
+
+
+def test_dec81_prelaunch_passes_the_real_measurement_cross_section_as_calibration_mask(tmp_path, monkeypatch):
+    """DEC-81 (F): per window the study gets exactly ``alive & finite beta_prev_26w & finite
+    returns`` -- the cross-section ``factor_share_from_trailing_beta`` measures on real data
+    -- and the new ``gegenprobe_z_max`` knob."""
+    panel, weekly, _sb, _sm, _db, del_manifest, dd_path = _build_prelaunch_fixture_tree(tmp_path)
+    captured: list[dict] = []
+    orig = nulls.beta_control_method_study
+
+    def spy(*a, **kw):
+        captured.append(dict(kw))
+        return orig(*a, **kw)
+
+    monkeypatch.setattr(nulls, "beta_control_method_study", spy)
+    prelaunch.assemble_prelaunch_report(
+        panel, weekly, delisted_manifest_path=del_manifest, delisting_dates_path=dd_path,
+        n_sims=5, n_reps_factor_null=5, n_reps_beta_control_study=5, n_reps_beta_control_winner=5, seed=53,
+        gegenprobe_n_reps=10, gegenprobe_rel_tol=10.0, gegenprobe_z_max=1e9,
+        calibration_search_n_reps=5, calibration_search_rel_tol=10.0, calibration_search_max_iter=8)
+    assert len(captured) == 2                                   # W1 and W2 (never L)
+    weeks, returns, alive = weekly["weeks"], weekly["returns"], weekly["alive"]
+    beta_prev = nulls.trailing_pit_beta_excluding_current_week(returns, panel["symbols"])
+    for kw, wname in zip(captured, ("W1", "W2")):
+        lo_hi = prelaunch.slice_window(weeks, *prelaunch.WINDOWS[wname], returns, alive)
+        lo, hi = lo_hi["lo"], lo_hi["hi"]
+        expected = alive[lo:hi] & ~np.isnan(beta_prev[lo:hi]) & ~np.isnan(returns[lo:hi])
+        mask = kw["calibration_mask"]
+        assert mask.dtype == bool and np.array_equal(mask, expected)
+        assert 0 < mask.sum() < mask.size
+        assert kw["gegenprobe_z_max"] == 1e9
 
 
 # ============================================================================
@@ -1444,7 +1927,13 @@ def test_beta_control_method_study_grid_shape_and_calibration_construction():
     ``gegenprobe_rel_tol`` is set generous here -- this test checks the
     GRID's ASSEMBLY shape, not the Gegenprobe's own statistical tolerance
     (see the dedicated ``factor_share_gegenprobe``/``calibrate_beta_sd_
-    to_observed_share`` tests below, which DO exercise real convergence)."""
+    to_observed_share`` tests below, which DO exercise real convergence).
+
+    DEC-81: ``gegenprobe_z_max=1e9`` and ``calibration_search_rel_tol=10.0``
+    switch the new z-test and the (now loud) convergence requirement off
+    on this 30-symbol panel, where the target share is otherwise
+    unreachable; the study also records the independent Gegenprobe seed
+    and the search SE it hands to the z-test."""
     w, k = 40, 30
     rng = np.random.default_rng(13)
     returns = rng.normal(0, 0.03, size=(w, k))
@@ -1453,8 +1942,8 @@ def test_beta_control_method_study_grid_shape_and_calibration_construction():
     study = nulls.beta_control_method_study(
         returns, alive, symbols, rho_f_measured=0.3, factor_share_measured=0.02,
         variants=("mom1", "rev_gap"), methods=("none", "ts_resid_8w", "double_sort_13w"),
-        n_reps=6, seed=53, gegenprobe_rel_tol=10.0, calibration_search_n_reps=5,
-        calibration_search_max_iter=6)
+        n_reps=6, seed=53, gegenprobe_n_reps=10, gegenprobe_rel_tol=10.0, gegenprobe_z_max=1e9,
+        calibration_search_n_reps=5, calibration_search_rel_tol=10.0, calibration_search_max_iter=6)
     assert set(study["calibrations"].keys()) == {"measured", "stress", "zero"}
     for cal in ("measured", "stress", "zero"):
         assert set(study["calibrations"][cal]["methods"].keys()) == {"none", "ts_resid_8w", "double_sort_13w"}
@@ -1464,6 +1953,12 @@ def test_beta_control_method_study_grid_shape_and_calibration_construction():
         assert "calibration_search" in study["calibrations"][cal]
         assert math.isfinite(study["calibrations"][cal]["beta_sd_calibrated"])
         assert math.isfinite(study["calibrations"][cal]["beta_sd_analytic_first_guess"])
+        # DEC-81: independent Gegenprobe seed, the search's SE handed to the z-test, no mask given.
+        gp = study["calibrations"][cal]["gegenprobe"]
+        assert gp["seed"] == 53 + nulls.GEGENPROBE_SEED_OFFSET
+        assert gp["search_se"] == study["calibrations"][cal]["calibration_search"]["achieved_share_se"]
+        assert study["calibrations"][cal]["calibration_search"]["crn"] is True
+        assert study["calibrations"][cal]["calibration_mask_k_median"] is None
     assert study["calibrations"]["stress"]["rho_f"] == pytest.approx(0.6)      # 2 * 0.3
     assert study["calibrations"]["measured"]["rho_f"] == pytest.approx(0.3)
     assert study["calibrations"]["zero"]["rho_f"] == 0.0

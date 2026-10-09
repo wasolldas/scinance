@@ -78,3 +78,14 @@
 - Sandbox-Python verliert nach Container-Wechsel Pakete: `pip install` der Abhaengigkeiten aus `pyproject.toml` ohne `filterpy` (baut nicht), dann `pip install --no-deps -e .`, plus `pytest pyarrow pyyaml`.
 - Ein Builder meldet "fertig", aber Zahlen im echten Lauf weichen ab -> jede Simulations-Kalibrierung gegen die gemessene Groesse mit demselben Schaetzer gegenpruefen (DEC-78).
 - Registry-Fehler der Vergangenheit: Schwelle aus fensterfremdem Messfenster, Rauschboden als "Messung" einer Identitaet, nie bindende Gates, stillschweigend entfallene Kill-Bedingungen - jede Neufassung gegen beide Reviews pruefen.
+
+---
+
+## 9. Nachtrag (zweite Sitzung 2026-10-09) - was sich geaendert hat
+
+- **Vorlauf v5 repariert (DEC-81):** Ursache war die Stichprobenstreuung des Median-R^2-Schaetzers (~8,5 % bei 30-40 Replikaten) zusammen mit einer Bisektion auf frischen Zufallszahlen je Iteration. Jetzt: Suche mit gemeinsamen Zufallszahlen (400 Replikate, 1 % Praezision, nicht konvergiert = laut), Gegenprobe unabhaengig (400 Replikate, `z <= 3` UND `3*se_diff <= 0,25*Ziel`), Simulation ueber den realen Querschnitt je Woche, `beta_characteristic` bitgleich ~36x schneller. Kontrolllauf mit echten W1/W2-Groessen: alle sechs Gegenproben bestanden (z <= 0,82, Power-Auslastung <= 0,78). Auftrag `2026-10-09_wp13a_v5c` an den Autopiloten.
+- **Data-Harvest in der Cloud: funktioniert** (Secrets gesetzt, Client gelesen und genutzt, Katalog 319.063 Partitionen). Client-Datei liegt NICHT im Repo; jede Sitzung holt sie neu (Abschnitt 4). Bybit-Stroeme im Archiv nur BNB/BTC/ETH/SOL/XRP.
+- **`api.bybit.com` aus der Cloud: Geosperre von Bybit selbst** (CloudFront, US-Region), nicht die Allowlist. `panel_1d` bleibt dauerhaft Autopilot-Sache; den Nutzer dafuer nicht um Freigaben bitten.
+- **Erweiterte V-1 (DEC-82):** Recherche in `state/V1_ERWEITERT_RECHERCHE_2026-10-09.md`. Naechster Schritt: empirische Gegenprobe auf `panel_1d` (Modalwert von `funding_sum/funding_n` je Intervallklasse = skaliertes I; Intervallwechsel je Symbol aus `funding_n`) als eigener Autopilot-Auftrag nach v5c.
+- **Branches:** Die Cloud-Sitzung bekommt je Sitzung einen eigenen Branch zugewiesen; der Autopilot liest NUR `claude/subagent-prd-development-T16fE`. Deshalb jeden Commit auf beide pushen (`git push origin HEAD:claude/subagent-prd-development-T16fE`, nur Fast-Forward, nie force).
+- **Testbaseline dieser Sandbox:** 3 Legacy-Fehler in `tests/unit/test_execution_live.py` (caplog/Root-Rechte, auch vor DEC-81) - kein WP-13-Bezug.

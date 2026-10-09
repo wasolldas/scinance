@@ -26,7 +26,7 @@ param(
     [string]$OutDir = "",
     [string]$Seed = "53",
     [string]$NSims = "1000",
-    [string]$NRepsBetaStudy = "100",
+    [string]$NRepsBetaStudy = "300",
     [string]$NRepsBetaWinner = "1000",
     [string]$Convention = "close_at_last",
     [string]$StressRel = "",
