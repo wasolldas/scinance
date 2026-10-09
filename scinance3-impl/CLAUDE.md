@@ -108,3 +108,24 @@ nie mit offenem Prompt abbrechen und rc != 0 bei Vorbedingungs-Fehlern geben.
 4. Jede Zahl im Programm hat eine Herleitung oder eine Quelle; Sekundaer-
    belege tragen [sek], Fehlendes heisst UNBELEGT und blockiert die
    abhaengige Konstante (RAISE), nie ein Default.
+
+## MARKTDATEN (DATA-HARVEST) - seit 2026-10-07
+Rohdaten aus dem Data-Harvest-Archiv kommen ausschliesslich ueber dessen
+Client `harvest_data.py` (Bezug und Regeln: `UEBERGABE_2026-10-09.md`
+Abschnitt 4): `hd.configure()` -> `hd.catalog()` / `hd.load(stream, symbols,
+start, end, exchange=...)`.
+- Zugangsdaten nur aus den Umgebungs-Secrets `HARVEST_S3_ENDPOINT`,
+  `HARVEST_S3_ACCESS_KEY`, `HARVEST_S3_SECRET_KEY`; nie aus Chat oder Datei,
+  nie ins Repo, nie der Hostname ins (oeffentliche) Repo.
+- Der Thin Client serviert nur; gerechnet wird in der Sandbox (CPU) oder auf
+  dem Nutzer-PC (Autopilot, DEC-79), nie auf dem Thin Client.
+- Nie den Bucket listen oder globben; was existiert, steht in `hd.catalog()`.
+- Endpunkt ~2 MB/s, geteilt: Zeitraeume klein, `columns=` nutzen; grosse
+  Orderbuch-Laeufe auf dem Nutzer-PC.
+- Fehlende Tage (`hd.gaps`) nie interpolieren oder still auslassen - benennen.
+- Bekannte Besonderheiten: 2026-08-13 Bybit-Live-Stroeme doppelt (Client
+  dedupliziert), 2026-08-14 Ausfalltag, Bybit-WS-Feldnamen ohne "1".
+
+## EINSTIEG FUER NEUE SITZUNGEN
+Zuerst `scinance3-impl/UEBERGABE_<juengstes Datum>.md` lesen (Stand, offene
+Arbeit, Autopilot, Datenzugang), dann diese Verfassung.
