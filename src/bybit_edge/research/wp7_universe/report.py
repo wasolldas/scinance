@@ -208,6 +208,64 @@ def _fmt(v: Any, nd: int = 4) -> str:
     return str(v)
 
 
+def _fmt_rate(v: Any) -> str:
+    """Plain-decimal rate (no exponent), trailing zeros trimmed."""
+    if v is None:
+        return "n/a"
+    s = f"{v:.10f}".rstrip("0").rstrip(".")
+    return "0" if s in ("", "-0") else s
+
+
+def _deadzone_by_class_markdown(by_class: dict[str, Any]) -> list[str]:
+    """DEC-82: per interval class, exact hits against every candidate I and
+    the 5 most frequent daily means (descriptive, ASCII)."""
+    lines = ["## DEC-82: Totzone je Intervallklasse gegen Kandidaten-I (deskriptiv, kein Urteil)",
+             "Treffer = Tagesmittel funding_sum/funding_n innerhalb tol von I(m) = 0.0001*m/480; "
+             "gemessen, keine Diagonale angenommen."]
+    for label, c in by_class.items():
+        lines.append(f"- Klasse {label}: n_symbol_tage={c.get('n_symbol_days')} "
+                     f"(Tagesmittel NaN: {c.get('n_mean_nan')})")
+        hits = c.get("exact_hits_vs_candidate_I") or {}
+        lines.append("  - Treffer gegen I: " + "; ".join(
+            f"{k}={h.get('n')} ({_fmt(h.get('share'))})" for k, h in hits.items()))
+        top = c.get("top5_daily_means") or []
+        lines.append("  - haeufigste Tagesmittel: " + (
+            "; ".join(f"{_fmt_rate(t.get('value'))} n={t.get('n')} ({_fmt(t.get('share'))})"
+                      for t in top) if top else "keine"))
+    lines.append("")
+    return lines
+
+
+def _episodes_markdown(es: dict[str, Any]) -> list[str]:
+    """DEC-82: run (episode) aggregates of the interval classes, split at
+    the [sek] auto-switch reference date (descriptive, ASCII)."""
+    ref = es.get("reference_date")
+    lines = [f"## DEC-82: Intervallklassen-Episoden, getrennt vor/ab {ref} (deskriptiv, kein Urteil)",
+             f"Datum {ref} ist [sek]-Angabe (nicht primaer belegt). Lauf = aufeinanderfolgende "
+             "klassifizierte Tage derselben Klasse; Tage ohne Funding/unklassifiziert werden "
+             "uebersprungen; Zuordnung nach Laufbeginn; Dauer = Kalendertage erster..letzter "
+             "Tag, nur bis zum Wechsel in die naechste Klasse (am Panelende offene und durch "
+             "Datenende/Delisting beendete Laeufe sind zensiert und ohne Dauer)."]
+    de = {"before": "vor", "from": "ab"}
+    for label, periods in (es.get("by_class") or {}).items():
+        for p in ("before", "from"):
+            s = periods.get(p, {})
+            d = s.get("duration_days", {})
+            lines.append(
+                f"- {label} {de[p]}: laeufe={s.get('n_runs')} offen_am_ende={s.get('n_open_at_end')} "
+                f"durch_datenende_beendet={s.get('n_closed_by_data_end')} | Dauer Tage "
+                f"(n={d.get('n')}): median={_fmt(d.get('median'), 1)} q10={_fmt(d.get('q10'), 1)} "
+                f"q25={_fmt(d.get('q25'), 1)} q75={_fmt(d.get('q75'), 1)} "
+                f"q90={_fmt(d.get('q90'), 1)} max={_fmt(d.get('max'), 0)}")
+    for p in ("before", "from"):
+        tr = (es.get("transitions") or {}).get(p) or {}
+        lines.append(f"- Uebergaenge {de[p]}: " + (
+            "; ".join(f"{k}={n}" for k, n in tr.items()) if tr else "keine"))
+    n60 = es.get("n_symbols_with_60min_run") or {}
+    lines += [f"- Symbole mit mind. einem 60min-Lauf: vor={n60.get('before')} ab={n60.get('from')}", ""]
+    return lines
+
+
 def _extra_sections_markdown(extra: dict[str, Any]) -> list[str]:
     """Full-census sections (``scripts/wp7_universe_census.py::cmd_census``)
     -- all descriptive, no verdict; every block says so explicitly. Absent
@@ -266,6 +324,8 @@ def _extra_sections_markdown(extra: dict[str, Any]) -> list[str]:
             lines.append(f"  - Dezil {d['decile']}: Totzonen-Anteil={_fmt(d.get('deadzone_share'))} "
                           f"(n_symbol_wochen={d.get('n_symbol_weeks')})")
         lines.append("")
+        if dz.get("by_interval_class"):
+            lines += _deadzone_by_class_markdown(dz["by_interval_class"])
 
     if "funding_autocorrelation_dec58" in extra:
         fa = extra["funding_autocorrelation_dec58"]
@@ -334,6 +394,8 @@ def _extra_sections_markdown(extra: dict[str, Any]) -> list[str]:
         for label, n in sorted((iw.get("days_per_class_total") or {}).items()):
             lines.append(f"  - {label}: {n}")
         lines.append("")
+        if iw.get("episodes_summary"):
+            lines += _episodes_markdown(iw["episodes_summary"])
 
     if "delisted" in extra:
         d = extra["delisted"]

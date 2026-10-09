@@ -51,6 +51,8 @@ __all__ = [
     # WP-12b / DEC-70 (union of panel_1d + panel_1d_delisted, additive):
     "delisted_symbols_with_history", "load_delisting_dates", "load_panel_union",
     "weekly_returns_and_mask_union", "union_range_fingerprint",
+    # DEC-82 (V-1 empirics in the WP-7 census, additive):
+    "AUTO_SWITCH_REFERENCE_DATE",
 ]
 
 _EPOCH = date(1970, 1, 1)
@@ -66,6 +68,14 @@ I_PER_8H = 0.0001
 #: funding_n is reported as its own bucket, never silently folded into one
 #: of these.
 _FUNDING_N_TO_MINUTES: dict[int, int] = {24: 60, 12: 120, 6: 240, 3: 480}
+#: DEC-82: the classified interval classes in ascending order, derived from
+#: the map above (never a second hand-written list).
+_CLASS_MINUTES: tuple[int, ...] = tuple(sorted(_FUNDING_N_TO_MINUTES.values()))
+#: DEC-82: [sek] date (secondary source, not primary-documented) from which
+#: Bybit is said to switch a symbol to 1h automatically on a cap/floor hit.
+#: Only used to split descriptive counts into "before" / "from"; never a
+#: threshold or a gate.
+AUTO_SWITCH_REFERENCE_DATE = date(2025, 10, 30)
 
 
 class PanelLoadError(RuntimeError):
@@ -349,6 +359,38 @@ def k_per_week_summary(alive: np.ndarray, weeks: list[str]) -> dict[str, Any]:
 # DEC-59: deadzone/interval-class census + funding autocorrelation
 # ----------------------------------------------------------------------------
 
+def _deadzone_by_interval_class(
+    avg_rate: np.ndarray, classified: np.ndarray, minutes: np.ndarray, tol: float,
+) -> dict[str, Any]:
+    """DEC-82 -- per classified interval class (60/120/240/480 min): the
+    number of symbol-days, the EXACT-hit matrix of the class's daily mean
+    rate against EVERY candidate ``I = I_PER_8H * m / 480`` (same ``tol``
+    and same strict ``<`` as the DEC-59 deadzone rule), and the 5 most
+    frequent daily means (rounded to 1e-10; the empirical mode). Measures
+    only: no class is assumed to hit its own candidate. Days whose mean is
+    NaN (``funding_sum`` missing) count in ``n_symbol_days`` and never hit;
+    they are counted in ``n_mean_nan`` and skipped for the modal values."""
+    out: dict[str, Any] = {}
+    for mins in _CLASS_MINUTES:
+        means = avg_rate[classified & (minutes == mins)]
+        n_cls = int(means.size)
+        finite = means[~np.isnan(means)]
+        hits: dict[str, Any] = {}
+        for cand in _CLASS_MINUTES:
+            i_cand = I_PER_8H * (cand / 480.0)
+            n_hit = int((np.abs(finite - i_cand) < tol).sum())
+            hits[f"I_{cand}min"] = {"n": n_hit, "share": (n_hit / n_cls) if n_cls else None}
+        # "+ 0.0" folds -0.0 into 0.0 so the mode key is canonical.
+        rounded = np.round(finite, 10) + 0.0
+        vals, cnts = np.unique(rounded, return_counts=True)
+        order = np.lexsort((vals, -cnts))[:5]  # count desc, value asc on ties
+        top = [{"value": float(vals[o]), "n": int(cnts[o]), "share": int(cnts[o]) / n_cls}
+               for o in order]
+        out[f"{mins}min"] = {"n_symbol_days": n_cls, "n_mean_nan": n_cls - int(finite.size),
+                              "exact_hits_vs_candidate_I": hits, "top5_daily_means": top}
+    return out
+
+
 def funding_deadzone_census(
     panel: dict[str, Any], *, tol: float = 1e-9, n_deciles: int = 10,
 ) -> dict[str, Any]:
@@ -358,7 +400,9 @@ def funding_deadzone_census(
     ``funding_n``, never assumed -- DEC-59: heterogeneity is 4h/8h, and a
     symbol's interval can change mid-history)? Reported overall, per
     interval class, and per decile of each symbol's WEEK-SUM funding
-    (DEC-59 point 2's sort key), averaged over weeks."""
+    (DEC-59 point 2's sort key), averaged over weeks. DEC-82 (additive):
+    ``by_interval_class`` -- per class, the exact-hit matrix against every
+    candidate I and the 5 most frequent daily means (descriptive)."""
     symbols = panel["symbols"]
     funding_n, funding_sum, dates = panel["funding_n"], panel["funding_sum"], panel["dates"]
     n_days, n_symbols = funding_n.shape
@@ -426,9 +470,11 @@ def funding_deadzone_census(
          "deadzone_share": (decile_deadzone[d] / decile_total[d]) if decile_total[d] else None}
         for d in range(n_deciles)
     ]
+    by_interval_class = _deadzone_by_interval_class(avg_rate, classified, minutes, tol)
     return {"overall_share": overall_share, "n_symbol_days_with_funding": n_with_funding,
             "n_deadzone_symbol_days": n_deadzone, "interval_class_counts": interval_counts,
-            "by_decile": by_decile, "n_symbols": len(symbols), "descriptive_only": True}
+            "by_decile": by_decile, "n_symbols": len(symbols), "descriptive_only": True,
+            "by_interval_class": by_interval_class}
 
 
 def funding_autocorrelation(panel: dict[str, Any], *, max_lag: int = 4,
@@ -659,6 +705,97 @@ def decile_degeneration_window_summary(
 # DEC-67 Entscheidung 6: interval-class switching per symbol
 # ----------------------------------------------------------------------------
 
+def _duration_stats(durations: list[int]) -> dict[str, Any]:
+    """DEC-82 -- n / median / q10 / q25 / q75 / q90 / max of run durations
+    in days (linear-interpolated quantiles); all ``None`` when empty."""
+    if not durations:
+        return {"n": 0, "median": None, "q10": None, "q25": None,
+                "q75": None, "q90": None, "max": None}
+    arr = np.asarray(durations, dtype=np.float64)
+    q10, q25, q75, q90 = (float(x) for x in np.quantile(arr, [0.1, 0.25, 0.75, 0.9]))
+    return {"n": int(arr.size), "median": float(np.median(arr)), "q10": q10, "q25": q25,
+            "q75": q75, "q90": q90, "max": float(arr.max())}
+
+
+def _episodes_summary(dates: list[str], minutes: np.ndarray,
+                      classified: np.ndarray) -> dict[str, Any]:
+    """DEC-82 -- aggregate episode (run) statistics of the interval classes;
+    no per-symbol list. Per symbol, a run is a maximal sequence of
+    consecutive CLASSIFIED days of the same class. Unclassified days and
+    days without funding are SKIPPED (they neither interrupt nor end a
+    run), exactly like ``interval_class_switching``'s transition count.
+    Consequences, deliberately kept: a run spans such gap days (its
+    ``duration_days`` is the calendar span first..last classified day,
+    inclusive), and the first run of a symbol starts at its first
+    classified day (listing or panel start, i.e. left-truncated).
+
+    Runs and transitions are split by the date the run STARTS
+    (``< AUTO_SWITCH_REFERENCE_DATE`` -> "before", else "from"); a
+    transition belongs to the period in which its NEW run starts. A run is
+    open at the panel end iff it is its symbol's last run and ends on the
+    last panel date with any classified day; open runs are counted in
+    ``n_open_at_end`` and excluded from ``duration_days``. A symbol's last
+    run that ended earlier (delisting, data end) is ended by the data, not
+    by a switch: it is right-censored too, counted in
+    ``n_closed_by_data_end`` and likewise excluded from ``duration_days``
+    (which therefore measures time until the NEXT class only).
+    Descriptive only."""
+    ref_iso = AUTO_SWITCH_REFERENCE_DATE.isoformat()
+    ordinals = [date.fromisoformat(d).toordinal() for d in dates]
+    n_symbols = classified.shape[1]
+    rows_any = np.flatnonzero(classified.any(axis=1))
+    panel_end_row = int(rows_any[-1]) if rows_any.size else -1
+    periods = ("before", "from")
+
+    n_runs = {(m, p): 0 for m in _CLASS_MINUTES for p in periods}
+    n_open = dict(n_runs)
+    n_data_end = dict(n_runs)
+    durations: dict[tuple[int, str], list[int]] = {k: [] for k in n_runs}
+    transitions: dict[str, dict[str, int]] = {p: {} for p in periods}
+    symbols_with_60 = {p: 0 for p in periods}
+
+    for j in range(n_symbols):
+        idx = np.flatnonzero(classified[:, j])
+        if idx.size == 0:
+            continue
+        cls = minutes[idx, j]
+        change = np.flatnonzero(cls[1:] != cls[:-1]) + 1
+        starts = np.concatenate(([0], change))
+        ends = np.concatenate((change - 1, [idx.size - 1]))
+        prev_m = None
+        had_60 = {p: False for p in periods}
+        for k in range(starts.size):
+            s_row, e_row = int(idx[starts[k]]), int(idx[ends[k]])
+            m = int(cls[starts[k]])
+            p = "from" if dates[s_row] >= ref_iso else "before"
+            n_runs[(m, p)] += 1
+            if k == starts.size - 1 and e_row == panel_end_row:
+                n_open[(m, p)] += 1
+            elif k == starts.size - 1:
+                # ended by the data (delisting), not by a switch: right-censored
+                n_data_end[(m, p)] += 1
+            else:
+                durations[(m, p)].append(ordinals[e_row] - ordinals[s_row] + 1)
+            if prev_m is not None:
+                key = f"{prev_m}min->{m}min"
+                transitions[p][key] = transitions[p].get(key, 0) + 1
+            if m == 60:
+                had_60[p] = True
+            prev_m = m
+        for p in periods:
+            symbols_with_60[p] += int(had_60[p])
+
+    by_class = {
+        f"{m}min": {p: {"n_runs": n_runs[(m, p)], "n_open_at_end": n_open[(m, p)],
+                         "n_closed_by_data_end": n_data_end[(m, p)],
+                         "duration_days": _duration_stats(durations[(m, p)])}
+                    for p in periods}
+        for m in _CLASS_MINUTES}
+    return {"reference_date": ref_iso, "by_class": by_class,
+            "transitions": {p: dict(sorted(transitions[p].items())) for p in periods},
+            "n_symbols_with_60min_run": symbols_with_60}
+
+
 def interval_class_switching(panel: dict[str, Any]) -> dict[str, Any]:
     """DEC-67 Entscheidung 6 -- per-symbol interval-CLASS switching
     (DEC-59: a symbol's settlement interval can change mid-history). For
@@ -671,7 +808,9 @@ def interval_class_switching(panel: dict[str, Any]) -> dict[str, Any]:
     symbols (never switches / switches once / 2-5 times />5 times), and
     the total symbol-days per class (same totals ``funding_deadzone_
     census``'s ``interval_class_counts`` reports, repeated here so this
-    section is self-contained) -- descriptive, no verdict."""
+    section is self-contained) -- descriptive, no verdict. DEC-82
+    (additive): ``episodes_summary`` -- aggregate run statistics, see
+    ``_episodes_summary`` (needs ``panel["dates"]``)."""
     symbols = panel["symbols"]
     funding_n = panel["funding_n"]
     n_days, n_symbols = funding_n.shape
@@ -701,7 +840,8 @@ def interval_class_switching(panel: dict[str, Any]) -> dict[str, Any]:
                             "n_classified_days": len(classes), "days_per_class": days_per_class})
     return {"per_symbol": per_symbol, "n_switch_distribution": n_switch_distribution,
             "days_per_class_total": days_per_class_total, "n_symbols": len(symbols),
-            "descriptive_only": True}
+            "descriptive_only": True,
+            "episodes_summary": _episodes_summary(panel["dates"], minutes, classified)}
 
 
 # ----------------------------------------------------------------------------
