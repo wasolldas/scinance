@@ -1,6 +1,6 @@
 {
-  "id": "2026-09-26_wp13a_v5b",
+  "id": "2026-10-09_wp13a_v5c",
   "tasks": ["wp13a"],
-  "skip_if_done_since": "38af605",
-  "zweck": "Vorlauf v5 mit eigener Kalibrierung fuer 'zero' (DEC-78 Nachtrag)"
+  "skip_if_done_since": "f168c04",
+  "zweck": "Vorlauf v5c: Kalibrierung mit gemeinsamen Zufallszahlen, Gegenprobe auf Standardfehler-Basis, realer Querschnitt (DEC-81)"
 }
