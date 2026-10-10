@@ -99,6 +99,10 @@ Artefakt-Round-Trip (DEC-53). Sandbox: T0-T2 + Fixture-Laeufe; Nutzer-PC:
 alle Netz-Backfills (Egress-Proxy blockt Boersen-APIs in der Sandbox) und
 alle Laeufe > Minuten, als Ein-Befehl-PowerShell-Runner (5.1, ASCII), die
 nie mit offenem Prompt abbrechen und rc != 0 bei Vorbedingungs-Fehlern geben.
+**Seit 2026-10-10 (Nutzer-Auflage, DEC-83):** gerechnet wird in der Cloud-Sitzung, alle
+Daten kommen vom Thin Client (Data-Harvest). Nutzer-PC/Autopilot nur noch als Rueckfall,
+solange ein Datenstueck dort fehlt (derzeit nur `panel_1d`, siehe
+`state/ANFRAGE_DATA_HARVEST_PANEL_2026-10-10.md`).
 
 ## ARBEITSREGELN
 1. Kontext-Hygiene: Dateipfade statt Volltexte.
