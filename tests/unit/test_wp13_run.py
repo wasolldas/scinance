@@ -29,6 +29,13 @@ from tests.unit.test_wp12b_delisted_panel import _closes, _load_script, _write_f
 
 WP13 = _load_script("wp13_xsec.py")
 
+#: DEC-89 E1: the registered bounce-fixture parameters the hand-built test files carry -- the production values
+#: (``rules.bounce_spread`` = WP-7 spread census, median perp spread of decile D10 = 36.21 bp / 1e4;
+#: ``windows.<W>.bounce_sigma_true`` = the Vorlauf's median weekly symbol vol, W1 0.17186 / W2 0.13311). The run has
+#: no defaults for them any more (a missing value is a loud fail), so every file that computes a rev_gap entry has them.
+BOUNCE_SPREAD = 0.003621
+BOUNCE_SIGMA = {"W1": 0.17186, "W2": 0.13311}
+
 
 # ============================================================================
 # START LOCK
@@ -350,10 +357,11 @@ def test_variant_window_payload_reports_drop_convention_lag_profile_beta_calibra
 
 
 def test_bounce_fixture_ic_is_deterministic_and_finite():
-    r1 = run_mod.bounce_fixture_ic(40, 30, seed=53)
-    r2 = run_mod.bounce_fixture_ic(40, 30, seed=53)
+    r1 = run_mod.bounce_fixture_ic(40, 30, spread=BOUNCE_SPREAD, sigma_true=BOUNCE_SIGMA["W1"], seed=53)
+    r2 = run_mod.bounce_fixture_ic(40, 30, spread=BOUNCE_SPREAD, sigma_true=BOUNCE_SIGMA["W1"], seed=53)
     assert r1 == r2
     assert math.isfinite(r1["ic_bounce"])
+    assert r1["spread"] == BOUNCE_SPREAD and r1["sigma_true"] == BOUNCE_SIGMA["W1"]      # DEC-89 E1: echoed
 
 
 # ============================================================================
@@ -500,7 +508,7 @@ def test_bounce_fixture_end_to_end_bounce_is_no_pass():
         w["ci_bound_toward_sign"] = -w["ci_bound_toward_sign"]
         w["residualized_mean_ic"] = -w["residualized_mean_ic"]
         w["res_quantile_drifting"] = -w["res_quantile_drifting"]   # DEC-76 (b): negative-direction quantile
-    bounce = run_mod.bounce_fixture_ic(60, 60, seed=53)
+    bounce = run_mod.bounce_fixture_ic(60, 60, spread=BOUNCE_SPREAD, sigma_true=BOUNCE_SIGMA["W1"], seed=53)
     harmless = {wn: abs(bounce["ic_bounce"]) for wn in payload["windows"]}
     assert all(harmless[wn] < abs(payload["windows"][wn]["mean_ic"]) for wn in harmless)
     payload["bounce_ic"] = harmless
@@ -569,13 +577,14 @@ def _registered_for_fixture() -> dict:
                        "H-30": {"variant": "vol_rv", "direction": "negative", "outcome": "vol_weighted"}},
         "windows": {
             "W1": {"start": "2024-07-01", "end": "2025-06-30", "ic_min_capped": ic_min_all,
-                   "calibration": _window_calibration(0.05, 0.50)},
+                   "bounce_sigma_true": BOUNCE_SIGMA["W1"], "calibration": _window_calibration(0.05, 0.50)},
             "W2": {"start": "2025-07-01", "end": "2026-06-30", "ic_min_capped": ic_min_all,
-                   "calibration": _window_calibration(0.06, 0.45)},
+                   "bounce_sigma_true": BOUNCE_SIGMA["W2"], "calibration": _window_calibration(0.06, 0.45)},
             "L": {"start": "2021-03-01", "end": "2024-06-30"},
         },
         "beta_control": {"method": "ts_resid_8w", "beta_window_weeks": 8},   # DEC-77 Entscheidung 2
-        "rules": {"seed": 53, "n_reps_bootstrap": 20, "n_reps_permutation": 20, "n_reps_factor_null": 20},
+        "rules": {"seed": 53, "n_reps_bootstrap": 20, "n_reps_permutation": 20, "n_reps_factor_null": 20,
+                  "n_sims_persistence": 20, "bounce_spread": BOUNCE_SPREAD},
     }
 
 
@@ -664,12 +673,13 @@ def _registered_for_large_fixture() -> dict:
         "hypotheses": {"H-28": {"variant": "mom1", "direction": "positive"}},
         "windows": {
             "W1": {"start": "2024-07-01", "end": "2025-06-30", "ic_min_capped": ic_min_all,
-                   "calibration": _window_calibration(0.05, 0.50)},
+                   "bounce_sigma_true": BOUNCE_SIGMA["W1"], "calibration": _window_calibration(0.05, 0.50)},
             "W2": {"start": "2025-07-01", "end": "2026-06-30", "ic_min_capped": ic_min_all,
-                   "calibration": _window_calibration(0.06, 0.45)},
+                   "bounce_sigma_true": BOUNCE_SIGMA["W2"], "calibration": _window_calibration(0.06, 0.45)},
         },
         "beta_control": {"method": "ts_resid_8w", "beta_window_weeks": 8},   # DEC-77 Entscheidung 2
-        "rules": {"seed": 53, "n_reps_bootstrap": 20, "n_reps_permutation": 20, "n_reps_factor_null": 30},
+        "rules": {"seed": 53, "n_reps_bootstrap": 20, "n_reps_permutation": 20, "n_reps_factor_null": 30,
+                  "n_sims_persistence": 20, "bounce_spread": BOUNCE_SPREAD},
     }
 
 
@@ -890,6 +900,13 @@ def test_cli_emit_registered_template_writes_yaml_skeleton_from_prelaunch_artifa
     assert loaded["rules"]["seed"] == 53
     assert loaded["rules"]["n_reps"] == prelaunch_report["n_reps_beta_control_winner"] == 5      # the freezing replicates
     assert loaded["data_fingerprints"] == fp
+    # DEC-89 E1/E3 (2): the real prelaunch sections flow into the template (spread from the WP-7 census, D10 / 1e4)
+    assert loaded["rules"]["bounce_spread"] == 0.003621 and loaded["rules"]["block_len"] == 4 and loaded["rules"]["level"] == 0.9936
+    for wn in ("W1", "W2"):
+        pre = prelaunch_report["windows"][wn]
+        assert loaded["windows"][wn]["bounce_sigma_true"] == pre["factor_preserving_null"]["driftfree"]["sigma_e_median_symbol_weekly"]
+        assert loaded["windows"][wn]["survivorship"] == {
+            k: pre["survivorship_fixture"][k] for k in ("mom1_diff_in_ic_min_units", "rev_gap_diff_in_ic_min_units")}
     # the emitted file passes the schema check (modulo a possibly empty method on this tiny fixture) ...
     run_mod.validate_registered(loaded)
     # ... and beta_control comes from the CONFIRMED recommendation only (empty if none was confirmed)
@@ -926,6 +943,10 @@ def test_cli_emit_registered_template_beta_control_filled_from_confirmed_method_
                 "ceiling_method_stress": 0.0081,
                 "res_quantile_driftfree": {v: 0.02 for v in characteristics.VARIANT_NAMES},
                 "res_quantile_drifting": {v: 0.021 for v in characteristics.VARIANT_NAMES}},
+            # DEC-89 E1/E3 (2): the Vorlauf sections the template copies the bounce sigma and the survivorship label from
+            "factor_preserving_null": {"driftfree": {"sigma_e_median_symbol_weekly": BOUNCE_SIGMA[wn]}},
+            "survivorship_fixture": {"mom1_diff_in_ic_min_units": -0.198 if wn == "W1" else -0.438,
+                                     "rev_gap_diff_in_ic_min_units": -0.189 if wn == "W1" else -0.579},
         } for wn, s0, e0 in (("W1", "2024-07-01", "2025-06-30"), ("W2", "2025-07-01", "2026-06-30"))},
         "h30_feasibility_weekly_units": {"spread_d10_minus_d1_over_kante": 2.8, "se_drag_over_kante": 0.18, "feasible": False},
     }
@@ -938,6 +959,10 @@ def test_cli_emit_registered_template_beta_control_filled_from_confirmed_method_
     assert y1["windows"]["W1"]["ceiling_method_stress"] == 0.0081
     assert y1["windows"]["W2"]["res_quantile_drifting"]["vol_rv"] == 0.021
     assert y1["windows"]["W1"]["calibration"]["stress"]["rho_f"] == 0.1
+    # DEC-89 E1/E3 (2): bounce spread from the WP-7 census (D10 36.21 bp -> 0.003621), sigma_true + survivorship per window
+    assert y1["rules"]["bounce_spread"] == BOUNCE_SPREAD
+    assert y1["windows"]["W1"]["bounce_sigma_true"] == BOUNCE_SIGMA["W1"] and y1["windows"]["W2"]["bounce_sigma_true"] == BOUNCE_SIGMA["W2"]
+    assert y1["windows"]["W2"]["survivorship"] == {"mom1_diff_in_ic_min_units": -0.438, "rev_gap_diff_in_ic_min_units": -0.579}
     # (G) mechanical H-30 lock: Spread/Kante 2.8 > 0.5 -> all three H-30 entries gl012_pre_run, H-28/H-29 untouched
     for k, h in y1["hypotheses"].items():
         assert (h.get("status") == "gl012_pre_run") == k.startswith("H-30")
@@ -1186,7 +1211,8 @@ def _registered_dec87_large() -> dict:
     }
     reg["windows"]["L"] = {"start": "2021-03-01", "end": "2024-06-30"}        # descriptive/sealed, never judged
     reg["beta_control"] = {"method": "fm_neutral_8w", "beta_window_weeks": 8}
-    reg["rules"] = {"seed": 53, "n_reps": 12, "n_reps_bootstrap": 20, "n_reps_permutation": 20}
+    reg["rules"] = {"seed": 53, "n_reps": 12, "n_reps_bootstrap": 20, "n_reps_permutation": 20,
+                    "n_sims_persistence": 20, "bounce_spread": BOUNCE_SPREAD}
     return reg
 
 
@@ -1236,17 +1262,21 @@ def test_dec87_benjamini_hochberg_denominator_is_fixed_at_seven():
 
 def test_dec87_hypothesis_is_pass_iff_at_least_one_variant_passes():
     """DEC-87 (J): aggregation by hypothesis; every variant remains individually reported."""
-    def res(group, variant, verdict, computed=True):
-        return {"hypothesis": group, "variant": variant, "computed": computed, "verdict": {"verdict": verdict}}
+    def res(group, variant, verdict, computed=True, reason=None):
+        return {"hypothesis": group, "variant": variant, "computed": computed, "verdict": {"verdict": verdict},
+                "reason": reason}
     agg = run_mod.aggregate_hypotheses({
         "H-28_mom1": res("H-28", "mom1", "DROP"), "H-28_mom2": res("H-28", "mom2", "PASS"),
-        "H-28_mom4": res("H-28", "mom4", "DROP", computed=False),
+        "H-28_mom4": res("H-28", "mom4", "DROP", computed=False, reason="MDE80 > IC_prior"),
         "H-29_rev_gap": res("H-29", "rev_gap", "DROP"),
-        "H-30_vol_rv": res("H-30", "vol_rv", "DROP", computed=False)})
+        "H-30_vol_rv": res("H-30", "vol_rv", "DROP", computed=False, reason="Feasibility")})
     assert agg["H-28"]["verdict"] == "PASS" and agg["H-28"]["variants_pass"] == ["mom2"]
     assert agg["H-28"]["variants_locked"] == ["mom4"] and agg["H-28"]["label"].startswith("vorlaeufig bis F-WEEK")
     assert agg["H-29"]["verdict"] == "DROP" and agg["H-29"]["label"] is None
-    assert agg["H-30"]["verdict"] == "DROP" and agg["H-30"]["variants_locked"] == ["vol_rv"]
+    # DEC-89 (E3 (3)): a hypothesis whose variants are ALL locked is "GL-012 vor dem Lauf" with the reasons, not "DROP"
+    assert agg["H-30"]["variants_locked"] == ["vol_rv"]
+    assert agg["H-30"]["verdict"] == run_mod.GL012_PRE_RUN_VERDICT == "GL-012 vor dem Lauf"
+    assert agg["H-30"]["reasons"] == {"vol_rv": "Feasibility"} and "Feasibility" in agg["H-30"]["label"]
 
 
 def test_dec87_hypothesis_group_from_id_prefix_explicit_field_or_legacy_id():
@@ -1283,6 +1313,12 @@ def test_dec87_validate_registered_can_require_the_frozen_constants():
     omit them (the run then recomputes and says ``frozen_constants_complete: False``)."""
     reg = _registered_dec87_large()
     run_mod.validate_registered(reg)                                           # lenient default
+    # DEC-89: a registered run additionally demands w_judged, the survivorship pair, block_len and level (tested on their
+    # own in test_dec89_strict_preflight_*); they are complete here so this test stays about the frozen null constants
+    reg["rules"].update(block_len=4, level=0.9936)
+    for wn in ("W1", "W2"):
+        reg["windows"][wn].update(w_judged=52, survivorship={"mom1_diff_in_ic_min_units": -0.2,
+                                                             "rev_gap_diff_in_ic_min_units": -0.19})
     with pytest.raises(run_mod.RegisteredSchemaError, match="ceiling_method_stress"):
         run_mod.validate_registered(reg, require_frozen_constants=True)
     for wn in ("W1", "W2"):
@@ -1808,14 +1844,16 @@ def _prd_positive_panel(*, k=200, seed=7, ic_mom1=0.06, ic_rev=0.06, n_sectors=8
 
 def _prd_registered(weekly, entries, *, n_reps=60):
     reg = {"hypotheses": entries, "windows": {}, "beta_control": {"method": "fm_neutral_8w", "beta_window_weeks": 8},
-           "rules": {"seed": 53, "n_reps": n_reps, "n_reps_bootstrap": 200, "n_reps_permutation": 200}}
+           "rules": {"seed": 53, "n_reps": n_reps, "n_reps_bootstrap": 200, "n_reps_permutation": 200,
+                     "n_sims_persistence": 40, "bounce_spread": BOUNCE_SPREAD}}
     from bybit_edge.research.wp13_xsec import prelaunch as prelaunch_mod
     for wn, (a, b) in {"W1": ("2024-07-01", "2025-06-30"), "W2": ("2025-07-01", "2026-06-30")}.items():
         win = prelaunch_mod.slice_window(weekly["weeks"], a, b, weekly["returns"], weekly["alive"])
         fl = nulls.analytic_permutation_floor(win["alive"], win["weeks"])
         thr = nulls.ic_threshold(fl["e_floor"], 1.0, fl["w_judged"])
         reg["windows"][wn] = {"start": a, "end": b, "ic_min_capped": {v: thr for v in characteristics.VARIANT_NAMES},
-                              "w_judged": fl["w_judged"], "calibration": _window_calibration(0.10, 0.45)}
+                              "w_judged": fl["w_judged"], "bounce_sigma_true": BOUNCE_SIGMA[wn],
+                              "calibration": _window_calibration(0.10, 0.45)}
     return reg
 
 
@@ -1882,9 +1920,11 @@ def test_dec87_cli_end_to_end_prelaunch_emit_run_produces_a_verdict_with_all_dec
     assert reg["data_fingerprints"]["union_range_fingerprint"] == fps["union_range_fingerprint"]
     assert reg["rules"]["n_reps"] == 5
     # the orchestrator-side step: the test only shrinks the bootstrap/permutation reps (not frozen constants)
-    reg["rules"].update(n_reps_bootstrap=20, n_reps_permutation=20)
+    reg["rules"].update(n_reps_bootstrap=20, n_reps_permutation=20, n_sims_persistence=20)
     template.write_text(yaml.safe_dump(reg, sort_keys=False), encoding="utf-8")
     sha = run_mod.sha256_of_file(template)
+    # DEC-89: the emitted template is complete for the strict pre-flight (bounce parameters, survivorship, rules, w_judged)
+    run_mod.validate_registered(reg, require_frozen_constants=True)
 
     run_out = tmp_path / "run_out"
     ns_run = WP13.argparse.Namespace(
@@ -1908,6 +1948,12 @@ def test_dec87_cli_end_to_end_prelaunch_emit_run_produces_a_verdict_with_all_dec
             assert (run_out / f"wp13_run_{eid}_{wn}_ic_weekly.csv").is_file()
             assert (run_out / f"wp13_run_{eid}_{wn}_ic_weekly_residualized.csv").is_file()
     assert (run_out / "wp13_run_fingerprint.json").is_file() and (run_out / "wp13_run_L_window_sealed.json").is_file()
+    # DEC-89 (E3 (7)): the Markdown report with the bounce parameters and the survivorship label sits next to the JSON
+    md = (run_out / "wp13_run.md").read_text(encoding="utf-8")
+    assert md.isascii() and "Bounce-Fixture" in md and "0.003621" in md and "Survivorship-Etikett" in md
+    assert main["registered_inputs"]["bounce_spread"] == 0.003621 == reg["rules"]["bounce_spread"]
+    assert main["registered_inputs"]["bounce_sigma_true"] == {wn: reg["windows"][wn]["bounce_sigma_true"] for wn in ("W1", "W2")}
+    assert main["results"]["H-28_mom1"]["verdict"]["survivorship_label"] is True
     fp = json.loads((run_out / "wp13_run_fingerprint.json").read_text(encoding="utf-8"))
     assert fp["data_fingerprints"]["delisting_dates_sha256"] == fps["delisting_dates_sha256"]
     assert fp["code"]["code_sha256"] and fp["registered_sha256"] == sha
@@ -1940,3 +1986,855 @@ def test_dec87_cli_end_to_end_prelaunch_emit_run_produces_a_verdict_with_all_dec
                                              "registered_sha256": run_mod.sha256_of_file(unfrozen_path),
                                              "out": str(tmp_path / "run_unfrozen")})
     assert WP13.cmd_run(ns_unfrozen) == 1 and not (tmp_path / "run_unfrozen").exists()
+
+
+# ============================================================================
+# DEC-89 (before the registration): bounce parameters from the YAML, survivorship label, GL-012 label at hypothesis
+# level, persistence null in both windows, T5 pins (w_judged / block_len / level), the run's Markdown report, and the
+# positive control in production configuration (``--positive-control``, PRD 3.3.8)
+# ============================================================================
+
+import inspect  # noqa: E402
+import re  # noqa: E402
+from datetime import timedelta  # noqa: E402
+
+from bybit_edge.research.wp13_xsec import positive_control as pc_mod  # noqa: E402
+
+_MOM1 = {"hypothesis": "H-28", "variant": "mom1", "direction": "positive"}
+_REV_GAP = {"hypothesis": "H-29", "variant": "rev_gap", "direction": "negative"}
+_SURV = {"W1": {"mom1_diff_in_ic_min_units": -0.198, "rev_gap_diff_in_ic_min_units": -0.189},
+         "W2": {"mom1_diff_in_ic_min_units": -0.438, "rev_gap_diff_in_ic_min_units": -0.579}}
+
+
+def _registered_lean(entries: dict) -> dict:
+    """The DEC-87/89 hand-built file (``fm_neutral_8w``, small reps, bounce parameters) with exactly ``entries``."""
+    reg = _registered_dec87_large()
+    reg["hypotheses"] = copy.deepcopy(entries)
+    return reg
+
+
+def _strict_registered() -> dict:
+    """A registered dict that passes the CLI's STRICT pre-flight: dummy finite frozen constants (the strict check only
+    demands that they exist and are finite) plus every DEC-89 mandatory field."""
+    reg = _registered_lean({"H-28_mom1": _MOM1, "H-29_rev_gap": _REV_GAP})
+    for wn in ("W1", "W2"):
+        reg["windows"][wn].update(
+            w_judged=52, ceiling_method_stress=0.008, survivorship=copy.deepcopy(_SURV[wn]),
+            res_quantile_driftfree={v: 0.02 for v in characteristics.VARIANT_NAMES},
+            res_quantile_drifting={v: 0.021 for v in characteristics.VARIANT_NAMES})
+    reg["rules"].update(block_len=4, level=0.9936)
+    return reg
+
+
+def _registered_dec89_large() -> dict:
+    """``_registered_dec87_large`` + the registered survivorship numbers; H-30 is locked in BOTH variants (so the
+    hypothesis reads ``GL-012 vor dem Lauf``), mom2 stays locked, mom1 and rev_gap are computed."""
+    reg = copy.deepcopy(_registered_dec87_large())
+    reg["hypotheses"]["H-30_vol_rv"] = {
+        "hypothesis": "H-30", "variant": "vol_rv", "direction": "negative", "outcome": "vol_weighted",
+        "status": "gl012_pre_run", "reason": "H-30-Feasibility in Wocheneinheiten verfehlt (Test)"}
+    for wn in ("W1", "W2"):
+        reg["windows"][wn]["survivorship"] = copy.deepcopy(_SURV[wn])
+    return reg
+
+
+@pytest.fixture(scope="module")
+def dec89_run(tmp_path_factory):
+    tmp = tmp_path_factory.mktemp("dec89_large")
+    panel, weekly = _build_run_fixture_tree_large(tmp)
+    registered = _registered_dec89_large()
+    for wn in ("W1", "W2"):                                  # the registered w_judged: what the Vorlauf froze for the window
+        wk = prelaunch_module.slice_window(weekly["weeks"], registered["windows"][wn]["start"],
+                                           registered["windows"][wn]["end"])["weeks"]
+        registered["windows"][wn]["w_judged"] = nulls.w_judged_of(len(wk))
+    report = run_mod.run_full(panel, weekly, registered, observed_fingerprints=None)
+    return panel, weekly, registered, report
+
+
+# ---- E1: bounce-fixture parameters come from the YAML --------------------------------------------
+
+def test_dec89_bounce_fixture_has_no_defaults_and_rejects_bad_values():
+    """DEC-89 E1: the former code constants (0.003 / 0.03, UNBELEGT in a kill condition) are gone: a call without the
+    registered values is a TypeError, a non-finite / non-positive / non-numeric one a ValueError."""
+    with pytest.raises(TypeError):
+        run_mod.bounce_fixture_ic(40, 30, seed=53)                        # type: ignore[call-arg]
+    with pytest.raises(TypeError):
+        run_mod.bounce_fixture_ic(40, 30, spread=0.003, seed=53)           # type: ignore[call-arg]
+    for bad in (0.0, -0.001, float("nan"), float("inf"), None, True, "0.003"):
+        with pytest.raises(ValueError, match="spread"):
+            run_mod.bounce_fixture_ic(40, 30, spread=bad, sigma_true=0.1)
+        with pytest.raises(ValueError, match="sigma_true"):
+            run_mod.bounce_fixture_ic(40, 30, spread=0.003, sigma_true=bad)
+    defaults = {p.name: p.default for p in inspect.signature(run_mod.bounce_fixture_ic).parameters.values()}
+    assert defaults["spread"] is inspect.Parameter.empty and defaults["sigma_true"] is inspect.Parameter.empty
+
+
+def test_dec89_run_full_feeds_the_registered_bounce_parameters_to_the_fixture(tmp_path, monkeypatch):
+    """DEC-89 E1: ``run_full`` hands ``rules.bounce_spread`` and each window's ``bounce_sigma_true`` (seed ``rules.seed``)
+    to the fixture; the payload and the report echo exactly those parameters and the resulting ``IC_bounce``."""
+    panel, weekly = _build_run_fixture_tree_large(tmp_path)
+    calls: list[dict] = []
+    orig = run_mod.bounce_fixture_ic
+
+    def spy(*a, **kw):
+        calls.append(kw)
+        return orig(*a, **kw)
+
+    monkeypatch.setattr(run_mod, "bounce_fixture_ic", spy)
+    reg = _registered_lean({"H-29_rev_gap": _REV_GAP})
+    reg["rules"]["bounce_spread"] = 0.0042
+    reg["windows"]["W1"]["bounce_sigma_true"], reg["windows"]["W2"]["bounce_sigma_true"] = 0.111, 0.222
+    report = run_mod.run_full(panel, weekly, reg)
+    assert [(c["spread"], c["sigma_true"], c["seed"]) for c in calls] == [(0.0042, 0.111, 53), (0.0042, 0.222, 53)]
+    payload = report["results"]["H-29_rev_gap"]["payload"]
+    for wn, sig in (("W1", 0.111), ("W2", 0.222)):
+        d = payload["bounce_fixture"][wn]
+        assert d["spread"] == 0.0042 and d["sigma_true"] == sig and d["seed"] == 53
+        assert payload["bounce_ic"][wn] == d["ic_bounce"]
+    assert report["registered_inputs"]["bounce_spread"] == 0.0042
+    assert report["registered_inputs"]["bounce_sigma_true"] == {"W1": 0.111, "W2": 0.222}
+
+
+def test_dec89_missing_or_malformed_bounce_parameters_are_a_loud_fail_even_in_the_lenient_mode():
+    """DEC-89 E1: the former defaults are gone, so even a hand-built file (lenient ``validate_registered``) that COMPUTES
+    an H-29/rev_gap entry must carry both parameters; a locked rev_gap entry or a file without one does not need them."""
+    base = _registered_lean({"H-28_mom1": _MOM1, "H-29_rev_gap": _REV_GAP})
+    run_mod.validate_registered(base)
+    no_spread = copy.deepcopy(base)
+    del no_spread["rules"]["bounce_spread"]
+    with pytest.raises(run_mod.RegisteredSchemaError, match="bounce_spread"):
+        run_mod.validate_registered(no_spread)
+    with pytest.raises(run_mod.RegisteredSchemaError, match="bounce_spread"):           # run_full refuses before any panel
+        run_mod.run_full({"symbols": []}, {"weeks": [], "returns": None, "alive": None}, no_spread)
+    no_sigma = copy.deepcopy(base)
+    del no_sigma["windows"]["W2"]["bounce_sigma_true"]
+    with pytest.raises(run_mod.RegisteredSchemaError, match=r"windows\.W2\.bounce_sigma_true"):
+        run_mod.validate_registered(no_sigma)
+    for key, val in (("spread", -0.003), ("spread", float("nan")), ("sigma", 0.0), ("sigma", "0.17")):
+        bad = copy.deepcopy(base)
+        if key == "spread":
+            bad["rules"]["bounce_spread"] = val
+        else:
+            bad["windows"]["W1"]["bounce_sigma_true"] = val
+        with pytest.raises(run_mod.RegisteredSchemaError, match="keine endliche positive Zahl"):
+            run_mod.validate_registered(bad)
+    locked = _registered_lean({"H-28_mom1": _MOM1, "H-29_rev_gap": dict(_REV_GAP, status="gl012_pre_run", reason="Test")})
+    del locked["rules"]["bounce_spread"]
+    del locked["windows"]["W1"]["bounce_sigma_true"]
+    run_mod.validate_registered(locked)                                                  # no computed H-29 entry: not needed
+
+
+@pytest.mark.parametrize("mutate, message", [
+    (lambda r: r["rules"].pop("bounce_spread"), "rules.bounce_spread fehlt"),
+    (lambda r: r["rules"].pop("block_len"), "rules.block_len fehlt"),
+    (lambda r: r["rules"].pop("level"), "rules.level fehlt"),
+    (lambda r: r["windows"]["W1"].pop("bounce_sigma_true"), "windows.W1.bounce_sigma_true fehlt"),
+    (lambda r: r["windows"]["W2"].pop("w_judged"), "windows.W2.w_judged fehlt"),
+    (lambda r: r["windows"]["W2"].pop("survivorship"), "windows.W2.survivorship fehlt"),
+    (lambda r: r["windows"]["W1"]["survivorship"].pop("rev_gap_diff_in_ic_min_units"), "rev_gap_diff_in_ic_min_units fehlt"),
+    (lambda r: r["windows"]["W1"]["survivorship"].update(mom1_diff_in_ic_min_units=None), "mom1_diff_in_ic_min_units fehlt"),
+    (lambda r: r["windows"]["W1"]["survivorship"].update(mom1_diff_in_ic_min_units=float("nan")), "nicht endlich"),
+    (lambda r: r["windows"]["W1"].update(bounce_sigma_true=-0.1), "keine endliche positive Zahl"),
+    (lambda r: r["rules"].update(bounce_spread=0.0), "keine endliche positive Zahl"),
+    (lambda r: r["rules"].update(block_len=4.5), "keine positive ganze Zahl"),
+    (lambda r: r["rules"].update(level=1.0), "liegt nicht in (0, 1)"),
+    (lambda r: r["windows"]["W1"].update(w_judged=0), "keine positive ganze Zahl"),
+])
+def test_dec89_strict_preflight_refuses_missing_or_malformed_constants(mutate, message):
+    """DEC-89 E1/E3 (CLI pre-flight like the other mandatory constants): ``--run`` and ``--positive-control`` validate with
+    ``require_frozen_constants=True``, which demands the bounce parameters, the survivorship pair, ``w_judged`` and the
+    ``rules.block_len``/``rules.level`` pins -- the template's ``None`` placeholders are refused."""
+    reg = _strict_registered()
+    run_mod.validate_registered(reg, require_frozen_constants=True)                       # the unmutated file passes
+    mutate(reg)
+    with pytest.raises(run_mod.RegisteredSchemaError, match=re.escape(message)):
+        run_mod.validate_registered(reg, require_frozen_constants=True)
+
+
+def test_dec89_read_bounce_spread_from_the_wp7_census_and_the_registered_value(tmp_path):
+    """DEC-89 E1: the registered spread = the census' median perp spread of decile D10 (36.21 bp) / 1e4 = 0.003621."""
+    census = Path(WP13.__file__).resolve().parents[1] / WP13.DEFAULT_SPREAD_CENSUS
+    assert census.is_file()
+    assert WP13.read_bounce_spread(census) == BOUNCE_SPREAD == 0.003621
+    custom = tmp_path / "census.json"
+    custom.write_text(json.dumps({"deciles": [{"decile": 1, "perp_spread_bp_median": 1.0},
+                                              {"decile": 10, "perp_spread_bp_median": 40.0}]}), encoding="utf-8")
+    assert WP13.read_bounce_spread(custom) == 0.004
+    for bad in ({"deciles": [{"decile": 1, "perp_spread_bp_median": 1.0}]},
+                {"deciles": [{"decile": 10, "perp_spread_bp_median": None}]},
+                {"deciles": [{"decile": 10, "perp_spread_bp_median": 0.0}]}, {}):
+        custom.write_text(json.dumps(bad), encoding="utf-8")
+        with pytest.raises(ValueError, match="Spread-Zensus"):
+            WP13.read_bounce_spread(custom)
+
+
+def _hand_prelaunch_artifact(tmp_path, *, with_dec89_sections=True, name="artifact.json"):
+    """A hand-built ``--prelaunch`` artifact (confirmed ``fm_neutral_8w``) with or without the Vorlauf sections the DEC-89
+    template fields are copied from (``factor_preserving_null.driftfree.sigma_e_median_symbol_weekly``,
+    ``survivorship_fixture``)."""
+    win = {}
+    for wn, s0, e0 in (("W1", "2024-07-01", "2025-06-30"), ("W2", "2025-07-01", "2026-06-30")):
+        w = {"available": True, "start": s0, "end": e0,
+             "noise_floor_and_threshold": {"ic_min_capped_per_variant": {v: 0.02 for v in characteristics.VARIANT_NAMES},
+                                           "w_judged": 52},
+             "beta_control_method_study": {"calibrations": {
+                 cal: {"rho_f": 0.05 * k, "beta_sd_calibrated": 0.5 * k, "target_factor_share": 0.03 * k}
+                 for cal, k in (("measured", 1), ("stress", 2), ("zero", 1))}},
+             "frozen_null_constants": {"ceiling_method_stress": 0.0081,
+                                       "res_quantile_driftfree": {v: 0.02 for v in characteristics.VARIANT_NAMES},
+                                       "res_quantile_drifting": {v: 0.021 for v in characteristics.VARIANT_NAMES}}}
+        if with_dec89_sections:
+            w["factor_preserving_null"] = {"driftfree": {"sigma_e_median_symbol_weekly": BOUNCE_SIGMA[wn]}}
+            w["survivorship_fixture"] = dict(_SURV[wn], k=419, n_weeks=53)
+        win[wn] = w
+    art = {"variants": list(characteristics.VARIANT_NAMES), "n_reps_beta_control_winner": 1000,
+           "data_fingerprints": {"union_range_fingerprint": "11" * 32, "delisting_dates_sha256": "22" * 32},
+           "windows": win,
+           "h30_feasibility_weekly_units": {"spread_d10_minus_d1_over_kante": 2.8, "se_drag_over_kante": 0.18},
+           "beta_control_confirmation": {"confirmed_method": "fm_neutral_8w", "note": "bestaetigt"}}
+    path = tmp_path / name
+    path.write_text(json.dumps(art), encoding="utf-8")
+    return path
+
+
+def test_dec89_emit_template_spread_census_option_and_loud_failures(tmp_path, monkeypatch):
+    """DEC-89 E1: ``--emit-registered-template`` reads ``rules.bounce_spread`` from ``--spread-census`` (default: the WP-7
+    census), an unreadable census is rc=1 and writes nothing; a missing Vorlauf section gives ``None`` placeholders + a
+    WARNUNG that the strict pre-flight refuses; ``main()`` wires the option."""
+    art = _hand_prelaunch_artifact(tmp_path)
+    out_default = tmp_path / "t_default.yaml"
+    assert WP13.cmd_emit_registered_template(str(art), str(out_default)) == 0
+    y = run_mod.load_registered_yaml(out_default)
+    assert y["rules"]["bounce_spread"] == 0.003621
+    run_mod.validate_registered(y, require_frozen_constants=True)                       # complete for the strict pre-flight
+    custom = tmp_path / "census.json"
+    custom.write_text(json.dumps({"deciles": [{"decile": 10, "perp_spread_bp_median": 40.0}]}), encoding="utf-8")
+    out_custom = tmp_path / "t_custom.yaml"
+    assert WP13.cmd_emit_registered_template(str(art), str(out_custom), spread_census_path=str(custom)) == 0
+    assert run_mod.load_registered_yaml(out_custom)["rules"]["bounce_spread"] == 0.004
+    # via main(): --spread-census is honoured
+    out_main = tmp_path / "t_main.yaml"
+    monkeypatch.setattr("sys.argv", ["wp13_xsec.py", "--emit-registered-template", str(art), str(out_main),
+                                     "--spread-census", str(custom)])
+    assert WP13.main() == 0 and run_mod.load_registered_yaml(out_main)["rules"]["bounce_spread"] == 0.004
+    # an unreadable / incomplete census: rc=1, nothing written
+    for i, content in enumerate(("not json", json.dumps({"deciles": []}), json.dumps({"deciles": [{"decile": 10}]}))):
+        bad = tmp_path / f"bad{i}.json"
+        bad.write_text(content, encoding="utf-8")
+        out_bad = tmp_path / f"t_bad{i}.yaml"
+        assert WP13.cmd_emit_registered_template(str(art), str(out_bad), spread_census_path=str(bad)) == 1
+        assert not out_bad.exists()
+    assert WP13.cmd_emit_registered_template(str(art), str(tmp_path / "t_none.yaml"),
+                                             spread_census_path=str(tmp_path / "missing.json")) == 1
+    # an artifact without the Vorlauf sections: placeholders, WARNUNG, and the strict pre-flight refuses them
+    art2 = _hand_prelaunch_artifact(tmp_path, with_dec89_sections=False, name="artifact2.json")
+    out2 = tmp_path / "t_missing.yaml"
+    assert WP13.cmd_emit_registered_template(str(art2), str(out2)) == 0
+    text = out2.read_text(encoding="utf-8")
+    assert "WARNUNG: Vorlauf-Artefakt ohne" in text and "bounce_sigma_true" in text and "survivorship" in text
+    y2 = run_mod.load_registered_yaml(out2)
+    assert y2["windows"]["W1"]["bounce_sigma_true"] is None
+    assert y2["windows"]["W1"]["survivorship"] == {"mom1_diff_in_ic_min_units": None, "rev_gap_diff_in_ic_min_units": None}
+    with pytest.raises(run_mod.RegisteredSchemaError, match="bounce_sigma_true"):
+        run_mod.validate_registered(y2)                                                  # lenient: rev_gap is computed
+    with pytest.raises(run_mod.RegisteredSchemaError):
+        run_mod.validate_registered(y2, require_frozen_constants=True)
+
+
+# ---- E3 (2): survivorship label ----------------------------------------------------------------
+
+def test_dec89_gates_survivorship_label_is_report_only():
+    """DEC-89 E3 (2): the registered survivorship numbers are attached as a LABEL; the verdict and every gate flag are
+    exactly those of the same payload without them (never a gate input)."""
+    payload = _conserved_payload()
+    base = gates.evaluate(payload)
+    assert base["survivorship_label"] is False and not [l for l in base["labels"] if "Survivorship" in l]
+    payload["survivorship_ic_min_units"] = {"W1": -0.198, "W2": -0.438}
+    v = gates.evaluate(payload)
+    assert v["verdict"] == base["verdict"] == "PASS" and v["per_window"] == base["per_window"]
+    assert v["survivorship_label"] is True and v["survivorship_ic_min_units"] == {"W1": -0.198, "W2": -0.438}
+    assert any("Survivorship-Etikett" in l and "W1=-0.198" in l and "W2=-0.438" in l and "report-only" in l for l in v["labels"])
+    huge = _conserved_payload()
+    huge["survivorship_ic_min_units"] = 50.0                                             # a float applies to every window
+    assert gates.evaluate(huge)["verdict"] == "PASS"
+    drop = _conserved_payload()
+    drop["windows"]["W2"]["mean_ic"] = 0.001
+    drop["survivorship_ic_min_units"] = {"W1": -3.0, "W2": -3.0}
+    assert gates.evaluate(drop)["verdict"] == "DROP"                                      # and never rescues or kills a verdict
+
+
+def test_dec89_run_attaches_the_registered_survivorship_label_to_mom1_and_rev_gap_only(dec89_run, dec87_run):
+    _panel, _weekly, registered, report = dec89_run
+    for eid, key in (("H-28_mom1", "mom1_diff_in_ic_min_units"), ("H-29_rev_gap", "rev_gap_diff_in_ic_min_units")):
+        v = report["results"][eid]["verdict"]
+        assert v["survivorship_label"] is True
+        assert v["survivorship_ic_min_units"] == {wn: registered["windows"][wn]["survivorship"][key] for wn in ("W1", "W2")}
+        assert any("Survivorship-Etikett" in l for l in v["labels"])
+        assert report["results"][eid]["payload"]["survivorship_ic_min_units"] == v["survivorship_ic_min_units"]
+        # report-only: the verdict and the gate flags equal those of the run WITHOUT the registered numbers
+        ref = dec87_run[3]["results"][eid]["verdict"]
+        assert v["verdict"] == ref["verdict"] and v["per_window"] == ref["per_window"]
+        assert not ref.get("survivorship_label")
+    for eid in ("H-28_mom2", "H-30_vol_rv"):                                              # locked entries carry none
+        assert report["results"][eid]["verdict"]["survivorship_label"] is False
+
+
+# ---- E3 (3): GL-012 label at hypothesis level ---------------------------------------------------
+
+def test_dec89_hypothesis_with_all_variants_locked_reads_gl012_vor_dem_lauf(dec89_run):
+    _panel, _weekly, registered, report = dec89_run
+    hv = report["hypothesis_verdicts"]
+    assert hv["H-30"]["verdict"] == "GL-012 vor dem Lauf" == run_mod.GL012_PRE_RUN_VERDICT
+    assert hv["H-30"]["reasons"] == {"vol_rv": registered["hypotheses"]["H-30_vol_rv"]["reason"],
+                                     "vol_beta": registered["hypotheses"]["H-30_vol_beta"]["reason"]}
+    assert all(r in hv["H-30"]["label"] for r in hv["H-30"]["reasons"].values()) and hv["H-30"]["variants_pass"] == []
+    assert sorted(hv["H-30"]["variants_locked"]) == ["vol_beta", "vol_rv"]
+    # a hypothesis with a computed variant keeps PASS/DROP even if another variant is locked (H-28: mom1 computed, mom2 locked)
+    assert hv["H-28"]["verdict"] in ("PASS", "DROP") and hv["H-28"]["variants_locked"] == ["mom2"]
+    assert hv["H-28"]["reasons"] == {"mom2": registered["hypotheses"]["H-28_mom2"]["reason"]}
+    assert hv["H-29"]["verdict"] in ("PASS", "DROP") and hv["H-29"]["reasons"] == {}
+    # the ENTRY verdicts stay DROP with the GL-012 label (DEC-87 (J)), only the hypothesis level reads GL-012
+    assert report["results"]["H-30_vol_rv"]["verdict"]["verdict"] == "DROP"
+
+
+# ---- E3 (4): persistence null, both windows, 1.000 simulations ---------------------------------
+
+def test_dec89_persistence_null_runs_in_both_windows(dec89_run):
+    _panel, _weekly, _registered, report = dec89_run
+    for eid in ("H-28_mom1", "H-29_rev_gap"):
+        payload = report["results"][eid]["payload"]
+        pn = payload["persistence_null"]
+        assert set(pn) == {"W1", "W2"} and all(d["n_sims"] == 20 and d["seed"] == 53 for d in pn.values())
+        assert payload["persistence_null_pass"] == all(d["pass"] for d in pn.values())      # conjunction over both windows
+        assert math.isfinite(pn["W2"]["quantile95_registered_direction"]) and math.isfinite(pn["W2"]["real_mean_ic"])
+
+
+def test_dec89_persistence_null_default_is_1000_simulations_in_each_window(tmp_path, monkeypatch):
+    assert run_mod.PERSISTENCE_NULL_N_SIMS == 1000 == run_mod.resolve_rules({})["n_sims_persistence"]
+    panel, weekly = _build_run_fixture_tree_large(tmp_path)
+    calls: list[tuple] = []
+
+    def stub(returns, alive, weeks, *, variants, convention, n_sims, seed):
+        calls.append((weeks[0], n_sims, tuple(variants), seed))
+        return {"variants": {v: {"quantile95_registered_direction": 0.0} for v in variants}}
+
+    monkeypatch.setattr(nulls, "persistence_null", stub)
+    reg = _registered_lean({"H-28_mom1": _MOM1})
+    del reg["rules"]["n_sims_persistence"]
+    run_mod.run_full(panel, weekly, reg)
+    assert [c[1:] for c in calls] == [(1000, ("mom1",), 53), (1000, ("mom1",), 53)]       # one call per window, 1.000 sims
+    assert calls[0][0] == "2024-07-01" and calls[1][0] >= "2025-07-01"                   # W1 then W2 (pre-DEC-89: W1 only, 200)
+
+
+# ---- E3 (5): w_judged / block_len / level are read, used and pinned (T5) -----------------------
+
+def test_dec89_t5_rules_are_pinned_against_the_code_constants(monkeypatch):
+    rr = run_mod.resolve_rules({"rules": {}})
+    assert rr["block_len"] == nulls.BLOCK_SIZE_WEEKS == 4 and rr["level"] == nulls.SELECTION_CEILING_ONE_SIDED_QUANTILE
+    assert rr["bounce_spread"] is None and rr["seed"] == 53 and rr["bh_alpha"] == 0.10
+    assert run_mod.resolve_rules({"rules": {"block_len": 4, "level": 0.9936, "bounce_spread": 0.003621}})["bounce_spread"] == 0.003621
+    with pytest.raises(run_mod.ConstantPinError, match="block_len"):
+        run_mod.resolve_rules({"rules": {"block_len": 5}})
+    with pytest.raises(run_mod.ConstantPinError, match="level"):
+        run_mod.resolve_rules({"rules": {"level": 0.99}})
+    assert issubclass(run_mod.ConstantPinError, run_mod.RunAbort)                        # the CLI turns it into rc=1
+    # the pin follows the code constant (looked up at call time), it is not a copy
+    monkeypatch.setattr(nulls, "BLOCK_SIZE_WEEKS", 5)
+    with pytest.raises(run_mod.ConstantPinError):
+        run_mod.resolve_rules({"rules": {"block_len": 4}})
+    assert run_mod.resolve_rules({"rules": {"block_len": 5}})["block_len"] == 5
+
+
+def test_dec89_run_full_uses_block_len_and_level_and_refuses_a_yaml_that_moved_alone(tmp_path, monkeypatch):
+    panel, weekly = _build_run_fixture_tree_large(tmp_path)
+    reg = _registered_lean({"H-28_mom1": _MOM1})
+    reg["rules"].update(block_len=5, level=0.99)
+    with pytest.raises(run_mod.ConstantPinError):                                         # YAML moved, code did not
+        run_mod.run_full({"symbols": []}, {"weeks": [], "returns": None, "alive": None}, reg)
+    monkeypatch.setattr(nulls, "BLOCK_SIZE_WEEKS", 5)
+    monkeypatch.setattr(nulls, "SELECTION_CEILING_ONE_SIDED_QUANTILE", 0.99)
+    report = run_mod.run_full(panel, weekly, reg)                                         # both moved together: USED
+    w = report["results"]["H-28_mom1"]["payload"]["windows"]["W1"]
+    assert w["ci_detail"]["block_size"] == 5 and w["ci_detail"]["level"] == 0.99
+    assert w["block_permutation_detail"]["block_size"] == 5
+    assert report["parameters"]["block_size"] == 5 and report["parameters"]["null_quantile_level"] == 0.99
+    assert report["registered_inputs"]["block_len"] == 5 and report["registered_inputs"]["level"] == 0.99
+
+
+def test_dec89_w_judged_is_read_used_and_pinned(dec89_run):
+    panel, weekly, registered, report = dec89_run
+    for wn in ("W1", "W2"):
+        reg_wj = registered["windows"][wn]["w_judged"]
+        assert report["registered_inputs"]["w_judged"][wn] == reg_wj
+        for eid in ("H-28_mom1", "H-29_rev_gap"):
+            assert report["results"][eid]["payload"]["windows"][wn]["se_detail"]["w_judged"] == reg_wj   # the SE denominator
+    wrong = copy.deepcopy(registered)
+    wrong["windows"]["W1"]["w_judged"] += 1
+    with pytest.raises(run_mod.ConstantPinError, match=r"windows\.W1\.w_judged"):
+        run_mod.run_full(panel, weekly, wrong)
+    alive, weeks = np.ones((10, 12), dtype=bool), [str(i) for i in range(10)]
+    reg = {"windows": {"W1": {"w_judged": 9}}}
+    c = run_mod.registered_window_constants(reg, "W1", alive, weeks)
+    assert c["w_judged"] == 9 == c["w_judged_window"] and c["ceiling"] is None and c["q_driftfree"] == {}
+    assert run_mod.registered_window_constants({"windows": {"W1": {}}}, "W1", alive, weeks)["w_judged"] == 9
+    with pytest.raises(run_mod.ConstantPinError):
+        run_mod.registered_window_constants({"windows": {"W1": {"w_judged": 8}}}, "W1", alive, weeks)
+
+
+def test_dec89_t5_constants_pin_lists_the_new_fields():
+    pin = run_mod.registered_constants_pin(_strict_registered())
+    assert pin["rules"] == {"bounce_spread": BOUNCE_SPREAD, "block_len": 4, "level": 0.9936}
+    for wn in ("W1", "W2"):
+        assert pin[wn]["bounce_sigma_true"] == BOUNCE_SIGMA[wn] and pin[wn]["survivorship"] == _SURV[wn]
+        assert pin[wn]["w_judged"] == 52
+
+
+# ---- E3 (7): the run's Markdown report ---------------------------------------------------------
+
+def test_dec89_run_markdown_reports_bounce_parameters_survivorship_and_the_gl012_hypothesis(dec89_run, tmp_path):
+    _panel, _weekly, registered, report = dec89_run
+    arts = run_mod.write_run_artifacts(tmp_path / "out", copy.deepcopy(report))["artifacts"]
+    assert "wp13_run_md" in arts and arts["wp13_run_md"]["sha256"] == panel_load.sha256_file(arts["wp13_run_md"]["path"])
+    md = Path(arts["wp13_run_md"]["path"]).read_text(encoding="utf-8")
+    assert md.isascii() and md == run_mod.render_run_markdown({k: v for k, v in report.items() if k != "_l_window_sealed"})
+    assert "## Bounce-Fixture" in md and "0.003621" in md                                 # the registered spread
+    for wn in ("W1", "W2"):
+        assert f"{wn}: {BOUNCE_SIGMA[wn]:.6f}" in md                                      # the registered sigma_true per window
+    assert "| H-29_rev_gap | W1 |" in md and "IC_bounce" in md
+    assert "## Survivorship-Etikett" in md and "-0.198" in md and "-0.579" in md
+    assert "GL-012 vor dem Lauf" in md and registered["hypotheses"]["H-30_vol_rv"]["reason"] in md
+    assert "## Persistenz-Null" in md and "wp13_run_L_window_sealed" not in md           # the sealed L window is not in the report
+
+
+# ============================================================================
+# DEC-89 E2: the positive control in production configuration (PRD 3.3.8)
+# ============================================================================
+
+_PC_AS_OF = date(2027, 1, 1)
+
+
+def _build_pc_union_tree(tmp_path: Path, k: int = 400):
+    """An on-disk survivors + delisted tree in the shape of the real union panel: BTCUSDT and ``k`` survivors (every
+    fifth lists late, between 2024 and 2025), eight symbols delisted between 2024-09 and 2026-03 (so K_t varies and
+    delisting weeks occur inside W1 and W2), built with the same WP-12b fixture writers the other CLI end-to-end tests
+    use. Returns ``(surv_base, del_base, delisting_dates_path)``."""
+    surv_base, del_base = tmp_path / "panel_1d", tmp_path / "panel_1d_delisted"
+    surv_manifest, del_manifest = surv_base / "panel_manifest.sqlite", del_base / "panel_manifest.sqlite"
+    full_start, full_end = date(2021, 1, 1), date(2026, 6, 30)
+    for i, sym in enumerate(["BTCUSDT"] + [f"SYM{j:03d}USDT" for j in range(k)]):
+        start = date(2024, 1, 1) + timedelta(days=(i * 11) % 600) if i % 5 == 3 else full_start
+        _write_full_history(surv_base, surv_manifest, sym, _closes(start, full_end, seed=i + 1), as_of_date=full_end)
+    delisted = {}
+    for n in range(8):
+        d = date(2024, 9, 2) + timedelta(days=80 * n)
+        _write_full_history(del_base, del_manifest, f"DEL{n}USDT", _closes(full_start, d, seed=500 + n), as_of_date=d)
+        delisted[f"DEL{n}USDT"] = {"delist_date": d.isoformat(), "announcement_id": f"ann-del{n}", "source": "delisting_ms"}
+    dd = delisted_panel.write_delisting_dates_json(del_base, delisted)
+    return surv_base, del_base, Path(dd["path"])
+
+
+def _pc_registered(shape, symbols, *, n_reps_null: int = 40, rho_f: float = 0.09, beta_sd: float = 0.6) -> dict:
+    """A registered YAML for the control with FROZEN constants produced by ``nulls.run_configuration_null`` (the Vorlauf
+    function) on a signal-free factor panel of the window's shape -- exactly what the Vorlauf freezes -- plus IC_min from
+    the window's real K_t series, the bounce parameters and the survivorship numbers. Normalised to plain JSON types."""
+    entries = {
+        "H-28_mom1": dict(_MOM1),
+        "H-28_mom2": {"hypothesis": "H-28", "variant": "mom2", "direction": "positive", "status": "gl012_pre_run",
+                      "reason": "MDE80 > IC_prior (Test)"},
+        "H-29_rev_gap": dict(_REV_GAP),
+        "H-30_vol_rv": {"hypothesis": "H-30", "variant": "vol_rv", "direction": "negative", "outcome": "vol_weighted",
+                        "status": "gl012_pre_run", "reason": "H-30-Feasibility (Test)"},
+    }
+    reg = {"hypotheses": entries, "windows": {}, "beta_control": {"method": "fm_neutral_8w", "beta_window_weeks": 8},
+           "rules": {"seed": 53, "n_reps": n_reps_null, "n_reps_bootstrap": 200, "n_reps_permutation": 200,
+                     "block_len": 4, "level": 0.9936, "bounce_spread": BOUNCE_SPREAD}}
+    rng = np.random.default_rng(1)
+    for wn, (a, b) in {"W1": ("2024-07-01", "2025-06-30"), "W2": ("2025-07-01", "2026-06-30")}.items():
+        sl = prelaunch_module.slice_window(shape["weeks"], a, b, shape["alive"], shape["alive"])    # ("returns", "alive")
+        fl = nulls.analytic_permutation_floor(sl["alive"], sl["weeks"])
+        thr = nulls.ic_threshold(fl["e_floor"], 1.0, fl["w_judged"])
+        noise = nulls.simulate_factor_panel(len(sl["weeks"]), len(symbols), sigma_f=0.06, sigma_e=0.12, rho_f=0.0,
+                                            drift_f=0.0, rng=rng, beta_sd=beta_sd,
+                                            market_index=symbols.index("BTCUSDT"))["returns"]
+        c = nulls.run_configuration_null(noise, sl["alive"], symbols, method="fm_neutral_8w", rho_f=rho_f,
+                                         beta_sd=beta_sd, n_reps=n_reps_null, seed=53)["constants"]
+        reg["windows"][wn] = {
+            "start": a, "end": b, "ic_min_capped": {v: thr for v in characteristics.VARIANT_NAMES},
+            "w_judged": fl["w_judged"], "bounce_sigma_true": BOUNCE_SIGMA[wn], "survivorship": copy.deepcopy(_SURV[wn]),
+            "calibration": _window_calibration(rho_f, beta_sd),
+            "ceiling_method_stress": c["ceiling_method_stress"],
+            "res_quantile_driftfree": c["res_quantile_driftfree"], "res_quantile_drifting": c["res_quantile_drifting"]}
+    return json.loads(json.dumps(reg))
+
+
+@pytest.fixture(scope="module")
+def pc_tree(tmp_path_factory):
+    """The on-disk union tree, its real loader output reduced to the SHAPE the control reads (week grid, PIT alive mask,
+    ``returns_valid``, symbol order), the registered YAML (without data fingerprints) and the panel's V9 fingerprints."""
+    tmp = tmp_path_factory.mktemp("pc_tree")
+    surv_base, del_base, dd_path = _build_pc_union_tree(tmp)
+    panel = panel_load.load_panel_union(
+        surv_base, surv_base / "panel_manifest.sqlite", del_base, del_base / "panel_manifest.sqlite",
+        year_start=2021, year_end=2026, as_of=_PC_AS_OF, delisting_dates_path=dd_path)
+    weekly = panel_load.weekly_returns_and_mask_union(panel, panel["last_alive_day"])
+    shape = {"weeks": list(weekly["weeks"]), "alive": weekly["alive"], "returns_valid": weekly["returns_valid"]}
+    symbols = list(panel["symbols"])
+    fps = WP13.data_fingerprints(_pc_ns(tmp, panel_base=str(surv_base), delisted_base=str(del_base)), panel, del_base,
+                                 dd_path, _PC_AS_OF)
+    return {"tmp": tmp, "surv_base": surv_base, "del_base": del_base, "shape": shape, "symbols": symbols,
+            "registered": _pc_registered(shape, symbols), "fps": fps}
+
+
+@pytest.fixture(scope="module")
+def pc_setup(pc_tree):
+    return pc_tree["shape"], pc_tree["symbols"], pc_tree["registered"]
+
+
+@pytest.fixture(scope="module")
+def pc_report(pc_setup):
+    """The control over the three registered seeds, with EVERY null function patched to explode: the control uses only
+    the frozen constants of the YAML (no factor-null replicates, no persistence null, no permutation null)."""
+    shape, symbols, registered = pc_setup
+
+    def boom(*_a, **_k):
+        raise AssertionError("the positive control recomputed a null (it must use the frozen YAML constants only)")
+
+    with pytest.MonkeyPatch.context() as mp:
+        for name in ("run_configuration_null", "beta_controlled_factor_null", "factor_preserving_null",
+                     "persistence_null", "block_permutation_pvalue", "block_permutation_null_draws"):
+            mp.setattr(nulls, name, boom)
+        return pc_mod.run_positive_control(shape, symbols, registered, registered_sha256="r" * 64)
+
+
+def test_dec89_pc_passes_on_a_production_shaped_fixture_panel(pc_report, pc_setup):
+    """DEC-89 E2: on the real-shaped panel the control is BESTANDEN -- H-28_mom1 and H-29_rev_gap PASS in all three seeds
+    (injected IC 0.06 through the complete gate evaluation against the FROZEN constants), the negative control (injected
+    signal 0, otherwise identical) gives no PASS in any seed; locked entries are skipped."""
+    _shape, _symbols, registered = pc_setup
+    r = pc_report
+    assert r["bestanden"] is True and r["line"] == "Positivkontrolle BESTANDEN"
+    assert r["seeds"] == [53, 54, 55] and r["injected_ic"] == 0.06
+    c = r["criteria"]
+    assert c["positive_all_pass"] and c["negative_no_pass"] and c["seeds_registered"] and not c["missing_or_locked_required_entries"]
+    assert set(r["skipped"]) == {"H-28_mom2", "H-30_vol_rv"} and r["uncovered"] == []
+    assert "persistence_null" in " ".join(r["not_computed"]) and r["registered_sha256"] == "r" * 64
+    for seed in ("53", "54", "55"):
+        for eid, direction in (("H-28_mom1", "positive"), ("H-29_rev_gap", "negative")):
+            pos, neg = r["runs"][seed]["positive"][eid], r["runs"][seed]["negative"][eid]
+            assert pos["verdict"] == "PASS", (seed, eid, pos["labels"])
+            assert neg["verdict"] != "PASS", (seed, eid, neg["labels"])
+            for wn in ("W1", "W2"):
+                p, n = pos["windows"][wn], neg["windows"][wn]
+                sign = 1.0 if direction == "positive" else -1.0
+                assert 0.035 < sign * p["mean_ic"] < 0.09 and abs(n["mean_ic"]) < 0.03 < sign * p["mean_ic"]
+                assert p["gates"]["window_pass"] and not n["gates"]["window_pass"]
+                # the FROZEN constants of the YAML are what the gate judged against (nothing recomputed)
+                wcfg = registered["windows"][wn]
+                v = "mom1" if eid == "H-28_mom1" else "rev_gap"
+                q = [wcfg["res_quantile_driftfree"][v], wcfg["res_quantile_drifting"][v]]
+                assert p["res_quantile_binding"] == (max(q) if direction == "positive" else min(q))
+                assert p["selection_ceiling_mean_of_max"] == wcfg["ceiling_method_stress"] < p["ic_min_capped"] == wcfg["ic_min_capped"][v]
+                assert p["residualized_mean_ic"] * sign > sign * p["res_quantile_binding"]    # the beta-controlled IC clears it
+    # labels: the registered survivorship numbers ride along, and the bounce parameters are the registered ones
+    rev = r["runs"]["53"]["positive"]["H-29_rev_gap"]
+    assert rev["survivorship_label"] is True and rev["survivorship_ic_min_units"] == {
+        wn: _SURV[wn]["rev_gap_diff_in_ic_min_units"] for wn in ("W1", "W2")}
+    shape = pc_setup[0]
+    for wn in ("W1", "W2"):
+        sl = prelaunch_module.slice_window(shape["weeks"], registered["windows"][wn]["start"], registered["windows"][wn]["end"])
+        alive_w = shape["alive"][sl["lo"]:sl["hi"]]
+        bf = run_mod.bounce_fixture_ic(alive_w.shape[0], max(int(np.median(alive_w.sum(axis=1))), 10),
+                                       spread=BOUNCE_SPREAD, sigma_true=BOUNCE_SIGMA[wn], seed=53)
+        assert rev["windows"][wn]["bounce_ic"] == bf["ic_bounce"]
+
+
+def test_dec89_pc_takes_no_real_returns(pc_setup):
+    """DEC-89 E2: nothing real is an outcome -- the control has no ``returns`` (nor ``weekly``/``panel``) parameter, and
+    the shape it needs holds only labels and booleans."""
+    params = inspect.signature(pc_mod.run_positive_control).parameters
+    assert not {"returns", "weekly", "panel"} & set(params) and list(params)[:3] == ["shape", "symbols", "registered"]
+    shape, symbols, _reg = pc_setup
+    assert set(shape) == {"weeks", "alive", "returns_valid"} and shape["alive"].dtype == bool
+    sig = inspect.signature(pc_mod.synthesize_window_returns)
+    assert "returns" not in sig.parameters and "real" not in " ".join(sig.parameters)
+
+
+def test_dec89_pc_world_scale_parameters_come_only_from_the_registered_yaml(pc_setup):
+    _shape, _symbols, registered = pc_setup
+    for wn in ("W1", "W2"):
+        w = pc_mod.window_world(registered, wn)
+        st = registered["windows"][wn]["calibration"]["stress"]
+        assert w["rho_f"] == st["rho_f"] and w["beta_sd"] == st["beta_sd_calibrated"] and w["drift_f"] == 0.0
+        assert w["sigma_e"] == registered["windows"][wn]["bounce_sigma_true"]
+        # sigma_f inverts share = (beta_sd sigma_f)^2 / ((beta_sd sigma_f)^2 + sigma_e^2) for the stress target share
+        implied = (w["beta_sd"] * w["sigma_f"]) ** 2 / ((w["beta_sd"] * w["sigma_f"]) ** 2 + w["sigma_e"] ** 2)
+        assert implied == pytest.approx(st["target_factor_share"])
+        assert w["sigma_g"] == pytest.approx(pc_mod.SECTOR_SHOCK_REL * w["sigma_e"])
+        assert w["sigma_tot"] == pytest.approx(math.sqrt(w["sigma_e"] ** 2 + w["sigma_g"] ** 2 + (w["beta_sd"] * w["sigma_f"]) ** 2))
+    bad = copy.deepcopy(registered)
+    del bad["windows"]["W1"]["calibration"]["stress"]["target_factor_share"]
+    with pytest.raises(run_mod.RegisteredSchemaError, match="target_factor_share"):
+        pc_mod.window_world(bad, "W1")
+    bad = copy.deepcopy(registered)
+    bad["windows"]["W2"]["bounce_sigma_true"] = None
+    with pytest.raises(run_mod.RegisteredSchemaError, match="bounce_sigma_true"):
+        pc_mod.window_world(bad, "W2")
+
+
+def test_dec89_pc_synthetic_world_carries_the_injected_signal_and_the_negative_control_differs_only_by_it(pc_setup):
+    shape, symbols, registered = pc_setup
+    alive, valid = shape["alive"], shape["returns_valid"]
+    world = pc_mod.window_world(registered, "W1")
+    pos = pc_mod.synthesize_window_returns(alive, valid, symbols, world, seed=53, window_index=0, signal_ic=0.06)
+    neg = pc_mod.synthesize_window_returns(alive, valid, symbols, world, seed=53, window_index=0, signal_ic=0.0)
+    m = symbols.index("BTCUSDT")
+    assert np.array_equal(pos["factor"], neg["factor"]) and np.array_equal(pos["beta"], neg["beta"])   # same stream, same base
+    assert pos["coefficient"] > 0.0 and neg["coefficient"] == 0.0
+    assert np.array_equal(pos["returns"][:, m], neg["returns"][:, m]) and np.array_equal(pos["returns"][0], neg["returns"][0])
+    t_inj = int(np.argmax((alive & valid).sum(axis=1) >= 10)) + 3         # a week with >= 10 members and two weeks of history
+    assert not np.array_equal(pos["returns"][t_inj], neg["returns"][t_inj])                            # the injection acts
+    # the real masks shape the synthetic arrays: zero where no return is computable, NaN in the estimation array there
+    for syn in (pos, neg):
+        assert np.all(syn["returns"][~valid] == 0.0) and np.array_equal(np.isnan(syn["returns_est"]), ~valid)
+        assert np.array_equal(syn["returns_est"][valid], syn["returns"][valid])
+    assert pos["beta"][m] == 1.0 and np.allclose(pos["returns"][1:, m], pos["factor"][1:])             # market column := factor
+    # realised cross-sectional ICs on the full grid: mom1 ~ +0.06, rev_gap ~ -0.06 (the PRD fixture), none without the injection
+    def mean_ic(char, ret):
+        return ic.weekly_ic_series(char, ret, alive, convention="close_at_last")["mean_ic"]
+
+    mom_pos = mean_ic(characteristics.momentum_characteristic(pos["returns"], trail_win=1), pos["returns"])
+    rev_pos = mean_ic(characteristics.reversal_gap_characteristic(pos["returns"]), pos["returns"])
+    mom_neg = mean_ic(characteristics.momentum_characteristic(neg["returns"], trail_win=1), neg["returns"])
+    rev_neg = mean_ic(characteristics.reversal_gap_characteristic(neg["returns"]), neg["returns"])
+    assert 0.04 < mom_pos < 0.08 and -0.08 < rev_pos < -0.04, (mom_pos, rev_pos)
+    assert abs(mom_neg) < 0.025 and abs(rev_neg) < 0.025, (mom_neg, rev_neg)
+    # deterministic, and another seed gives another world
+    again = pc_mod.synthesize_window_returns(alive, valid, symbols, world, seed=53, window_index=0, signal_ic=0.06)
+    other = pc_mod.synthesize_window_returns(alive, valid, symbols, world, seed=54, window_index=0, signal_ic=0.06)
+    assert np.array_equal(again["returns"], pos["returns"]) and not np.array_equal(other["returns"], pos["returns"])
+    # the synthetic turnover is independent of the returns' stream and zero off the alive mask
+    t1 = pc_mod.synthetic_turnover_trail(alive, seed=53, window_index=0)
+    assert np.array_equal(t1, pc_mod.synthetic_turnover_trail(alive, seed=53, window_index=0)) and t1.shape == alive.shape
+
+
+def test_dec89_pc_fails_when_the_injected_signal_is_too_weak(pc_setup):
+    """DEC-89 E2 teeth: a signal far below IC_min is not found -> NICHT BESTANDEN (the positive control can fail)."""
+    shape, symbols, registered = pc_setup
+    r = pc_mod.run_positive_control(shape, symbols, registered, seeds=(53,), signal_ic=0.004)
+    assert r["criteria"]["positive_all_pass"] is False and r["bestanden"] is False
+    assert r["line"] == "Positivkontrolle NICHT BESTANDEN"
+    assert r["runs"]["53"]["positive"]["H-28_mom1"]["verdict"] == "DROP"
+
+
+def test_dec89_pc_fails_with_a_broken_gate(pc_setup, monkeypatch):
+    """DEC-89 E2 teeth: (a) a frozen ceiling above IC_min (the GL-012 pre-verdict kill) makes the positive control
+    unpassable; (b) a gate that says PASS to everything makes the NEGATIVE control fail -- either way NICHT BESTANDEN."""
+    shape, symbols, registered = pc_setup
+    broken = copy.deepcopy(registered)
+    for wn in ("W1", "W2"):
+        broken["windows"][wn]["ceiling_method_stress"] = 1.0
+    r = pc_mod.run_positive_control(shape, symbols, broken, seeds=(53,))
+    assert r["criteria"]["positive_all_pass"] is False and r["bestanden"] is False
+    assert any("GL-012" in l for l in r["runs"]["53"]["positive"]["H-28_mom1"]["labels"])
+    orig = gates.evaluate
+    monkeypatch.setattr(gates, "evaluate", lambda payload: dict(orig(payload), verdict="PASS"))
+    r2 = pc_mod.run_positive_control(shape, symbols, registered, seeds=(53,))
+    assert r2["criteria"]["positive_all_pass"] is True and r2["criteria"]["negative_no_pass"] is False
+    assert r2["bestanden"] is False and r2["line"] == "Positivkontrolle NICHT BESTANDEN"
+
+
+def test_dec89_pc_requires_the_registered_entries_and_the_registered_seeds(pc_setup):
+    shape, symbols, registered = pc_setup
+    locked = copy.deepcopy(registered)
+    locked["hypotheses"]["H-28_mom1"].update(status="gl012_pre_run", reason="Test: gesperrt")
+    r = pc_mod.run_positive_control(shape, symbols, locked, seeds=(53,))
+    assert r["criteria"]["missing_or_locked_required_entries"] == ["H-28_mom1"] and r["bestanden"] is False
+    assert "H-28_mom1" in r["skipped"] and set(r["runs"]["53"]["positive"]) == {"H-29_rev_gap"}
+    wrong_dir = copy.deepcopy(registered)
+    wrong_dir["hypotheses"]["H-29_rev_gap"]["direction"] = "positive"
+    assert pc_mod.run_positive_control(shape, symbols, wrong_dir, seeds=(53,))["criteria"]["missing_or_locked_required_entries"] == ["H-29_rev_gap"]
+    # a control over other seeds than 53, 54, 55 is an exploration, never BESTANDEN -- even if every verdict is right
+    r2 = pc_mod.run_positive_control(shape, symbols, registered, seeds=(53,))
+    assert r2["criteria"]["positive_all_pass"] and r2["criteria"]["negative_no_pass"]
+    assert r2["criteria"]["seeds_registered"] is False and r2["bestanden"] is False and "weichen" in r2["criteria"]["note"]
+    # another computed entry (mom2 unlocked) cannot be injected: listed as not covered
+    more = copy.deepcopy(registered)
+    del more["hypotheses"]["H-28_mom2"]["status"], more["hypotheses"]["H-28_mom2"]["reason"]
+    assert pc_mod.run_positive_control(shape, symbols, more, seeds=(53,))["uncovered"] == ["H-28_mom2"]
+
+
+def test_dec89_pc_refuses_incomplete_or_mismatching_registrations_loudly(pc_setup):
+    shape, symbols, registered = pc_setup
+    no_ceiling = copy.deepcopy(registered)
+    no_ceiling["windows"]["W1"]["ceiling_method_stress"] = None
+    with pytest.raises(run_mod.RegisteredSchemaError, match="ceiling_method_stress"):
+        pc_mod.run_positive_control(shape, symbols, no_ceiling)
+    no_spread = copy.deepcopy(registered)
+    del no_spread["rules"]["bounce_spread"]
+    with pytest.raises(run_mod.RegisteredSchemaError, match="bounce_spread"):
+        pc_mod.run_positive_control(shape, symbols, no_spread)
+    wrong_wj = copy.deepcopy(registered)
+    wrong_wj["windows"]["W2"]["w_judged"] += 1
+    with pytest.raises(run_mod.ConstantPinError, match="w_judged"):
+        pc_mod.run_positive_control(shape, symbols, wrong_wj)
+    wrong_block = copy.deepcopy(registered)
+    wrong_block["rules"]["block_len"] = 6
+    with pytest.raises(run_mod.ConstantPinError, match="block_len"):
+        pc_mod.run_positive_control(shape, symbols, wrong_block)
+    fp = copy.deepcopy(registered)
+    fp["data_fingerprints"] = {"union_range_fingerprint": "ab" * 32, "delisting_dates_sha256": "cd" * 32}
+    with pytest.raises(run_mod.DataFingerprintError):
+        pc_mod.run_positive_control(shape, symbols, fp, observed_fingerprints={
+            "union_range_fingerprint": "00" * 32, "delisting_dates_sha256": "cd" * 32})
+    with pytest.raises(ValueError, match="shape inkonsistent"):
+        pc_mod.run_positive_control({**shape, "alive": shape["alive"][:, :-1]}, symbols, registered)
+    with pytest.raises(ValueError, match="BTCUSDT"):
+        pc_mod.run_positive_control(shape, ["XUSDT" if s == "BTCUSDT" else s for s in symbols], registered)
+
+
+def test_dec89_pc_is_deterministic_and_the_artifacts_round_trip(pc_setup, pc_report, tmp_path):
+    shape, symbols, registered = pc_setup
+    a = pc_mod.run_positive_control(shape, symbols, registered, seeds=(53,))
+    b = pc_mod.run_positive_control(shape, symbols, registered, seeds=(53,))
+    assert a["result_sha256"] == b["result_sha256"] and len(a["result_sha256"]) == 64
+    assert a["runs"]["53"] == pc_report["runs"]["53"]                      # seed 53 is the same world in the 3-seed run
+    arts = pc_mod.write_positive_control_artifacts(tmp_path / "pc_out", pc_report)["artifacts"]
+    loaded = json.loads(Path(arts["wp13_positive_control_json"]["path"]).read_text(encoding="utf-8"))
+    assert loaded["bestanden"] is True and loaded["line"] == "Positivkontrolle BESTANDEN"
+    md = Path(arts["wp13_positive_control_md"]["path"]).read_text(encoding="utf-8")
+    assert md.isascii() and md.splitlines()[0] == "Positivkontrolle BESTANDEN" and md.rstrip().splitlines()[-1] == "Positivkontrolle BESTANDEN"
+    assert "| H-28_mom1 | positiv |" in md and "| H-29_rev_gap | negativ |" in md and "Synthetische Welten" in md
+    for art in arts.values():
+        assert art["sha256"] == panel_load.sha256_file(art["path"])
+    with pytest.raises(ValueError, match="data/harvest"):
+        pc_mod.write_positive_control_artifacts(Path("data/harvest/pc_should_not_write_here"), pc_report)
+
+
+# ---- the CLI: START LOCK, pre-flight, panel loading, exit codes ---------------------------------
+
+def _pc_ns(tmp_path, **over):
+    base = dict(positive_control=True, run=False, prelaunch=False, registered="", registered_sha256="",
+                panel_base=str(tmp_path / "panel_1d"), delisted_base=str(tmp_path / "panel_1d_delisted"),
+                delisted_manifest="", delisting_dates="", start_year=2021, end_year=2026, as_of="2027-01-01",
+                out=str(tmp_path / "pc_out"), seed=53, convention="close_at_last", allow_partial=False, seeds="53,54,55")
+    base.update(over)
+    return WP13.argparse.Namespace(**base)
+
+
+def test_dec89_cli_positive_control_has_the_same_start_lock_as_run(tmp_path):
+    reg = _minimal_registered_yaml(tmp_path)
+    sha = run_mod.sha256_of_file(reg)
+    for given in ("", "0" * 64):                                             # omitted / wrong hash: refused
+        assert WP13.cmd_positive_control(_pc_ns(tmp_path, registered=str(reg), registered_sha256=given)) == 1
+    assert WP13.cmd_positive_control(_pc_ns(tmp_path, registered=str(tmp_path / "none.yaml"), registered_sha256=sha)) == 1
+    # the right hash passes the lock but there is no panel: rc=1 for a different reason, still no output directory
+    assert WP13.cmd_positive_control(_pc_ns(tmp_path, registered=str(reg), registered_sha256=sha)) == 1
+    assert not (tmp_path / "pc_out").exists()
+    assert WP13.cmd_positive_control(_pc_ns(tmp_path, registered=str(reg), registered_sha256=sha, seeds="53,x")) == 1
+
+
+def test_dec89_cli_main_positive_control_mode_flags(monkeypatch, tmp_path):
+    reg = _minimal_registered_yaml(tmp_path)
+    monkeypatch.setattr("sys.argv", ["wp13_xsec.py", "--positive-control", "--out", str(tmp_path / "o")])
+    with pytest.raises(SystemExit):                                          # --registered is mandatory
+        WP13.main()
+    monkeypatch.setattr("sys.argv", ["wp13_xsec.py", "--positive-control", "--run", "--registered", str(reg),
+                                     "--out", str(tmp_path / "o")])
+    with pytest.raises(SystemExit):                                          # exactly one mode
+        WP13.main()
+    monkeypatch.setattr("sys.argv", ["wp13_xsec.py", "--positive-control", "--emit-registered-template", "a", "b"])
+    with pytest.raises(SystemExit):
+        WP13.main()
+    monkeypatch.setattr("sys.argv", ["wp13_xsec.py", "--positive-control", "--registered", str(reg), "--out", str(tmp_path / "o")])
+    assert WP13.main() == 1                                                  # no --registered-sha256: the lock refuses (rc=1)
+    assert not (tmp_path / "o").exists()
+
+
+_REAL_LOADERS = (panel_load.load_panel_symbols, panel_load.load_panel_union, panel_load.weekly_returns_and_mask_union)
+
+
+class _NoRealReturns(dict):
+    """A ``weekly`` dict whose real ``returns`` explode on access: proof the control never reads them."""
+
+    def __getitem__(self, key):
+        if key == "returns":
+            raise AssertionError("the positive control read the REAL weekly returns")
+        return super().__getitem__(key)
+
+    def get(self, key, default=None):
+        if key == "returns":
+            raise AssertionError("the positive control read the REAL weekly returns")
+        return super().get(key, default)
+
+
+def _pc_cli_env(tmp_path, monkeypatch, pc_tree, *, mutate=None, fingerprints=None):
+    """Registered YAML on disk (+ its sha256, with the panel's V9 fingerprints unless ``fingerprints`` overrides them) and
+    spies around the REAL panel loaders of the on-disk tree; the real weekly ``returns`` the loader computes are wrapped so
+    that any access explodes. Returns ``(namespace, loader_calls)``."""
+    reg = copy.deepcopy(pc_tree["registered"])
+    fps = pc_tree["fps"] if fingerprints is None else fingerprints
+    reg["data_fingerprints"] = {k: fps[k] for k in ("union_range_fingerprint", "delisting_dates_sha256")}
+    if mutate is not None:
+        mutate(reg)
+    path = tmp_path / "registered.yaml"
+    path.write_text(yaml.safe_dump(reg, sort_keys=False), encoding="utf-8")
+    calls: list[str] = []
+    real_symbols, real_union, real_weekly = _REAL_LOADERS
+    monkeypatch.setattr(panel_load, "load_panel_symbols", lambda *a, **k: calls.append("symbols") or real_symbols(*a, **k))
+    monkeypatch.setattr(panel_load, "load_panel_union", lambda *a, **k: calls.append("union") or real_union(*a, **k))
+    monkeypatch.setattr(panel_load, "weekly_returns_and_mask_union",
+                        lambda *a, **k: calls.append("weekly") or _NoRealReturns(real_weekly(*a, **k)))
+    ns = _pc_ns(tmp_path, registered=str(path), registered_sha256=run_mod.sha256_of_file(path),
+                panel_base=str(pc_tree["surv_base"]), delisted_base=str(pc_tree["del_base"]), as_of=_PC_AS_OF.isoformat())
+    return ns, calls
+
+
+def test_dec89_cli_positive_control_end_to_end_bestanden_rc0(tmp_path, monkeypatch, pc_tree):
+    """DEC-89 E2 CLI: lock -> pre-flight -> the REAL union-panel loader on the on-disk tree (its week grid, PIT alive mask
+    and fingerprints only; the real weekly returns are wrapped to explode on access) -> V9 fingerprints checked against the
+    YAML -> control -> ``wp13_positive_control.json/.md`` and the verdict line; rc 0 only because it is BESTANDEN."""
+    ns, calls = _pc_cli_env(tmp_path, monkeypatch, pc_tree)
+    assert WP13.cmd_positive_control(ns) == 0
+    assert calls == ["symbols", "union", "weekly"]
+    out = tmp_path / "pc_out"
+    rep = json.loads((out / "wp13_positive_control.json").read_text(encoding="utf-8"))
+    assert rep["bestanden"] is True and rep["line"] == "Positivkontrolle BESTANDEN" and rep["seeds"] == [53, 54, 55]
+    assert rep["registered_sha256"] == ns.registered_sha256
+    assert rep["data_fingerprints"]["union_range_fingerprint"] == pc_tree["fps"]["union_range_fingerprint"]
+    assert rep["data_fingerprints"]["delisting_dates_sha256"] == pc_tree["fps"]["delisting_dates_sha256"]
+    assert (out / "wp13_positive_control.md").read_text(encoding="utf-8").startswith("Positivkontrolle BESTANDEN")
+    assert not list(out.glob("*L_window_sealed*")) and not list(out.glob("wp13_run*"))      # no run artifacts, nothing sealed
+    # the loaded panel IS the fixture's shape: the window K_t the control used are the real alive counts
+    shape = pc_tree["shape"]
+    assert rep["criteria"]["bestanden"] and shape["alive"].shape[1] == len(pc_tree["symbols"]) > 400
+
+
+def test_dec89_cli_positive_control_not_passed_is_rc3_and_still_reports(tmp_path, monkeypatch, pc_tree):
+    def break_ceiling(reg):
+        for wn in ("W1", "W2"):
+            reg["windows"][wn]["ceiling_method_stress"] = 1.0
+
+    ns, _calls = _pc_cli_env(tmp_path, monkeypatch, pc_tree, mutate=break_ceiling)
+    ns.seeds = "53"                                                                   # fewer seeds: faster; verdict is a FAIL anyway
+    assert WP13.cmd_positive_control(ns) == 3
+    rep = json.loads((tmp_path / "pc_out" / "wp13_positive_control.json").read_text(encoding="utf-8"))
+    assert rep["bestanden"] is False and rep["line"] == "Positivkontrolle NICHT BESTANDEN"
+    assert (tmp_path / "pc_out" / "wp13_positive_control.md").read_text(encoding="utf-8").startswith("Positivkontrolle NICHT BESTANDEN")
+
+
+def test_dec89_cli_positive_control_and_run_refuse_before_reading_the_panel(tmp_path, monkeypatch, pc_tree):
+    """The mandatory-constant pre-flight (bounce spread, ...) refuses with rc=1 BEFORE a single panel call -- for
+    ``--positive-control`` and ``--run`` alike -- and a fingerprint of another panel is rc=1 without output."""
+    def no_spread(reg):
+        del reg["rules"]["bounce_spread"]
+
+    ns, calls = _pc_cli_env(tmp_path, monkeypatch, pc_tree, mutate=no_spread)
+    assert WP13.cmd_positive_control(ns) == 1 and calls == [] and not (tmp_path / "pc_out").exists()
+    ns_run = WP13.argparse.Namespace(**{**vars(ns), "run": True, "positive_control": False, "out": str(tmp_path / "run_out")})
+    assert WP13.cmd_run(ns_run) == 1 and calls == [] and not (tmp_path / "run_out").exists()
+    tmp2 = tmp_path / "second"
+    tmp2.mkdir()
+    ns2, calls2 = _pc_cli_env(tmp2, monkeypatch, pc_tree, fingerprints={"union_range_fingerprint": "00" * 32,
+                                                                         "delisting_dates_sha256": pc_tree["fps"]["delisting_dates_sha256"]})
+    assert WP13.cmd_positive_control(ns2) == 1
+    assert calls2 == ["symbols", "union", "weekly"] and not (tmp2 / "pc_out").exists()

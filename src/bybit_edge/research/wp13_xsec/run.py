@@ -58,6 +58,31 @@ reads a CLI flag, and the only file I/O is :func:`write_run_artifacts`/
       the ``delisting_dates.json`` sha256 are checked against the YAML's
       ``data_fingerprints`` (:class:`DataFingerprintError`).
 
+**DEC-89 (before the registration), what changed here.**
+  (E1) the H-29 bounce fixture takes its parameters from the registered YAML --
+      ``rules.bounce_spread`` (WP-7 spread census, median perp spread of the least
+      liquid decile D10) and ``windows.<W>.bounce_sigma_true`` (the window's measured
+      median weekly symbol vol, Vorlauf ``factor_preserving_null.driftfree.
+      sigma_e_median_symbol_weekly``); the pre-DEC-89 code constants ``0.003`` /
+      ``0.03`` (UNBELEGT, in a kill condition) are gone and a missing value is a loud
+      fail (:class:`RegisteredSchemaError`), as is every other mandatory constant.
+  (E3 (2)) ``windows.<W>.survivorship`` (the Vorlauf survivorship-fixture differences of
+      mom1/rev_gap in IC_min units) is attached to the matching entry as a label --
+      report-only, never a gate input (``gates.evaluate``).
+  (E3 (3)) a hypothesis whose variants are ALL ``gl012_pre_run`` has the verdict
+      ``"GL-012 vor dem Lauf"`` with the registered reasons (:func:`aggregate_hypotheses`).
+  (E3 (4)) the persistence null (report-only) runs in BOTH windows with 1.000 simulations
+      (``rules.n_sims_persistence``, default 1000).
+  (E3 (5)) ``windows.<W>.w_judged``, ``rules.block_len`` and ``rules.level`` are READ from
+      the YAML and used (SE denominator, bootstrap/permutation block, CI and null level)
+      after a T5 pin against the code constants (:func:`resolve_rules`,
+      :class:`ConstantPinError`).
+  (E2) the per-entry evaluation is :func:`evaluate_entry`, shared with the positive
+      control (``positive_control.py``, ``scripts/wp13_xsec.py --positive-control``): the
+      control runs the SAME code on synthetic returns.
+  (E3 (7)) the run writes ``wp13_run.md`` (:func:`render_run_markdown`) with the bounce
+      parameters and the survivorship label.
+
 **T3 (checkpoint round trip).** The run is a single pass without checkpoint or
 resume state, so there is nothing to round-trip; the persisted state IS the
 artifact set, whose round trip is T7 (:func:`verify_run_artifacts` re-derives the
@@ -73,6 +98,7 @@ import math
 import re
 import subprocess
 import sys
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
@@ -87,12 +113,14 @@ __all__ = [
     "build_all_characteristics_full_panel", "se_of_mean_ic",
     "moving_block_bootstrap_ci", "max_p_over_windows", "liquidity_decile_sensitivity",
     "bounce_fixture_ic", "lag_profile", "benjamini_hochberg", "assert_null_calibration",
-    "RunAbort", "NullCalibrationError", "DataFingerprintError", "RunArtifactError",
-    "RegisteredSchemaError", "NULL_CALIBRATION_REL_TOL", "GL012_PRE_RUN",
-    "validate_registered", "check_data_fingerprints", "hypothesis_group", "h30_outcome_for_window",
-    "aggregate_hypotheses",
+    "RunAbort", "NullCalibrationError", "DataFingerprintError", "RunArtifactError", "ConstantPinError",
+    "RegisteredSchemaError", "NULL_CALIBRATION_REL_TOL", "GL012_PRE_RUN", "GL012_PRE_RUN_VERDICT",
+    "PERSISTENCE_NULL_N_SIMS", "validate_registered", "check_data_fingerprints", "hypothesis_group",
+    "h30_outcome_for_window", "aggregate_hypotheses", "resolve_rules", "resolve_beta_control",
+    "registered_window_constants", "EntryContext", "evaluate_entry",
     "variant_window_payload", "run_hypothesis", "run_full", "registered_constants_pin",
     "code_fingerprint", "result_fingerprint", "write_run_artifacts", "verify_run_artifacts",
+    "render_run_markdown",
 ]
 
 #: DEC-76 Entscheidung 1 (b)/Task A item 3: +/-10% tolerance between the
@@ -105,12 +133,25 @@ NULL_CALIBRATION_REL_TOL = 0.10
 #: run does not compute it, it counts with p = 1 in the fixed-7 BH denominator.
 GL012_PRE_RUN = "gl012_pre_run"
 
+#: DEC-89 (E3 (3)): the verdict of a HYPOTHESIS all of whose variants are ``gl012_pre_run`` (feasibility, power or
+#: structural neutralisation decided mechanically in the Vorlauf): not "DROP" on the Vol/Mom anomaly itself but a
+#: feasibility lock with the registered reasons.
+GL012_PRE_RUN_VERDICT = "GL-012 vor dem Lauf"
+
+#: DEC-89 (E3 (4)) / DEC-74 (c): the persistence null of the run (report-only), simulations per variant and window.
+PERSISTENCE_NULL_N_SIMS = nulls.PERSISTENCE_NULL_N_SIMS_DEFAULT
+
 REGISTERED_SCHEMA_HINT = (
     "hypotheses: {<entry id, e.g. H-28_mom1>: {hypothesis?: H-28 (default: id prefix), variant: str, "
     "direction: positive|negative, outcome?: vol_weighted (required for H-30), "
     "status?: gl012_pre_run + reason: str (DEC-87 (J): locked, not computed, p = 1)}} -- one entry per "
     "variant, each variant at most once; a hypothesis is PASS iff at least one of its variants is; "
-    "windows: {W1: {start, end, ic_min_capped: {variant: float}, w_judged: int, "
+    "windows: {W1: {start, end, ic_min_capped: {variant: float}, w_judged: int (DEC-89: read and used as the SE "
+    "denominator, pinned against the window's own W_judged), "
+    "bounce_sigma_true: float (DEC-89 E1: the window's measured median weekly symbol vol -- Vorlauf "
+    "factor_preserving_null.driftfree.sigma_e_median_symbol_weekly -- the H-29 bounce fixture's true weekly vol), "
+    "survivorship: {mom1_diff_in_ic_min_units: float, rev_gap_diff_in_ic_min_units: float} (DEC-89 E3 (2): the "
+    "Vorlauf survivorship-fixture differences, attached to the mom1/rev_gap entry as a label, report-only), "
     "calibration: {measured: {rho_f, beta_sd_calibrated, target_factor_share}, stress: {...}, zero: {...}} "
     "(DEC-87 (D): PER WINDOW, `stress` REQUIRED; a top-level `calibration` block is refused loudly), "
     "ceiling_method_stress: float (DEC-87 (A): the registered method's mean-of-max ceiling under the "
@@ -127,8 +168,10 @@ REGISTERED_SCHEMA_HINT = (
     "checked against the panel actually loaded; mismatch = KEIN VERDIKT); "
     "rules: {seed: 53, n_reps: >=1000 (factor-null replicates -- must equal the Vorlauf's "
     "n_reps_beta_control_winner that froze the constants; n_reps_bootstrap/n_reps_permutation default "
-    "1000), block_len: 4 (FIXED DEC-75 constant, recorded for audit; code hardcodes 4), "
-    "level: 0.9936, bh_alpha: 0.10}. "
+    "1000; n_sims_persistence default 1000, DEC-89 E3 (4)), block_len: 4 and level: 0.9936 (DEC-89 E3 (5): READ and "
+    "USED, T5-pinned against nulls.BLOCK_SIZE_WEEKS / nulls.SELECTION_CEILING_ONE_SIDED_QUANTILE, a deviation is "
+    "ConstantPinError), bh_alpha: 0.10, bounce_spread: float (DEC-89 E1: the WP-7 spread census' median perp spread "
+    "of decile D10 as a fraction, 36.21 bp -> 0.003621; REQUIRED when an H-29/rev_gap entry is computed)}. "
     "run_full recomputes ceiling and both quantiles per window via nulls.run_configuration_null (registered "
     "beta_control.method, the window's calibration.stress read DIRECTLY -- no re-search --, seed 53, "
     "rules.n_reps reps) and asserts each is within +/-NULL_CALIBRATION_REL_TOL of the FROZEN value, else "
@@ -184,7 +227,13 @@ class RunArtifactError(RunAbort):
 
 
 class RegisteredSchemaError(ValueError):
-    """The registered YAML does not follow the DEC-87 schema (C.14 loud fail, before any panel arithmetic)."""
+    """The registered YAML does not follow the DEC-87/DEC-89 schema (C.14 loud fail, before any panel arithmetic)."""
+
+
+class ConstantPinError(RunAbort):
+    """DEC-89 (E3 (5)), T5: a registered constant that the run READS (``rules.block_len``, ``rules.level``,
+    ``windows.<W>.w_judged``) differs from the code constant / the value derived from the loaded panel it must equal.
+    Raised before any verdict -- the registration and the code no longer describe the same run."""
 
 
 def assert_null_calibration(recomputed: float, registered: float | None, *, label: str,
@@ -333,7 +382,7 @@ def liquidity_decile_sensitivity(
 # ----------------------------------------------------------------------------
 
 def bounce_fixture_ic(
-    n_weeks: int, n_symbols: int, *, spread: float = 0.003, sigma_true: float = 0.03,
+    n_weeks: int, n_symbols: int, *, spread: float, sigma_true: float,
     seed: int = 53, convention: ic.Convention = "close_at_last",
 ) -> dict[str, Any]:
     """DEC-75 Entscheidung 1 (5) / task brief: a synthetic panel sized
@@ -346,7 +395,20 @@ def bounce_fixture_ic(
     IC on this bounce-only panel (``ic_bounce``) for comparison against
     the REAL rev_gap IC (``gates.evaluate``, DEC-87 (I): ``|ic_bounce,W| >=
     |ic_real,W|`` in any window -> no PASS). With the one-week gap formation
-    and outcome share no close, so ``ic_bounce`` is ~0 by construction."""
+    and outcome share no close, so ``ic_bounce`` is ~0 by construction.
+
+    **DEC-89 (E1): ``spread`` and ``sigma_true`` have NO defaults any more.** The former code
+    constants (``0.003`` / ``0.03``) were UNBELEGT (no derivation) in a kill condition. The run
+    passes the registered values -- ``rules.bounce_spread`` (the WP-7 spread census' median perp
+    spread of the least liquid decile D10, the strictest choice = the largest bounce, 36.21 bp ->
+    0.003621) and the window's ``windows.<W>.bounce_sigma_true`` (its measured median weekly
+    symbol vol) -- and a call without them is a ``TypeError`` (a missing registered value is a
+    loud fail, never a silent default); non-finite or non-positive values are a ``ValueError``."""
+    for name, val in (("spread", spread), ("sigma_true", sigma_true)):
+        if not (isinstance(val, (int, float)) and not isinstance(val, bool) and math.isfinite(float(val))
+                and float(val) > 0.0):
+            raise ValueError(f"bounce_fixture_ic: {name}={val!r} muss eine endliche positive Zahl sein "
+                             "(DEC-89 E1: aus der registrierten YAML, kein Default)")
     rng = np.random.default_rng(seed)
     true_log_ret = rng.normal(0.0, sigma_true, size=(n_weeks, n_symbols))
     true_log_price = np.cumsum(true_log_ret, axis=0)
@@ -533,9 +595,14 @@ def variant_window_payload(
     se_info = se_of_mean_ic(ic_weekly, floor, w_judged)
     ci_info = moving_block_bootstrap_ci(ic_weekly, direction=direction, block_size=block_size,
                                          n_reps=n_reps_bootstrap, seed=seed, level=ci_level)
-    perm = nulls.block_permutation_pvalue(res["mean_ic"], characteristic, returns, alive,
-                                           direction=direction, convention=convention,
-                                           block_size=block_size, n_reps=n_reps_permutation, seed=seed)
+    if n_reps_permutation > 0:
+        perm = nulls.block_permutation_pvalue(res["mean_ic"], characteristic, returns, alive,
+                                               direction=direction, convention=convention,
+                                               block_size=block_size, n_reps=n_reps_permutation, seed=seed)
+    else:
+        # DEC-89 (E2): the positive control skips this report-only null (runtime; the p-value is no gate input).
+        perm = {"p_value": float("nan"), "n_reps": 0, "n_reps_finite": 0, "skipped": True, "direction": direction,
+                "block_size": block_size, "seed": seed, "draws_sha256": None}
 
     residualized_mean_ic = None
     ic_residualized_weekly = None
@@ -604,6 +671,10 @@ def run_hypothesis(
     gate5_by_window: dict[str, float] | None = None,
     beta_control_method: str | None = None,
     beta_control_pit_by_window: dict[str, np.ndarray] | None = None,
+    block_size: int = 4, ci_level: float = 1.0 - 0.0064,
+    survivorship_ic_min_units: dict[str, float] | None = None,
+    bounce_detail: dict[str, Any] | None = None,
+    persistence_detail: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     """One hypothesis variant, BOTH judgement windows (C.10 hard) -> the full
     ``gates.evaluate`` payload + verdict. Windows are keyed ``"W1"``/``"W2"``
@@ -617,7 +688,14 @@ def run_hypothesis(
     ``beta_control_method``/``beta_control_pit_by_window`` (DEC-77
     Entscheidung 2, additive, ``None`` by default -- exact pre-DEC-77
     fallback via ``beta_8w_pit_by_window``) select the registered
-    beta-control method, see :func:`variant_window_payload`'s docstring."""
+    beta-control method, see :func:`variant_window_payload`'s docstring.
+
+    **DEC-89 (additive):** ``block_size``/``ci_level`` are the registered ``rules.block_len``/``rules.level``
+    (:func:`resolve_rules`; the defaults are the code constants they are pinned against);
+    ``survivorship_ic_min_units`` (``{window: float}``) is the registered survivorship label of THIS variant
+    (``gates.evaluate`` attaches it, report-only); ``bounce_detail`` (``{window: bounce_fixture_ic result}``,
+    spread/sigma_true/seed/IC) and ``persistence_detail`` (``{window: {...}}``) are carried into the payload
+    verbatim so the report shows exactly which parameters produced ``bounce_ic`` and the persistence label."""
     windows_payload: dict[str, Any] = {}
     for wname in ("W1", "W2"):
         beta_8w = beta_8w_pit_by_window.get(wname) if beta_8w_pit_by_window else None
@@ -632,6 +710,7 @@ def run_hypothesis(
             selection_ceiling_mean_of_max=selection_ceiling_by_window[wname],
             beta_8w_pit=beta_8w, convention=convention,
             n_reps_bootstrap=n_reps_bootstrap, n_reps_permutation=n_reps_permutation, seed=seed,
+            block_size=block_size, ci_level=ci_level,
             res_quantile_drifting=rqd, res_quantile_driftfree=rqf, gate5_median_spearman=g5,
             beta_control_method=beta_control_method, beta_control_pit=beta_control_pit)
 
@@ -640,6 +719,8 @@ def run_hypothesis(
         "windows": windows_payload,
         "persistence_null_pass": persistence_null_pass, "bh_fdr_pass": bh_fdr_pass,
         "liquidity_ic_without_d1": liquidity_ic_without_d1, "bounce_ic": bounce_ic,
+        "survivorship_ic_min_units": survivorship_ic_min_units,
+        "bounce_fixture": bounce_detail, "persistence_null": persistence_detail,
     }
     verdict = gates.evaluate(payload)
     return {"payload": payload, "verdict": verdict}
@@ -665,6 +746,76 @@ def _is_finite_number(x: Any) -> bool:
     return isinstance(x, (int, float)) and not isinstance(x, bool) and math.isfinite(float(x))
 
 
+def _is_positive_int(x: Any) -> bool:
+    return isinstance(x, int) and not isinstance(x, bool) and x > 0
+
+
+def _check_rules_block(rules: dict[str, Any], *, strict: bool, needs_bounce: bool) -> None:
+    """DEC-89 schema check of the ``rules`` block (see :func:`validate_registered`): ``bounce_spread`` (positive
+    finite; mandatory when a rev_gap entry is computed or ``strict``), ``block_len`` (positive int) and ``level``
+    (``0 < level < 1``) -- mandatory when ``strict``, a value that is present must be well-formed."""
+    spread = rules.get("bounce_spread")
+    if spread is None:
+        if strict or needs_bounce:
+            raise RegisteredSchemaError(
+                "rules.bounce_spread fehlt (DEC-89 E1): der Bounce-Fixture-Spread kommt aus der Messung (WP-7-Spread-"
+                "Zensus, Median-Perp-Spread des Dezils D10, als Bruchteil), nie aus einer Code-Konstante -- kein Lauf, "
+                "kein Verdikt (C.14). Mit --emit-registered-template neu erzeugen.")
+    elif not (_is_finite_number(spread) and float(spread) > 0.0):
+        raise RegisteredSchemaError(f"rules.bounce_spread={spread!r} ist keine endliche positive Zahl (DEC-89 E1)")
+    block_len = rules.get("block_len")
+    if block_len is None:
+        if strict:
+            raise RegisteredSchemaError("rules.block_len fehlt (DEC-89 E3 (5): wird gelesen und gegen die "
+                                        "Code-Konstante gepinnt) -- kein Lauf, kein Verdikt")
+    elif not _is_positive_int(block_len):
+        raise RegisteredSchemaError(f"rules.block_len={block_len!r} ist keine positive ganze Zahl (DEC-89 E3 (5))")
+    level = rules.get("level")
+    if level is None:
+        if strict:
+            raise RegisteredSchemaError("rules.level fehlt (DEC-89 E3 (5): wird gelesen und gegen die "
+                                        "Code-Konstante gepinnt) -- kein Lauf, kein Verdikt")
+    elif not (_is_finite_number(level) and 0.0 < float(level) < 1.0):
+        raise RegisteredSchemaError(f"rules.level={level!r} liegt nicht in (0, 1) (DEC-89 E3 (5))")
+
+
+def _check_window_dec89_fields(wn: str, wcfg: dict[str, Any], *, strict: bool, needs_bounce: bool) -> None:
+    """DEC-89 schema check of one window block: ``bounce_sigma_true`` (E1), ``w_judged`` and ``survivorship`` (E3)."""
+    sigma = wcfg.get("bounce_sigma_true")
+    if sigma is None:
+        if strict or needs_bounce:
+            raise RegisteredSchemaError(
+                f"windows.{wn}.bounce_sigma_true fehlt (DEC-89 E1): die wahre Wochen-Vol der Bounce-Fixture ist die "
+                "gemessene Median-Wochen-Vol der Symbole des Fensters (Vorlauf factor_preserving_null.driftfree."
+                "sigma_e_median_symbol_weekly), nie eine Code-Konstante -- kein Lauf, kein Verdikt (C.14)")
+    elif not (_is_finite_number(sigma) and float(sigma) > 0.0):
+        raise RegisteredSchemaError(f"windows.{wn}.bounce_sigma_true={sigma!r} ist keine endliche positive Zahl (DEC-89 E1)")
+    wj = wcfg.get("w_judged")
+    if wj is None:
+        if strict:
+            raise RegisteredSchemaError(f"windows.{wn}.w_judged fehlt (DEC-89 E3 (5): wird gelesen, verwendet und gegen "
+                                        "W_judged des geladenen Fensters gepinnt) -- kein Lauf, kein Verdikt")
+    elif not _is_positive_int(wj):
+        raise RegisteredSchemaError(f"windows.{wn}.w_judged={wj!r} ist keine positive ganze Zahl (DEC-89 E3 (5))")
+    surv = wcfg.get("survivorship")
+    keys = ("mom1_diff_in_ic_min_units", "rev_gap_diff_in_ic_min_units")
+    if surv is None:
+        if strict:
+            raise RegisteredSchemaError(f"windows.{wn}.survivorship fehlt (DEC-89 E3 (2): {keys} aus dem Vorlauf-"
+                                        "`survivorship_fixture`) -- kein Lauf, kein Verdikt")
+    elif not isinstance(surv, dict):
+        raise RegisteredSchemaError(f"windows.{wn}.survivorship ist kein Mapping (DEC-89 E3 (2))")
+    else:
+        for k in keys:
+            v = surv.get(k)
+            if v is None:
+                if strict:
+                    raise RegisteredSchemaError(f"windows.{wn}.survivorship.{k} fehlt oder ist nicht endlich "
+                                                "(DEC-89 E3 (2)) -- kein Lauf, kein Verdikt")
+            elif not _is_finite_number(v):
+                raise RegisteredSchemaError(f"windows.{wn}.survivorship.{k}={v!r} ist nicht endlich (DEC-89 E3 (2))")
+
+
 def validate_registered(registered: dict[str, Any], *, require_frozen_constants: bool = False) -> None:
     """DEC-87 (C.14 loud fail, before any panel arithmetic): the registered YAML
     must follow the Drittfassung schema (:data:`REGISTERED_SCHEMA_HINT`).
@@ -683,7 +834,19 @@ def validate_registered(registered: dict[str, Any], *, require_frozen_constants:
     ``calibration.stress.{rho_f, beta_sd_calibrated}``; an entry with an unknown
     variant/direction/status, a locked entry without a ``reason``, an H-30 entry
     without ``outcome: vol_weighted``, or one variant registered twice (K = 7 is
-    a family of seven DISTINCT variants)."""
+    a family of seven DISTINCT variants).
+
+    **DEC-89 (E1/E3), additive:** ``rules.bounce_spread`` and each window's
+    ``bounce_sigma_true`` are REQUIRED whenever an H-29/``rev_gap`` entry is computed (not
+    locked) -- even in the non-strict (hand-built) mode: the former code defaults are gone
+    and a missing value is a loud fail (C.14). With ``require_frozen_constants=True`` (the
+    CLI's ``--run`` and ``--positive-control``) additionally ``rules.block_len``,
+    ``rules.level``, ``rules.bounce_spread``, every window's ``w_judged``,
+    ``bounce_sigma_true`` and the ``survivorship`` pair (both finite) are mandatory; a
+    template emitted without a Vorlauf datum carries ``None`` placeholders that this
+    refuses. Where present, a value must be of the right kind (positive finite number,
+    positive integer, ``0 < level < 1``). The T5 pin against the code constants happens in
+    :func:`resolve_rules`."""
     hyps = registered.get("hypotheses")
     if not isinstance(hyps, dict) or not hyps:
         raise RegisteredSchemaError("registered YAML: 'hypotheses' fehlt oder ist leer")
@@ -717,10 +880,19 @@ def validate_registered(registered: dict[str, Any], *, require_frozen_constants:
     windows = registered.get("windows")
     if not isinstance(windows, dict):
         raise RegisteredSchemaError("registered YAML: 'windows' fehlt")
+    needs_bounce = any(h.get("status") != GL012_PRE_RUN and (h.get("variant") == "rev_gap"
+                                                             or hypothesis_group(e, h) == "H-29")
+                       for e, h in hyps.items())
+    rules = registered.get("rules")
+    if rules is not None and not isinstance(rules, dict):
+        raise RegisteredSchemaError("registered YAML: 'rules' ist kein Mapping")
+    rules = rules or {}
+    _check_rules_block(rules, strict=require_frozen_constants, needs_bounce=needs_bounce)
     for wn in ("W1", "W2"):
         wcfg = windows.get(wn)
         if not isinstance(wcfg, dict):
             raise RegisteredSchemaError(f"windows.{wn} fehlt")
+        _check_window_dec89_fields(wn, wcfg, strict=require_frozen_constants, needs_bounce=needs_bounce)
         if "ceiling_driftfree_res" in wcfg:
             raise RegisteredSchemaError(
                 f"windows.{wn}.ceiling_driftfree_res ist der VOR-DEC-87-Schluessel der TS-Residualisierungs-Decke "
@@ -774,18 +946,253 @@ def check_data_fingerprints(registered: dict[str, Any], observed: dict[str, Any]
                 "-- anderes Panel als im Vorlauf, kein Verdikt (DEC-87 V9).")
 
 
+def resolve_rules(registered: dict[str, Any]) -> dict[str, Any]:
+    """DEC-89 (E3 (5)): the ``rules`` block as the run USES it, after the T5 pin. ``seed`` (53), the replicate
+    counts (``n_reps_bootstrap``/``n_reps_permutation`` default 1000, ``n_reps`` = the factor-null replicates,
+    legacy key ``n_reps_factor_null``), ``bh_alpha`` and ``n_sims_persistence`` (default
+    :data:`PERSISTENCE_NULL_N_SIMS` = 1000) keep their pre-DEC-89 meaning.
+
+    ``block_len`` and ``level`` are READ from the YAML (absent = the code constants, for hand-built unit-test files) and
+    PINNED against :data:`nulls.BLOCK_SIZE_WEEKS` / :data:`nulls.SELECTION_CEILING_ONE_SIDED_QUANTILE`, looked up at
+    call time: any difference raises :class:`ConstantPinError` ("Abweichung -> laut", T5) -- the values are frozen
+    DEC-75 constants, a registered file may repeat them but not change them. The returned ``block_len``/``level``
+    are what the run applies to the bootstrap/permutation block size, the bootstrap CI level and the null quantile
+    level. ``bounce_spread`` is returned as registered (``None`` if absent; :func:`validate_registered` has already
+    refused a missing one where it is needed)."""
+    rules = registered.get("rules", {}) or {}
+    code_block, code_level = int(nulls.BLOCK_SIZE_WEEKS), float(nulls.SELECTION_CEILING_ONE_SIDED_QUANTILE)
+    block_len = rules.get("block_len")
+    if block_len is not None and int(block_len) != code_block:
+        raise ConstantPinError(
+            f"rules.block_len={block_len!r} weicht von der Code-Konstante nulls.BLOCK_SIZE_WEEKS={code_block} ab "
+            "(DEC-89 E3 (5), T5: eingefrorene DEC-75-Konstante) -- kein Verdikt.")
+    level = rules.get("level")
+    if level is not None and not math.isclose(float(level), code_level, rel_tol=0.0, abs_tol=1e-12):
+        raise ConstantPinError(
+            f"rules.level={level!r} weicht von der Code-Konstante nulls.SELECTION_CEILING_ONE_SIDED_QUANTILE="
+            f"{code_level!r} ab (DEC-89 E3 (5), T5: eingefrorene DEC-75-Konstante) -- kein Verdikt.")
+    return {
+        "seed": int(rules.get("seed", 53)),
+        "n_reps_bootstrap": int(rules.get("n_reps_bootstrap", 1000)),
+        "n_reps_permutation": int(rules.get("n_reps_permutation", 1000)),
+        # DEC-76 Task A item 4: the canonical key is `n_reps` (>= 1000); the legacy `n_reps_factor_null` (DEC-75)
+        # is still read as a fallback for a pre-DEC-76 registered file.
+        "n_reps_factor_null": int(rules.get("n_reps", rules.get("n_reps_factor_null", 1000))),
+        "n_sims_persistence": int(rules.get("n_sims_persistence", PERSISTENCE_NULL_N_SIMS)),
+        "block_len": code_block if block_len is None else int(block_len),
+        "level": code_level if level is None else float(level),
+        "bh_alpha": float(rules.get("bh_alpha", 0.10)),
+        "bounce_spread": None if rules.get("bounce_spread") is None else float(rules["bounce_spread"]),
+    }
+
+
+def resolve_beta_control(registered: dict[str, Any]) -> tuple[str, int | None]:
+    """DEC-77 Entscheidung 2: the registered beta-control method and its trailing window -- C.14 loud fail, no
+    fallback (extracted from :func:`run_full` for the positive control, behaviour unchanged): a missing/empty
+    ``beta_control.method``, an unknown method or a ``beta_window_weeks`` that does not match the method's window
+    raises :class:`ValueError`."""
+    beta_control_cfg = registered.get("beta_control")
+    if not isinstance(beta_control_cfg, dict) or not beta_control_cfg.get("method"):
+        raise ValueError(
+            "registered YAML fehlt beta_control.method (DEC-77 Entscheidung 2) oder es ist leer -- "
+            "kein Lauf ohne vom Orchestrator gewaehlte Beta-Kontroll-Methode (loud fail, kein "
+            "Verdikt). --emit-registered-template fuellt method nur aus einer BESTAETIGTEN "
+            "Empfehlung (DEC-87); sonst bleibt es leer und die Drittfassung muss es vor der "
+            "Registrierung fuellen.")
+    method = beta_control_cfg["method"]
+    trail_win = ic.beta_control_trail_weeks(method)   # raises on an unknown method
+    reg_beta_window = beta_control_cfg.get("beta_window_weeks")
+    if trail_win is not None and reg_beta_window != trail_win:
+        raise ValueError(
+            f"registered beta_control.beta_window_weeks ({reg_beta_window!r}) passt nicht zum "
+            f"von beta_control.method={method!r} implizierten Fenster "
+            f"({trail_win}) -- loud fail, kein Verdikt.")
+    return method, trail_win
+
+
+def registered_window_constants(registered: dict[str, Any], wn: str, alive_window: np.ndarray,
+                                weeks_window: list[str]) -> dict[str, Any]:
+    """The per-window numbers the gate needs that depend on the window's SHAPE (alive mask, K_t) plus the FROZEN
+    registered ones, read the same way by :func:`run_full` and the positive control: ``floor`` (the analytic
+    ``E_t[1/sqrt(K_t-1)]``, ``nulls.analytic_permutation_floor``), ``w_judged`` (the registered
+    ``windows.<W>.w_judged`` if present -- T5-pinned against the window's own ``W_judged``, any difference raises
+    :class:`ConstantPinError` -- else the window's own), and the registered null constants ``ceiling``/``q_driftfree``/
+    ``q_drifting`` (``None``/``{}`` where the YAML carries none: hand-built unit-test files)."""
+    f = nulls.analytic_permutation_floor(alive_window, weeks_window)
+    wcfg = registered["windows"][wn]
+    w_judged = f["w_judged"]
+    reg_wj = wcfg.get("w_judged")
+    if reg_wj is not None and int(reg_wj) != int(w_judged):
+        raise ConstantPinError(
+            f"windows.{wn}.w_judged={reg_wj!r} weicht von W_judged des geladenen Fensters ({w_judged}) ab "
+            "(DEC-89 E3 (5), T5: anderes Wochenraster als im Vorlauf) -- kein Verdikt.")
+    return {
+        "floor": f["e_floor"], "w_judged": int(reg_wj) if reg_wj is not None else int(w_judged),
+        "w_judged_window": int(w_judged), "k_series": f["k_series"],
+        "ceiling": wcfg.get("ceiling_method_stress"),
+        "q_driftfree": wcfg.get("res_quantile_driftfree") or {},
+        "q_drifting": wcfg.get("res_quantile_drifting") or {},
+    }
+
+
 def _locked_result(entry_id: str, group: str, variant: str, direction: str, reason: str) -> dict[str, Any]:
     """DEC-87 (J): a locked (``status: gl012_pre_run``) entry is NOT computed: no payload, verdict
-    DROP with the GL-012 label and the registered reason, p = 1 in the BH family."""
+    DROP with the GL-012 label and the registered reason, p = 1 in the BH family. DEC-89 (E3 (3)): the
+    registered ``reason`` is kept as a field so :func:`aggregate_hypotheses` can name it on the hypothesis."""
     verdict = {
         "verdict": "DROP", "hypothesis": group, "variant": variant, "direction": direction,
         "labels": [f"GL-012 vorab (gesperrt, nicht gerechnet, p=1 im BH-Nenner 7): {reason}"],
         "gl012_kill": True, "gl012_pre_run": True, "computed": False, "bounce_kill": False,
         "bounce_windows": [], "liquidity_label": False, "liquidity_windows": [],
-        "per_window": {}, "c10_hard": True,
+        "survivorship_label": False, "survivorship_ic_min_units": {},
+        "per_window": {}, "c10_hard": True, "reason": reason,
     }
     return {"entry": entry_id, "hypothesis": group, "variant": variant, "payload": None,
-            "computed": False, "verdict": verdict}
+            "computed": False, "reason": reason, "verdict": verdict}
+
+
+@dataclass
+class EntryContext:
+    """DEC-89 (E2): everything :func:`evaluate_entry` needs besides the entry itself -- the part of :func:`run_full`
+    that the positive control shares. ``windows[W]`` (``W`` in W1/W2) carries ``characteristics`` (``{variant:
+    array}``, sliced to the window), ``returns`` (the outcome array), ``alive``, ``weeks``, ``turnover_trail``,
+    ``returns_est`` and -- for H-30 only -- ``day_count``. The frozen registered constants (``ic_min``, ``ceiling``,
+    ``q_driftfree``/``q_drifting``, ``floor``, ``w_judged``), the bounce parameters, the survivorship numbers and the
+    resolved rules are plain dicts. ``persistence_n_sims`` ``None`` or 0 skips the persistence null,
+    ``n_reps_permutation`` 0 skips the block-permutation p-value (both report-only nulls: the positive control)."""
+    windows: dict[str, dict[str, Any]]
+    symbols: list[str]
+    ic_min: dict[str, dict[str, float]]
+    floor: dict[str, float]
+    w_judged: dict[str, int]
+    ceiling: dict[str, float]
+    q_driftfree: dict[str, dict[str, float]]
+    q_drifting: dict[str, dict[str, float]]
+    beta_control_method: str
+    beta_control_pit: dict[str, np.ndarray | None]
+    bounce_spread: float | None
+    bounce_sigma_true: dict[str, float]
+    survivorship: dict[str, dict[str, float]] = field(default_factory=dict)
+    convention: ic.Convention = "close_at_last"
+    seed: int = 53
+    n_reps_bootstrap: int = 1000
+    n_reps_permutation: int = 1000
+    block_size: int = 4
+    ci_level: float = 1.0 - 0.0064
+    persistence_n_sims: int | None = PERSISTENCE_NULL_N_SIMS
+
+
+def evaluate_entry(entry_id: str, hcfg: dict[str, Any], ctx: EntryContext) -> dict[str, Any]:
+    """DEC-89 (E2): ONE computed (not locked) entry -- characteristic per window, outcome (H-30: vol-weighted,
+    drag-adjusted), the H-29 liquidity sensitivity and bounce fixture in EACH window (registered parameters), the
+    Gate (5) Spearman for H-30, the report-only persistence null in BOTH windows (1.000 simulations), then
+    :func:`run_hypothesis` -> ``gates.evaluate``. This is the body :func:`run_full` used per entry before DEC-89
+    (unchanged arithmetic), extracted so the positive control runs the SAME code on synthetic returns.
+
+    Returns ``run_hypothesis``'s dict plus ``entry``, ``hypothesis``, ``variant``, ``computed``, ``p_max`` (the Max-p of
+    the block-permutation p-values, NaN if skipped) and ``persistence_null`` (per window: the registered-direction 95 %
+    quantile of the AR(1) null, the real mean IC, pass flag, simulations -- ``persistence_null_pass`` is the
+    conjunction over both windows, report-only)."""
+    variant, direction = hcfg["variant"], hcfg["direction"]
+    group = hypothesis_group(entry_id, hcfg)
+    names = ("W1", "W2")
+    win = ctx.windows
+    is_vol_weighted = hcfg.get("outcome") == "vol_weighted"
+    char_by_window = {wn: win[wn]["characteristics"][variant] for wn in names}
+    if is_vol_weighted:
+        # DEC-75 Entscheidung 1 (4) + DEC-87 (G): H-30 is judged against the vol-weighted,
+        # drag-adjusted outcome (weekly sigma_w, +sigma_w^2/2), not the raw next-week return.
+        returns_by_window = {
+            wn: h30_outcome_for_window(win[wn]["returns"], win[wn]["characteristics"]["vol_rv"], win[wn]["day_count"])
+            for wn in names
+        }
+    else:
+        returns_by_window = {wn: win[wn]["returns"] for wn in names}
+    alive_by_window = {wn: win[wn]["alive"] for wn in names}
+    ic_min_by_window = {wn: ctx.ic_min[wn][variant] for wn in names}
+    # NOTE (registered composition, DEC-87 1.6): the beta-control (DEC-75 (3)) is applied to whichever
+    # `returns_by_window` array this entry is judged on -- for H-30 the vol-weighted, drag-adjusted,
+    # shifted array, neutralised with the SAME registered method as every other variant.
+    beta_by_window = ({wn: win[wn]["characteristics"]["vol_beta"] for wn in names}
+                      if all("vol_beta" in win[wn]["characteristics"] for wn in names) else None)
+
+    # DEC-87 (I): the H-29 sensitivities in EACH window (not W1 only).
+    liquidity: dict[str, float] | None = None
+    bounce_ic_val: dict[str, float] | None = None
+    bounce_detail: dict[str, Any] | None = None
+    if variant == "rev_gap":
+        liquidity = {}
+        for wn in names:
+            liq = liquidity_decile_sensitivity(char_by_window[wn], returns_by_window[wn], alive_by_window[wn],
+                                                win[wn]["turnover_trail"], convention=ctx.convention)
+            liquidity[wn] = liq["mean_ic_without_d1"]
+    if hypothesis_group(entry_id, hcfg) == "H-29" or variant == "rev_gap":
+        if ctx.bounce_spread is None or any(ctx.bounce_sigma_true.get(wn) is None for wn in names):
+            raise RegisteredSchemaError(
+                "Bounce-Fixture ohne registrierte Parameter (rules.bounce_spread / windows.<W>.bounce_sigma_true, "
+                "DEC-89 E1) -- kein Verdikt")
+        bounce_ic_val, bounce_detail = {}, {}
+        for wn in names:
+            k_median = int(np.median(alive_by_window[wn].sum(axis=1)))
+            # DEC-89 (E1): spread and sigma_true are the REGISTERED measurements (no code defaults), seed 53.
+            bf = bounce_fixture_ic(alive_by_window[wn].shape[0], max(k_median, 10),
+                                    spread=ctx.bounce_spread, sigma_true=ctx.bounce_sigma_true[wn],
+                                    seed=ctx.seed, convention=ctx.convention)
+            bounce_ic_val[wn] = bf["ic_bounce"]
+            bounce_detail[wn] = bf
+
+    # DEC-87 Gate (5), H-30 only: median Spearman(characteristic rank, turnover rank) per window.
+    gate5_by_window: dict[str, float] | None = None
+    if is_vol_weighted or group == "H-30":
+        gate5_by_window = {}
+        for wn in names:
+            g5 = characteristics.characteristic_turnover_spearman(
+                char_by_window[wn], win[wn]["turnover_trail"], alive_by_window[wn], win[wn]["weeks"])
+            gate5_by_window[wn] = float("nan") if g5["median"] is None else g5["median"]
+
+    # DEC-89 (E3 (4)): the persistence null (report-only), BOTH windows, 1.000 simulations. DEC-87 (item 10): the
+    # AR(1) persistence fits are ESTIMATES -> returns_est.
+    persistence_detail: dict[str, Any] | None = None
+    persistence_pass: bool | None = None
+    if ctx.persistence_n_sims:
+        persistence_detail = {}
+        for wn in names:
+            pnull = nulls.persistence_null(win[wn]["returns_est"], win[wn]["alive"], win[wn]["weeks"],
+                                            variants=(variant,), convention=ctx.convention,
+                                            n_sims=ctx.persistence_n_sims, seed=ctx.seed)
+            real_mean_ic = ic.weekly_ic_series(char_by_window[wn], returns_by_window[wn], alive_by_window[wn],
+                                                convention=ctx.convention)["mean_ic"]
+            q = pnull["variants"][variant]["quantile95_registered_direction"]
+            passed = bool(real_mean_ic > q) if direction == "positive" else bool(real_mean_ic < q)
+            persistence_detail[wn] = {"quantile95_registered_direction": q, "real_mean_ic": real_mean_ic,
+                                       "pass": passed, "n_sims": ctx.persistence_n_sims, "seed": ctx.seed}
+        persistence_pass = all(d["pass"] for d in persistence_detail.values())
+
+    surv_variant_key = {"mom1": "mom1_diff_in_ic_min_units", "rev_gap": "rev_gap_diff_in_ic_min_units"}.get(variant)
+    survivorship = None
+    if surv_variant_key is not None:
+        survivorship = {wn: ctx.survivorship[wn][surv_variant_key] for wn in names
+                        if surv_variant_key in (ctx.survivorship.get(wn) or {})
+                        and ctx.survivorship[wn][surv_variant_key] is not None} or None
+
+    run_res = run_hypothesis(
+        group, variant, direction, char_by_window, returns_by_window, alive_by_window, ctx.symbols,
+        ic_min_by_window, ctx.w_judged, ctx.floor, ctx.ceiling,
+        beta_8w_pit_by_window=beta_by_window, liquidity_ic_without_d1=liquidity, bounce_ic=bounce_ic_val,
+        persistence_null_pass=persistence_pass, bh_fdr_pass=None,
+        convention=ctx.convention, n_reps_bootstrap=ctx.n_reps_bootstrap, n_reps_permutation=ctx.n_reps_permutation,
+        seed=ctx.seed,
+        res_quantile_drifting_by_window={wn: ctx.q_drifting[wn][variant] for wn in names},
+        res_quantile_driftfree_by_window={wn: ctx.q_driftfree[wn][variant] for wn in names},
+        gate5_by_window=gate5_by_window,
+        beta_control_method=ctx.beta_control_method, beta_control_pit_by_window=ctx.beta_control_pit,
+        block_size=ctx.block_size, ci_level=ctx.ci_level, survivorship_ic_min_units=survivorship,
+        bounce_detail=bounce_detail, persistence_detail=persistence_detail)
+    run_res.update({"entry": entry_id, "hypothesis": group, "variant": variant, "computed": True})
+    p_max = max_p_over_windows({
+        wn: run_res["payload"]["windows"][wn]["block_permutation_p"] for wn in names})
+    run_res["p_max"] = p_max
+    return run_res
 
 
 # ----------------------------------------------------------------------------
@@ -828,40 +1235,31 @@ def run_full(
     **H-30 / Gate (5) / Gate (4).** An H-30 entry is judged against
     :func:`h30_outcome_for_window` and carries the per-window Gate (5) median
     Spearman; an ``rev_gap`` entry gets the bounce fixture and the liquidity
-    sensitivity in EACH window."""
+    sensitivity in EACH window.
+
+    **DEC-89.** The entries are evaluated by :func:`evaluate_entry` (shared with the positive
+    control). The bounce fixture runs with the REGISTERED ``rules.bounce_spread`` and the
+    window's ``bounce_sigma_true`` (seed ``rules.seed``), the registered survivorship numbers
+    become the report-only label of the mom1/rev_gap entry, the persistence null runs in both
+    windows with ``rules.n_sims_persistence`` (default 1.000) simulations, and ``w_judged``,
+    ``rules.block_len`` and ``rules.level`` are read from the YAML and used after the T5 pin
+    (:func:`resolve_rules`, :func:`registered_window_constants`: :class:`ConstantPinError`).
+    ``report["registered_inputs"]`` echoes what was read."""
     from . import prelaunch  # local import: prelaunch.slice_window, avoids a module cycle at import time
 
     # DEC-77 Entscheidung 2: the registered beta-control method -- C.14 loud fail, no fallback.
-    beta_control_cfg = registered.get("beta_control")
-    if not isinstance(beta_control_cfg, dict) or not beta_control_cfg.get("method"):
-        raise ValueError(
-            "registered YAML fehlt beta_control.method (DEC-77 Entscheidung 2) oder es ist leer -- "
-            "kein Lauf ohne vom Orchestrator gewaehlte Beta-Kontroll-Methode (loud fail, kein "
-            "Verdikt). --emit-registered-template fuellt method nur aus einer BESTAETIGTEN "
-            "Empfehlung (DEC-87); sonst bleibt es leer und die Drittfassung muss es vor der "
-            "Registrierung fuellen.")
-    beta_control_method = beta_control_cfg["method"]
-    beta_control_trail_win = ic.beta_control_trail_weeks(beta_control_method)   # raises on an unknown method
-    reg_beta_window = beta_control_cfg.get("beta_window_weeks")
-    if beta_control_trail_win is not None and reg_beta_window != beta_control_trail_win:
-        raise ValueError(
-            f"registered beta_control.beta_window_weeks ({reg_beta_window!r}) passt nicht zum "
-            f"von beta_control.method={beta_control_method!r} implizierten Fenster "
-            f"({beta_control_trail_win}) -- loud fail, kein Verdikt.")
+    beta_control_method, beta_control_trail_win = resolve_beta_control(registered)
 
     validate_registered(registered)
     if observed_fingerprints is not None or "data_fingerprints" in registered:
         check_data_fingerprints(registered, observed_fingerprints)
 
-    rules = registered.get("rules", {})
-    seed = int(rules.get("seed", 53))
-    n_reps_bootstrap = int(rules.get("n_reps_bootstrap", 1000))
-    n_reps_permutation = int(rules.get("n_reps_permutation", 1000))
-    # DEC-76 Task A item 4: the canonical rules key is `n_reps` (>= 1000); the legacy
-    # `n_reps_factor_null` (DEC-75) is still read as a fallback for a pre-DEC-76 registered file.
-    n_reps_factor_null = int(rules.get("n_reps", rules.get("n_reps_factor_null", 1000)))
-    null_quantile_level = float(rules.get("level", nulls.SELECTION_CEILING_ONE_SIDED_QUANTILE))
-    bh_alpha = float(rules.get("bh_alpha", 0.10))
+    # DEC-89 (E3 (5)): rules.block_len / rules.level are READ and USED after the T5 pin (ConstantPinError).
+    rules = registered.get("rules", {}) or {}
+    rr = resolve_rules(registered)
+    seed, n_reps_bootstrap, n_reps_permutation = rr["seed"], rr["n_reps_bootstrap"], rr["n_reps_permutation"]
+    n_reps_factor_null, bh_alpha = rr["n_reps_factor_null"], rr["bh_alpha"]
+    block_size, null_quantile_level = rr["block_len"], rr["level"]
 
     weeks = weekly["weeks"]
     symbols = panel["symbols"]
@@ -907,9 +1305,11 @@ def run_full(
     frozen_complete = True
     for wname in ("W1", "W2"):
         w = windows[wname]
-        f = nulls.analytic_permutation_floor(w["alive"], w["weeks"])
-        floor_by_window[wname] = f["e_floor"]
-        wjudged_by_window[wname] = f["w_judged"]
+        # DEC-89 (E3 (5)): W_judged is the REGISTERED value (T5-pinned against the window's own), used as the SE
+        # denominator; the floor is the analytic E_t[1/sqrt(K_t-1)] of the window's real K_t series.
+        wc = registered_window_constants(registered, wname, w["alive"], w["weeks"])
+        floor_by_window[wname] = wc["floor"]
+        wjudged_by_window[wname] = wc["w_judged"]
         beta_control_pit_by_window[wname] = w["beta_control_pit"]
 
         reg_window_cfg = registered["windows"][wname]
@@ -963,6 +1363,19 @@ def run_full(
             "rho_f": stress_rho_f, "beta_sd_calibrated": stress_beta_sd,
         }
 
+    # DEC-89 (E1)/(E3): the registered bounce parameters, survivorship numbers and rules the entries use.
+    bounce_sigma_true = {wn: registered["windows"][wn].get("bounce_sigma_true") for wn in ("W1", "W2")}
+    survivorship_reg = {wn: dict(registered["windows"][wn].get("survivorship") or {}) for wn in ("W1", "W2")}
+    ctx = EntryContext(
+        windows={wn: windows[wn] for wn in ("W1", "W2")}, symbols=symbols,
+        ic_min={wn: dict(registered["windows"][wn]["ic_min_capped"]) for wn in ("W1", "W2")},
+        floor=floor_by_window, w_judged=wjudged_by_window, ceiling=ceiling_by_window,
+        q_driftfree=q_driftfree_by_window, q_drifting=q_drifting_by_window,
+        beta_control_method=beta_control_method, beta_control_pit=beta_control_pit_by_window,
+        bounce_spread=rr["bounce_spread"], bounce_sigma_true=bounce_sigma_true, survivorship=survivorship_reg,
+        convention=convention, seed=seed, n_reps_bootstrap=n_reps_bootstrap, n_reps_permutation=n_reps_permutation,
+        block_size=block_size, ci_level=null_quantile_level, persistence_n_sims=rr["n_sims_persistence"])
+
     results: dict[str, Any] = {}
     p_by_variant: dict[str, float] = {v: 1.0 for v in characteristics.VARIANT_NAMES}   # DEC-87 (J): fixed 7
     for entry_id, hcfg in registered["hypotheses"].items():
@@ -971,76 +1384,10 @@ def run_full(
         if hcfg.get("status") == GL012_PRE_RUN:
             results[entry_id] = _locked_result(entry_id, group, variant, direction, str(hcfg["reason"]))
             continue
-        is_vol_weighted = hcfg.get("outcome") == "vol_weighted"
-        char_by_window = {wn: windows[wn]["characteristics"][variant] for wn in ("W1", "W2")}
-        if is_vol_weighted:
-            # DEC-75 Entscheidung 1 (4) + DEC-87 (G): H-30 is judged against the vol-weighted,
-            # drag-adjusted outcome (weekly sigma_w, +sigma_w^2/2), not the raw next-week return.
-            returns_by_window = {
-                wn: h30_outcome_for_window(windows[wn]["returns"], windows[wn]["characteristics"]["vol_rv"],
-                                            windows[wn]["day_count"])
-                for wn in ("W1", "W2")
-            }
-        else:
-            returns_by_window = {wn: windows[wn]["returns"] for wn in ("W1", "W2")}
-        alive_by_window = {wn: windows[wn]["alive"] for wn in ("W1", "W2")}
-        ic_min_by_window = {wn: registered["windows"][wn]["ic_min_capped"][variant] for wn in ("W1", "W2")}
-        # NOTE (registered composition, DEC-87 1.6): the beta-control (DEC-75 (3)) is applied to whichever
-        # `returns_by_window` array this entry is judged on -- for H-30 the vol-weighted, drag-adjusted,
-        # shifted array, neutralised with the SAME registered method as every other variant.
-        beta_by_window = {wn: windows[wn]["characteristics"]["vol_beta"] for wn in ("W1", "W2")}
-
-        # DEC-87 (I): the H-29 sensitivities in EACH window (not W1 only).
-        liquidity: dict[str, float] | None = None
-        bounce_ic_val: dict[str, float] | None = None
-        if variant == "rev_gap":
-            liquidity = {}
-            for wn in ("W1", "W2"):
-                liq = liquidity_decile_sensitivity(char_by_window[wn], returns_by_window[wn],
-                                                    alive_by_window[wn], windows[wn]["turnover_trail"],
-                                                    convention=convention)
-                liquidity[wn] = liq["mean_ic_without_d1"]
-        if group == "H-29" or variant == "rev_gap":
-            bounce_ic_val = {}
-            for wn in ("W1", "W2"):
-                k_median = int(np.median(alive_by_window[wn].sum(axis=1)))
-                bf = bounce_fixture_ic(alive_by_window[wn].shape[0], max(k_median, 10), seed=seed,
-                                        convention=convention)
-                bounce_ic_val[wn] = bf["ic_bounce"]
-
-        # DEC-87 Gate (5), H-30 only: median Spearman(characteristic rank, turnover rank) per window.
-        gate5_by_window: dict[str, float] | None = None
-        if is_vol_weighted or group == "H-30":
-            gate5_by_window = {}
-            for wn in ("W1", "W2"):
-                g5 = characteristics.characteristic_turnover_spearman(
-                    char_by_window[wn], windows[wn]["turnover_trail"], alive_by_window[wn], windows[wn]["weeks"])
-                gate5_by_window[wn] = float("nan") if g5["median"] is None else g5["median"]
-
-        # DEC-87 (item 10): the AR(1) persistence fits are ESTIMATES -> returns_est.
-        pnull = nulls.persistence_null(windows["W1"]["returns_est"], windows["W1"]["alive"], windows["W1"]["weeks"],
-                                        variants=(variant,), convention=convention, n_sims=200, seed=seed)
-        real_mean_ic_w1 = ic.weekly_ic_series(char_by_window["W1"], returns_by_window["W1"],
-                                               alive_by_window["W1"], convention=convention)["mean_ic"]
-        q = pnull["variants"][variant]["quantile95_registered_direction"]
-        persistence_pass = (real_mean_ic_w1 > q) if direction == "positive" else (real_mean_ic_w1 < q)
-
-        run_res = run_hypothesis(
-            group, variant, direction, char_by_window, returns_by_window, alive_by_window, symbols,
-            ic_min_by_window, wjudged_by_window, floor_by_window, ceiling_by_window,
-            beta_8w_pit_by_window=beta_by_window, liquidity_ic_without_d1=liquidity, bounce_ic=bounce_ic_val,
-            persistence_null_pass=bool(persistence_pass), bh_fdr_pass=None,
-            convention=convention, n_reps_bootstrap=n_reps_bootstrap, n_reps_permutation=n_reps_permutation,
-            seed=seed,
-            res_quantile_drifting_by_window={wn: q_drifting_by_window[wn][variant] for wn in ("W1", "W2")},
-            res_quantile_driftfree_by_window={wn: q_driftfree_by_window[wn][variant] for wn in ("W1", "W2")},
-            gate5_by_window=gate5_by_window,
-            beta_control_method=beta_control_method, beta_control_pit_by_window=beta_control_pit_by_window)
-        run_res.update({"entry": entry_id, "hypothesis": group, "variant": variant, "computed": True})
+        # DEC-89 (E2): the per-entry evaluation is shared with the positive control (evaluate_entry).
+        run_res = evaluate_entry(entry_id, hcfg, ctx)
         results[entry_id] = run_res
-        p_max = max_p_over_windows({
-            wn: run_res["payload"]["windows"][wn]["block_permutation_p"] for wn in ("W1", "W2")})
-        p_by_variant[variant] = 1.0 if math.isnan(p_max) else p_max
+        p_by_variant[variant] = 1.0 if math.isnan(run_res["p_max"]) else run_res["p_max"]
 
     bh = benjamini_hochberg(p_by_variant, alpha=bh_alpha, m_total=len(characteristics.VARIANT_NAMES))
     for entry_id, hcfg in registered["hypotheses"].items():
@@ -1069,8 +1416,14 @@ def run_full(
         "beta_control": {"method": beta_control_method, "beta_window_weeks": beta_control_trail_win},
         "calibration_used_for_stress_null": calibration_used,   # DEC-87 (D): per window, audit trail
         "observed_fingerprints": observed_fingerprints, "registered_sha256": registered_sha256,
+        # DEC-89 (E1)/(E3 (2))/(E3 (5)): what the run READ from the YAML and used, for the report and the audit trail.
+        "registered_inputs": {
+            "bounce_spread": rr["bounce_spread"], "bounce_sigma_true": bounce_sigma_true,
+            "bounce_seed": seed, "survivorship": survivorship_reg,
+            "w_judged": dict(wjudged_by_window), "block_len": block_size, "level": null_quantile_level,
+            "n_sims_persistence": rr["n_sims_persistence"]},
         "parameters": {"rules": dict(rules), "bh_alpha": bh_alpha, "null_quantile_level": null_quantile_level,
-                        "convention": convention, "block_size": 4,
+                        "convention": convention, "block_size": block_size,
                         "variants": list(characteristics.VARIANT_NAMES)},
     }
 
@@ -1079,18 +1432,34 @@ def aggregate_hypotheses(results: dict[str, dict[str, Any]]) -> dict[str, Any]:
     """DEC-87 (J): a hypothesis is PASS iff AT LEAST ONE of its variants (entries) is PASS; every variant stays
     individually reported (``entries``, ``variants_pass``) and a locked (not computed) variant is listed in
     ``variants_locked``. ``results[entry_id]`` needs ``hypothesis``, ``variant``, ``computed`` and
-    ``verdict["verdict"]``. A PASS carries the label "vorlaeufig bis F-WEEK geschlossen" (DEC-74 (e))."""
+    ``verdict["verdict"]``. A PASS carries the label "vorlaeufig bis F-WEEK geschlossen" (DEC-74 (e)).
+
+    **DEC-89 (E3 (3)): GL-012 label at hypothesis level.** If EVERY variant (entry) of a hypothesis is locked
+    (``computed`` False, i.e. ``status: gl012_pre_run``), the hypothesis' verdict is
+    :data:`GL012_PRE_RUN_VERDICT` (``"GL-012 vor dem Lauf"``) -- a feasibility lock decided mechanically before the
+    run, NOT a "DROP" on the anomaly itself -- with ``reasons`` (``{variant: registered reason}``) and a ``label``
+    that names them. A hypothesis with at least one computed variant keeps PASS/DROP (``variants_locked`` still lists
+    its locked ones). The locked reason comes from ``res["reason"]`` (or the entry verdict's ``reason``)."""
     out: dict[str, Any] = {}
     for entry_id, res in results.items():
-        g = out.setdefault(res["hypothesis"], {"entries": [], "variants_pass": [], "variants_locked": []})
+        g = out.setdefault(res["hypothesis"], {"entries": [], "variants_pass": [], "variants_locked": [],
+                                               "reasons": {}})
         g["entries"].append(entry_id)
         if res["verdict"]["verdict"] == "PASS":
             g["variants_pass"].append(res["variant"])
         if not res["computed"]:
             g["variants_locked"].append(res["variant"])
+            g["reasons"][res["variant"]] = str(res.get("reason") or res["verdict"].get("reason")
+                                                or "(kein Grund uebergeben)")
     for g in out.values():
-        g["verdict"] = "PASS" if g["variants_pass"] else "DROP"
-        g["label"] = "vorlaeufig bis F-WEEK geschlossen (DEC-74 (e))" if g["variants_pass"] else None
+        if g["variants_pass"]:
+            g["verdict"], g["label"] = "PASS", "vorlaeufig bis F-WEEK geschlossen (DEC-74 (e))"
+        elif g["entries"] and len(g["variants_locked"]) == len(g["entries"]):
+            g["verdict"] = GL012_PRE_RUN_VERDICT
+            g["label"] = (f"{GL012_PRE_RUN_VERDICT}: alle Varianten gesperrt, nicht gerechnet (Feasibility-DROP, kein "
+                          "Verdikt ueber die Anomalie selbst) -- " + "; ".join(f"{v}: {r}" for v, r in g["reasons"].items()))
+        else:
+            g["verdict"], g["label"] = "DROP", None
     return out
 
 
@@ -1098,7 +1467,11 @@ def registered_constants_pin(registered: dict[str, Any]) -> dict[str, Any]:
     """DEC-87 T5 (constants pin): the flat set of numbers the Drittfassung FREEZES, read from the
     registered YAML -- ``ic_min_capped``, ``ceiling_method_stress``, both frozen quantile sets and the
     stress calibration pair, per window. A test (or the Orchestrator's sha256 pin) compares this with
-    what actually flowed into every payload."""
+    what actually flowed into every payload.
+
+    DEC-89: also ``bounce_sigma_true`` and ``survivorship`` per window and, under the top-level key
+    ``"rules"``, the registered ``bounce_spread``, ``block_len`` and ``level`` (as the YAML states them,
+    ``None`` if absent) -- the numbers :func:`run_full` READS and the pin test compares with the code constants."""
     out: dict[str, Any] = {}
     for wn in ("W1", "W2"):
         wcfg = registered["windows"][wn]
@@ -1109,7 +1482,12 @@ def registered_constants_pin(registered: dict[str, Any]) -> dict[str, Any]:
             "res_quantile_driftfree": dict(wcfg.get("res_quantile_driftfree") or {}),
             "res_quantile_drifting": dict(wcfg.get("res_quantile_drifting") or {}),
             "calibration_stress": dict(((wcfg.get("calibration") or {}).get("stress")) or {}),
+            "bounce_sigma_true": wcfg.get("bounce_sigma_true"),
+            "survivorship": dict(wcfg.get("survivorship") or {}),
         }
+    rules = registered.get("rules") or {}
+    out["rules"] = {"bounce_spread": rules.get("bounce_spread"), "block_len": rules.get("block_len"),
+                    "level": rules.get("level")}
     return out
 
 
@@ -1292,6 +1670,94 @@ def verify_run_artifacts(out_dir: Path | str, report: dict[str, Any], *,
     return {"n_entry_windows_checked": n_checked, "result_sha256": fp["result_sha256"]}
 
 
+def _fmt(v: Any, nd: int = 5) -> str:
+    """ASCII number formatting for the Markdown report (``-`` for None, ``nan`` for NaN)."""
+    if v is None:
+        return "-"
+    if isinstance(v, bool):
+        return str(v)
+    try:
+        x = float(v)
+    except (TypeError, ValueError):
+        return str(v)
+    return "nan" if math.isnan(x) else f"{x:.{nd}f}"
+
+
+def render_run_markdown(report: dict[str, Any]) -> str:
+    """DEC-89 (E3 (7)): the run's Markdown report (ASCII only) -- registration pin and data fingerprints, the verdict per
+    hypothesis (a hypothesis whose variants are all locked reads ``GL-012 vor dem Lauf`` with the reasons) and per entry
+    (labels), the window figures of every computed entry, the H-29 BOUNCE-FIXTURE parameters (registered spread,
+    per-window sigma_true, seed, the resulting ``IC_bounce``), the SURVIVORSHIP label per entry and window, the
+    persistence-null line (both windows). The sealed L window is not part of it."""
+    ri = report.get("registered_inputs") or {}
+    lines = ["# WP-13 Lauf-Bericht (DEC-87, DEC-89)", "",
+             f"- registrierte Datei sha256: `{report.get('registered_sha256')}`",
+             f"- Konvention: `{report.get('convention')}`, Seed {report.get('seed')}, "
+             f"Beta-Kontrolle `{(report.get('beta_control') or {}).get('method')}`",
+             f"- Daten-Fingerprints (V9): `{report.get('observed_fingerprints')}`",
+             f"- gelesene Regeln (T5-gepinnt): block_len={ri.get('block_len')}, level={ri.get('level')}, "
+             f"w_judged={ri.get('w_judged')}, Persistenz-Null n_sims={ri.get('n_sims_persistence')}", "",
+             "## Verdikt je Hypothese", "",
+             "| Hypothese | Verdikt | Varianten PASS | gesperrt | Etikett / Gruende |", "|---|---|---|---|---|"]
+    for hyp, hv in report["hypothesis_verdicts"].items():
+        lines.append(f"| {hyp} | {hv['verdict']} | {', '.join(hv['variants_pass']) or '-'} | "
+                     f"{', '.join(hv['variants_locked']) or '-'} | {hv.get('label') or '-'} |")
+    lines += ["", "## Eintraege (je Variante)", "", "| Eintrag | gerechnet | Verdikt | Etiketten |", "|---|---|---|---|"]
+    for eid, res in report["results"].items():
+        labels = " / ".join(res["verdict"].get("labels") or []) or "-"
+        lines.append(f"| {eid} | {res['computed']} | {res['verdict']['verdict']} | {labels} |")
+    lines += ["", "## Fensterkennzahlen (gerechnete Eintraege)", "",
+              "| Eintrag | Fenster | IC | SE | CI-Grenze | IC_min | IC_res | Quantil (bindend) | Decke | Fenster PASS |",
+              "|---|---|---|---|---|---|---|---|---|---|"]
+    for eid, res in report["results"].items():
+        if res.get("payload") is None:
+            continue
+        for wn, w in res["payload"]["windows"].items():
+            pw = res["verdict"]["per_window"].get(wn, {})
+            lines.append(f"| {eid} | {wn} | {_fmt(w['mean_ic'])} | {_fmt(w['se'])} | {_fmt(w['ci_bound_toward_sign'])} | "
+                         f"{_fmt(w['ic_min_capped'])} | {_fmt(w['residualized_mean_ic'])} | {_fmt(w['res_quantile_binding'])} | "
+                         f"{_fmt(w['selection_ceiling_mean_of_max'])} | {pw.get('window_pass')} |")
+    lines += ["", "## Bounce-Fixture (H-29, DEC-89 E1)", "",
+              f"- registrierter Spread `rules.bounce_spread` = {_fmt(ri.get('bounce_spread'), 6)} "
+              "(WP-7-Spread-Zensus, Median-Perp-Spread Dezil D10), Seed " f"{ri.get('bounce_seed')}",
+              "- wahre Wochen-Vol `windows.<W>.bounce_sigma_true` = " +
+              ", ".join(f"{wn}: {_fmt((ri.get('bounce_sigma_true') or {}).get(wn), 6)}" for wn in ("W1", "W2")), ""]
+    bounce_rows = []
+    for eid, res in report["results"].items():
+        bf = (res.get("payload") or {}).get("bounce_fixture")
+        if bf:
+            for wn, d in bf.items():
+                bounce_rows.append(f"| {eid} | {wn} | {d['n_weeks']} | {d['n_symbols']} | {_fmt(d['spread'], 6)} | "
+                                   f"{_fmt(d['sigma_true'], 6)} | {_fmt(d['ic_bounce'])} |")
+    if bounce_rows:
+        lines += ["| Eintrag | Fenster | Wochen | Symbole | Spread | sigma_true | IC_bounce |", "|---|---|---|---|---|---|---|"]
+        lines += bounce_rows
+    else:
+        lines.append("(kein H-29-Eintrag gerechnet)")
+    lines += ["", "## Survivorship-Etikett (report-only, nie Gate; DEC-89 E3 (2))", "",
+              "Differenz 'Beobachtung verworfen' minus 'zum letzten Schlusskurs geschlossen' auf dem signalfreien "
+              "Drawdown-Fixture des Vorlaufs, in IC_min-Einheiten:", ""]
+    surv_rows = []
+    for eid, res in report["results"].items():
+        sv = res["verdict"].get("survivorship_ic_min_units") or {}
+        if sv:
+            surv_rows.append(f"| {eid} | " + " | ".join(_fmt(sv.get(wn), 3) for wn in ("W1", "W2")) + " |")
+    if surv_rows:
+        lines += ["| Eintrag | W1 | W2 |", "|---|---|---|"] + surv_rows
+    else:
+        lines.append("(kein Etikett: Eintrag ohne mom1/rev_gap oder YAML ohne `survivorship`)")
+    lines += ["", "## Persistenz-Null (report-only, beide Fenster)", "",
+              "| Eintrag | Fenster | 95-%-Quantil | reale mittlere IC | bestanden | Simulationen |", "|---|---|---|---|---|---|"]
+    for eid, res in report["results"].items():
+        pn = (res.get("payload") or {}).get("persistence_null")
+        if pn:
+            for wn, d in pn.items():
+                lines.append(f"| {eid} | {wn} | {_fmt(d['quantile95_registered_direction'])} | {_fmt(d['real_mean_ic'])} | "
+                             f"{d['pass']} | {d['n_sims']} |")
+    lines += ["", "Kein Verdikt ohne die DEC-53-Artefakte (`wp13_run_fingerprint.json`, Wochen-IC-Serien).", ""]
+    return "\n".join(lines)
+
+
 def write_run_artifacts(out_dir: Path | str, report: dict[str, Any], *,
                          require_data_fingerprints: bool = False) -> dict[str, Any]:
     """DEC-53 / DEC-87 (V7) artifacts for the run report, in this order:
@@ -1307,7 +1773,8 @@ def write_run_artifacts(out_dir: Path | str, report: dict[str, Any], *,
       3. :func:`verify_run_artifacts` -- if anything mandatory is missing or does not
          reproduce the gate estimators, :class:`RunArtifactError` is raised and NO
          verdict file is written (KEIN VERDIKT);
-      4. only then the main JSON (the verdicts) and the L window in its own sealed
+      4. only then the main JSON (the verdicts), its Markdown report ``wp13_run.md``
+         (:func:`render_run_markdown`, DEC-89) and the L window in its own sealed
          file (DEC-74 (k)).
 
     Locked (``gl012_pre_run``) entries have no series (not computed) and are
@@ -1340,6 +1807,10 @@ def write_run_artifacts(out_dir: Path | str, report: dict[str, Any], *,
     main_json = out_dir / "wp13_run.json"
     main_json.write_text(json.dumps(main_report, indent=1, default=str), encoding="utf-8")
     artifacts["wp13_run_json"] = {"path": str(main_json), "sha256": panel_load.sha256_file(main_json)}
+    # DEC-89 (E3 (7)): the Markdown report with the bounce parameters and the survivorship label.
+    main_md = out_dir / "wp13_run.md"
+    main_md.write_text(render_run_markdown(main_report), encoding="utf-8")
+    artifacts["wp13_run_md"] = {"path": str(main_md), "sha256": panel_load.sha256_file(main_md)}
 
     if l_window_sealed is not None:
         l_path = out_dir / "wp13_run_L_window_sealed.json"

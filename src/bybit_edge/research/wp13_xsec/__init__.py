@@ -80,5 +80,18 @@ denominator fixed 7, locked ``gl012_pre_run`` entries count with p = 1); DEC-53
 artifacts incl. the residualised series and a generator fingerprint, verified
 before any verdict is written (KEIN VERDIKT otherwise); data fingerprints of the
 loaded panel are checked against the YAML.
+
+**DEC-89 -- before the registration.** ``positive_control.py`` /
+``scripts/wp13_xsec.py --positive-control`` is the PRD 3.3.8 positive control in
+production configuration (real week grid / alive masks / K_t, SYNTHETIC returns only,
+frozen constants of the registered YAML, no null recomputation; PASS = H-28_mom1 and
+H-29_rev_gap PASS in seeds 53/54/55 and the negative control no PASS). The H-29 bounce
+fixture reads ``rules.bounce_spread`` / ``windows.<W>.bounce_sigma_true`` from the YAML
+(measured, no code defaults); the survivorship numbers ``windows.<W>.survivorship`` become a
+report-only label; a hypothesis whose variants are all ``gl012_pre_run`` reads
+``GL-012 vor dem Lauf``; the persistence null runs in both windows with 1.000
+simulations; ``w_judged``/``block_len``/``level`` are read from the YAML and T5-pinned
+against the code constants; ``run.evaluate_entry`` is the one per-entry evaluation
+``run_full`` and the positive control share.
 """
 from __future__ import annotations

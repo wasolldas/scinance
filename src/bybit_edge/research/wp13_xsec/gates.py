@@ -61,10 +61,16 @@ exists to catch a future regression that sneaks in hidden state).
   (6) Gate (2) persistence-null and Gate (3) BH-FDR are REPORT-ONLY
       (DEC-75 Entscheidung 1 (6)): their comparison booleans are attached as
       labels, never gate inputs.
+  (7) **DEC-89 (E3 (2)), survivorship label:** the payload may carry
+      ``survivorship_ic_min_units`` (per window: the Vorlauf's survivorship-
+      drawdown-fixture difference "discarded minus closed at the last price" of
+      THIS variant's characteristic, in IC_min units, registered in the YAML).
+      It is attached as a label (``survivorship_label`` True when any window is
+      present) -- report-only, NEVER a gate input, the verdict is unchanged.
 
-``bounce_ic`` and ``liquidity_ic_without_d1`` in the payload are either a
-float (the same number for every window, the pre-DEC-87 shape) or a dict
-``{"W1": float, "W2": float}`` (what ``run.run_full`` supplies).
+``bounce_ic``, ``liquidity_ic_without_d1`` and ``survivorship_ic_min_units`` in
+the payload are either a float (the same number for every window, the pre-DEC-87
+shape) or a dict ``{"W1": float, "W2": float}`` (what ``run.run_full`` supplies).
 """
 from __future__ import annotations
 
@@ -161,6 +167,7 @@ def evaluate(payload: dict[str, Any]) -> dict[str, Any]:
           "bh_fdr_pass": bool | None,                # report-only, Gate (3)
           "liquidity_ic_without_d1": float | {W: float} | None,   # H-29 label
           "bounce_ic": float | {W: float} | None,                 # H-29 KEIN PASS
+          "survivorship_ic_min_units": float | {W: float} | None, # DEC-89 label only
         }
 
     Returns ``{"verdict": "PASS"|"DROP", "hypothesis", "variant", "labels":
@@ -234,10 +241,21 @@ def evaluate(payload: dict[str, Any]) -> dict[str, Any]:
                           f"{bound} -- Verdikt steht, Lesart eingeschraenkt")
     liquidity_label = bool(liq_windows)
 
+    # DEC-89 (E3 (2)): survivorship label -- report-only, never a gate input, the verdict stays as decided above.
+    surv_by_w = _by_window(payload.get("survivorship_ic_min_units"), window_names)
+    surv_present = {wn: float(v) for wn, v in surv_by_w.items() if _finite(v)}
+    survivorship_label = bool(surv_present)
+    if survivorship_label:
+        parts = ", ".join(f"{wn}={v:+.3f}" for wn, v in surv_present.items())
+        labels.append(f"Survivorship-Etikett (report-only, nie Gate; DEC-76/DEC-89): Differenz 'Beobachtung verworfen' minus "
+                      f"'zum letzten Schlusskurs geschlossen' auf dem signalfreien Drawdown-Fixture = {parts} IC_min-Einheiten "
+                      "-- Verdikt unveraendert")
+
     return {
         "verdict": verdict, "hypothesis": payload.get("hypothesis"), "variant": payload.get("variant"),
         "direction": direction, "labels": labels, "gl012_kill": gl012_kill,
         "bounce_kill": bounce_kill, "bounce_windows": bounce_windows,
         "liquidity_label": liquidity_label, "liquidity_windows": liq_windows,
+        "survivorship_label": survivorship_label, "survivorship_ic_min_units": surv_present,
         "per_window": per_window, "c10_hard": True,
     }
