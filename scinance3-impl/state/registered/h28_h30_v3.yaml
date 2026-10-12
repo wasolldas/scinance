@@ -1,0 +1,168 @@
+# DEC-76 Task A item 4 / DEC-87: automatisch aus einem --prelaunch-Artefakt erzeugtes Skelett.
+# Kalibrierung JE FENSTER (DEC-87 (D)); Konstanten aus dem Gewinner-Abschnitt des Vorlaufs (DEC-87 (A)/(E)).
+# hypotheses: sieben Eintraege (J). NICHT automatisch geprueft -- Orchestrator bestaetigt, ordnet C.10/GL-012 nach Power zu (F) und registriert.
+# beta_control.method aus der BESTAETIGTEN Empfehlung ('fm_neutral_8w', DEC-87 V1 Bindung): Gewinner bestaetigt: fm_neutral_8w besteht die unveraenderte DEC-77-Regel mit 1000 Replikaten in W1 und W2 (je Fenster eigene Kalibrierung)
+# H-30 mechanisch gesperrt: H-30-Feasibility in Wocheneinheiten verfehlt: Spread(D10-D1)/Kante=2.764, SE(sigma_w^2/2)/Kante=0.175, Grenze 0,5 (DEC-74 (h), DEC-87 (G)); K bleibt 7
+# DEC-89 E1: rules.bounce_spread=0.003621 = Median-Perp-Spread Dezil D10 aus spread_census.json (bp/1e4); bounce_sigma_true = gemessene Median-Wochen-Vol je Fenster; survivorship = Vorlauf-Differenzen in IC_min-Einheiten (report-only Etikett).
+hypotheses:
+  H-28_mom1:
+    hypothesis: H-28
+    variant: mom1
+    direction: positive
+  H-28_mom2:
+    hypothesis: H-28
+    variant: mom2
+    direction: positive
+    status: gl012_pre_run
+    reason: 'Power-Zuordnung DEC-88 (DEC-87 (F), DEC-51 (2)): MDE80 0,0353 > IC_prior 0,03 in W1 (P_voll 0,597); W2 0,0264 / 0,912; K bleibt 7'
+  H-28_mom4:
+    hypothesis: H-28
+    variant: mom4
+    direction: positive
+    status: gl012_pre_run
+    reason: 'Power-Zuordnung DEC-88 (DEC-87 (F), DEC-51 (2)): MDE80 0,0424 / 0,0321 > IC_prior 0,03 in W1 und W2 (P_voll 0,380 / 0,722); K bleibt 7'
+  H-29_rev_gap:
+    hypothesis: H-29
+    variant: rev_gap
+    direction: negative
+  H-30_vol_rv:
+    hypothesis: H-30
+    variant: vol_rv
+    direction: negative
+    outcome: vol_weighted
+    status: gl012_pre_run
+    reason: 'H-30-Feasibility in Wocheneinheiten verfehlt: Spread(D10-D1)/Kante=2.764,
+      SE(sigma_w^2/2)/Kante=0.175, Grenze 0,5 (DEC-74 (h), DEC-87 (G)); K bleibt 7'
+  H-30_vol_max:
+    hypothesis: H-30
+    variant: vol_max
+    direction: negative
+    outcome: vol_weighted
+    status: gl012_pre_run
+    reason: 'H-30-Feasibility in Wocheneinheiten verfehlt: Spread(D10-D1)/Kante=2.764,
+      SE(sigma_w^2/2)/Kante=0.175, Grenze 0,5 (DEC-74 (h), DEC-87 (G)); K bleibt 7'
+  H-30_vol_beta:
+    hypothesis: H-30
+    variant: vol_beta
+    direction: negative
+    outcome: vol_weighted
+    status: gl012_pre_run
+    reason: 'strukturell durch die registrierte Beta-Kontrolle neutralisiert (C.4;
+      DEC-87 (H)): fm_neutral_8w regressiert das Outcome auf genau dieses Beta; H-30-Feasibility
+      in Wocheneinheiten verfehlt: Spread(D10-D1)/Kante=2.764, SE(sigma_w^2/2)/Kante=0.175,
+      Grenze 0,5 (DEC-74 (h), DEC-87 (G)); K bleibt 7'
+windows:
+  W1:
+    start: '2024-07-01'
+    end: '2025-06-30'
+    null_scales:
+      sigma_f: 0.06685192489159383
+      sigma_e_used: 0.1206430784847655
+    ic_min_capped:
+      mom1: 0.01966388032132622
+      mom2: 0.017536020453653458
+      mom4: 0.017294818011448197
+      rev_gap: 0.017269113517560233
+      vol_rv: 0.016935747779891368
+      vol_max: 0.01698392152232868
+      vol_beta: 0.01675080586947597
+    w_judged: 52
+    bounce_sigma_true: 0.1718564938769564
+    survivorship:
+      mom1_diff_in_ic_min_units: -0.19807571898782755
+      rev_gap_diff_in_ic_min_units: -0.18910982801933468
+    calibration:
+      measured:
+        rho_f: 0.0462406062845375
+        beta_sd_calibrated: 0.5736662871596756
+        target_factor_share: 0.03211009130904934
+      stress:
+        rho_f: 0.092481212569075
+        beta_sd_calibrated: 0.7706722222199406
+        target_factor_share: 0.06422018261809868
+      zero:
+        rho_f: 0.0
+        beta_sd_calibrated: 0.5768705816233175
+        target_factor_share: 0.03211009130904934
+    ceiling_method_stress: 0.00834007601167642
+    res_quantile_driftfree:
+      mom1: 0.022435209187597924
+      mom2: 0.02755652667289176
+      mom4: 0.03243453978348444
+      rev_gap: -0.016662684571509455
+      vol_rv: -0.018433251836406928
+      vol_max: -0.018433251836406928
+      vol_beta: -0.005571980065334979
+    res_quantile_drifting:
+      mom1: 0.02218867144119198
+      mom2: 0.027798755429231506
+      mom4: 0.033305885031515756
+      rev_gap: -0.01658821795749503
+      vol_rv: -0.017478971895658814
+      vol_max: -0.017478971895658814
+      vol_beta: -0.005593534926904284
+  W2:
+    start: '2025-07-01'
+    end: '2026-06-30'
+    null_scales:
+      sigma_f: 0.05514230351329163
+      sigma_e_used: 0.10729439736101687
+    ic_min_capped:
+      mom1: 0.017440054544018344
+      mom2: 0.015583612187845436
+      mom4: 0.01540567657700099
+      rev_gap: 0.015314838422031313
+      vol_rv: 0.014698146297944437
+      vol_max: 0.014636964555582232
+      vol_beta: 0.014596161768787955
+    w_judged: 51
+    bounce_sigma_true: 0.13310944847015532
+    survivorship:
+      mom1_diff_in_ic_min_units: -0.4376229105721445
+      rev_gap_diff_in_ic_min_units: -0.5793462946362501
+    calibration:
+      measured:
+        rho_f: 0.04158370169318816
+        beta_sd_calibrated: 0.4464794357550345
+        target_factor_share: 0.013885620141525619
+      stress:
+        rho_f: 0.08316740338637632
+        beta_sd_calibrated: 0.5833329646471259
+        target_factor_share: 0.027771240283051238
+      zero:
+        rho_f: 0.0
+        beta_sd_calibrated: 0.4464794357550345
+        target_factor_share: 0.013885620141525619
+    ceiling_method_stress: 0.006852488667596501
+    res_quantile_driftfree:
+      mom1: 0.017004706741045376
+      mom2: 0.020288478269529512
+      mom4: 0.02489500595755558
+      rev_gap: -0.015456629463946657
+      vol_rv: -0.01638697507257066
+      vol_max: -0.01638697507257066
+      vol_beta: -0.004827514956598575
+    res_quantile_drifting:
+      mom1: 0.016912272968051423
+      mom2: 0.02042863247665043
+      mom4: 0.025064049443952442
+      rev_gap: -0.015139605762471885
+      vol_rv: -0.01608930183986374
+      vol_max: -0.01608930183986374
+      vol_beta: -0.004855120893952585
+  L:
+    start: '2021-03-01'
+    end: '2024-06-30'
+beta_control:
+  method: fm_neutral_8w
+  beta_window_weeks: 8
+rules:
+  seed: 53
+  n_reps: 1000
+  block_len: 4
+  level: 0.9936
+  bh_alpha: 0.1
+  bounce_spread: 0.003621
+data_fingerprints:
+  union_range_fingerprint: a7e4dec7cb7475426f477c6d17359007b75026b2f8562b29e66457fed027793a
+  delisting_dates_sha256: 852bf75332fd1990b13b9a059fd871a75d7f71757b48e2bf102bc1f25c412933
