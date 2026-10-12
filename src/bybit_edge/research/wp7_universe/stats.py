@@ -161,7 +161,14 @@ def sigma_xs_series(returns: np.ndarray, alive: np.ndarray, *,
         mask = alive[t]
         if int(mask.sum()) < min_universe:
             continue
-        out[t] = float(np.std(returns[t, mask], ddof=1))
+        vals = returns[t, mask]
+        if np.isnan(vals).any():
+            # DEC-87 (item 10): a NaN estimation cell (returns_est: symbol did not trade)
+            # is a missing observation, not a poisoned week. NaN-free input is unchanged.
+            vals = vals[~np.isnan(vals)]
+            if vals.size < min_universe:
+                continue
+        out[t] = float(np.std(vals, ddof=1))
     return out
 
 

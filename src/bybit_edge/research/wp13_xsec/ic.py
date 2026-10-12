@@ -87,6 +87,7 @@ from typing import Any, Literal
 import numpy as np
 
 from ..wp7_universe.pit_universe import spearman_rank_ic
+from .characteristics import weekly_vol_from_daily
 
 __all__ = [
     "DELISTING_CONVENTIONS", "weekly_ic_series", "mean_ic", "vol_weighted_outcome_with_drag",
@@ -164,55 +165,61 @@ def mean_ic(characteristic: np.ndarray, returns: np.ndarray, alive: np.ndarray, 
 
 
 def vol_weighted_outcome_with_drag(
-    returns: np.ndarray, weekly_vol: np.ndarray, *, weight_source: str = "pit",
+    returns: np.ndarray, vol: np.ndarray, *, weight_source: str = "pit",
     target_vol: float | None = None, floor: float = 1e-8,
+    day_count: np.ndarray | None = None,
 ) -> dict[str, Any]:
-    """DEC-75 Entscheidung 1 (4) / task brief item 4 -- H-30, corrected
-    (v2) construction (Review B-5/B-6 fixes, verbatim):
+    """H-30's vol-weighted, drag-adjusted outcome (DEC-75 Entscheidung 1 (4),
+    Review B-5/B-6 fixes, PRECISED by DEC-87 (G)).
 
-      B-6 fix: ``weekly_vol[t]`` is the FORMATION week's realised vol
-      (``characteristics.realized_vol_characteristic``'s ``vol_rv[t]``,
-      known PIT by week ``t``'s end) and it now weights
-      ``returns[t+1]`` -- the NEXT week's outcome -- not
-      ``returns[t]`` paired with the same row index (the v1 bug B-6
-      names explicitly: "Helfer nutzt Zeilenindex des Outcomes").
-      B-5 fix: the drag term ``sigma_w[t]^2/2`` is subtracted from the
-      UNWEIGHTED outcome ``returns[t+1]`` FIRST, and only THEN is the
-      (drag-adjusted) outcome scaled by the weight -- so the reported
-      drag is heterogeneous ACROSS symbol-weeks again (``sigma_w[t]`` is
-      the formation week's own vol, not the post-weighting constant
-      ``target_vol`` every leg shares -- v1's bug B-5, verbatim:
-      "target_vol^2/2 ist rangneutral (misst nichts)").
+    **Units (DEC-87 (G)).** ``vol`` is the formation week's vol
+    (``characteristics.realized_vol_characteristic``'s ``vol_rv[t]``, known
+    PIT by week ``t``'s end). That characteristic is the SD of the week's
+    DAILY log returns (daily units); the outcome ``returns`` is a WEEKLY log
+    return. With ``day_count`` (``characteristics.weekly_valid_day_count``,
+    the ``n_t`` valid daily returns of week ``t``) the WEEKLY vol
+    ``sigma_w[t] = sqrt(n_t) * vol_rv[t]`` is formed
+    (``characteristics.weekly_vol_from_daily``); without ``day_count`` the
+    caller declares ``vol`` to be ALREADY weekly (``sigma_w = vol``). Weight,
+    drag and ``target_vol`` all live in weekly units (``target_vol`` defaults
+    to the median finite ``sigma_w``).
 
-    Formally, for formation week ``t`` (``t in [0, n_weeks-2]``):
-      ``weight[t]   = target_vol / max(weekly_vol[t], floor)``
-      ``drag[t]     = 0.5 * weekly_vol[t]**2``               (log-return units)
-      ``weighted_outcome[t] = (returns[t+1] - drag[t]) * weight[t]``
-    ``weight_source`` MUST be the literal string ``"pit"`` (C.14 loud
-    fail, DEC-75: the task brief explicitly requires this so a future
-    caller can never silently swap in a non-PIT vol source -- e.g. the
-    OUTCOME week's own realised vol, which would leak the outcome into
-    its own weight). ``target_vol`` defaults to the CROSS-SECTIONAL
-    MEDIAN of ``weekly_vol`` over its finite entries (unchanged from v1).
+    **Sign (DEC-87 (G)).** The outcome is a LOG return; ``E[r_arith] -
+    E[r_log] = sigma^2/2``, so removing the log drag means ADDING it:
+    ``adjusted = r_log[t+1] + sigma_w[t]^2/2``. The pre-DEC-87 code SUBTRACTED
+    it (doubling the drag and giving the registered negative sign a
+    mechanical, monotone-in-vol advantage). Then the weighting:
 
-    Returns ``{"weighted_outcome", "weight", "drag", "target_vol",
-    "weight_source"}`` all shaped ``[n_weeks, n_symbols]`` (row ``t`` =
-    formation week ``t``'s weighted, drag-adjusted view of week ``t+1``'s
-    outcome; the LAST row is NaN -- no ``t+1`` inside the array) except
-    ``target_vol`` (scalar). Units: weekly LOG return throughout (NOT
-    basis points -- callers that want bp multiply by 1e4 themselves, same
-    convention as ``characteristics.realized_vol_characteristic``'s
-    output). NaN propagates from ``weekly_vol``'s own NaNs and from
-    ``returns[t+1]``'s own NaNs."""
+      ``weight[t]   = target_vol / max(sigma_w[t], floor)``
+      ``drag[t]     = 0.5 * sigma_w[t]**2``                     (weekly log units)
+      ``weighted_outcome[t] = (returns[t+1] + drag[t]) * weight[t]``
+
+    B-6: the weight is the FORMATION week's vol applied to the NEXT week's
+    outcome; B-5: the drag is heterogeneous across symbol-weeks and is added
+    to the UNWEIGHTED outcome BEFORE the weighting. ``weight_source`` MUST be
+    the literal string ``"pit"`` (C.14 loud fail) so a caller can never
+    silently weight with the outcome week's own vol.
+
+    Returns ``{"weighted_outcome", "weight", "drag", "sigma_w", "target_vol",
+    "weight_source", "units"}`` all shaped ``[n_weeks, n_symbols]`` (row ``t``
+    = formation week ``t``'s weighted view of week ``t+1``'s outcome; the LAST
+    row is NaN) except ``target_vol`` (scalar). NaN propagates from ``vol``,
+    ``day_count`` and ``returns[t+1]``."""
     if weight_source != "pit":
         raise ValueError(f"weight_source must be the literal 'pit' (C.14 loud fail), got {weight_source!r}")
-    finite_vol = weekly_vol[~np.isnan(weekly_vol)]
+    if day_count is not None:
+        sigma_w = weekly_vol_from_daily(vol, day_count)
+        units = "sigma_w = sqrt(n_t) * vol_rv (weekly log units, DEC-87 (G))"
+    else:
+        sigma_w = np.asarray(vol, dtype=np.float64)
+        units = "sigma_w = vol (declared weekly by the caller)"
+    finite_vol = sigma_w[~np.isnan(sigma_w)]
     if target_vol is None:
         target_vol = float(np.median(finite_vol)) if finite_vol.size else float("nan")
     n_weeks, n_symbols = returns.shape
-    safe_vol = np.where(np.isnan(weekly_vol), np.nan, np.maximum(weekly_vol, floor))
+    safe_vol = np.where(np.isnan(sigma_w), np.nan, np.maximum(sigma_w, floor))
     weight_full = target_vol / safe_vol
-    drag_full = 0.5 * weekly_vol ** 2
+    drag_full = 0.5 * sigma_w ** 2
 
     weighted_outcome = np.full((n_weeks, n_symbols), np.nan, dtype=np.float64)
     weight = np.full((n_weeks, n_symbols), np.nan, dtype=np.float64)
@@ -220,13 +227,14 @@ def vol_weighted_outcome_with_drag(
     for t in range(n_weeks - 1):
         weight[t] = weight_full[t]
         drag[t] = drag_full[t]
-        weighted_outcome[t] = (returns[t + 1] - drag_full[t]) * weight_full[t]
+        weighted_outcome[t] = (returns[t + 1] + drag_full[t]) * weight_full[t]
 
     return {
-        "weighted_outcome": weighted_outcome, "weight": weight, "drag": drag,
-        "target_vol": target_vol, "weight_source": weight_source,
+        "weighted_outcome": weighted_outcome, "weight": weight, "drag": drag, "sigma_w": sigma_w,
+        "target_vol": target_vol, "weight_source": weight_source, "units": units,
         "note": "Einheit: woechentliche Log-Rendite; weighted_outcome[t] gehoert zu Woche t+1's "
-                "Outcome, gewichtet mit Formationswoche t's PIT-Vol (DEC-75 (4)).",
+                "Outcome, gewichtet mit Formationswoche t's PIT-Wochenvol, bereinigt um +sigma_w^2/2 "
+                "(DEC-75 (4), praezisiert durch DEC-87 (G)).",
     }
 
 

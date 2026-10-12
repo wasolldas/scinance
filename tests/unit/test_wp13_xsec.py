@@ -702,14 +702,18 @@ def test_vol_weighted_outcome_with_drag_requires_literal_pit():
 
 
 def test_vol_weighted_outcome_with_drag_uses_formation_week_vol_for_next_week_outcome():
+    """DEC-87 (G) changed the SIGN of the drag term (the pre-DEC-87 version of this test pinned
+    ``(returns[1] - 0.5*vol**2) * w``, which subtracted the drag from a LOG outcome and so doubled it): the
+    adjusted outcome is ``returns[t+1] + sigma_w[t]^2/2``. Without ``day_count`` the caller declares ``vol`` to be
+    weekly already (sigma_w = vol); the formation-week/next-week alignment (B-6) is unchanged."""
     n_weeks, k = 4, 2
     returns = np.array([[0.0, 0.0], [0.10, 0.20], [-0.05, 0.03], [0.02, -0.01]])
     weekly_vol = np.array([[0.04, 0.06], [0.05, 0.03], [0.02, 0.08], [0.01, 0.01]])
     out = ic.vol_weighted_outcome_with_drag(returns, weekly_vol, weight_source="pit")
     target_vol = out["target_vol"]
     assert target_vol == pytest.approx(float(np.median(weekly_vol)))
-    # row t=0: formation week 0's vol (weekly_vol[0]) weights returns[1] (NOT returns[0])
-    expected_w0 = (returns[1] - 0.5 * weekly_vol[0] ** 2) * (target_vol / weekly_vol[0])
+    # row t=0: formation week 0's vol (weekly_vol[0]) weights returns[1] (NOT returns[0]); the drag is ADDED
+    expected_w0 = (returns[1] + 0.5 * weekly_vol[0] ** 2) * (target_vol / weekly_vol[0])
     assert np.allclose(out["weighted_outcome"][0], expected_w0)
     # last row has no t+1 -> NaN
     assert np.isnan(out["weighted_outcome"][-1]).all()
@@ -2457,3 +2461,497 @@ def test_dec85_factor_calibration_report_uses_the_estimation_returns_cross_secti
     assert ks == {k - 5}
     calib = nulls.factor_calibration_report(est, alive, symbols, beta_prev)
     assert math.isfinite(calib["market_factor"]["sigma_f"]) and math.isfinite(calib["sigma_e_used"])
+
+
+# ============================================================================
+# DEC-87 (Drittfassung H-28..H-30, Vorlauf v5e) -- prelaunch / ic / nulls / characteristics
+# ============================================================================
+
+def _weekly_daily_panel(k: int = 40, n_weeks: int = 60, seed: int = 11, daily_sd=None, mu_d: float = 0.0,
+                        start: date = date(2022, 1, 3)):
+    """A daily-close panel starting on a MONDAY with exactly ``7 * n_weeks`` days (every ISO week has 7 valid
+    daily returns except the first week, which has 6), plus its weekly log returns. ``daily_sd`` (per symbol)
+    and ``mu_d`` (the daily LOG-return mean shift added to ``-sd^2/2``) shape the data."""
+    import datetime as _dt
+    n_days = 7 * n_weeks
+    dates = [(start + _dt.timedelta(days=i)).isoformat() for i in range(n_days)]
+    rng = np.random.default_rng(seed)
+    sd = np.full(k, 0.02) if daily_sd is None else np.asarray(daily_sd, dtype=np.float64)
+    d = rng.normal(loc=mu_d - 0.5 * sd ** 2, scale=sd, size=(n_days, k))
+    close = 100.0 * np.exp(np.cumsum(d, axis=0))
+    weeks = sorted({pit_universe.iso_week_start(date.fromisoformat(x)).isoformat() for x in dates})
+    wk_close = close[6::7]
+    returns = np.zeros((len(weeks), k))
+    returns[1:] = np.log(wk_close[1:] / wk_close[:-1])
+    return {"dates": dates, "close": close}, weeks, returns
+
+
+# ---- DEC-87 (G): H-30 drag, weekly units, sign ------------------------------
+
+def test_dec87_vol_weighted_outcome_weekly_sigma_and_added_drag():
+    """DEC-87 (G): with ``day_count`` the vol is the DAILY SD and ``sigma_w = sqrt(n_t) * vol_rv``; the adjusted
+    outcome is ``r_log[t+1] + sigma_w[t]^2/2`` (removes the log drag), weighted by ``target_vol / sigma_w`` with
+    ``target_vol`` the median ``sigma_w`` -- all in weekly units. The pre-DEC-87 formula ``(r - vol_daily^2/2) *
+    target_daily/vol_daily`` is NOT what comes out."""
+    returns = np.array([[0.0, 0.0, 0.0], [0.10, 0.20, -0.05], [-0.05, 0.03, 0.02], [0.02, -0.01, 0.04]])
+    vol_daily = np.array([[0.02, 0.05, 0.03], [0.04, 0.03, 0.02], [0.02, 0.08, 0.01], [0.01, 0.01, 0.02]])
+    day_count = np.array([[7, 7, 6], [7, 7, 7], [7, 5, 7], [7, 7, 7]])
+    out = ic.vol_weighted_outcome_with_drag(returns, vol_daily, day_count=day_count)
+    sigma_w = np.sqrt(day_count) * vol_daily
+    assert np.allclose(out["sigma_w"], sigma_w)
+    assert np.allclose(characteristics.weekly_vol_from_daily(vol_daily, day_count), sigma_w)
+    target = float(np.median(sigma_w))
+    assert out["target_vol"] == pytest.approx(target)
+    for t in range(3):
+        expected = (returns[t + 1] + 0.5 * sigma_w[t] ** 2) * (target / sigma_w[t])
+        assert np.allclose(out["weighted_outcome"][t], expected)
+        assert np.allclose(out["drag"][t], 0.5 * sigma_w[t] ** 2)
+    assert np.isnan(out["weighted_outcome"][-1]).all()
+    old = (returns[1] - 0.5 * vol_daily[0] ** 2) * (np.median(vol_daily) / vol_daily[0])
+    assert not np.allclose(out["weighted_outcome"][0], old)
+    # a NaN vol or a zero day count -> NaN sigma_w -> NaN outcome (never a number from nothing)
+    vd = vol_daily.copy()
+    vd[0, 0] = np.nan
+    dc = day_count.copy()
+    dc[0, 1] = 0
+    out2 = ic.vol_weighted_outcome_with_drag(returns, vd, day_count=dc)
+    assert np.isnan(out2["weighted_outcome"][0, 0]) and np.isnan(out2["weighted_outcome"][0, 1])
+    with pytest.raises(ValueError, match="day_count shape"):
+        characteristics.weekly_vol_from_daily(vol_daily, day_count[:2])
+
+
+def test_dec87_h30_feasibility_weekly_units_is_n_times_the_daily_drag():
+    """DEC-87 (G): ``h30_feasibility`` works in WEEKLY units -- the drag is ``0.5 * (sqrt(n) * vol_rv)^2`` and so
+    ``n`` (= 7) times the daily drag it used until v5d (Spread/Kante 0.395 daily vs ~2.8 weekly on L); a window
+    without ``day_count`` is a loud fail (no daily fallback)."""
+    k = 40
+    panel, weeks, returns = _weekly_daily_panel(k=k, n_weeks=60, daily_sd=np.linspace(0.01, 0.06, k))
+    alive = np.ones((len(weeks), k), dtype=bool)
+    vol_rv = characteristics.realized_vol_characteristic(panel, weeks)
+    day_count = characteristics.weekly_valid_day_count(panel, weeks)
+    window_l = {"returns": returns, "alive": alive, "weeks": weeks, "vol_rv": vol_rv, "day_count": day_count}
+    h = prelaunch.h30_feasibility(window_l)
+
+    # the old (daily-unit) decile spread on the same data, computed by hand
+    by_decile: dict[int, list[float]] = {d: [] for d in range(1, 11)}
+    for t in range(len(weeks)):
+        buckets = characteristics.decile_bucket(vol_rv[t], alive[t])
+        drag = 0.5 * vol_rv[t] ** 2 * 1e4
+        for d in range(1, 11):
+            by_decile[d].extend(float(x) for x in drag[(buckets == d) & ~np.isnan(drag)])
+    daily_spread = float(np.median(by_decile[10]) - np.median(by_decile[1]))
+    assert (day_count[1:] == 7).all()                                 # fixture: every week but the first has 7 days
+    # all weeks (but the 6-day first one) have n = 7 -> the weekly spread is 7x the daily one (within the
+    # tiny effect of the single 6-day week on a decile median)
+    assert h["spread_d10_minus_d1_bps"] == pytest.approx(7.0 * daily_spread, rel=0.02)
+    assert h["units"].startswith("weekly") and h["n_days_median"] == 7.0
+    assert h["spread_d10_minus_d1_over_kante"] == pytest.approx(h["spread_d10_minus_d1_bps"] / h["kante_bps_per_week"])
+    assert h["target_vol"] == pytest.approx(float(np.nanmedian(np.sqrt(day_count) * vol_rv)))
+
+    no_dc = {k_: v for k_, v in window_l.items() if k_ != "day_count"}
+    with pytest.raises(ValueError, match="day_count"):
+        prelaunch.h30_feasibility(no_dc)
+
+
+def test_dec87_h30_feasibility_sigma_xs_uses_returns_est_and_is_nan_safe():
+    """DEC-87 (item 10): ``Kante`` uses the ESTIMATION returns -- a not-trading cell (NaN in ``returns_est``) is a
+    missing observation, neither a zero return nor a poisoned week (``stats.sigma_xs_series`` skips NaN)."""
+    k = 30
+    panel, weeks, returns = _weekly_daily_panel(k=k, n_weeks=40, seed=5)
+    alive = np.ones((len(weeks), k), dtype=bool)
+    est = returns.copy()
+    est[10:20, :4] = np.nan                                  # four symbols silent for ten weeks
+    returns_zero = np.where(np.isnan(est), 0.0, est)         # the zero-filled outcome array
+    vol_rv = characteristics.realized_vol_characteristic(panel, weeks)
+    dc = characteristics.weekly_valid_day_count(panel, weeks)
+    base = {"alive": alive, "weeks": weeks, "vol_rv": vol_rv, "day_count": dc}
+    h_est = prelaunch.h30_feasibility({**base, "returns": returns_zero, "returns_est": est})
+    h_zero = prelaunch.h30_feasibility({**base, "returns": returns_zero})
+    expected = np.array([np.std(est[t][~np.isnan(est[t])], ddof=1) for t in range(len(weeks))])
+    assert h_est["sigma_xs_l"]["median"] == pytest.approx(float(np.median(expected)))
+    assert h_est["sigma_xs_l"]["n_weeks"] == len(weeks)                       # no week lost to a NaN
+    assert h_est["sigma_xs_l"]["median"] != h_zero["sigma_xs_l"]["median"]    # zero fill changes the estimate
+
+
+def test_dec87_sigma_xs_series_skips_nan_cells_and_is_unchanged_without_nan():
+    """DEC-87 (item 10): ``stats.sigma_xs_series`` ignores NaN cells (a symbol that did not trade is a missing
+    observation); NaN-free input gives the exact pre-DEC-87 numbers, a week with fewer than ``min_universe`` usable
+    cells stays NaN."""
+    from bybit_edge.research.wp7_universe import stats
+    rng = np.random.default_rng(8)
+    r = rng.normal(0, 0.05, size=(6, 12))
+    alive = np.ones((6, 12), dtype=bool)
+    clean = stats.sigma_xs_series(r, alive)
+    assert np.array_equal(clean, np.array([np.std(r[t], ddof=1) for t in range(6)]))
+    r2 = r.copy()
+    r2[1, :3] = np.nan
+    r2[2, :11] = np.nan                                  # one usable cell left
+    out = stats.sigma_xs_series(r2, alive)
+    assert out[1] == pytest.approx(np.std(r[1, 3:], ddof=1)) and np.isnan(out[2])
+    assert np.array_equal(out[[0, 3, 4, 5]], clean[[0, 3, 4, 5]])
+
+
+# ---- DEC-87 (item 10): persistence null / survivorship fixture on returns_est ---
+
+def test_dec87_ar1_fit_skips_nan_cells_and_is_unchanged_without_nan():
+    """DEC-87 (item 10): ``fit_ar1_per_symbol`` on ``returns_est`` treats NaN as missing (the symbol's pairs and
+    moments use valid weeks only) and is bit-identical to before on NaN-free input."""
+    rng = np.random.default_rng(3)
+    w, k = 60, 6
+    returns = rng.normal(0, 0.05, size=(w, k))
+    alive = np.ones((w, k), dtype=bool)
+    clean = nulls.fit_ar1_per_symbol(returns, alive)
+    est = returns.copy()
+    est[20:40, 2] = np.nan                                   # symbol 2 silent for 20 weeks
+    fitted = nulls.fit_ar1_per_symbol(est, alive)
+    assert fitted["n_obs"][2] == w - 20 and fitted["n_obs"][0] == w
+    assert np.isfinite(fitted["phi"]).all() and np.isfinite(fitted["sigma"]).all()
+    assert fitted["phi"][0] == clean["phi"][0] and fitted["sigma"][0] == clean["sigma"][0]     # untouched columns
+    # the zero-filled column would have fitted a different (distorted) sigma
+    zero = returns.copy()
+    zero[20:40, 2] = 0.0
+    assert nulls.fit_ar1_per_symbol(zero, alive)["sigma"][2] != fitted["sigma"][2]
+    # a whole persistence null runs on NaN-carrying input without a NaN anywhere in the fit
+    res = nulls.persistence_null(est, alive, [f"w{i}" for i in range(w)], variants=("mom1",), n_sims=5, seed=53)
+    assert np.isfinite(res["ar1"]["phi"]).all() and np.isfinite(res["ar1"]["sigma"]).all()
+
+
+def test_dec87_window_noise_floor_uses_returns_est_for_the_ar1_fits(monkeypatch):
+    """DEC-87 (item 10): ``window_noise_floor_and_threshold`` hands the persistence null the window's
+    ``returns_est`` when it has one (the zero-filled ``returns`` only as a fallback for hand-built windows)."""
+    rng = np.random.default_rng(9)
+    w, k = 30, 40
+    returns = rng.normal(0, 0.03, size=(w, k))
+    est = returns.copy()
+    est[:10, :5] = np.nan
+    alive = np.ones((w, k), dtype=bool)
+    weeks = [str(i) for i in range(w)]
+    seen = []
+    orig = nulls.persistence_null
+
+    def spy(r, *a, **kw):
+        seen.append(r)
+        return orig(r, *a, **kw)
+
+    monkeypatch.setattr(nulls, "persistence_null", spy)
+    prelaunch.window_noise_floor_and_threshold({"returns": returns, "returns_est": est, "alive": alive, "weeks": weeks},
+                                               variants=("mom1",), n_sims=3, seed=53)
+    prelaunch.window_noise_floor_and_threshold({"returns": returns, "alive": alive, "weeks": weeks},
+                                               variants=("mom1",), n_sims=3, seed=53)
+    assert seen[0] is est and seen[1] is returns
+
+
+def test_dec87_survivorship_fixture_is_sized_from_the_estimation_cross_section():
+    """DEC-87 (item 10): K of the signal-free fixture is the window's median count of symbols that are alive AND
+    carry a computed return (``returns_est``), not the bare alive count."""
+    n_weeks, k = 60, 100
+    alive = np.ones((n_weeks, k), dtype=bool)
+    est = np.zeros((n_weeks, k))
+    est[:, 40:] = np.nan                                     # only 40 symbols have a computed return
+    window = {"returns": np.zeros((n_weeks, k)), "returns_est": est, "alive": alive,
+              "weeks": [str(i) for i in range(n_weeks)]}
+    r = prelaunch.survivorship_drawdown_fixture(window, ic_min_mom1=0.02, ic_min_rev_gap=0.02, seed=53)
+    assert r["k"] == 40
+    without = {k_: v for k_, v in window.items() if k_ != "returns_est"}
+    r_old = prelaunch.survivorship_drawdown_fixture(without, ic_min_mom1=0.02, ic_min_rev_gap=0.02, seed=53)
+    assert r_old["k"] == 100
+
+
+# ---- DEC-87 (V5): Gate (5) reachability for all three H-30 variants -------------
+
+def test_dec87_gate5_reachability_by_variant_and_shared_core():
+    """DEC-87 (V5): the outcome-free reachability is reported for ``vol_rv``, ``vol_max`` and ``vol_beta``; the
+    number is the one ``characteristics.characteristic_turnover_spearman`` gives (the same core ``run_full`` feeds
+    ``gates.evaluate`` as Gate (5)). A characteristic identical to the turnover rank has Spearman 1 -> not
+    reachable (>= 0.60), an independent one is."""
+    rng = np.random.default_rng(6)
+    w, k = 30, 80
+    alive = np.ones((w, k), dtype=bool)
+    weeks = [str(i) for i in range(w)]
+    turnover_trail = rng.lognormal(size=(w, k))
+    window = {"alive": alive, "weeks": weeks, "turnover_trail": turnover_trail,
+              "vol_rv": turnover_trail * 2.0,                          # perfectly rank-correlated
+              "vol_max": rng.normal(size=(w, k)),                      # independent
+              "vol_beta": np.where(np.arange(k) < 10, np.nan, rng.normal(size=(w, k)))}
+    by = prelaunch.gate5_reachability_by_variant(window)
+    assert set(by) == {"vol_rv", "vol_max", "vol_beta"}
+    assert by["vol_rv"]["median"] == pytest.approx(1.0) and by["vol_rv"]["gate5_reachable"] is False
+    assert abs(by["vol_max"]["median"]) < 0.2 and by["vol_max"]["gate5_reachable"] is True
+    assert by["vol_beta"]["available"] is True and by["vol_beta"]["gate5_reachable"] is True
+    core = characteristics.characteristic_turnover_spearman(window["vol_max"], turnover_trail, alive, weeks)
+    assert by["vol_max"]["median"] == core["median"] and by["vol_max"]["n_weeks_used"] == w
+    legacy = prelaunch.gate5_reachability(window)                      # pre-DEC-87 call shape: vol_rv
+    assert legacy["median"] == by["vol_rv"]["median"] and legacy["threshold"] == 0.60
+    missing = prelaunch.gate5_reachability_by_variant({k_: v for k_, v in window.items() if k_ != "vol_max"})
+    assert missing["vol_max"] == {"available": False, "note": "vol_max nicht im Fenster geladen"}
+    # weeks with fewer than 10 usable symbols are skipped, never silently scored
+    few = np.zeros((w, k), dtype=bool)
+    few[:, :5] = True
+    thin = characteristics.characteristic_turnover_spearman(window["vol_max"], turnover_trail, few, weeks)
+    assert thin["median"] is None and thin["n_weeks_used"] == 0
+
+
+# ---- DEC-87 (A)/(C)/(E): constants, ceilings, binding quantile ------------------
+
+def test_dec87_analytic_selection_ceiling_reports_both_lines():
+    """DEC-87 (C): the per-window analytic ceiling is ``z_max * SE_W`` (the 1/sqrt(2) factor, sigma_SR of a
+    pooled two-year estimator, is discarded); the v5d line with the factor stays available as ``ceiling_ic``."""
+    r = prelaunch.analytic_selection_ceiling(0.04858, 52)
+    se = 0.04858 / math.sqrt(52)
+    assert r["ceiling_ic_without_factor"] == pytest.approx(prelaunch.analytic_bailey_ldp_ceiling(7) * se)
+    assert r["ceiling_ic"] == pytest.approx(r["ceiling_ic_without_factor"] / math.sqrt(2.0))
+    assert r["ceiling_ic_without_factor"] == pytest.approx(1.3868 * se, rel=1e-3)
+
+
+def test_dec87_run_configuration_null_two_drifts_constants_and_binding():
+    """DEC-87 (A)/(E): ``nulls.run_configuration_null`` = the registered method under the stress calibration,
+    driftfree AND drift 0.002; ``frozen_null_constants`` derives the ceiling (driftfree), both quantile sets and the
+    binding (more extreme in the hypothesis direction) from the two cells -- Vorlauf and Lauf use this one code."""
+    rng = np.random.default_rng(21)
+    w, k = 40, 45
+    symbols = [f"s{i}" for i in range(k - 1)] + ["BTCUSDT"]
+    est = rng.normal(0, 0.05, size=(w, k))
+    alive = np.ones((w, k), dtype=bool)
+    cfg = nulls.run_configuration_null(est, alive, symbols, method="fm_neutral_8w", rho_f=0.09, beta_sd=0.6,
+                                       n_reps=12, seed=53)
+    assert cfg["driftfree"]["drift_f"] == 0.0 and cfg["drifting"]["drift_f"] == pytest.approx(0.002)
+    assert cfg["driftfree"]["rho_f"] == cfg["drifting"]["rho_f"] == 0.09 and cfg["driftfree"]["beta_sd"] == 0.6
+    c = cfg["constants"]
+    assert c["ceiling_method_stress"] == cfg["driftfree"]["ceiling_mean_of_max"]
+    assert c["ceiling_method_stress_drifting_report_only"] == cfg["drifting"]["ceiling_mean_of_max"]
+    for v in characteristics.VARIANT_NAMES:
+        qf = cfg["driftfree"]["variants"][v]["quantile_one_sided"]
+        qd = cfg["drifting"]["variants"][v]["quantile_one_sided"]
+        assert c["res_quantile_driftfree"][v] == qf and c["res_quantile_drifting"][v] == qd
+        direction = nulls.REGISTERED_DIRECTION[v]
+        assert c["res_quantile_binding"][v] == (max(qf, qd) if direction == "positive" else min(qf, qd))
+    # deterministic: the same configuration twice is bit-identical (T2 at the function level)
+    again = nulls.run_configuration_null(est, alive, symbols, method="fm_neutral_8w", rho_f=0.09, beta_sd=0.6,
+                                         n_reps=12, seed=53)
+    assert again["constants"] == c
+    with pytest.raises(ValueError, match="direction"):
+        nulls.binding_quantile(0.1, 0.2, "sideways")
+
+
+# ---- DEC-87 (V1): the winner is confirmed with each window's OWN calibration ---
+
+def _cell(null_mean: float, ceiling: float, n_reps: int = 1000) -> dict:
+    return {"variants": {v: {"mean_ic_draws_mean": null_mean, "mean_ic_draws_sd": 0.004,
+                             "quantile_one_sided": 0.02, "direction": nulls.REGISTERED_DIRECTION[v]}
+                         for v in characteristics.VARIANT_NAMES},
+            "ceiling_mean_of_max": ceiling, "n_reps": n_reps}
+
+
+def _confirmation_fixture():
+    """Two judged windows with DIFFERENT calibrations; floor 0.05, W 52 -> null-mean bound 0.001734, pure-noise
+    ceiling 0.009 -> ceiling bound 0.0135."""
+    def study(rho_m, sd_m, rho_s, sd_s):
+        return {"calibrations": {"measured": {"rho_f": rho_m, "beta_sd_calibrated": sd_m},
+                                 "stress": {"rho_f": rho_s, "beta_sd_calibrated": sd_s}}}
+    w_arr = np.zeros((40, 12))
+    a_arr = np.ones((40, 12), dtype=bool)
+    windows_out, sliced = {}, {}
+    for wn, cal in (("W1", study(0.046, 0.574, 0.092, 0.771)), ("W2", study(0.042, 0.446, 0.083, 0.583))):
+        windows_out[wn] = {"available": True, "beta_control_method_study": cal,
+                           "noise_floor_and_threshold": {"floor": {"e_floor": 0.05}, "w_judged": 52},
+                           "selection_ceiling_measured": {"ceiling_ic_mean": 0.009}}
+        sliced[wn] = {"returns_est": w_arr, "alive": a_arr}
+    return windows_out, sliced, [f"s{i}" for i in range(11)] + ["BTCUSDT"]
+
+
+def test_dec87_confirm_winner_hands_each_window_its_own_calibration(monkeypatch):
+    """DEC-87 V1 REGRESSION (DEC-86 Nachtrag): the v5d winner loop reused the variable ``study`` of the previous window
+    loop, i.e. always W2's, so W1's winner run carried W2's rho_f/beta_sd. The confirmation must call the null for
+    W1 with W1's calibration and for W2 with W2's -- for every calibration and every window."""
+    windows_out, sliced, symbols = _confirmation_fixture()
+    calls: list[tuple] = []
+
+    def fake_null(window_returns, window_alive, syms, *, method, rho_f, beta_sd, drift_f, n_reps, **kw):
+        calls.append((method, rho_f, beta_sd, drift_f, n_reps))
+        return _cell(0.0005, 0.008, n_reps)
+
+    monkeypatch.setattr(nulls, "beta_controlled_factor_null", fake_null)
+    rec = {"recommended_method": "fm_neutral_8w", "ranked_methods": ["fm_neutral_8w"]}
+    conf = prelaunch.confirm_beta_control_winner(windows_out, sliced, symbols, rec, n_reps=1000, seed=53)
+    assert conf["confirmed_method"] == "fm_neutral_8w" and conf["beta_window_weeks"] == 8
+    assert calls == [("fm_neutral_8w", 0.046, 0.574, 0.0, 1000), ("fm_neutral_8w", 0.092, 0.771, 0.0, 1000),     # W1
+                     ("fm_neutral_8w", 0.042, 0.446, 0.0, 1000), ("fm_neutral_8w", 0.083, 0.583, 0.0, 1000)]    # W2
+    used = conf["attempts"][0]["windows"]
+    assert used["W1"]["calibration_used"]["stress"] == {"rho_f": 0.092, "beta_sd_calibrated": 0.771}
+    assert used["W2"]["calibration_used"]["stress"] == {"rho_f": 0.083, "beta_sd_calibrated": 0.583}
+
+
+def test_dec87_confirm_winner_falls_through_to_the_next_ranked_method_and_reports_none(monkeypatch):
+    """DEC-87 Bindung: a recommended method that fails the UNCHANGED DEC-77 rule with the 1.000-replicate cells is
+    replaced by the next eligible method of the SAME ranking; if no method is confirmed the finding is 'keine
+    Methode bestaetigt' (DEC-77 E1 (c) applies)."""
+    windows_out, sliced, symbols = _confirmation_fixture()
+    bad, good = _cell(0.0030, 0.008), _cell(0.0005, 0.008)                    # 0.0030 > 0.001734 null-mean bound
+
+    def make_null(failing_methods):
+        def fake_null(window_returns, window_alive, syms, *, method, rho_f, beta_sd, drift_f, n_reps, **kw):
+            return bad if method in failing_methods else good
+        return fake_null
+
+    rec = {"recommended_method": "fm_neutral_8w", "ranked_methods": ["fm_neutral_8w", "fm_neutral_13w", "double_sort_13w"]}
+    monkeypatch.setattr(nulls, "beta_controlled_factor_null", make_null({"fm_neutral_8w"}))
+    conf = prelaunch.confirm_beta_control_winner(windows_out, sliced, symbols, rec, n_reps=1000, seed=53)
+    assert conf["confirmed_method"] == "fm_neutral_13w"
+    assert [a["method"] for a in conf["attempts"]] == ["fm_neutral_8w", "fm_neutral_13w"]
+    assert [a["confirmed"] for a in conf["attempts"]] == [False, True]
+    assert conf["attempts"][0]["windows"]["W1"]["pass"] is False
+    assert "Vorrang-Methode" in conf["note"]
+
+    monkeypatch.setattr(nulls, "beta_controlled_factor_null", make_null({"fm_neutral_8w", "fm_neutral_13w", "double_sort_13w"}))
+    none = prelaunch.confirm_beta_control_winner(windows_out, sliced, symbols, rec, n_reps=1000, seed=53)
+    assert none["confirmed_method"] is None and none["beta_window_weeks"] is None
+    assert none["note"].startswith("keine Methode bestaetigt") and len(none["attempts"]) == 3
+    empty = prelaunch.confirm_beta_control_winner(windows_out, sliced, symbols, {"ranked_methods": []}, n_reps=1000)
+    assert empty["confirmed_method"] is None and "keine im Raster zugelassene Methode" in empty["note"]
+
+
+def test_dec87_recommendation_exposes_the_full_ranking_with_unchanged_rule():
+    """The selection rule (smallest residualised SD, tie -> shorter window) is UNCHANGED; DEC-87 only exposes the
+    whole order (``ranked_methods``) for the confirmation fall-through."""
+    ok = (0.0001, 0.002, 0.01)
+    mk = lambda sd: (0.0001, sd, 0.01)                                          # noqa: E731
+    study = _fake_study({"fm_neutral_8w": {"measured": mk(0.004), "stress": ok},
+                         "fm_neutral_13w": {"measured": mk(0.003), "stress": ok},
+                         "double_sort_13w": {"measured": mk(0.0035), "stress": ok},
+                         "none": {"measured": (0.05, 0.001, 0.1), "stress": (0.05, 0.001, 0.1)}})
+    decision = prelaunch.beta_control_pass_table(study, floor=0.05, w_judged=52, pure_noise_ceiling=0.01,
+                                                 variants=("mom1", "rev_gap"))
+    windows_out = {wn: {"available": True, "beta_control_decision": decision, "beta_control_method_study": study}
+                   for wn in ("W1", "W2")}
+    rec = prelaunch.beta_control_recommendation(windows_out)
+    assert rec["recommended_method"] == "fm_neutral_13w"
+    assert rec["ranked_methods"] == ["fm_neutral_13w", "double_sort_13w", "fm_neutral_8w"]   # ascending residualised SD
+    assert "none" not in rec["ranked_methods"]
+
+
+def _relaxed_pass_table(monkeypatch):
+    """The tiny 12-symbol fixture is statistically too weak for the strict DEC-77 bounds; relax the TOLERANCE FACTORS
+    only (the rule's arithmetic is the real function) -- same discipline as the Gegenprobe knobs."""
+    real = prelaunch.beta_control_pass_table
+
+    def relaxed(study, **kw):
+        kw.setdefault("null_mean_tol_factor", 1e6)
+        kw.setdefault("ceiling_tol_factor", 1e6)
+        return real(study, **kw)
+
+    monkeypatch.setattr(prelaunch, "beta_control_pass_table", relaxed)
+
+
+_PRELAUNCH_TINY = dict(
+    n_sims=5, n_reps_factor_null=5, n_reps_beta_control_study=5, seed=53,
+    gegenprobe_n_reps=10, gegenprobe_rel_tol=10.0, gegenprobe_z_max=1e9, gegenprobe_market_check=False,
+    calibration_search_n_reps=5, calibration_search_rel_tol=10.0, calibration_search_max_iter=8)
+
+
+def test_dec87_prelaunch_winner_carries_its_own_windows_calibration_and_run_configuration_constants(tmp_path, monkeypatch):
+    """DEC-87 V1 + (A)/(E) end to end on the fixture tree: the confirmed winner's high-rep cells of W1 carry W1's
+    rho_f/beta_sd (not W2's), the drifting stress cell exists, and the frozen constants of each window are exactly
+    what ``nulls.run_configuration_null`` -- the function ``run_full`` recomputes with -- returns for that window."""
+    _relaxed_pass_table(monkeypatch)
+    # On this tiny fixture both windows calibrate to the same beta_sd; make the windows DIFFERENT (W2 gets larger
+    # rho_f/beta_sd) so that using the wrong window's study -- the v5d defect -- would be visible.
+    orig_study = nulls.beta_control_method_study
+    n_calls = []
+
+    def distinct_study(*a, **kw):
+        out = orig_study(*a, **kw)
+        i = len(n_calls)
+        n_calls.append(i)
+        for cal in out["calibrations"].values():
+            cal["rho_f"] = cal["rho_f"] * (1.0 + 0.5 * i)
+            cal["beta_sd_calibrated"] = cal["beta_sd_calibrated"] * (1.0 + 0.25 * i)
+        return out
+
+    monkeypatch.setattr(nulls, "beta_control_method_study", distinct_study)
+    panel, weekly, _sb, _sm, _db, del_manifest, dd_path = _build_prelaunch_fixture_tree(tmp_path)
+    report = prelaunch.assemble_prelaunch_report(
+        panel, weekly, delisted_manifest_path=del_manifest, delisting_dates_path=dd_path,
+        n_reps_beta_control_winner=6,
+        data_fingerprints={"union_range_fingerprint": "aa" * 32, "delisting_dates_sha256": "bb" * 32},
+        **_PRELAUNCH_TINY)
+    assert len(n_calls) == 2                                           # W1 then W2 (never L)
+    conf = report["beta_control_confirmation"]
+    method = conf["confirmed_method"]
+    assert method and method == report["beta_control_recommendation"]["ranked_methods"][0] == conf["ranked_methods"][0]
+    assert report["data_fingerprints"]["union_range_fingerprint"] == "aa" * 32
+    w1, w2 = report["windows"]["W1"], report["windows"]["W2"]
+    cal1 = w1["beta_control_method_study"]["calibrations"]
+    cal2 = w2["beta_control_method_study"]["calibrations"]
+    assert cal1["stress"]["beta_sd_calibrated"] != cal2["stress"]["beta_sd_calibrated"]       # windows really differ
+    for wn, w, cal in (("W1", w1, cal1), ("W2", w2, cal2)):
+        hr = w["beta_control_recommended_high_rep"]
+        assert set(hr) == {"measured", "stress", "stress_drifting"}
+        for name in ("measured", "stress"):
+            assert hr[name]["rho_f"] == cal[name]["rho_f"] and hr[name]["beta_sd"] == cal[name]["beta_sd_calibrated"]
+            assert hr[name]["n_reps"] == 6 and hr[name]["method"] == method
+        assert hr["stress_drifting"]["drift_f"] == pytest.approx(nulls.DRIFT_F_DRIFTING)
+        assert hr["stress_drifting"]["rho_f"] == cal["stress"]["rho_f"]
+        fz = w["frozen_null_constants"]
+        window = prelaunch.slice_window(weekly["weeks"], *prelaunch.WINDOWS[wn], weekly["returns"], weekly["alive"])
+        est = nulls.estimation_returns(weekly)[window["lo"]:window["hi"]]
+        cfg = nulls.run_configuration_null(est, window["alive"], panel["symbols"], method=method, convention="close_at_last",
+                                           n_reps=6, seed=53, rho_f=cal["stress"]["rho_f"],
+                                           beta_sd=cal["stress"]["beta_sd_calibrated"])
+        for key in ("ceiling_method_stress", "res_quantile_driftfree", "res_quantile_drifting", "res_quantile_binding"):
+            assert fz[key] == cfg["constants"][key]
+        assert fz["n_reps"] == 6 and fz["seed"] == 53 and fz["calibration"] == "stress"
+        # the confirmation's own stress cell is the same configuration as the run's driftfree cell
+        att = [a for a in conf["attempts"] if a["method"] == method][0]["windows"][wn]["cells"]["stress"]
+        assert att["ceiling_mean_of_max"] == fz["ceiling_method_stress"]
+    # the report carries the new open sections incl. the H-30 weekly-unit summary (L stays in its sealed file)
+    assert report["h30_feasibility_weekly_units"]["units"].startswith("weekly")
+    assert set(report["windows"]["W1"]["gate5_reachability_by_variant"]) == {"vol_rv", "vol_max", "vol_beta"}
+    assert report["historical_ts_ceiling_note"] and "DEC-87 (A)" in report["historical_ts_ceiling_note"]
+
+
+def test_dec87_prelaunch_without_a_confirmed_method_has_no_frozen_constants(tmp_path):
+    """The strict DEC-77 bounds reject everything on the 12-symbol fixture: the report says so ('keine Methode
+    bestaetigt', DEC-77 E1 (c)), carries NO ``beta_control_recommended_high_rep``/``frozen_null_constants`` and
+    nothing is silently picked."""
+    panel, weekly, _sb, _sm, _db, del_manifest, dd_path = _build_prelaunch_fixture_tree(tmp_path)
+    report = prelaunch.assemble_prelaunch_report(
+        panel, weekly, delisted_manifest_path=del_manifest, delisting_dates_path=dd_path,
+        n_reps_beta_control_winner=5, **_PRELAUNCH_TINY)
+    conf = report["beta_control_confirmation"]
+    if conf["confirmed_method"] is None:                         # the expected outcome of this fixture
+        assert conf["note"].startswith("keine Methode bestaetigt")
+        for wn in ("W1", "W2"):
+            assert "frozen_null_constants" not in report["windows"][wn]
+            assert "beta_control_recommended_high_rep" not in report["windows"][wn]
+    assert report["data_fingerprints"] is None
+
+
+def test_dec87_prelaunch_markdown_has_the_v5e_sections(tmp_path, monkeypatch):
+    """DEC-87 item 12: the Markdown report carries Gewinner-Bestaetigung, bindende Decke / Drift-Quantile,
+    H-30-Feasibility (Wocheneinheit), Gate-(5)-Erreichbarkeit and Fingerprints sections; the v3 TS ceiling line is
+    labelled 'historisch, nicht bindend'."""
+    _relaxed_pass_table(monkeypatch)
+    panel, weekly, _sb, _sm, _db, del_manifest, dd_path = _build_prelaunch_fixture_tree(tmp_path)
+    report = prelaunch.assemble_prelaunch_report(
+        panel, weekly, delisted_manifest_path=del_manifest, delisting_dates_path=dd_path,
+        n_reps_beta_control_winner=5,
+        data_fingerprints={"union_range_fingerprint": "aa" * 32, "delisting_dates_sha256": "bb" * 32,
+                           "union_range_detail": {"n_partitions": 7}}, **_PRELAUNCH_TINY)
+    art = prelaunch.write_prelaunch_artifacts(tmp_path / "out", report)
+    md = Path(art["artifacts"]["wp13a_prelaunch_md"]["path"]).read_text(encoding="utf-8")
+    for heading in ("## Gewinner-Bestaetigung (DEC-87 V1", "## Bindende GL-012-Decke (DEC-87 (A)) und Drift-Quantile",
+                    "## H-30-Feasibility in Wocheneinheiten (DEC-87 (G))", "## Gate-(5)-Erreichbarkeit (DEC-87 V5",
+                    "## Daten-Fingerprints (DEC-87 V9)"):
+        assert heading in md, heading
+    assert "HISTORISCH, NICHT BINDEND" in md and "historisch, nicht bindend" in md
+    assert "Decke (bindend) =" in md and "| Variante (W1) | Quantil driftfrei | Quantil drifting" in md
+    assert "union_range_fingerprint: " + "aa" * 32 in md and "delisting_dates_sha256: " + "bb" * 32 in md
+    assert "| W1 | " in md and "vol_max" in md
+    payload = __import__("json").loads(Path(art["artifacts"]["wp13a_prelaunch_json"]["path"]).read_text(encoding="utf-8"))
+    assert payload["data_fingerprints"]["union_range_fingerprint"] == "aa" * 32
+    assert payload["h30_feasibility_weekly_units"]["units"].startswith("weekly")
+    assert "feasible" in payload["h30_feasibility_weekly_units"]
+    # the seal still holds: no real-IC key anywhere in the open JSON (new keys included)
+    bad = [k for k in _walk_keys(payload) if re.search(r"real.*ic|ic.*real", k.rsplit("/", 1)[-1], re.IGNORECASE)]
+    assert not bad
+    assert not [k for k in _walk_keys(payload) if k.rsplit("/", 1)[-1] == "mean_ic"]

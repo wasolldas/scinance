@@ -28,84 +28,60 @@ Entscheidung 1), mit STARTSPERRE (siehe ``cmd_run``'s Docstring). Die
 ``--registered``-YAML (die Drittfassung) MUSS folgende Schluessel tragen
 (``run.REGISTERED_SCHEMA_HINT``, verbatim hier gespiegelt):
 
-    hypotheses:
-      H-xx: {variant: <einer der 7 F-XSEC1-Namen>, direction: positive|negative,
-             outcome?: vol_weighted}          # nur H-30
+    hypotheses:                    # DEC-87 (J): ein Eintrag je VARIANTE, H-28_mom1 ... H-30_vol_beta
+      H-28_mom1: {hypothesis: H-28, variant: mom1, direction: positive}
+      H-30_vol_rv: {hypothesis: H-30, variant: vol_rv, direction: negative, outcome: vol_weighted}
+      H-30_vol_beta: {hypothesis: H-30, variant: vol_beta, direction: negative, outcome: vol_weighted,
+                      status: gl012_pre_run, reason: "<Grund>"}   # gesperrt: wird nicht gerechnet, p = 1
     windows:
       W1: {start: <ISO-Datum>, end: <ISO-Datum>,
            ic_min_capped: {<variant>: <float>, ...},   # DEC-74 (a)+(d)/DEC-75 (8)
            w_judged: <int>,                             # DEC-75 Entscheidung 1 (1)
-           res_quantile_drifting: {<variant>: <float>, ...},  # DEC-76 (b), optional*
-           ceiling_driftfree_res: <float>}              # DEC-76 (c), optional*
+           calibration:                                 # DEC-87 (D): JE FENSTER (DEC-86), stress PFLICHT
+             measured: {rho_f, beta_sd_calibrated, target_factor_share}
+             stress:   {rho_f, beta_sd_calibrated, target_factor_share}
+             zero:     {rho_f, beta_sd_calibrated, target_factor_share}
+           ceiling_method_stress: <float>               # DEC-87 (A): bindende GL-012-Decke (Methode, stress, driftfrei)
+           res_quantile_driftfree: {<variant>: <float>} # DEC-87 (E): 99,36-%-Quantil, Drift 0
+           res_quantile_drifting: {<variant>: <float>}} # DEC-87 (E): 99,36-%-Quantil, Drift 0,002/Woche
       W2: {...}
       L: {start: <ISO-Datum>, end: <ISO-Datum>}          # optional, descriptive/sealed only
     beta_control:
       method: <einer der 9 ic.BETA_CONTROL_METHODS-Namen>   # DEC-77 Entscheidung 2, PFLICHT, nicht leer
       beta_window_weeks: <int|null>                          # muss zu 'method' passen, sonst loud fail
-    calibration:                                              # DEC-78 Entscheidung 1/Nachtrag, OPTIONAL*
-      sigma_f: <float>            # gemessene BTC-Wochenvol (W1)
-      sigma_e: <float>            # gemessene idiosynkratische Wochenvol (W1)
-      stress_multiplier: 2.0      # vorab, nie selbst gemessen
-      measured:
-        rho_f: <float>                        # gemessenes rho_f (BTC-Wochenautokorrelation, W1)
-        factor_share: <float>                 # gemessener Faktoranteil (Median Querschnitts-R^2, W1)
-        beta_sd_calibrated: <float>            # bisektionell kalibriert (nulls.calibrate_beta_sd_to_observed_share)
-        beta_sd_analytic_first_guess: <float>  # geschlossene Formel, report-only (nulls.true_beta_sd_from_factor_share)
-      stress:
-        rho_f: <float>                        # 2x measured.rho_f
-        factor_share: <float>                 # 2x measured.factor_share
-        beta_sd_calibrated: <float>            # EIGENE Kalibrierungssuche (anderes Ziel)
-        beta_sd_analytic_first_guess: <float>
+    data_fingerprints:                                       # DEC-87 V9: gegen das geladene Panel geprueft
+      union_range_fingerprint: <sha256>
+      delisting_dates_sha256: <sha256>
     rules:
       seed: 53
-      n_reps: 1000            # bootstrap/permutation/factor-null reps, >= 1000 (DEC-75/76)
+      n_reps: 1000            # Faktor-Null-Replikate, >= 1000 und gleich n_reps_beta_control_winner des Vorlaufs
       block_len: 4            # FIXED DEC-75 constant, recorded for audit only (code hardcodes 4)
       level: 0.9936           # one-sided CI/quantile level (1 - 0.0064)
-      bh_alpha: 0.10           # report-only BH-FDR alpha (DEC-75 Entscheidung 1 (6))
+      bh_alpha: 0.10           # report-only BH-FDR alpha (DEC-75 Entscheidung 1 (6)); Nenner fest 7
 
-  * ``res_quantile_drifting``/``ceiling_driftfree_res`` are the DEC-76
-    Entscheidung 1 (b)/(c) FROZEN null constants -- ``--run`` RECOMPUTES
-    both on the real K series/``W_judged`` (seed 53, ``rules.n_reps``
-    reps) and asserts each is within +/-10% of these frozen values
-    (``run.assert_null_calibration``), else loud fail ("Null-Kalibrierung
-    weicht ab", no verdict for ANY hypothesis in the run) -- see
-    ``run.py``'s module docstring. Omitting them (a pre-DEC-76 registered
-    file) skips the assertion and falls back to the recomputed value,
-    documented, not a registered Drittfassung run.
-
-  * ``calibration`` (DEC-78 Entscheidung 1, revised by its Nachtrag)
-    supplies the "stress" null's ``rho_f``/``beta_sd`` for THAT
-    recomputation, READ DIRECTLY, NO re-search at run time:
-    ``rho_f = calibration.stress.rho_f``, ``beta_sd = calibration.
-    stress.beta_sd_calibrated`` -- ONE global pair (from the prelaunch
-    artifact's own bisection search, ``nulls.calibrate_beta_sd_to_
-    observed_share``), applied identically to BOTH W1 and W2 (same
-    convention as DEC-75's own single global ``rho_f=0.2``). Omitting it
-    (a pre-DEC-78 registered file) falls back to that OLD hardcoded
-    stress null (``rho_f=0.2``, beta ~ ``U(0.5, 2.0)``), documented, not
-    a registered Drittfassung run -- the pair actually used is echoed in
-    the run report's ``calibration_used_for_stress_null``.
+  * ``ceiling_method_stress`` / ``res_quantile_driftfree`` / ``res_quantile_drifting`` sind die EINGEFRORENEN
+    Null-Konstanten (DEC-87 (A)/(E)): ``--run`` RECHNET sie auf der realen K-Reihe/``W_judged`` nach
+    (``nulls.run_configuration_null``: registrierte Methode, ``windows.<W>.calibration.stress``, Seed 53,
+    ``rules.n_reps``, driftfrei UND 0,002/Woche) und bricht laut ab, wenn eine mehr als +-10 % abweicht
+    ("Null-Kalibrierung weicht ab", KEIN VERDIKT fuer keine Hypothese) -- ``run.assert_null_calibration``.
+    Bindend fuer die Beta-Kontrolle ist je Variante/Fenster das in Hypothesenrichtung extremere der beiden
+    Quantile. Der alte Schluessel ``ceiling_driftfree_res`` (TS-Residualisierung) und ein globaler
+    ``calibration``-Block werden abgewiesen (C.14).
 
   python scripts/wp13_xsec.py --emit-registered-template \
       scinance3-impl/state/wp13a_YYYYMMDD/wp13a_prelaunch.json \
       scinance3-impl/state/wp13a_YYYYMMDD/registered_template.yaml
 
-liest EINEN ``--prelaunch``-Artefakt (DEC-78 Vorlauf v5 oder spaeter) und
-schreibt genau das obige YAML-Skelett (``ic_min_capped``, ``w_judged``,
-``res_quantile_drifting`` aus ``factor_preserving_null.drifting``,
-``ceiling_driftfree_res`` aus ``factor_preserving_null.driftfree``,
-``calibration`` aus W1's ``beta_control_method_study.calibrations.
-{measured, stress}`` (DEC-78 Entscheidung 1/Nachtrag, ein EINZELNER
-globaler Satz fuer beide Fenster, ``beta_sd_calibrated`` = die eigene
-Bisektions-Suche des Vorlaufs, NIE hier neu berechnet, siehe ``run.
-REGISTERED_SCHEMA_HINT``), plus ``rules``) fuer W1/W2 -- die Drittfassung
-zitiert den sha256 dieser
-Ausgabedatei (geloggt) als ihren ``--registered-sha256``-Wert. Die
-``hypotheses``-Zuordnung (welche Variante zu H-28/H-29/H-30 gehoert) ist
-NICHT im Vorlauf enthalten und wird als PRD-5.3-Standardbelegung
-(H-28=mom1 positiv, H-29=rev_gap negativ, H-30=vol_rv negativ/
-vol_weighted) vorbelegt -- vom Orchestrator vor der Registrierung zu
-pruefen/anzupassen, nie automatisch scharf geschaltet.
+liest EINEN ``--prelaunch``-Artefakt (Vorlauf v5e / DEC-87 oder spaeter) und schreibt das obige YAML-Skelett:
+je Fenster ``ic_min_capped``, ``w_judged``, ``calibration.{measured,stress,zero}`` aus dem
+``beta_control_method_study`` DES FENSTERS, ``ceiling_method_stress`` und beide Quantil-Mengen aus
+``frozen_null_constants`` (Gewinner-Bestaetigung), ``beta_control.method`` aus der BESTAETIGTEN Empfehlung
+(``beta_control_confirmation``; keine bestaetigt -> leer), sieben Eintraege ``H-28_mom1`` ... ``H-30_vol_beta``
+(``vol_beta`` vorab ``gl012_pre_run`` nach DEC-87 (H); alle H-30-Eintraege ``gl012_pre_run``, wenn die
+H-30-Feasibility in Wocheneinheiten verfehlt ist, DEC-87 (G)), ``data_fingerprints`` und ``rules``. Die
+Zuordnung C.10/GL-012 nach Power (DEC-87 (F)) wird hier NICHT vorgenommen -- sie ist Sache des Orchestrators,
+mechanisch auf diesen Zahlen. Die Drittfassung zitiert den sha256 dieser Ausgabedatei (geloggt) als ihren
+``--registered-sha256``-Wert.
 """
 from __future__ import annotations
 
@@ -120,11 +96,31 @@ import yaml
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
 from bybit_edge.research.wp7_universe import panel_load, panel_store  # noqa: E402
-from bybit_edge.research.wp13_xsec import characteristics, nulls, prelaunch, run as run_mod  # noqa: E402
+from bybit_edge.research.wp13_xsec import characteristics, ic, nulls, prelaunch, run as run_mod  # noqa: E402
 
 
 def log(msg: str) -> None:
     print(msg, file=sys.stderr, flush=True)
+
+
+def data_fingerprints(a: argparse.Namespace, panel: dict, delisted_base: Path,
+                      delisting_dates_path: Path, as_of: date) -> dict:
+    """DEC-87 (V9): the two fingerprints of the panel actually loaded -- the UNION range fingerprint
+    (``panel_load.union_range_fingerprint``: survivors tree + delisted tree + symbol set, for the year range and
+    ``as_of`` of the load) and the sha256 of ``delisting_dates.json``. ``--prelaunch`` reports them, ``--run``
+    checks them against the registered YAML's ``data_fingerprints``. Read-only."""
+    surv_syms = [sym for sym, dl in zip(panel["symbols"], panel["is_delisted"]) if not dl]
+    fp = panel_load.union_range_fingerprint(
+        a.panel_base, delisted_base, surv_syms, panel["delisted_symbols"],
+        year_start=a.start_year, year_end=a.end_year, as_of=as_of)
+    return {
+        "union_range_fingerprint": fp["sha256"],
+        "delisting_dates_sha256": panel_load.sha256_file(delisting_dates_path),
+        "union_range_detail": {"year_range": fp["year_range"], "n_partitions": fp["n_partitions"],
+                               "survivors_fingerprint": fp["survivors_fingerprint"],
+                               "delisted_fingerprint": fp["delisted_fingerprint"],
+                               "n_symbols": len(fp["symbols"]), "as_of": as_of.isoformat()},
+    }
 
 
 def cmd_prelaunch(a: argparse.Namespace) -> int:
@@ -160,6 +156,9 @@ def cmd_prelaunch(a: argparse.Namespace) -> int:
     log("[2/4] Woechentliche Renditen + PIT-Alive-Maske (Union)")
     weekly = panel_load.weekly_returns_and_mask_union(panel, panel["last_alive_day"])
     log(f"  {len(weekly['weeks'])} Wochen ({weekly['weeks'][0]}..{weekly['weeks'][-1]})")
+    fingerprints = data_fingerprints(a, panel, delisted_base, delisting_dates_path, as_of)
+    log(f"  Daten-Fingerprints (DEC-87 V9): union_range={fingerprints['union_range_fingerprint']} "
+        f"delisting_dates={fingerprints['delisting_dates_sha256']}")
 
     log(f"[3/4] Vorlauf-Report zusammenstellen (n_sims={a.n_sims}, seed={a.seed}, "
         f"convention={a.convention}) -- KEINE reale Signal-Outcome-IC")
@@ -176,7 +175,8 @@ def cmd_prelaunch(a: argparse.Namespace) -> int:
         gegenprobe_market_check=not a.no_gegenprobe_market_check,
         calibration_search_n_reps=a.calibration_search_n_reps,
         calibration_search_rel_tol=a.calibration_search_rel_tol,
-        calibration_search_max_iter=a.calibration_search_max_iter)
+        calibration_search_max_iter=a.calibration_search_max_iter,
+        data_fingerprints=fingerprints)
 
     for name in ("W1", "W2", "L"):
         w = report["windows"].get(name, {})
@@ -187,6 +187,8 @@ def cmd_prelaunch(a: argparse.Namespace) -> int:
             f"{w['delisting']['n_symbol_weeks_delisting']}, Gate(5) erreichbar="
             f"{w['gate5_reachability']['gate5_reachable']}")
 
+    conf = report.get("beta_control_confirmation") or {}
+    log(f"  Gewinner-Bestaetigung (DEC-87): {conf.get('note')}")
     log("[4/4] DEC-53-Artefakte schreiben")
     out_dir = Path(a.out)
     artifacts = prelaunch.write_prelaunch_artifacts(out_dir, report)
@@ -203,7 +205,14 @@ def cmd_run(a: argparse.Namespace) -> int:
     Refuses (rc=1, loud, C.14) unless ``--registered-sha256`` matches the
     sha256 of the ``--registered`` YAML -- this check happens BEFORE a
     single byte of the real panel is loaded, so a mismatched/omitted hash
-    can NEVER reach a real characteristic-vs-real-outcome computation."""
+    can NEVER reach a real characteristic-vs-real-outcome computation.
+
+    DEC-87: after the lock the registered YAML is validated against the schema (per-window calibration, renamed
+    ceiling, locked entries; C.14) BEFORE the panel is read; the loaded panel's union-range fingerprint and
+    ``delisting_dates.json`` sha256 are checked against ``data_fingerprints`` (V9); the artifacts (raw AND
+    residualised weekly IC series, replicate/generator fingerprints) are written and verified BEFORE any verdict
+    is logged or written -- every :class:`run.RunAbort` (null calibration drifted, fingerprint mismatch, missing
+    mandatory artifact) ends the run with rc=1 and KEIN VERDIKT."""
     registered_path = Path(a.registered)
     if not registered_path.is_file():
         log(f"FEHLER: keine registrierte Datei unter {registered_path}")
@@ -234,6 +243,14 @@ def cmd_run(a: argparse.Namespace) -> int:
         log(f"FEHLER: kein delistetes Manifest unter {delisted_manifest}.")
         return 1
 
+    # DEC-87 pre-flight (C.14): schema errors surface before a single panel byte is read.
+    try:
+        registered = run_mod.load_registered_yaml(registered_path)
+        run_mod.validate_registered(registered, require_frozen_constants=True)
+    except (ValueError, yaml.YAMLError) as exc:           # RegisteredSchemaError is a ValueError
+        log(f"FEHLER (registered YAML, DEC-87): {exc}\nKEIN VERDIKT.")
+        return 1
+
     as_of = date.fromisoformat(a.as_of) if a.as_of else date.today()
     log(f"[1/4] Union-Panel laden (as_of={as_of.isoformat()})")
     symbols = panel_load.load_panel_symbols(manifest)
@@ -248,52 +265,71 @@ def cmd_run(a: argparse.Namespace) -> int:
         return 1
     log(f"  {len(panel['symbols'])} Symbole, {len(panel['dates'])} Tage.")
 
-    log("[2/4] Woechentliche Renditen + PIT-Alive-Maske (Union)")
+    log("[2/4] Woechentliche Renditen + PIT-Alive-Maske (Union), Daten-Fingerprints")
     weekly = panel_load.weekly_returns_and_mask_union(panel, panel["last_alive_day"])
     log(f"  {len(weekly['weeks'])} Wochen ({weekly['weeks'][0]}..{weekly['weeks'][-1]})")
+    observed = data_fingerprints(a, panel, delisted_base, delisting_dates_path, as_of)
+    log(f"  union_range={observed['union_range_fingerprint']} delisting_dates={observed['delisting_dates_sha256']}")
 
-    log("[3/4] Registrierte Schwellen-Datei laden")
-    registered = run_mod.load_registered_yaml(registered_path)
+    log("[3/4] Registrierte Schwellen-Datei geladen und validiert (siehe oben)")
 
-    log("[4/4] Lauf-Pipeline (DEC-75 Entscheidung 1 (1)-(7))")
-    report = run_mod.run_full(panel, weekly, registered, convention=a.convention)
-    for hyp, res in report["results"].items():
-        log(f"  {hyp} ({res['payload']['variant']}): {res['verdict']['verdict']} "
-            f"labels={res['verdict']['labels']}")
-
+    log("[4/4] Lauf-Pipeline (DEC-75 Entscheidung 1 (1)-(7), DEC-87)")
     out_dir = Path(a.out)
-    artifacts = run_mod.write_run_artifacts(out_dir, report)
+    try:
+        report = run_mod.run_full(panel, weekly, registered, convention=a.convention,
+                                  observed_fingerprints=observed, registered_sha256=actual_sha256)
+        # DEC-53: artifacts FIRST (and verified) -- no verdict is logged or written without them.
+        artifacts = run_mod.write_run_artifacts(out_dir, report, require_data_fingerprints=True)
+    except (run_mod.RunAbort, ValueError) as exc:     # ValueError: C.14 loud fails (beta_control, schema)
+        log(f"FEHLER ({type(exc).__name__}): {exc}\nKEIN VERDIKT.")
+        return 1
+    for entry_id, res in report["results"].items():
+        log(f"  {entry_id} ({res['variant']}): {res['verdict']['verdict']} labels={res['verdict']['labels']}")
+    for hyp, hv in report["hypothesis_verdicts"].items():
+        log(f"  => {hyp}: {hv['verdict']} (Varianten PASS: {hv['variants_pass']}; gesperrt: {hv['variants_locked']})")
     for name, art in artifacts["artifacts"].items():
         log(f"  {name}: {art['path']} sha256={art['sha256']}")
     log(f"Report geschrieben: {out_dir}")
     return 0
 
 
+#: DEC-87 (H): vol_beta is locked BEFORE the run -- the registered fm_neutral beta control regresses the
+#: outcome on exactly this beta, the residual is linearly orthogonal to the characteristic.
+VOL_BETA_LOCK_REASON = ("strukturell durch die registrierte Beta-Kontrolle neutralisiert (C.4; DEC-87 (H)): "
+                        "fm_neutral_8w regressiert das Outcome auf genau dieses Beta")
+
+#: PRD 5.3 defaults (hypothesis, direction, outcome) of the seven F-XSEC1 entries, DEC-87 (J).
+ENTRY_DEFAULTS: tuple[tuple[str, str, str, str, str | None], ...] = (
+    ("H-28_mom1", "H-28", "mom1", "positive", None),
+    ("H-28_mom2", "H-28", "mom2", "positive", None),
+    ("H-28_mom4", "H-28", "mom4", "positive", None),
+    ("H-29_rev_gap", "H-29", "rev_gap", "negative", None),
+    ("H-30_vol_rv", "H-30", "vol_rv", "negative", "vol_weighted"),
+    ("H-30_vol_max", "H-30", "vol_max", "negative", "vol_weighted"),
+    ("H-30_vol_beta", "H-30", "vol_beta", "negative", "vol_weighted"),
+)
+
+
 def cmd_emit_registered_template(prelaunch_json_path: str, out_yaml_path: str) -> int:
-    """DEC-76 Task A item 4, extended by DEC-78 Entscheidung 1/Nachtrag:
-    reads a ``--prelaunch`` artifact (DEC-76 Vorlauf v3 or later -- needs
-    ``factor_preserving_null.{drifting, driftfree}``) and writes the
-    registered-YAML SKELETON (``run.REGISTERED_SCHEMA_HINT``'s shape) --
-    ``ic_min_capped``/``w_judged`` from ``noise_floor_and_threshold``,
-    ``res_quantile_drifting`` from ``factor_preserving_null.drifting.
-    variants.<v>.quantile_one_sided_residualized``, ``ceiling_driftfree_
-    res`` from ``factor_preserving_null.driftfree.selection_ceiling_mean_
-    of_max_residualized`` -- for W1/W2. ``calibration`` (DEC-78
-    Entscheidung 1/Nachtrag) is taken from W1's ``beta_control_method_
-    study.calibrations.{measured, stress}`` ONLY (a SINGLE global block,
-    applied identically to both windows' stress-null recomputation, the
-    same single-global-constant convention DEC-75's own ``rho_f=0.2``
-    used) -- ``beta_sd_calibrated`` is the artifact's OWN bisection-
-    search result (never re-derived here); ``{}`` if the artifact
-    predates DEC-78/its Nachtrag or W1 is unavailable. DEC-81: contract
-    unchanged -- only ``rho_f``/``target_factor_share``/``beta_sd_calibrated``/
-    ``beta_sd_analytic_first_guess`` and the study's sigmas are read, never
-    the Gegenprobe/search diagnostics (``z``, ``se_diff``,
-    ``achieved_share_se``, ``calibration_mask_k_median``), which stay in
-    the artifact. Never registers
-    anything itself (no sha256 check here) -- the Orchestrator reviews
-    the written file, then cites ITS sha256 (logged below) in the
-    Drittfassung."""
+    """DEC-76 Task A item 4, reworked by DEC-87 (D)/(A)/(E)/(J): reads a ``--prelaunch`` artifact (Vorlauf v5e or
+    later) and writes the registered-YAML SKELETON (``run.REGISTERED_SCHEMA_HINT``'s shape), per window W1/W2:
+
+      * ``ic_min_capped``/``w_judged`` from ``noise_floor_and_threshold``;
+      * ``calibration.{measured, stress, zero}`` = ``{rho_f, beta_sd_calibrated, target_factor_share}`` from THAT
+        window's own ``beta_control_method_study.calibrations`` (DEC-86 / DEC-87 (D) -- the pre-DEC-87 global
+        W1-sourced block is gone), the artifact's own bisection result, never re-derived here;
+      * ``ceiling_method_stress``, ``res_quantile_driftfree``, ``res_quantile_drifting`` from the window's
+        ``frozen_null_constants`` (the Vorlauf's winner section, produced by ``nulls.run_configuration_null`` --
+        the very configuration ``--run`` recomputes), ``None`` placeholders if no method was confirmed.
+
+    ``beta_control.method``/``beta_window_weeks`` are filled from the artifact's CONFIRMED recommendation
+    (``beta_control_confirmation``, DEC-87 V1 Bindung) -- left empty if none was confirmed (the run then loud-fails
+    on the empty method). Seven entries ``H-28_mom1`` ... ``H-30_vol_beta`` (DEC-87 (J)); ``vol_beta`` is written as
+    ``status: gl012_pre_run`` (H), and all three H-30 entries are when the Vorlauf's H-30 feasibility in weekly
+    units is violated (``h30_feasibility_weekly_units``: Spread/Kante or SE/Kante > 0.5, DEC-74 (h)/DEC-87 (G)).
+    ``data_fingerprints`` and ``rules.n_reps`` (= the winner replicates that froze the constants) are copied from
+    the artifact. Never registers anything itself (no sha256 check here) -- the Orchestrator reviews the written
+    file (incl. the power assignment (F), NOT done here), then cites ITS sha256 (logged below) in the Drittfassung."""
     in_path = Path(prelaunch_json_path)
     out_path_check = Path(out_yaml_path)
     if "data/harvest" in out_path_check.as_posix():
@@ -312,84 +348,94 @@ def cmd_emit_registered_template(prelaunch_json_path: str, out_yaml_path: str) -
             log(f"  Fenster {wname}: nicht verfuegbar im Vorlauf-Artefakt -- uebersprungen.")
             continue
         nf = w.get("noise_floor_and_threshold", {})
-        fp = w.get("factor_preserving_null", {})
-        drifting, driftfree = fp.get("drifting", {}), fp.get("driftfree", {})
-        res_quantile_drifting = {
-            v: drifting.get("variants", {}).get(v, {}).get("quantile_one_sided_residualized")
-            for v in variants
-        }
+        fz = w.get("frozen_null_constants") or {}
+        cals = (w.get("beta_control_method_study") or {}).get("calibrations", {})
+
+        def _cal_block(c: dict) -> dict:
+            return {"rho_f": c.get("rho_f"), "beta_sd_calibrated": c.get("beta_sd_calibrated"),
+                    "target_factor_share": c.get("target_factor_share")}
+
         windows_out[wname] = {
             "start": w["start"], "end": w["end"],
             "ic_min_capped": nf.get("ic_min_capped_per_variant", {}),
             "w_judged": nf.get("w_judged"),
-            "res_quantile_drifting": res_quantile_drifting,
-            "ceiling_driftfree_res": driftfree.get("selection_ceiling_mean_of_max_residualized"),
+            "calibration": {cal: _cal_block(cals[cal]) for cal in ("measured", "stress", "zero") if cal in cals},
+            "ceiling_method_stress": fz.get("ceiling_method_stress"),
+            "res_quantile_driftfree": fz.get("res_quantile_driftfree") or {v: None for v in variants},
+            "res_quantile_drifting": fz.get("res_quantile_drifting") or {v: None for v in variants},
         }
-    if "L" in report.get("windows", {}):
-        wl = report["windows"]["L"]
-        if wl.get("available") and "start" in wl and "end" in wl:
-            windows_out["L"] = {"start": wl["start"], "end": wl["end"]}
+    wl = report.get("windows", {}).get("L") or {}
+    if wl.get("available"):
+        # the open JSON replaces the L window by a pointer to its sealed file (no start/end), so the
+        # descriptive L entry takes the registered L calendar (prelaunch.WINDOWS) -- never judged, no IC here.
+        windows_out["L"] = {"start": wl.get("start", prelaunch.WINDOWS["L"][0]),
+                            "end": wl.get("end", prelaunch.WINDOWS["L"][1])}
 
-    # DEC-78 Entscheidung 1/Nachtrag: the SINGLE global calibration block, taken from W1's
-    # beta_control_method_study.calibrations.{measured, stress} only -- {} (never a fabricated
-    # value) if the artifact predates DEC-78/its Nachtrag or W1 is unavailable; run.py's
-    # calibration_cfg check treats {} the same as an absent key (falls back to the pre-DEC-78
-    # hardcoded stress null, documented). beta_sd_calibrated is the artifact's OWN bisection
-    # search result -- NEVER re-derived/re-searched here.
-    calibration_block: dict = {}
-    w1 = report.get("windows", {}).get("W1")
-    if w1 and w1.get("available") and "beta_control_method_study" in w1:
-        study = w1["beta_control_method_study"]
-        cals = study.get("calibrations", {})
-        if "measured" in cals and "stress" in cals:
-            def _cal_block(c: dict) -> dict:
-                return {
-                    "rho_f": c.get("rho_f"), "factor_share": c.get("target_factor_share"),
-                    "beta_sd_calibrated": c.get("beta_sd_calibrated"),
-                    "beta_sd_analytic_first_guess": c.get("beta_sd_analytic_first_guess"),
-                }
-            calibration_block = {
-                "sigma_f": study.get("sigma_f"), "sigma_e": study.get("sigma_e_used"),
-                "stress_multiplier": study.get("stress_multiplier", 2.0),
-                "measured": _cal_block(cals["measured"]), "stress": _cal_block(cals["stress"]),
-            }
+    conf = report.get("beta_control_confirmation") or {}
+    confirmed = conf.get("confirmed_method")
+    beta_control = ({"method": confirmed, "beta_window_weeks": ic.beta_control_trail_weeks(confirmed)}
+                    if confirmed else {"method": "", "beta_window_weeks": None})
 
-    # DEC-77 Entscheidung 2: beta_control.method/beta_window_weeks are EMPTY (never
-    # auto-filled from the prelaunch artifact's own recommendation) -- the orchestrator
-    # must read the artifact's beta_control_recommendation and fill these in deliberately;
-    # run.run_full loud-fails if either is still empty at --run time.
-    rec = report.get("beta_control_recommendation", {})
-    recommended = rec.get("recommended_method")
-    template = {
-        "hypotheses": {
-            "H-28": {"variant": "mom1", "direction": "positive"},
-            "H-29": {"variant": "rev_gap", "direction": "negative"},
-            "H-30": {"variant": "vol_rv", "direction": "negative", "outcome": "vol_weighted"},
-        },
+    h30 = report.get("h30_feasibility_weekly_units")
+    h30_lock_reason = None
+    if h30:
+        rs, rse = h30.get("spread_d10_minus_d1_over_kante"), h30.get("se_drag_over_kante")
+        finite = all(isinstance(x, (int, float)) and x == x for x in (rs, rse))
+        if finite and (rs > 0.5 or rse > 0.5):
+            h30_lock_reason = (f"H-30-Feasibility in Wocheneinheiten verfehlt: Spread(D10-D1)/Kante={rs:.3f}, "
+                               f"SE(sigma_w^2/2)/Kante={rse:.3f}, Grenze 0,5 (DEC-74 (h), DEC-87 (G)); K bleibt 7")
+    hypotheses: dict[str, dict] = {}
+    for entry_id, hyp, variant, direction, outcome in ENTRY_DEFAULTS:
+        entry: dict = {"hypothesis": hyp, "variant": variant, "direction": direction}
+        if outcome:
+            entry["outcome"] = outcome
+        reasons = []
+        if variant == "vol_beta":
+            reasons.append(VOL_BETA_LOCK_REASON)
+        if hyp == "H-30" and h30_lock_reason:
+            reasons.append(h30_lock_reason)
+        if reasons:
+            entry["status"] = "gl012_pre_run"
+            entry["reason"] = "; ".join(reasons)
+        hypotheses[entry_id] = entry
+
+    template: dict = {
+        "hypotheses": hypotheses,
         "windows": windows_out,
-        "beta_control": {"method": "", "beta_window_weeks": None},
-        "calibration": calibration_block,
-        "rules": {"seed": 53, "n_reps": 1000, "block_len": 4, "level": 0.9936, "bh_alpha": 0.10},
+        "beta_control": beta_control,
+        "rules": {"seed": 53, "n_reps": int(report.get("n_reps_beta_control_winner") or 1000),
+                  "block_len": 4, "level": 0.9936, "bh_alpha": 0.10},
     }
+    fps = report.get("data_fingerprints")
+    if isinstance(fps, dict) and "union_range_fingerprint" in fps and "delisting_dates_sha256" in fps:
+        template["data_fingerprints"] = {"union_range_fingerprint": fps["union_range_fingerprint"],
+                                         "delisting_dates_sha256": fps["delisting_dates_sha256"]}
 
     out_path = Path(out_yaml_path)
     out_path.parent.mkdir(parents=True, exist_ok=True)
-    rec_comment = (f"# DEC-77 Hinweis (kein Auto-Fuellen): Vorlauf-Empfehlung war {recommended!r} "
-                   f"(beta_window_weeks={rec.get('beta_window_weeks')!r}).\n"
-                   if recommended else
-                   "# DEC-77 Hinweis: der Vorlauf hat KEINE Methode empfohlen (siehe Artefakt) -- "
-                   "beta_control.method bleibt leer, kein Lauf ohne Orchestrator-Entscheidung.\n")
-    out_path.write_text(
-        "# DEC-76 Task A item 4: automatisch aus einem --prelaunch-Artefakt erzeugtes Skelett.\n"
-        "# hypotheses: NICHT automatisch geprueft -- Orchestrator bestaetigt vor der Registrierung.\n"
-        "# beta_control.method/beta_window_weeks: LEER, Orchestrator-Pflicht vor der Registrierung "
-        "(DEC-77 Entscheidung 2) -- run.py schlaegt laut fehl, wenn method beim --run leer ist.\n"
-        + rec_comment
-        + yaml.safe_dump(template, sort_keys=False, allow_unicode=True),
-        encoding="utf-8")
+    header = ["# DEC-76 Task A item 4 / DEC-87: automatisch aus einem --prelaunch-Artefakt erzeugtes Skelett.",
+              "# Kalibrierung JE FENSTER (DEC-87 (D)); Konstanten aus dem Gewinner-Abschnitt des Vorlaufs (DEC-87 (A)/(E)).",
+              "# hypotheses: sieben Eintraege (J). NICHT automatisch geprueft -- Orchestrator bestaetigt, ordnet C.10/GL-012 "
+              "nach Power zu (F) und registriert."]
+    if confirmed:
+        header.append(f"# beta_control.method aus der BESTAETIGTEN Empfehlung ({confirmed!r}, DEC-87 V1 Bindung): {conf.get('note')}")
+    else:
+        header.append("# WARNUNG: KEINE Methode bestaetigt (" + str(conf.get("note", "Artefakt ohne Bestaetigung"))
+                      + ") -- beta_control.method bleibt leer, run.py schlaegt laut fehl (DEC-77 E1 (c)).")
+    if h30_lock_reason:
+        header.append("# H-30 mechanisch gesperrt: " + h30_lock_reason)
+    elif not h30:
+        header.append("# HINWEIS: Artefakt ohne h30_feasibility_weekly_units -- H-30-Sperre (G) nicht beurteilt.")
+    if "data_fingerprints" not in template:
+        header.append("# WARNUNG: Artefakt ohne data_fingerprints (DEC-87 V9) -- ohne diesen Block lehnt --run ab.")
+    if template["rules"]["n_reps"] < 1000:
+        header.append(f"# WARNUNG: rules.n_reps={template['rules']['n_reps']} < 1000 (Vorlauf mit weniger Replikaten).")
+    out_path.write_text("\n".join(header) + "\n" + yaml.safe_dump(template, sort_keys=False, allow_unicode=True),
+                        encoding="utf-8")
     log(f"Quelle: {in_path} sha256={panel_load.sha256_file(in_path)}")
     log(f"Registrierungs-Vorlage geschrieben: {out_path} sha256={panel_load.sha256_file(out_path)}")
-    log("Pruefung Pflicht: hypotheses-Zuordnung, beta_control und alle Werte vor der Registrierung bestaetigen.")
+    log("Pruefung Pflicht: hypotheses-Zuordnung (inkl. Power-Zuordnung F), beta_control und alle Werte vor der "
+        "Registrierung bestaetigen.")
     return 0
 
 
@@ -402,9 +448,11 @@ def main() -> int:
                           "und --registered-sha256.")
     ap.add_argument("--emit-registered-template", nargs=2, default=None,
                      metavar=("PRELAUNCH_JSON", "OUT_YAML"),
-                     help="DEC-76 Task A item 4: liest einen --prelaunch-Artefakt und schreibt das "
-                          "Registrierungs-YAML-Skelett (ic_min_capped, w_judged, res_quantile_drifting, "
-                          "ceiling_driftfree_res, rules) nach OUT_YAML -- kein Panel-Zugriff, kein Lauf.")
+                     help="DEC-76 Task A item 4 / DEC-87: liest einen --prelaunch-Artefakt und schreibt das "
+                          "Registrierungs-YAML-Skelett (ic_min_capped, w_judged, calibration je Fenster, "
+                          "ceiling_method_stress, res_quantile_driftfree/-drifting, beta_control aus der "
+                          "bestaetigten Empfehlung, sieben Eintraege, data_fingerprints, rules) nach OUT_YAML "
+                          "-- kein Panel-Zugriff, kein Lauf.")
     ap.add_argument("--registered", default="",
                      help="Pfad zur registrierten Schwellen-YAML (Drittfassung).")
     ap.add_argument("--registered-sha256", default="",

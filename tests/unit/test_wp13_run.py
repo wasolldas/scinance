@@ -190,14 +190,85 @@ def test_beta_control_quantile_absent_is_backward_compatible():
     assert v["per_window"]["W1"]["beta_control_beyond_drifting_null_ok"] is True
 
 
-def test_liquidity_and_bounce_labels_do_not_change_verdict():
-    payload = _conserved_payload()
-    payload["liquidity_ic_without_d1"] = -0.5 * payload["windows"]["W1"]["ic_min_capped"] - 0.001
-    payload["bounce_ic"] = payload["windows"]["W1"]["mean_ic"] + 0.01
+def test_liquidity_label_does_not_change_verdict_but_bounce_does():
+    """DEC-87 (I) (formerly ``test_liquidity_and_bounce_labels_do_not_change_verdict``, which pinned the
+    pre-DEC-87 behaviour): (1) the Liquiditaets-Etikett is verdict-neutral and fires when ``IC_ohne_D1,W``
+    is NOT beyond half of that window's IC_min (for a negative registration ``> -0.5*IC_min``) in at least one
+    window; (2) the bounce rule is a KILL again (DEC-75 (5): "Etikett Artefakt, KEIN PASS"): ``|IC_bounce,W| >=
+    |IC_W|`` in any window -> no PASS."""
+    payload = _conserved_payload()                      # positive registration, PASS baseline
+    # positive direction: IC_ohne_D1 below +0.5*IC_min in W1 -> the effect did not survive -> label, verdict stays
+    payload["liquidity_ic_without_d1"] = {"W1": 0.5 * payload["windows"]["W1"]["ic_min_capped"] - 0.001,
+                                          "W2": 0.04}
     v = gates.evaluate(payload)
-    assert v["verdict"] == "PASS"
+    assert v["verdict"] == "PASS" and v["liquidity_label"] is True and v["liquidity_windows"] == ["W1"]
     assert any("Illiquiditaets-Artefakt" in l for l in v["labels"])
-    assert any("Bounce" in l for l in v["labels"])
+    # an effect that survives in both windows -> no label
+    payload["liquidity_ic_without_d1"] = {"W1": 0.04, "W2": 0.04}
+    assert gates.evaluate(payload)["liquidity_label"] is False
+    # bounce: |IC_bounce,W2| >= |IC_W2| -> not PASS although W1's bounce is harmless
+    payload = _conserved_payload()
+    payload["bounce_ic"] = {"W1": 0.001, "W2": payload["windows"]["W2"]["mean_ic"] + 0.01}
+    v = gates.evaluate(payload)
+    assert v["verdict"] == "DROP" and v["bounce_kill"] is True and v["bounce_windows"] == ["W2"]
+    assert any("Artefakt Bounce in W2" in l and "KEIN PASS" in l for l in v["labels"])
+    assert all(r["window_pass"] for r in v["per_window"].values())      # every other component still passes
+
+
+def test_liquidity_and_bounce_labels_do_not_change_verdict():
+    """DEC-87: kept under its old id (it pinned the pre-DEC-87 "labels only" behaviour for BOTH rules). The contract
+    changed: the liquidity label still leaves the verdict alone, the bounce rule is a KEIN-PASS again -- see
+    :func:`test_liquidity_label_does_not_change_verdict_but_bounce_does`, which this id now delegates to."""
+    test_liquidity_label_does_not_change_verdict_but_bounce_does()
+
+
+def test_liquidity_label_direction_negative_and_old_inverted_condition_is_gone():
+    """DEC-87 (I): for H-29 (negative) the label fires at ``IC_ohne_D1 > -0.5*IC_min`` -- the pre-DEC-87
+    code labelled exactly the OPPOSITE case (``<= -0.5*IC_min``, i.e. the effect surviving) and only in W1."""
+    payload = _conserved_payload()
+    payload["hypothesis"], payload["variant"], payload["direction"] = "H-29", "rev_gap", "negative"
+    for w in payload["windows"].values():
+        for k in ("mean_ic", "ci_bound_toward_sign", "residualized_mean_ic", "res_quantile_drifting"):
+            w[k] = -w[k]
+    survives = {wn: -0.5 * w["ic_min_capped"] - 0.001 for wn, w in payload["windows"].items()}
+    payload["liquidity_ic_without_d1"] = survives
+    assert gates.evaluate(payload)["liquidity_label"] is False           # old code labelled this case
+    payload["liquidity_ic_without_d1"] = {"W1": survives["W1"], "W2": -0.5 * payload["windows"]["W2"]["ic_min_capped"] + 0.001}
+    v = gates.evaluate(payload)
+    assert v["liquidity_label"] is True and v["liquidity_windows"] == ["W2"]   # W2 only: not a W1-only rule
+    assert v["verdict"] == "PASS"
+
+
+def test_gate5_component_blocks_pass_and_fails_closed_on_nan():
+    """DEC-87 Gate (5): ``gate5_median_spearman`` must be < 0.60 in each window; absent = not applicable; NaN
+    fails closed."""
+    payload = _conserved_payload()
+    assert gates.evaluate(payload)["verdict"] == "PASS"                    # absent -> not applicable
+    payload["windows"]["W1"]["gate5_median_spearman"] = 0.15
+    payload["windows"]["W2"]["gate5_median_spearman"] = 0.142
+    assert gates.evaluate(payload)["verdict"] == "PASS"
+    payload["windows"]["W2"]["gate5_median_spearman"] = 0.61
+    v = gates.evaluate(payload)
+    assert v["verdict"] == "DROP" and v["per_window"]["W2"]["gate5_ok"] is False
+    assert any("Gate (5) verfehlt in W2" in l for l in v["labels"])
+    payload["windows"]["W2"]["gate5_median_spearman"] = float("nan")
+    assert gates.evaluate(payload)["per_window"]["W2"]["gate5_ok"] is False
+
+
+def test_binding_quantile_is_the_more_extreme_of_driftfree_and_drifting():
+    """DEC-87 (E): the gate judges against ``res_quantile_binding`` (more extreme in the hypothesis direction);
+    the pre-DEC-87 key ``res_quantile_drifting`` alone is still honoured (backward compatible)."""
+    assert nulls.binding_quantile(0.020, 0.025, "positive") == 0.025
+    assert nulls.binding_quantile(0.020, 0.015, "positive") == 0.020
+    assert nulls.binding_quantile(-0.020, -0.025, "negative") == -0.025
+    assert nulls.binding_quantile(-0.020, -0.015, "negative") == -0.020
+    assert nulls.binding_quantile(None, 0.02, "positive") == 0.02 and nulls.binding_quantile(None, None, "negative") is None
+    payload = _conserved_payload()                                       # residualized 0.045 / 0.035
+    payload["windows"]["W1"]["res_quantile_binding"] = 0.05             # stricter than the 0.03 drifting value
+    v = gates.evaluate(payload)
+    assert v["verdict"] == "DROP" and v["per_window"]["W1"]["beta_control_beyond_drifting_null_ok"] is False
+    payload["windows"]["W1"]["res_quantile_binding"] = 0.04             # binding wins over the (looser) legacy key
+    assert gates.evaluate(payload)["verdict"] == "PASS"
 
 
 # ============================================================================
@@ -417,10 +488,11 @@ def v_beta_control_ok(w1_payload: dict) -> bool:
     return resid_ic > quantile   # H-ADV is registered "positive"
 
 
-def test_bounce_fixture_end_to_end_label_not_verdict_change():
-    """Directly exercises ``gates.evaluate``'s bounce-label rule on a
-    hypothesis that otherwise PASSes -- the bounce fixture produces a
-    LABEL, never a verdict-changing kill (DEC-75 Entscheidung 1 (5))."""
+def test_bounce_fixture_end_to_end_bounce_is_no_pass():
+    """DEC-87 (I) (formerly ``test_bounce_fixture_end_to_end_label_not_verdict_change``, which pinned that a bounce
+    only produced a label): directly exercises ``gates.evaluate``'s bounce rule on a hypothesis that otherwise
+    PASSes -- ``|IC_bounce,W| >= |IC_W|`` is a KEIN-PASS (DEC-75 (5), reinstated), the verdict is DROP with the
+    ``Artefakt Bounce`` label; a harmless bounce leaves the PASS alone."""
     payload = _conserved_payload()
     payload["hypothesis"], payload["variant"], payload["direction"] = "H-29", "rev_gap", "negative"
     for w in payload["windows"].values():
@@ -429,10 +501,21 @@ def test_bounce_fixture_end_to_end_label_not_verdict_change():
         w["residualized_mean_ic"] = -w["residualized_mean_ic"]
         w["res_quantile_drifting"] = -w["res_quantile_drifting"]   # DEC-76 (b): negative-direction quantile
     bounce = run_mod.bounce_fixture_ic(60, 60, seed=53)
-    payload["bounce_ic"] = max(abs(bounce["ic_bounce"]), abs(payload["windows"]["W1"]["mean_ic"]) + 0.05)
+    harmless = {wn: abs(bounce["ic_bounce"]) for wn in payload["windows"]}
+    assert all(harmless[wn] < abs(payload["windows"][wn]["mean_ic"]) for wn in harmless)
+    payload["bounce_ic"] = harmless
+    assert gates.evaluate(payload)["verdict"] == "PASS"
+    payload["bounce_ic"] = {"W1": max(abs(bounce["ic_bounce"]), abs(payload["windows"]["W1"]["mean_ic"]) + 0.05),
+                            "W2": harmless["W2"]}
     v = gates.evaluate(payload)
-    assert v["verdict"] == "PASS"
+    assert v["verdict"] == "DROP" and v["bounce_kill"] is True
     assert any("Bounce" in l for l in v["labels"])
+
+
+def test_bounce_fixture_end_to_end_label_not_verdict_change():
+    """DEC-87: kept under its old id (it pinned that a bounce only produced a LABEL). The contract changed (DEC-75 (5)
+    reinstated by DEC-87 (I)): see :func:`test_bounce_fixture_end_to_end_bounce_is_no_pass`, which this id delegates to."""
+    test_bounce_fixture_end_to_end_bounce_is_no_pass()
 
 
 # ============================================================================
@@ -470,6 +553,14 @@ def _build_run_fixture_tree(tmp_path: Path):
     return panel, weekly
 
 
+def _window_calibration(rho_f: float, beta_sd: float) -> dict:
+    """DEC-87 (D): a per-window ``calibration`` block (``stress`` is required by the schema; the numbers are
+    arbitrary small-panel values -- the run reads them DIRECTLY, no search)."""
+    block = lambda r, b, share: {"rho_f": r, "beta_sd_calibrated": b, "target_factor_share": share}   # noqa: E731
+    return {"measured": block(rho_f / 2, beta_sd * 0.7, 0.02), "stress": block(rho_f, beta_sd, 0.04),
+            "zero": block(0.0, beta_sd * 0.7, 0.02)}
+
+
 def _registered_for_fixture() -> dict:
     ic_min_all = {v: 0.02 for v in characteristics.VARIANT_NAMES}
     return {
@@ -477,8 +568,10 @@ def _registered_for_fixture() -> dict:
                        "H-29": {"variant": "rev_gap", "direction": "negative"},
                        "H-30": {"variant": "vol_rv", "direction": "negative", "outcome": "vol_weighted"}},
         "windows": {
-            "W1": {"start": "2024-07-01", "end": "2025-06-30", "ic_min_capped": ic_min_all},
-            "W2": {"start": "2025-07-01", "end": "2026-06-30", "ic_min_capped": ic_min_all},
+            "W1": {"start": "2024-07-01", "end": "2025-06-30", "ic_min_capped": ic_min_all,
+                   "calibration": _window_calibration(0.05, 0.50)},
+            "W2": {"start": "2025-07-01", "end": "2026-06-30", "ic_min_capped": ic_min_all,
+                   "calibration": _window_calibration(0.06, 0.45)},
             "L": {"start": "2021-03-01", "end": "2024-06-30"},
         },
         "beta_control": {"method": "ts_resid_8w", "beta_window_weeks": 8},   # DEC-77 Entscheidung 2
@@ -507,7 +600,8 @@ def test_run_full_orchestrator_end_to_end_on_synthetic_union_panel(tmp_path):
 
 
 def test_run_full_h30_uses_vol_weighted_outcome_not_raw_returns():
-    """DEC-75 Entscheidung 1 (4): a hypothesis registered with
+    """DEC-75 Entscheidung 1 (4) (DEC-87 (G): weekly sigma_w, ``h30_outcome_for_window`` now needs the
+    ``day_count``): a hypothesis registered with
     ``outcome: vol_weighted`` must be judged on ``ic.vol_weighted_outcome_
     with_drag``'s output, not the raw next-week return -- verified by
     checking the ACTUAL array ``variant_window_payload`` receives differs
@@ -521,7 +615,8 @@ def test_run_full_h30_uses_vol_weighted_outcome_not_raw_returns():
     alive = np.ones((w, k_full), dtype=bool)
     vol_rv = np.abs(rng.normal(0.03, 0.01, size=(w, k_full))) + 1e-3
 
-    weighted = run_mod.h30_outcome_for_window(returns, vol_rv)
+    day_count = np.full(returns.shape, 7, dtype=np.int64)     # DEC-87 (G): n_t valid daily returns per week
+    weighted = run_mod.h30_outcome_for_window(returns, vol_rv, day_count)
     assert weighted.shape == returns.shape
     assert not np.allclose(weighted[1:-1], returns[1:-1], equal_nan=True)
     assert np.isnan(weighted[0]).all()               # no formation week -1
@@ -568,8 +663,10 @@ def _registered_for_large_fixture() -> dict:
     return {
         "hypotheses": {"H-28": {"variant": "mom1", "direction": "positive"}},
         "windows": {
-            "W1": {"start": "2024-07-01", "end": "2025-06-30", "ic_min_capped": ic_min_all},
-            "W2": {"start": "2025-07-01", "end": "2026-06-30", "ic_min_capped": ic_min_all},
+            "W1": {"start": "2024-07-01", "end": "2025-06-30", "ic_min_capped": ic_min_all,
+                   "calibration": _window_calibration(0.05, 0.50)},
+            "W2": {"start": "2025-07-01", "end": "2026-06-30", "ic_min_capped": ic_min_all,
+                   "calibration": _window_calibration(0.06, 0.45)},
         },
         "beta_control": {"method": "ts_resid_8w", "beta_window_weeks": 8},   # DEC-77 Entscheidung 2
         "rules": {"seed": 53, "n_reps_bootstrap": 20, "n_reps_permutation": 20, "n_reps_factor_null": 30},
@@ -577,104 +674,152 @@ def _registered_for_large_fixture() -> dict:
 
 
 def test_run_full_null_calibration_report_present_and_matches_recomputation(tmp_path):
-    """No frozen constants in the registered YAML (pre-DEC-76 shape,
-    backward compatible): ``run_full`` falls back to its OWN recomputed
-    DEC-76 null constants (no assertion, documented) and reports them
-    under ``report["null_calibration"]``."""
+    """No frozen constants in the registered YAML (hand-built unit-test file, backward compatible): ``run_full``
+    falls back to its OWN recomputed DEC-87 null constants (no assertion, flagged ``frozen_constants_complete:
+    False``) and reports them under ``report["null_calibration"]``.
+
+    DEC-87: the keys are ``ceiling_method_stress_*`` (A) and ``res_quantile_driftfree_*``/
+    ``res_quantile_drifting_*`` (E) -- the latter now REALLY is the drift-0.002 null (until v5d the key
+    ``res_quantile_drifting`` held the driftfree one)."""
     panel, weekly = _build_run_fixture_tree_large(tmp_path)
     registered = _registered_for_large_fixture()
     report = run_mod.run_full(panel, weekly, registered)
 
     nc = report["null_calibration"]
     assert set(nc.keys()) == {"W1", "W2"}
+    assert report["frozen_constants_complete"] is False
     for wn in ("W1", "W2"):
-        assert nc[wn]["ceiling_driftfree_res_registered"] is None
-        assert math.isfinite(nc[wn]["ceiling_driftfree_res_recomputed"])
+        assert nc[wn]["ceiling_method_stress_registered"] is None
+        assert math.isfinite(nc[wn]["ceiling_method_stress_recomputed"])
         for v in characteristics.VARIANT_NAMES:
             assert math.isfinite(nc[wn]["res_quantile_drifting_recomputed"][v])
-    # the FALLBACK (no registered value) means the payload's own res_quantile_drifting
-    # is exactly the recomputed value (no frozen constant to prefer instead).
+            assert math.isfinite(nc[wn]["res_quantile_driftfree_recomputed"][v])
+    # the FALLBACK (no registered value) means the payload's own quantiles are exactly the recomputed
+    # values (no frozen constant to prefer instead); the gate judges against the more extreme (E).
     h28 = report["results"]["H-28"]["payload"]["windows"]["W1"]
-    assert h28["res_quantile_drifting"] == pytest.approx(nc["W1"]["res_quantile_drifting_recomputed"]["mom1"])
+    q_free = nc["W1"]["res_quantile_driftfree_recomputed"]["mom1"]
+    q_drift = nc["W1"]["res_quantile_drifting_recomputed"]["mom1"]
+    assert h28["res_quantile_drifting"] == pytest.approx(q_drift)
+    assert h28["res_quantile_driftfree"] == pytest.approx(q_free)
+    assert h28["res_quantile_binding"] == pytest.approx(max(q_free, q_drift))      # positive: the larger one
+    assert h28["selection_ceiling_mean_of_max"] == pytest.approx(nc["W1"]["ceiling_method_stress_recomputed"])
 
 
-def test_run_full_calibration_block_derives_stress_null(tmp_path):
-    """DEC-78 Entscheidung 1/Nachtrag: a registered YAML WITH a
-    ``calibration`` block reads the "stress" null's ``rho_f``/
-    ``beta_sd_calibrated`` DIRECTLY from ``calibration.stress`` -- NO
-    re-search/re-derivation at run time -- never the old hardcoded
-    ``rho_f=0.2``/``U(0.5, 2.0)`` beta -- echoed in the report's
-    ``calibration_used_for_stress_null``."""
+def test_run_full_calibration_block_derives_stress_null(tmp_path, monkeypatch):
+    """DEC-87 (D) (was: a single global ``calibration`` block, DEC-78 Nachtrag): each window's
+    ``windows.<W>.calibration.stress`` supplies THAT window's ``rho_f``/``beta_sd_calibrated`` to the null,
+    READ DIRECTLY (no re-search) -- W1 and W2 carry different pairs here and the null of each window receives its
+    own; echoed in the report's ``calibration_used_for_stress_null[W]``."""
     panel, weekly = _build_run_fixture_tree_large(tmp_path)
     registered = _registered_for_large_fixture()
-    registered["calibration"] = {
-        "sigma_f": 0.06, "sigma_e": 0.05, "stress_multiplier": 2.0,
-        "measured": {"rho_f": 0.05, "factor_share": 0.02,
-                     "beta_sd_calibrated": 0.09, "beta_sd_analytic_first_guess": 0.08},
-        "stress": {"rho_f": 0.10, "factor_share": 0.04,
-                   "beta_sd_calibrated": 0.135, "beta_sd_analytic_first_guess": 0.12},
-    }
+    registered["windows"]["W1"]["calibration"] = _window_calibration(0.10, 0.135)
+    registered["windows"]["W2"]["calibration"] = _window_calibration(0.08, 0.20)
+    seen: list[tuple] = []
+    orig = nulls.beta_controlled_factor_null
+
+    def spy(window_returns, *a, **kw):
+        seen.append((kw["rho_f"], kw["beta_sd"], kw["drift_f"]))
+        return orig(window_returns, *a, **kw)
+
+    monkeypatch.setattr(nulls, "beta_controlled_factor_null", spy)
     report = run_mod.run_full(panel, weekly, registered)
     used = report["calibration_used_for_stress_null"]
-    assert used["rho_f"] == pytest.approx(0.10)
-    assert used["beta_sd_calibrated"] == pytest.approx(0.135)
-    assert "registered.calibration.stress" in used["source"]
+    assert used["W1"]["rho_f"] == pytest.approx(0.10) and used["W1"]["beta_sd_calibrated"] == pytest.approx(0.135)
+    assert used["W2"]["rho_f"] == pytest.approx(0.08) and used["W2"]["beta_sd_calibrated"] == pytest.approx(0.20)
+    assert "registered.windows.W1.calibration.stress" in used["W1"]["source"]
+    # two null cells per window (E): driftfree then drifting, each with the window's own pair
+    assert seen == [(0.10, 0.135, 0.0), (0.10, 0.135, 0.002), (0.08, 0.20, 0.0), (0.08, 0.20, 0.002)]
+
+
+def test_run_full_without_window_calibration_is_loud_fail(tmp_path):
+    """DEC-87 (D) (formerly ``test_run_full_without_calibration_block_falls_back_to_old_stress_null``, which
+    pinned the silent fallback to the refuted hardcoded stress null ``rho_f=0.2``, beta ~ U(0.5, 2.0)): a window
+    without ``calibration.stress`` is a loud fail (C.14) -- no fallback, no verdict."""
+    panel, weekly = _build_run_fixture_tree_large(tmp_path)
+    registered = _registered_for_large_fixture()
+    del registered["windows"]["W2"]["calibration"]
+    with pytest.raises(run_mod.RegisteredSchemaError, match="calibration.stress"):
+        run_mod.run_full(panel, weekly, registered)
 
 
 def test_run_full_without_calibration_block_falls_back_to_old_stress_null(tmp_path):
-    """A pre-DEC-78 registered file (no ``calibration`` key) falls back to
-    the OLD hardcoded stress null (``rho_f=0.2``, ``beta_sd_calibrated=
-    None`` -> ``U(0.5, 2.0)``), documented, not a registered Drittfassung
-    run."""
+    """DEC-87: kept under its old id (it pinned the silent fallback to the refuted hardcoded stress null). The contract
+    changed (DEC-87 (D)): no fallback, a loud fail -- see :func:`test_run_full_without_window_calibration_is_loud_fail`,
+    which this id delegates to."""
+    test_run_full_without_window_calibration_is_loud_fail(tmp_path)
+
+
+def test_run_full_refuses_the_old_global_calibration_block_loudly(tmp_path):
+    """DEC-87 (D)/C.14: the pre-DEC-87 GLOBAL ``calibration`` block (W1-sourced, applied to both windows) is
+    refused with a message naming the per-window form, even when the per-window blocks are present."""
     panel, weekly = _build_run_fixture_tree_large(tmp_path)
     registered = _registered_for_large_fixture()
-    assert "calibration" not in registered
-    report = run_mod.run_full(panel, weekly, registered)
-    used = report["calibration_used_for_stress_null"]
-    assert used["rho_f"] == pytest.approx(0.2)
-    assert used["beta_sd_calibrated"] is None
-    assert "pre-DEC-78" in used["source"]
+    registered["calibration"] = {"sigma_f": 0.06, "stress": {"rho_f": 0.10, "beta_sd_calibrated": 0.135}}
+    with pytest.raises(run_mod.RegisteredSchemaError, match="GLOBALEN 'calibration'"):
+        run_mod.run_full(panel, weekly, registered)
+
+
+def test_run_full_refuses_the_pre_dec87_ceiling_key_loudly(tmp_path):
+    """DEC-87 (A): ``ceiling_driftfree_res`` (TS-residualisation ceiling, historical) is no longer a schema key;
+    a stale file must not be silently read as "no frozen ceiling"."""
+    panel, weekly = _build_run_fixture_tree_large(tmp_path)
+    registered = _registered_for_large_fixture()
+    registered["windows"]["W1"]["ceiling_driftfree_res"] = 0.0496
+    with pytest.raises(run_mod.RegisteredSchemaError, match="ceiling_method_stress"):
+        run_mod.run_full(panel, weekly, registered)
 
 
 def test_run_full_uses_frozen_registered_null_constants_within_tolerance(tmp_path):
-    """A registered YAML that DOES carry ``res_quantile_drifting``/
-    ``ceiling_driftfree_res`` (values within tolerance of what the run's
-    own recomputation gets, deterministically -- same seed/panel/rules):
-    ``run_full`` must NOT raise, and every hypothesis's payload must carry
-    the FROZEN (registered) value, never the recomputed one, even though
-    here they happen to be numerically identical."""
+    """A registered YAML that DOES carry ``ceiling_method_stress`` / ``res_quantile_driftfree`` /
+    ``res_quantile_drifting`` (values within tolerance of what the run's own recomputation gets, deterministically
+    -- same seed/panel/rules): ``run_full`` must NOT raise, and every payload must carry the FROZEN (registered)
+    values, never the recomputed ones, even though here they happen to be numerically identical (DEC-87 (A)/(E);
+    T5: the numbers that flow into the gate ARE the YAML's)."""
     panel, weekly = _build_run_fixture_tree_large(tmp_path)
     baseline = run_mod.run_full(panel, weekly, _registered_for_large_fixture())
     nc = baseline["null_calibration"]
 
     registered = _registered_for_large_fixture()
     for wn in ("W1", "W2"):
-        registered["windows"][wn]["ceiling_driftfree_res"] = nc[wn]["ceiling_driftfree_res_recomputed"]
-        registered["windows"][wn]["res_quantile_drifting"] = dict(nc[wn]["res_quantile_drifting_recomputed"])
+        registered["windows"][wn]["ceiling_method_stress"] = nc[wn]["ceiling_method_stress_recomputed"] * 1.05
+        registered["windows"][wn]["res_quantile_driftfree"] = {
+            v: q * 0.95 for v, q in nc[wn]["res_quantile_driftfree_recomputed"].items()}
+        registered["windows"][wn]["res_quantile_drifting"] = {
+            v: q * 1.05 for v, q in nc[wn]["res_quantile_drifting_recomputed"].items()}
 
-    report = run_mod.run_full(panel, weekly, registered)      # must not raise NullCalibrationError
-    h28 = report["results"]["H-28"]["payload"]["windows"]["W1"]
-    assert h28["res_quantile_drifting"] == pytest.approx(registered["windows"]["W1"]["res_quantile_drifting"]["mom1"])
+    report = run_mod.run_full(panel, weekly, registered)      # +-5 % is inside +-10 %: must not raise
+    assert report["frozen_constants_complete"] is True
+    pin = run_mod.registered_constants_pin(registered)
+    for wn in ("W1", "W2"):
+        w = report["results"]["H-28"]["payload"]["windows"][wn]
+        assert w["selection_ceiling_mean_of_max"] == pin[wn]["ceiling_method_stress"]       # bit-exact: frozen, not recomputed
+        assert w["res_quantile_driftfree"] == pin[wn]["res_quantile_driftfree"]["mom1"]
+        assert w["res_quantile_drifting"] == pin[wn]["res_quantile_drifting"]["mom1"]
+        assert w["ic_min_capped"] == pin[wn]["ic_min_capped"]["mom1"]
+        assert w["res_quantile_binding"] == max(w["res_quantile_driftfree"], w["res_quantile_drifting"])
 
 
 def test_run_full_raises_null_calibration_error_when_registered_has_drifted(tmp_path):
     """A registered constant that has drifted far (>10%) from what the
     run's own recomputation gets is a LOUD FAIL (C.14): the whole run
     aborts with ``NullCalibrationError``, BEFORE any hypothesis gets a
-    verdict -- DEC-76 Task A item 3, verbatim."""
+    verdict -- DEC-76 Task A item 3, verbatim (DEC-87 (A): the frozen
+    ceiling is ``ceiling_method_stress``)."""
     panel, weekly = _build_run_fixture_tree(tmp_path)
     registered = _registered_for_fixture()
-    registered["windows"]["W1"]["ceiling_driftfree_res"] = 999.0    # wildly stale
+    registered["windows"]["W1"]["ceiling_method_stress"] = 999.0    # wildly stale
     with pytest.raises(run_mod.NullCalibrationError, match="Null-Kalibrierung weicht ab"):
         run_mod.run_full(panel, weekly, registered)
 
 
 def test_run_full_raises_null_calibration_error_on_stale_per_variant_quantile(tmp_path):
+    """DEC-87 (E): BOTH frozen quantile sets are re-checked at +-10 % -- the driftfree and the drifting one."""
     panel, weekly = _build_run_fixture_tree(tmp_path)
-    registered = _registered_for_fixture()
-    registered["windows"]["W1"]["res_quantile_drifting"] = {v: 999.0 for v in characteristics.VARIANT_NAMES}
-    with pytest.raises(run_mod.NullCalibrationError, match="Null-Kalibrierung weicht ab"):
-        run_mod.run_full(panel, weekly, registered)
+    for key in ("res_quantile_drifting", "res_quantile_driftfree"):
+        registered = _registered_for_fixture()
+        registered["windows"]["W1"][key] = {v: 999.0 for v in characteristics.VARIANT_NAMES}
+        with pytest.raises(run_mod.NullCalibrationError, match=f"{key}"):
+            run_mod.run_full(panel, weekly, registered)
 
 
 def test_assert_null_calibration_pure_function():
@@ -691,22 +836,33 @@ def test_assert_null_calibration_pure_function():
 # DEC-76 Task A item 4: --emit-registered-template
 # ============================================================================
 
-def test_cli_emit_registered_template_writes_yaml_skeleton_from_prelaunch_artifact(tmp_path):
+def _tiny_prelaunch_artifact(tmp_path):
+    """A real (tiny) ``--prelaunch`` artifact on the >= 10-survivor fixture tree; the probes are kept small and
+    the Gegenprobe knobs relaxed exactly as the CLI e2e test in ``test_wp13_xsec.py`` does (statistically
+    underpowered fixture -- the wiring is under test, not the calibration quality)."""
     from bybit_edge.research.wp13_xsec import prelaunch as prelaunch_mod
     from tests.unit.test_wp13_xsec import _build_prelaunch_fixture_tree
 
     panel, weekly, _sb, _sm, _db, del_manifest, dd_path = _build_prelaunch_fixture_tree(tmp_path)
-    # DEC-78 Nachtrag: gegenprobe_rel_tol widened -- see test_wp13_xsec.py's CLI e2e test
-    # comment (this fixture's small K is too statistically underpowered for the strict default).
-    # DEC-81: z-test and search precision switched off the same way (gegenprobe_z_max,
-    # calibration_search_rel_tol), probes kept small.
+    fp = {"union_range_fingerprint": "ab" * 32, "delisting_dates_sha256": "cd" * 32}
     prelaunch_report = prelaunch_mod.assemble_prelaunch_report(
         panel, weekly, delisted_manifest_path=del_manifest, delisting_dates_path=dd_path,
         n_sims=5, n_reps_factor_null=5, n_reps_beta_control_study=5, n_reps_beta_control_winner=5, seed=53,
         gegenprobe_n_reps=10, gegenprobe_rel_tol=10.0, gegenprobe_z_max=1e9, gegenprobe_market_check=False,
-        calibration_search_n_reps=5, calibration_search_rel_tol=10.0, calibration_search_max_iter=8)
+        calibration_search_n_reps=5, calibration_search_rel_tol=10.0, calibration_search_max_iter=8,
+        data_fingerprints=fp)
     artifacts = prelaunch_mod.write_prelaunch_artifacts(tmp_path / "prelaunch_out", prelaunch_report)
-    prelaunch_json = artifacts["artifacts"]["wp13a_prelaunch_json"]["path"]
+    return prelaunch_report, artifacts["artifacts"]["wp13a_prelaunch_json"]["path"], fp
+
+
+def test_cli_emit_registered_template_writes_yaml_skeleton_from_prelaunch_artifact(tmp_path):
+    """DEC-87 contract of the emitted skeleton (was the DEC-76/78 one with a GLOBAL W1 ``calibration`` block, one
+    entry per hypothesis, ``ceiling_driftfree_res``/``res_quantile_drifting`` from the TS-driftfree null and
+    ``rules.n_reps >= 1000``): per-window ``calibration.{measured,stress,zero}`` taken from THAT window's study,
+    ``ceiling_method_stress``/``res_quantile_driftfree``/``res_quantile_drifting`` from the winner section, seven
+    ``H-xx_<variant>`` entries (``vol_beta`` locked), ``beta_control.method`` filled ONLY from a confirmed
+    recommendation, ``data_fingerprints``, and ``rules.n_reps`` = the replicates that froze the constants."""
+    prelaunch_report, prelaunch_json, fp = _tiny_prelaunch_artifact(tmp_path)
 
     out_yaml = tmp_path / "registered_template.yaml"
     rc = WP13.cmd_emit_registered_template(prelaunch_json, str(out_yaml))
@@ -714,34 +870,87 @@ def test_cli_emit_registered_template_writes_yaml_skeleton_from_prelaunch_artifa
     assert out_yaml.is_file()
 
     loaded = run_mod.load_registered_yaml(out_yaml)     # round-trips through the real YAML loader
-    assert set(loaded["hypotheses"].keys()) == {"H-28", "H-29", "H-30"}
-    assert loaded["hypotheses"]["H-30"]["outcome"] == "vol_weighted"
+    hyps = loaded["hypotheses"]
+    assert list(hyps) == ["H-28_mom1", "H-28_mom2", "H-28_mom4", "H-29_rev_gap",
+                          "H-30_vol_rv", "H-30_vol_max", "H-30_vol_beta"]          # DEC-87 (J)
+    assert {run_mod.hypothesis_group(k, v) for k, v in hyps.items()} == {"H-28", "H-29", "H-30"}
+    assert all(hyps[k]["outcome"] == "vol_weighted" for k in hyps if k.startswith("H-30"))
+    assert hyps["H-30_vol_beta"]["status"] == "gl012_pre_run" and "C.4" in hyps["H-30_vol_beta"]["reason"]   # (H)
     for wn in ("W1", "W2"):
-        assert wn in loaded["windows"]
-        assert set(loaded["windows"][wn]["ic_min_capped"].keys()) == set(characteristics.VARIANT_NAMES)
-        assert "res_quantile_drifting" in loaded["windows"][wn]
-        assert "ceiling_driftfree_res" in loaded["windows"][wn]
-    assert loaded["rules"]["seed"] == 53 and loaded["rules"]["n_reps"] >= 1000
-    # DEC-77 Entscheidung 2: beta_control is present but EMPTY -- never auto-filled, the
-    # orchestrator must choose it deliberately before a real --run (run_full loud-fails on empty).
-    assert loaded["beta_control"] == {"method": "", "beta_window_weeks": None}
-    with pytest.raises(ValueError, match="beta_control"):
-        run_mod.run_full({"symbols": []}, {"weeks": [], "returns": None, "alive": None}, loaded)
-    # DEC-78 Entscheidung 1/Nachtrag: calibration is a SINGLE global block, taken from W1's
-    # beta_control_method_study only (the enlarged >= 10-survivor fixture makes it FINITE),
-    # nested measured/stress sub-blocks (run.py reads calibration.stress.* directly).
-    assert "calibration" in loaded
-    calib = loaded["calibration"]
-    for key in ("sigma_f", "sigma_e", "stress_multiplier", "measured", "stress"):
-        assert key in calib
-    assert calib["stress_multiplier"] == pytest.approx(2.0)
-    for sub in ("measured", "stress"):
-        for key in ("rho_f", "factor_share", "beta_sd_calibrated", "beta_sd_analytic_first_guess"):
-            assert key in calib[sub]
-    if calib["measured"]["rho_f"] is not None:   # finite calibration (usual case on this fixture)
-        assert math.isfinite(calib["measured"]["rho_f"])
-        assert math.isfinite(calib["stress"]["beta_sd_calibrated"])
-        assert calib["stress"]["rho_f"] == pytest.approx(2.0 * calib["measured"]["rho_f"])
+        wcfg = loaded["windows"][wn]
+        assert set(wcfg["ic_min_capped"].keys()) == set(characteristics.VARIANT_NAMES)
+        assert set(wcfg["calibration"]) == {"measured", "stress", "zero"}                 # DEC-87 (D), per window
+        study = prelaunch_report["windows"][wn]["beta_control_method_study"]["calibrations"]
+        for cal in ("measured", "stress", "zero"):
+            blk = wcfg["calibration"][cal]
+            assert set(blk) == {"rho_f", "beta_sd_calibrated", "target_factor_share"}
+            assert blk["rho_f"] == study[cal]["rho_f"] and blk["beta_sd_calibrated"] == study[cal]["beta_sd_calibrated"]
+        assert "ceiling_driftfree_res" not in wcfg and "ceiling_method_stress" in wcfg
+        assert set(wcfg["res_quantile_driftfree"]) == set(characteristics.VARIANT_NAMES) == set(wcfg["res_quantile_drifting"])
+    assert loaded["rules"]["seed"] == 53
+    assert loaded["rules"]["n_reps"] == prelaunch_report["n_reps_beta_control_winner"] == 5      # the freezing replicates
+    assert loaded["data_fingerprints"] == fp
+    # the emitted file passes the schema check (modulo a possibly empty method on this tiny fixture) ...
+    run_mod.validate_registered(loaded)
+    # ... and beta_control comes from the CONFIRMED recommendation only (empty if none was confirmed)
+    conf = prelaunch_report["beta_control_confirmation"]
+    if conf["confirmed_method"]:
+        assert loaded["beta_control"] == {"method": conf["confirmed_method"],
+                                          "beta_window_weeks": ic.beta_control_trail_weeks(conf["confirmed_method"])}
+        for wn in ("W1", "W2"):
+            fz = prelaunch_report["windows"][wn]["frozen_null_constants"]
+            assert loaded["windows"][wn]["ceiling_method_stress"] == fz["ceiling_method_stress"]
+            assert loaded["windows"][wn]["res_quantile_driftfree"] == fz["res_quantile_driftfree"]
+            assert loaded["windows"][wn]["res_quantile_drifting"] == fz["res_quantile_drifting"]
+    else:
+        assert loaded["beta_control"] == {"method": "", "beta_window_weeks": None}
+        with pytest.raises(ValueError, match="beta_control"):
+            run_mod.run_full({"symbols": []}, {"weeks": [], "returns": None, "alive": None}, loaded)
+
+
+def test_cli_emit_registered_template_beta_control_filled_from_confirmed_method_only(tmp_path):
+    """DEC-87: ``--emit-registered-template`` fills ``beta_control.method`` from the artifact's
+    ``beta_control_confirmation`` and leaves it empty when "keine Methode bestaetigt" (hand-built artifact so both
+    branches are exercised deterministically); the frozen constants flow from ``frozen_null_constants``."""
+    base = {
+        "variants": list(characteristics.VARIANT_NAMES), "n_reps_beta_control_winner": 1000,
+        "data_fingerprints": {"union_range_fingerprint": "11" * 32, "delisting_dates_sha256": "22" * 32},
+        "windows": {wn: {
+            "available": True, "start": s0, "end": e0,
+            "noise_floor_and_threshold": {"ic_min_capped_per_variant": {v: 0.02 for v in characteristics.VARIANT_NAMES},
+                                          "w_judged": 52},
+            "beta_control_method_study": {"calibrations": {
+                cal: {"rho_f": 0.05 * k, "beta_sd_calibrated": 0.5 * k, "target_factor_share": 0.03 * k}
+                for cal, k in (("measured", 1), ("stress", 2), ("zero", 1))}},
+            "frozen_null_constants": {
+                "ceiling_method_stress": 0.0081,
+                "res_quantile_driftfree": {v: 0.02 for v in characteristics.VARIANT_NAMES},
+                "res_quantile_drifting": {v: 0.021 for v in characteristics.VARIANT_NAMES}},
+        } for wn, s0, e0 in (("W1", "2024-07-01", "2025-06-30"), ("W2", "2025-07-01", "2026-06-30"))},
+        "h30_feasibility_weekly_units": {"spread_d10_minus_d1_over_kante": 2.8, "se_drag_over_kante": 0.18, "feasible": False},
+    }
+    confirmed = dict(base, beta_control_confirmation={"confirmed_method": "fm_neutral_8w", "note": "bestaetigt"})
+    p1 = tmp_path / "confirmed.json"
+    p1.write_text(__import__("json").dumps(confirmed), encoding="utf-8")
+    assert WP13.cmd_emit_registered_template(str(p1), str(tmp_path / "t1.yaml")) == 0
+    y1 = run_mod.load_registered_yaml(tmp_path / "t1.yaml")
+    assert y1["beta_control"] == {"method": "fm_neutral_8w", "beta_window_weeks": 8}
+    assert y1["windows"]["W1"]["ceiling_method_stress"] == 0.0081
+    assert y1["windows"]["W2"]["res_quantile_drifting"]["vol_rv"] == 0.021
+    assert y1["windows"]["W1"]["calibration"]["stress"]["rho_f"] == 0.1
+    # (G) mechanical H-30 lock: Spread/Kante 2.8 > 0.5 -> all three H-30 entries gl012_pre_run, H-28/H-29 untouched
+    for k, h in y1["hypotheses"].items():
+        assert (h.get("status") == "gl012_pre_run") == k.startswith("H-30")
+    assert "Wocheneinheiten" in y1["hypotheses"]["H-30_vol_rv"]["reason"]
+    run_mod.validate_registered(y1)
+
+    none_confirmed = dict(base, beta_control_confirmation={"confirmed_method": None, "note": "keine Methode bestaetigt: x"})
+    p2 = tmp_path / "none.json"
+    p2.write_text(__import__("json").dumps(none_confirmed), encoding="utf-8")
+    assert WP13.cmd_emit_registered_template(str(p2), str(tmp_path / "t2.yaml")) == 0
+    y2 = run_mod.load_registered_yaml(tmp_path / "t2.yaml")
+    assert y2["beta_control"] == {"method": "", "beta_window_weeks": None}
+    assert "WARNUNG: KEINE Methode bestaetigt" in (tmp_path / "t2.yaml").read_text(encoding="utf-8")
 
 
 def test_cli_emit_registered_template_missing_input_file_is_loud_fail(tmp_path):
@@ -867,12 +1076,14 @@ def test_dec85_run_full_estimates_real_betas_and_null_scalars_on_returns_est(tmp
 
     beta_est = characteristics.beta_characteristic(returns_est, panel["symbols"], trail_win=13, min_weeks=13)
     beta_zero = characteristics.beta_characteristic(returns, panel["symbols"], trail_win=13, min_weeks=13)
-    assert len(seen_hyp) == 1 and len(seen_null) == 2                      # one hypothesis; W1 + W2 nulls
+    # DEC-87 (E): two null cells (driftfree + drifting) per window -> W1, W1, W2, W2
+    assert len(seen_hyp) == 1 and len(seen_null) == 4
     lo, hi = lo_w1, lo_w1 + len(seen_hyp[0]["beta_pit"]["W1"])
     assert np.array_equal(seen_hyp[0]["beta_pit"]["W1"], beta_est[lo:hi], equal_nan=True)
     assert np.isnan(seen_hyp[0]["beta_pit"]["W1"][5:35 + 12, j_silent]).all()   # window + 12 following weeks
     assert np.isfinite(beta_zero[lo + 17:lo + 40, j_silent]).all()               # zero-filled would be finite
     assert np.array_equal(seen_null[0], returns_est[lo:hi], equal_nan=True)
+    assert np.array_equal(seen_null[1], returns_est[lo:hi], equal_nan=True)
     # the IC outcome array is untouched (zero fill, no NaN for the silent symbol)
     assert np.array_equal(seen_hyp[0]["returns_by_window"]["W1"], returns[lo:hi])
 
@@ -942,3 +1153,790 @@ def test_variant_window_payload_default_none_method_is_backward_compatible():
     assert payload["residualized_mean_ic"] == pytest.approx(expected_mean_ic, nan_ok=True)
     assert payload["beta_control_method"] is None
     assert payload["beta_control_coverage"] is None
+
+
+# ============================================================================
+# DEC-87 (Drittfassung H-28..H-30): run mode -- entries, locks, BH, fingerprints, Gate (5), T1-T7
+# ============================================================================
+
+import copy  # noqa: E402
+import json  # noqa: E402
+import subprocess  # noqa: E402
+import sys  # noqa: E402
+
+import yaml  # noqa: E402
+
+from bybit_edge.research.wp13_xsec import prelaunch as prelaunch_module  # noqa: E402
+from tests.unit.test_wp13_xsec import _build_prelaunch_fixture_tree, _ns_prelaunch, _weekly_daily_panel  # noqa: E402
+
+
+def _registered_dec87_large() -> dict:
+    """The seven-entry DEC-87 shape on the >= 10-survivor fixture: computed entries (mom1, rev_gap, vol_rv), two
+    locked ones (mom2: power, vol_beta: C.4), registered method ``fm_neutral_8w`` (the Drittfassung's), small reps."""
+    reg = _registered_for_large_fixture()
+    reg["hypotheses"] = {
+        "H-28_mom1": {"hypothesis": "H-28", "variant": "mom1", "direction": "positive"},
+        "H-28_mom2": {"hypothesis": "H-28", "variant": "mom2", "direction": "positive",
+                      "status": "gl012_pre_run", "reason": "MDE80 > IC_prior (Test, DEC-87 (F))"},
+        "H-29_rev_gap": {"hypothesis": "H-29", "variant": "rev_gap", "direction": "negative"},
+        "H-30_vol_rv": {"hypothesis": "H-30", "variant": "vol_rv", "direction": "negative", "outcome": "vol_weighted"},
+        "H-30_vol_beta": {"hypothesis": "H-30", "variant": "vol_beta", "direction": "negative",
+                          "outcome": "vol_weighted", "status": "gl012_pre_run",
+                          "reason": "strukturell durch die registrierte Beta-Kontrolle neutralisiert (C.4)"},
+    }
+    reg["windows"]["L"] = {"start": "2021-03-01", "end": "2024-06-30"}        # descriptive/sealed, never judged
+    reg["beta_control"] = {"method": "fm_neutral_8w", "beta_window_weeks": 8}
+    reg["rules"] = {"seed": 53, "n_reps": 12, "n_reps_bootstrap": 20, "n_reps_permutation": 20}
+    return reg
+
+
+@pytest.fixture(scope="module")
+def dec87_run(tmp_path_factory):
+    tmp = tmp_path_factory.mktemp("dec87_large")
+    panel, weekly = _build_run_fixture_tree_large(tmp)
+    registered = _registered_dec87_large()
+    report = run_mod.run_full(panel, weekly, registered, observed_fingerprints=None)
+    return panel, weekly, registered, report
+
+
+# ---- entries, locks, aggregation, BH -------------------------------------------
+
+def test_dec87_entries_locked_variants_are_not_computed_and_count_with_p_one(dec87_run):
+    """DEC-87 (J): seven-variant family; a ``status: gl012_pre_run`` entry is NOT computed (no payload), carries the
+    GL-012 label with the registered reason, and counts with p = 1 in a BH family whose denominator stays 7."""
+    _panel, _weekly, registered, report = dec87_run
+    assert set(report["results"]) == set(registered["hypotheses"])
+    for entry_id in ("H-28_mom2", "H-30_vol_beta"):
+        res = report["results"][entry_id]
+        assert res["computed"] is False and res["payload"] is None
+        assert res["verdict"]["verdict"] == "DROP" and res["verdict"]["gl012_pre_run"] is True
+        assert "GL-012 vorab" in res["verdict"]["labels"][0] and registered["hypotheses"][entry_id]["reason"] in res["verdict"]["labels"][0]
+    for entry_id in ("H-28_mom1", "H-29_rev_gap", "H-30_vol_rv"):
+        assert report["results"][entry_id]["computed"] is True and report["results"][entry_id]["payload"] is not None
+    assert report["bh"]["m"] == 7                                            # fixed denominator, 2 locked + 2 never registered
+    hv = report["hypothesis_verdicts"]
+    assert hv["H-28"]["variants_locked"] == ["mom2"] and hv["H-30"]["variants_locked"] == ["vol_beta"]
+    assert set(hv) == {"H-28", "H-29", "H-30"} and hv["H-28"]["entries"] == ["H-28_mom1", "H-28_mom2"]
+    # the payload and the verdict of a computed entry name the HYPOTHESIS, not the entry id
+    assert report["results"]["H-28_mom1"]["payload"]["hypothesis"] == "H-28"
+
+
+def test_dec87_benjamini_hochberg_denominator_is_fixed_at_seven():
+    """DEC-87 (J): BH ``m`` is the family size K = 7 even when only some variants are computed -- the missing ones
+    (locked / never run) count with p = 1, so a lone small p-value must clear ``rank/7 * alpha``, not ``rank/1 * alpha``."""
+    p = {"mom1": 0.02}                                           # one computed variant, six more at p = 1
+    res = run_mod.benjamini_hochberg(p, alpha=0.10)
+    assert res["m"] == 7 and res["reject"]["mom1"] is False        # 0.02 > 1/7 * 0.10 = 0.0143
+    assert run_mod.benjamini_hochberg({"mom1": 0.01}, alpha=0.10)["reject"]["mom1"] is True
+    # the pre-DEC-87 behaviour (m = number of finite items) would have rejected: pinned for contrast
+    assert run_mod.benjamini_hochberg(p, alpha=0.10, m_total=1)["reject"]["mom1"] is True
+    nan_p = run_mod.benjamini_hochberg({"mom1": 0.001, "mom2": float("nan")}, alpha=0.10)
+    assert nan_p["m"] == 7 and nan_p["reject"] == {"mom1": True, "mom2": False}
+
+
+def test_dec87_hypothesis_is_pass_iff_at_least_one_variant_passes():
+    """DEC-87 (J): aggregation by hypothesis; every variant remains individually reported."""
+    def res(group, variant, verdict, computed=True):
+        return {"hypothesis": group, "variant": variant, "computed": computed, "verdict": {"verdict": verdict}}
+    agg = run_mod.aggregate_hypotheses({
+        "H-28_mom1": res("H-28", "mom1", "DROP"), "H-28_mom2": res("H-28", "mom2", "PASS"),
+        "H-28_mom4": res("H-28", "mom4", "DROP", computed=False),
+        "H-29_rev_gap": res("H-29", "rev_gap", "DROP"),
+        "H-30_vol_rv": res("H-30", "vol_rv", "DROP", computed=False)})
+    assert agg["H-28"]["verdict"] == "PASS" and agg["H-28"]["variants_pass"] == ["mom2"]
+    assert agg["H-28"]["variants_locked"] == ["mom4"] and agg["H-28"]["label"].startswith("vorlaeufig bis F-WEEK")
+    assert agg["H-29"]["verdict"] == "DROP" and agg["H-29"]["label"] is None
+    assert agg["H-30"]["verdict"] == "DROP" and agg["H-30"]["variants_locked"] == ["vol_rv"]
+
+
+def test_dec87_hypothesis_group_from_id_prefix_explicit_field_or_legacy_id():
+    assert run_mod.hypothesis_group("H-28_mom1", {}) == "H-28"
+    assert run_mod.hypothesis_group("H-30_vol_beta", {"hypothesis": "H-30"}) == "H-30"
+    assert run_mod.hypothesis_group("H-29", {}) == "H-29"                 # pre-DEC-87 one-entry shape
+    assert run_mod.hypothesis_group("custom", {"hypothesis": "H-99"}) == "H-99"
+
+
+@pytest.mark.parametrize("mutate, message", [
+    (lambda r: r["hypotheses"]["H-28_mom1"].update(variant="momX"), "unbekannt"),
+    (lambda r: r["hypotheses"]["H-28_mom1"].update(direction="up"), "direction"),
+    (lambda r: r["hypotheses"]["H-28_mom1"].update(status="dropped"), "status"),
+    (lambda r: r["hypotheses"]["H-28_mom2"].pop("reason"), "ohne 'reason'"),
+    (lambda r: r["hypotheses"]["H-30_vol_rv"].pop("outcome"), "vol_weighted"),
+    (lambda r: r["hypotheses"].update({"H-28_mom1b": {"hypothesis": "H-28", "variant": "mom1", "direction": "positive"}}),
+     "doppelt"),
+    (lambda r: r["windows"]["W2"]["ic_min_capped"].pop("mom1"), "ic_min_capped"),
+    (lambda r: r["windows"]["W1"]["calibration"]["stress"].update(beta_sd_calibrated=float("nan")), "calibration.stress"),
+    (lambda r: r["windows"].pop("W2"), "windows.W2"),
+])
+def test_dec87_validate_registered_loud_failures(mutate, message):
+    """DEC-87 (C.14): the registered schema is validated before any panel arithmetic."""
+    reg = _registered_dec87_large()
+    run_mod.validate_registered(reg)                              # the baseline is valid
+    mutate(reg)
+    with pytest.raises(run_mod.RegisteredSchemaError, match=message):
+        run_mod.validate_registered(reg)
+
+
+def test_dec87_validate_registered_can_require_the_frozen_constants():
+    """DEC-87 (A)/(E) + C.14: a REGISTERED run (the CLI) demands the three frozen null constants of every judged window
+    -- finite ceiling and finite driftfree/drifting quantiles for all seven variants; hand-built unit-test files may
+    omit them (the run then recomputes and says ``frozen_constants_complete: False``)."""
+    reg = _registered_dec87_large()
+    run_mod.validate_registered(reg)                                           # lenient default
+    with pytest.raises(run_mod.RegisteredSchemaError, match="ceiling_method_stress"):
+        run_mod.validate_registered(reg, require_frozen_constants=True)
+    for wn in ("W1", "W2"):
+        reg["windows"][wn]["ceiling_method_stress"] = 0.008
+        reg["windows"][wn]["res_quantile_driftfree"] = {v: 0.02 for v in characteristics.VARIANT_NAMES}
+        reg["windows"][wn]["res_quantile_drifting"] = {v: 0.021 for v in characteristics.VARIANT_NAMES}
+    run_mod.validate_registered(reg, require_frozen_constants=True)            # complete -> fine
+    reg["windows"]["W2"]["res_quantile_drifting"]["vol_max"] = None            # placeholder of an unconfirmed template
+    with pytest.raises(run_mod.RegisteredSchemaError, match=r"res_quantile_drifting.*vol_max"):
+        run_mod.validate_registered(reg, require_frozen_constants=True)
+    reg["windows"]["W2"]["res_quantile_drifting"]["vol_max"] = float("nan")
+    with pytest.raises(run_mod.RegisteredSchemaError, match="nicht endlich"):
+        run_mod.validate_registered(reg, require_frozen_constants=True)
+    run_mod.validate_registered(reg)                                           # NaN is not checked in lenient mode
+
+
+# ---- Data fingerprints (V9) ----------------------------------------------------
+
+def test_dec87_check_data_fingerprints_match_mismatch_and_missing():
+    reg = {"data_fingerprints": {"union_range_fingerprint": "u" * 64, "delisting_dates_sha256": "d" * 64}}
+    good = {"union_range_fingerprint": "u" * 64, "delisting_dates_sha256": "d" * 64, "union_range_detail": {}}
+    run_mod.check_data_fingerprints(reg, good)                                      # match -> silent
+    with pytest.raises(run_mod.DataFingerprintError, match="union_range_fingerprint weicht ab"):
+        run_mod.check_data_fingerprints(reg, {**good, "union_range_fingerprint": "x" * 64})
+    with pytest.raises(run_mod.DataFingerprintError, match="delisting_dates_sha256 weicht ab"):
+        run_mod.check_data_fingerprints(reg, {**good, "delisting_dates_sha256": "x" * 64})
+    with pytest.raises(run_mod.DataFingerprintError, match="fehlt data_fingerprints"):
+        run_mod.check_data_fingerprints({}, good)
+    with pytest.raises(run_mod.DataFingerprintError, match="nicht pruefbar"):
+        run_mod.check_data_fingerprints(reg, None)
+    with pytest.raises(run_mod.DataFingerprintError, match="data_fingerprints.delisting_dates_sha256 fehlt"):
+        run_mod.check_data_fingerprints({"data_fingerprints": {"union_range_fingerprint": "u" * 64}}, good)
+
+
+def test_dec87_run_full_checks_fingerprints_before_any_computation(tmp_path, monkeypatch):
+    """DEC-87 V9: a fingerprint mismatch aborts BEFORE the null is simulated (no verdict, no compute)."""
+    panel, weekly = _build_run_fixture_tree_large(tmp_path)
+    registered = _registered_dec87_large()
+    registered["data_fingerprints"] = {"union_range_fingerprint": "u" * 64, "delisting_dates_sha256": "d" * 64}
+    called = []
+    monkeypatch.setattr(nulls, "run_configuration_null", lambda *a, **k: called.append(1))
+    with pytest.raises(run_mod.DataFingerprintError):
+        run_mod.run_full(panel, weekly, registered,
+                         observed_fingerprints={"union_range_fingerprint": "z" * 64, "delisting_dates_sha256": "d" * 64})
+    with pytest.raises(run_mod.DataFingerprintError, match="nicht pruefbar"):         # YAML has them, caller gave none
+        run_mod.run_full(panel, weekly, registered)
+    assert called == []
+
+
+# ---- Gate (5) inside run_full for H-30 ------------------------------------------
+
+def test_dec87_run_full_feeds_gate5_for_h30_only(dec87_run):
+    """DEC-87 (V5): an H-30 entry carries the per-window Gate (5) median Spearman in its payload (finite on the
+    >= 10-survivor fixture), other hypotheses do not."""
+    _panel, _weekly, _registered, report = dec87_run
+    h30 = report["results"]["H-30_vol_rv"]
+    for wn in ("W1", "W2"):
+        g5 = h30["payload"]["windows"][wn]["gate5_median_spearman"]
+        assert isinstance(g5, float) and math.isfinite(g5)
+        assert h30["verdict"]["per_window"][wn]["gate5_ok"] == (g5 < characteristics.GATE5_SPEARMAN_MAX)
+        assert report["results"]["H-28_mom1"]["payload"]["windows"][wn]["gate5_median_spearman"] is None
+
+
+def test_dec87_run_full_h29_gets_bounce_and_liquidity_in_every_window(dec87_run):
+    """DEC-87 (I): the bounce fixture and the D1-exclusion sensitivity are computed in BOTH judged windows (until
+    v5d: W1 only), as ``{window: value}`` dicts the gate reads per window."""
+    _panel, _weekly, _registered, report = dec87_run
+    p = report["results"]["H-29_rev_gap"]["payload"]
+    assert set(p["bounce_ic"]) == {"W1", "W2"} and set(p["liquidity_ic_without_d1"]) == {"W1", "W2"}
+    assert all(math.isfinite(v) for v in p["bounce_ic"].values())
+    assert report["results"]["H-28_mom1"]["payload"]["bounce_ic"] is None
+
+
+# ---- DEC-53 artifacts / fingerprint / T2 / T3 / T5 / T6 / T7 --------------------
+
+def test_dec87_artifacts_contain_raw_and_residualized_series_and_generator_fingerprint(dec87_run, tmp_path):
+    """DEC-53 / DEC-87 (V7): per computed entry and window the raw AND the residualised weekly IC series (CSV, sha256),
+    bootstrap/permutation replicate fingerprints + seed, and a generator fingerprint (code hash, python/numpy,
+    data fingerprints, parameters); locked entries have no series; the result carries every mandatory artifact."""
+    _panel, _weekly, _registered, report = dec87_run
+    obs = {"union_range_fingerprint": "u" * 64, "delisting_dates_sha256": "d" * 64}
+    report = dict(copy.deepcopy(report), observed_fingerprints=obs, registered_sha256="r" * 64)
+    out = tmp_path / "run_out"
+    arts = run_mod.write_run_artifacts(out, report, require_data_fingerprints=True)["artifacts"]
+    for eid in ("H-28_mom1", "H-29_rev_gap", "H-30_vol_rv"):
+        for wn in ("W1", "W2"):
+            assert f"wp13_run_{eid}_{wn}_ic_weekly.csv" in arts
+            assert f"wp13_run_{eid}_{wn}_ic_weekly_residualized.csv" in arts          # the (3b) series, DEC-53 Pflicht
+    assert not [n for n in arts if "mom2" in n or "vol_beta" in n]                       # locked: no series
+    assert {"wp13_run_json", "wp13_run_fingerprint_json", "l_window_sealed_json"} <= set(arts)
+    for art in arts.values():
+        assert art["sha256"] == panel_load.sha256_file(art["path"])
+    fp = json.loads(Path(arts["wp13_run_fingerprint_json"]["path"]).read_text(encoding="utf-8"))
+    assert fp["seed"] == 53 and fp["code"]["bit_generator"] == "PCG64" and len(fp["code"]["code_sha256"]) == 64
+    assert fp["data_fingerprints"] == obs and fp["registered_sha256"] == "r" * 64
+    assert any(k.startswith("wp13_xsec/run.py") for k in fp["code"]["files"]) and "wp7_universe/panel_load.py" in " ".join(fp["code"]["files"])
+    d = fp["draws"]["H-28_mom1/W1"]
+    assert d["bootstrap_seed"] == 53 and d["permutation_seed"] == 53 and len(d["bootstrap_means_sha256"]) == 64
+    assert len(d["permutation_draws_sha256"]) == 64 and d["bootstrap_n_reps"] == 20
+    assert fp["parameters"]["rules"]["n_reps"] == 12 and fp["beta_control"]["method"] == "fm_neutral_8w"
+    main = json.loads(Path(arts["wp13_run_json"]["path"]).read_text(encoding="utf-8"))
+    assert main["hypothesis_verdicts"]["H-28"]["variants_locked"] == ["mom2"] and "_l_window_sealed" not in main
+    # require_data_fingerprints is a hard requirement when asked for
+    with pytest.raises(run_mod.RunArtifactError, match="ohne Daten-Fingerprints"):
+        run_mod.write_run_artifacts(tmp_path / "run_out2", copy.deepcopy(dec87_run[3]), require_data_fingerprints=True)
+    assert not (tmp_path / "run_out2" / "wp13_run.json").exists()                        # and then NO verdict file
+
+
+def test_dec87_t2_determinism_n3_with_fingerprint(dec87_run, tmp_path):
+    """T2: the full run is deterministic -- three runs on the same inputs give the same result fingerprint
+    (sha256 of every payload/verdict/null re-computation) and byte-identical generator-fingerprint files
+    (N >= 3; the first run is the module fixture's)."""
+    panel, weekly, registered, report1 = dec87_run
+    reports = [report1] + [run_mod.run_full(panel, weekly, copy.deepcopy(registered)) for _ in range(2)]
+    fps = [run_mod.result_fingerprint(r) for r in reports]
+    assert len(set(fps)) == 1 and len(fps[0]) == 64
+    blobs = []
+    for i, r in enumerate(reports):
+        art = run_mod.write_run_artifacts(tmp_path / f"r{i}", copy.deepcopy(r))["artifacts"]
+        blobs.append(Path(art["wp13_run_fingerprint_json"]["path"]).read_bytes())
+    assert blobs[0] == blobs[1] == blobs[2]
+    # a different seed gives a different fingerprint (the fingerprint has teeth)
+    other = copy.deepcopy(registered)
+    other["rules"]["seed"] = 54
+    assert run_mod.result_fingerprint(run_mod.run_full(panel, weekly, other)) != fps[0]
+
+
+def test_dec87_t3_no_checkpoints_artifact_round_trip_documented(dec87_run, tmp_path):
+    """T3 (DEC-75 (7) 'Checkpoint-Round-Trip'): the run is a single pass that has NO checkpoint/resume state -- there is
+    no API to round-trip (documented, DEC-87 V7). What persists is the artifact set, whose round trip is T7: reading it
+    back reproduces the gate estimators. This test pins both statements, so adding a checkpoint later forces a real T3."""
+    assert not [n for n in dir(run_mod) if "checkpoint" in n.lower() or "resume" in n.lower()]
+    assert not [n for n in dir(WP13) if "checkpoint" in n.lower() or "resume" in n.lower()]
+    out = tmp_path / "t3"
+    run_mod.write_run_artifacts(out, copy.deepcopy(dec87_run[3]))
+    info = run_mod.verify_run_artifacts(out, dec87_run[3])
+    assert info["n_entry_windows_checked"] == 6 and info["result_sha256"] == run_mod.result_fingerprint(dec87_run[3])
+
+
+def test_dec87_t5_constants_pin_the_yaml_values_flow_into_every_payload(tmp_path):
+    """T5: the frozen constants ARE the registered YAML's -- IC_min, the ceiling, both quantile sets and the stress
+    calibration pair, per window; the file's sha256 (the Startsperre pin) changes with any of them."""
+    panel, weekly = _build_run_fixture_tree_large(tmp_path)
+    reg = _registered_dec87_large()
+    base = run_mod.run_full(panel, weekly, reg)
+    nc = base["null_calibration"]
+    for wn in ("W1", "W2"):
+        reg["windows"][wn]["ceiling_method_stress"] = nc[wn]["ceiling_method_stress_recomputed"] * 1.03
+        reg["windows"][wn]["res_quantile_driftfree"] = {v: q * 0.97 for v, q in nc[wn]["res_quantile_driftfree_recomputed"].items()}
+        reg["windows"][wn]["res_quantile_drifting"] = {v: q * 1.03 for v, q in nc[wn]["res_quantile_drifting_recomputed"].items()}
+    path = tmp_path / "registered.yaml"
+    path.write_text(yaml.safe_dump(reg, sort_keys=False), encoding="utf-8")
+    sha = run_mod.sha256_of_file(path)
+    loaded = run_mod.load_registered_yaml(path)
+    assert loaded == reg                                                # YAML round trip is exact for these numbers
+    pin = run_mod.registered_constants_pin(loaded)
+    report = run_mod.run_full(panel, weekly, loaded)
+    assert report["frozen_constants_complete"] is True
+    for eid in ("H-28_mom1", "H-29_rev_gap", "H-30_vol_rv"):
+        v = report["results"][eid]["variant"]
+        for wn in ("W1", "W2"):
+            w = report["results"][eid]["payload"]["windows"][wn]
+            assert w["ic_min_capped"] == pin[wn]["ic_min_capped"][v]
+            assert w["selection_ceiling_mean_of_max"] == pin[wn]["ceiling_method_stress"]
+            assert w["res_quantile_driftfree"] == pin[wn]["res_quantile_driftfree"][v]
+            assert w["res_quantile_drifting"] == pin[wn]["res_quantile_drifting"][v]
+            assert report["calibration_used_for_stress_null"][wn]["rho_f"] == pin[wn]["calibration_stress"]["rho_f"]
+            assert report["calibration_used_for_stress_null"][wn]["beta_sd_calibrated"] == pin[wn]["calibration_stress"]["beta_sd_calibrated"]
+    # any change of a pinned constant changes the file hash the run is locked to
+    loaded["windows"]["W1"]["res_quantile_drifting"]["mom1"] += 1e-6
+    path2 = tmp_path / "registered2.yaml"
+    path2.write_text(yaml.safe_dump(loaded, sort_keys=False), encoding="utf-8")
+    assert run_mod.sha256_of_file(path2) != sha
+
+
+def test_dec87_t6_wp13_xsec_never_imports_the_legacy_package():
+    """T6 legacy-import lock for ``wp13_xsec`` (DEC-75 (7), Verfassung): neither the package modules nor the runner
+    script import ``_legacy_v1`` (statically, by AST, or dynamically via importlib strings), and importing the
+    package pulls no ``_legacy_v1`` module into ``sys.modules`` (fresh interpreter)."""
+    import ast
+    pkg_dir = Path(run_mod.__file__).resolve().parent
+    files = sorted(pkg_dir.glob("*.py")) + [Path(WP13.__file__).resolve()]
+    assert len(files) >= 8
+    for f in files:
+        tree = ast.parse(f.read_text(encoding="utf-8"), filename=str(f))
+        for node in ast.walk(tree):
+            if isinstance(node, ast.Import):
+                assert not [a.name for a in node.names if "_legacy_v1" in a.name], f
+            elif isinstance(node, ast.ImportFrom):
+                assert "_legacy_v1" not in (node.module or ""), f
+                assert not [a.name for a in node.names if "_legacy_v1" in a.name], f
+            elif isinstance(node, ast.Call):
+                fn = getattr(node.func, "attr", getattr(node.func, "id", ""))
+                if fn in ("import_module", "__import__"):
+                    assert not [a.value for a in node.args if isinstance(a, ast.Constant) and "_legacy_v1" in str(a.value)], f
+    src_root = Path(run_mod.__file__).resolve().parents[3]
+    code = ("import sys; sys.path.insert(0, %r); import bybit_edge.research.wp13_xsec.run, "
+            "bybit_edge.research.wp13_xsec.prelaunch; "
+            "print(any('_legacy_v1' in m for m in sys.modules))" % str(src_root))
+    out = subprocess.run([sys.executable, "-c", code], capture_output=True, text=True, timeout=120)
+    assert out.returncode == 0, out.stderr
+    assert out.stdout.strip() == "False"
+
+
+def _corrupt_first_value(path: Path) -> None:
+    lines = path.read_text(encoding="utf-8").splitlines()
+    for i in range(1, len(lines)):
+        cols = lines[i].split(",")
+        if cols[1] != "nan":
+            lines[i] = f"{cols[0]},{float(cols[1]) + 0.125!r}"
+            break
+    else:
+        raise AssertionError(f"no finite value to corrupt in {path}")
+    path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+
+
+def test_dec87_t7_artifact_round_trip_reproduces_the_gate_estimators_bitwise(dec87_run, tmp_path):
+    """T7: the written artifacts alone re-derive the gate estimators bit for bit -- mean IC, SE, the moving-block
+    bootstrap bound AND replicate fingerprint, IC_res -- and ``verify_run_artifacts`` says so; every kind of damage
+    (changed series, missing residualised series, missing fingerprint file, wrong result hash) is KEIN VERDIKT."""
+    report = dec87_run[3]
+    out = tmp_path / "t7"
+    arts = run_mod.write_run_artifacts(out, copy.deepcopy(report))["artifacts"]
+    for eid in ("H-28_mom1", "H-29_rev_gap", "H-30_vol_rv"):
+        for wn in ("W1", "W2"):
+            w = report["results"][eid]["payload"]["windows"][wn]
+            raw = np.array(run_mod._read_series_csv(out / f"wp13_run_{eid}_{wn}_ic_weekly.csv"))
+            assert np.array_equal(raw, np.array(w["ic_weekly"]), equal_nan=True)
+            fin = raw[~np.isnan(raw)]
+            assert float(fin.mean()) == w["mean_ic"]
+            assert run_mod.se_of_mean_ic(raw, w["se_detail"]["floor"], w["se_detail"]["w_judged"])["se"] == w["se"]
+            cd = w["ci_detail"]
+            ci = run_mod.moving_block_bootstrap_ci(raw, direction=cd["direction"], block_size=4, n_reps=cd["n_reps"],
+                                                    seed=cd["seed"], level=cd["level"])
+            assert ci["ci_bound_toward_sign"] == w["ci_bound_toward_sign"] and ci["means_sha256"] == cd["means_sha256"]
+            res = np.array(run_mod._read_series_csv(out / f"wp13_run_{eid}_{wn}_ic_weekly_residualized.csv"))
+            assert float(res[~np.isnan(res)].mean()) == w["residualized_mean_ic"]
+    assert run_mod.verify_run_artifacts(out, report)["n_entry_windows_checked"] == 6
+
+    raw_csv = out / "wp13_run_H-28_mom1_W1_ic_weekly.csv"
+    original = raw_csv.read_text(encoding="utf-8")
+    _corrupt_first_value(raw_csv)
+    with pytest.raises(run_mod.RunArtifactError, match="KEIN VERDIKT"):
+        run_mod.verify_run_artifacts(out, report)
+    raw_csv.write_text(original, encoding="utf-8")
+    res_csv = out / "wp13_run_H-29_rev_gap_W2_ic_weekly_residualized.csv"
+    res_text = res_csv.read_text(encoding="utf-8")
+    res_csv.unlink()
+    with pytest.raises(run_mod.RunArtifactError, match="residualisierte Wochenserie"):
+        run_mod.verify_run_artifacts(out, report)
+    res_csv.write_text(res_text, encoding="utf-8")
+    _corrupt_first_value(res_csv)
+    with pytest.raises(run_mod.RunArtifactError, match="KEIN VERDIKT"):
+        run_mod.verify_run_artifacts(out, report)
+    res_csv.write_text(res_text, encoding="utf-8")
+    fp_path = out / "wp13_run_fingerprint.json"
+    fp = json.loads(fp_path.read_text(encoding="utf-8"))
+    fp["result_sha256"] = "0" * 64
+    fp_path.write_text(json.dumps(fp), encoding="utf-8")
+    with pytest.raises(run_mod.RunArtifactError, match="result_sha256"):
+        run_mod.verify_run_artifacts(out, report)
+    fp_path.unlink()
+    with pytest.raises(run_mod.RunArtifactError, match="Generator-Fingerprint"):
+        run_mod.verify_run_artifacts(out, report)
+
+
+def test_dec87_missing_mandatory_artifact_means_no_verdict_file(dec87_run, tmp_path, monkeypatch):
+    """DEC-87 (V7): if a mandatory artifact cannot be written/verified the run aborts loudly and NO verdict file
+    (``wp13_run.json``) exists -- KEIN VERDIKT. Here the residualised series is silently not written."""
+    orig = run_mod._write_series_csv
+
+    def skipping(path, series):
+        if path.name.endswith("_residualized.csv"):
+            return {"path": str(path), "sha256": "0" * 64}
+        return orig(path, series)
+
+    monkeypatch.setattr(run_mod, "_write_series_csv", skipping)
+    out = tmp_path / "abort"
+    with pytest.raises(run_mod.RunArtifactError, match="KEIN VERDIKT"):
+        run_mod.write_run_artifacts(out, copy.deepcopy(dec87_run[3]))
+    assert not (out / "wp13_run.json").exists() and not (out / "wp13_run_L_window_sealed.json").exists()
+
+
+# ---- T1 fixtures with the registered method fm_neutral_8w ----------------------------
+
+def _fm8_constants(returns, alive, symbols, *, n_reps_null=80, rho_f=0.05, beta_sd=0.5):
+    """The DEC-87 constants of a fixture window, computed by ``nulls.run_configuration_null`` -- the registered method
+    ``fm_neutral_8w`` under a stress calibration (``rho_f``/``beta_sd``), driftfree and drifting -- exactly what the
+    Vorlauf freezes and ``run_full`` recomputes -- plus the analytic floor and IC_min."""
+    e_floor, w_judged = _floor_and_symbols(alive, returns.shape[0])
+    cfg = nulls.run_configuration_null(returns, alive, symbols, method="fm_neutral_8w", rho_f=rho_f, beta_sd=beta_sd,
+                                       n_reps=n_reps_null, seed=53)
+    return {"e_floor": e_floor, "w_judged": w_judged, "ic_min": nulls.ic_threshold(e_floor, 1.0, w_judged),
+            **cfg["constants"]}
+
+
+def _fm8_gate(variant, direction, characteristic, returns, alive, symbols, consts, *, bounce=None, outcome=None,
+              gate5=None):
+    """``run_hypothesis`` for both windows (the same arrays in W1 and W2) with the registered method
+    ``fm_neutral_8w`` and the FROZEN ``consts`` (from :func:`_fm8_constants`)."""
+    pit = characteristics.beta_characteristic(returns, symbols, market_symbol="BTCUSDT", trail_win=8, min_weeks=8)
+    both = lambda x: {"W1": x, "W2": x}                                                  # noqa: E731
+    return run_mod.run_hypothesis(
+        "H-X", variant, direction, both(characteristic), both(returns if outcome is None else outcome), both(alive),
+        symbols, both(consts["ic_min"]), both(consts["w_judged"]), both(consts["e_floor"]),
+        both(consts["ceiling_method_stress"]), bounce_ic=bounce, gate5_by_window=gate5,
+        beta_control_method="fm_neutral_8w", beta_control_pit_by_window=both(pit),
+        res_quantile_driftfree_by_window=both(consts["res_quantile_driftfree"][variant]),
+        res_quantile_drifting_by_window=both(consts["res_quantile_drifting"][variant]),
+        n_reps_bootstrap=200, n_reps_permutation=200, seed=53)
+
+
+def _fm8_hypothesis_run(variant, direction, characteristic, returns, alive, symbols, *, bounce=None,
+                        n_reps_null=80, rho_f=0.05, beta_sd=0.5, outcome=None, gate5=None):
+    consts = _fm8_constants(returns, alive, symbols, n_reps_null=n_reps_null, rho_f=rho_f, beta_sd=beta_sd)
+    return (_fm8_gate(variant, direction, characteristic, returns, alive, symbols, consts, bounce=bounce,
+                      outcome=outcome, gate5=gate5), consts, consts["ic_min"])
+
+
+def test_dec87_t1_fm8_positive_fixture_passes():
+    """T1 positive with the registered method: an injected cross-sectional signal (rho 0.30) clears every component --
+    raw IC, bootstrap, IC_min, the fm_neutral_8w-neutralised IC and the (more extreme) binding null quantile."""
+    rng = np.random.default_rng(0)
+    k, w = 120, 52
+    symbols = [f"s{i}" for i in range(k)] + ["BTCUSDT"]
+    returns = rng.normal(0, 0.03, size=(w, k + 1))
+    characteristic = rng.normal(0, 1, size=(w, k + 1))
+    a = 0.30 / math.sqrt(1 - 0.30 ** 2)
+    returns[1:] += a * 0.03 * characteristic[:-1]
+    alive = np.ones((w, k + 1), dtype=bool)
+    res, c, ic_min = _fm8_hypothesis_run("mom1", "positive", characteristic, returns, alive, symbols)
+    assert res["verdict"]["verdict"] == "PASS", res["verdict"]["labels"]
+    w1 = res["payload"]["windows"]["W1"]
+    assert w1["res_quantile_binding"] == max(c["res_quantile_driftfree"]["mom1"], c["res_quantile_drifting"]["mom1"])
+    assert w1["residualized_mean_ic"] > w1["res_quantile_binding"] and w1["selection_ceiling_mean_of_max"] < ic_min
+
+
+def test_dec87_t1_fm8_null_fixture_drops():
+    """T1 null (permuted characteristic, i.e. no information at all) with ``fm_neutral_8w``: no PASS."""
+    rng = np.random.default_rng(1)
+    k, w = 120, 52
+    symbols = [f"s{i}" for i in range(k)] + ["BTCUSDT"]
+    returns = rng.normal(0, 0.03, size=(w, k + 1))
+    characteristic = rng.normal(0, 1, size=(w, k + 1))
+    alive = np.ones((w, k + 1), dtype=bool)
+    res, _c, _ic_min = _fm8_hypothesis_run("mom1", "positive", characteristic, returns, alive, symbols)
+    assert res["verdict"]["verdict"] == "DROP"
+
+
+def _adversarial_beta_panel(seed: int, k: int = 150, w: int = 104):
+    """PRD 5.3 adversarial fixture: an AR(1) market factor (rho 0.2) with drift 0.002, betas U(0.5, 2.0), NO cross-sectional
+    predictability -- the momentum characteristic is only mechanically tied to beta (market-timing artifact)."""
+    rng = np.random.default_rng(seed)
+    rho_f, drift_f, sigma_f = 0.2, 0.002, 0.05
+    beta_true = rng.uniform(0.5, 2.0, size=k)
+    f = np.empty(w)
+    f[0] = drift_f / (1.0 - rho_f) + sigma_f * rng.standard_normal()
+    for t in range(1, w):
+        f[t] = drift_f + rho_f * f[t - 1] + sigma_f * rng.standard_normal()
+    idio = rng.normal(0.0, sigma_f, size=(w, k))
+    returns_full = np.concatenate([beta_true[None, :] * f[:, None] + idio, f[:, None]], axis=1)
+    symbols = [f"s{i}" for i in range(k)] + ["BTCUSDT"]
+    alive = np.ones((w, k + 1), dtype=bool)
+    return returns_full, symbols, alive, characteristics.momentum_characteristic(returns_full, trail_win=1)
+
+
+def test_dec87_t1_fm8_adversarial_beta_fixture_drops_where_the_raw_gate_would_fire():
+    """T1 adversarial with ``fm_neutral_8w`` and the DEC-87 binding null quantile (max of driftfree/drifting). The null
+    is calibrated to the adversary's own world (stress rho_f 0.2, beta_sd 0.45 ~ the U(0.5, 2) dispersion; the v5d
+    calibrations are rho_f 0.05-0.09, i.e. an easier world), frozen ONCE from one panel (as the Vorlauf freezes it) and
+    applied to several independent draws of the fixture. Teeth: in every draw the RAW mean IC is the market-timing
+    artifact (positive, above IC_min, sign/IC_min components pass); the beta-control component is what stops it -- the
+    neutralised IC does not clear the binding quantile -- and the verdict is DROP in all of them."""
+    seeds = (8, 9, 10, 12)
+    returns_full, symbols, alive, mom1 = _adversarial_beta_panel(seeds[0])
+    consts = _fm8_constants(returns_full, alive, symbols, n_reps_null=150, rho_f=0.2, beta_sd=0.45)
+    for seed in seeds:
+        returns_full, symbols, alive, mom1 = _adversarial_beta_panel(seed)
+        res = _fm8_gate("mom1", "positive", mom1, returns_full, alive, symbols, consts)
+        assert res["verdict"]["verdict"] == "DROP", (seed, res["verdict"]["labels"])
+        for wn in ("W1", "W2"):
+            w = res["payload"]["windows"][wn]
+            pw = res["verdict"]["per_window"][wn]
+            assert w["mean_ic"] > w["ic_min_capped"] and pw["sign_ok"] and pw["ic_min_ok"], (seed, w["mean_ic"])   # artifact
+            assert w["residualized_mean_ic"] < w["mean_ic"]                                                        # fm8 removes most of it
+            assert not pw["beta_control_beyond_drifting_null_ok"] and not pw["window_pass"], (seed, w["residualized_mean_ic"])
+            assert w["res_quantile_binding"] == max(w["res_quantile_driftfree"], w["res_quantile_drifting"])
+
+
+def test_dec87_t1_h29_bounce_fixture_fires_no_pass():
+    """T1 H-29: a bounce at least as large as the real |IC| in a window is no PASS even though every other component
+    holds (a strong Lag-2 reversal injected: r[t] = e[t] - c * z(r[t-2]), i.e. rev_gap vs the next week is negative)."""
+    rng = np.random.default_rng(2)
+    k, w = 120, 52
+    symbols = [f"s{i}" for i in range(k)] + ["BTCUSDT"]
+    e = rng.normal(0, 0.03, size=(w, k + 1))
+    c = 0.30 / math.sqrt(1 - 0.30 ** 2) * 0.03
+    returns = e.copy()
+    for t in range(2, w):
+        prev = returns[t - 2]
+        returns[t] = e[t] - c * (prev - prev.mean()) / prev.std(ddof=1)
+    alive = np.ones((w, k + 1), dtype=bool)
+    rev = characteristics.reversal_gap_characteristic(returns)
+    consts = _fm8_constants(returns, alive, symbols, n_reps_null=80)
+    clean = _fm8_gate("rev_gap", "negative", rev, returns, alive, symbols, consts, bounce={"W1": 0.0005, "W2": 0.0005})
+    assert clean["verdict"]["verdict"] == "PASS", clean["verdict"]["labels"]
+    ic_real = abs(clean["payload"]["windows"]["W2"]["mean_ic"])
+    hit = _fm8_gate("rev_gap", "negative", rev, returns, alive, symbols, consts,
+                    bounce={"W1": 0.0005, "W2": ic_real + 0.001})
+    assert hit["verdict"]["verdict"] == "DROP" and hit["verdict"]["bounce_windows"] == ["W2"]
+    assert hit["verdict"]["bounce_kill"] and any("Artefakt Bounce" in l for l in hit["verdict"]["labels"])
+    assert all(r["window_pass"] for r in hit["verdict"]["per_window"].values())      # only the bounce rule fires
+
+
+def test_dec87_t1_a3v_fixture_same_vol_dispersion_no_relation_fires_no_gate():
+    """T1 A3-V (PRD 5.3 adversarial fixture for H-30, DEC-87 (G)): wide vol DISPERSION across symbols, NO relation between
+    vol and return, daily log returns with E[r_log] = mu - sigma^2/2 (mu = 0: every symbol has the same ARITHMETIC
+    mean). With the weekly sigma_w and the ADDED drag the vol-weighted, adjusted outcome has no negative relation to vol
+    (a small POSITIVE offset remains: the drag adjustment uses the NOISY estimate sigma_w-hat, whose regression to the
+    mean over-corrects high estimates -- against the registered negative direction, i.e. conservative); no component in
+    the hypothesis direction fires and the verdict is DROP. The same data under the pre-DEC-87 formula (daily drag
+    SUBTRACTED from the weekly log outcome) and under the right units with the wrong sign give clearly lower ICs -- the
+    mechanical advantage in the registered direction this fixture exists to catch."""
+    k, n_weeks = 150, 70
+    rng = np.random.default_rng(31)
+    daily_sd = np.exp(np.log(0.055) + 0.5 * rng.standard_normal(k + 1))         # wide dispersion, incl. the BTC column
+    panel, weeks, returns = _weekly_daily_panel(k=k + 1, n_weeks=n_weeks, seed=32, daily_sd=daily_sd)
+    symbols = [f"s{i}" for i in range(k)] + ["BTCUSDT"]
+    alive = np.ones((len(weeks), k + 1), dtype=bool)
+    vol_rv = characteristics.realized_vol_characteristic(panel, weeks)
+    day_count = characteristics.weekly_valid_day_count(panel, weeks)
+    new_outcome = run_mod.h30_outcome_for_window(returns, vol_rv, day_count)
+    new_ic = ic.weekly_ic_series(vol_rv, new_outcome, alive, convention="close_at_last")["mean_ic"]
+
+    def ic_of(pre_aligned):
+        return ic.weekly_ic_series(vol_rv, run_mod.prealigned_outcome_to_returns_like(pre_aligned), alive,
+                                   convention="close_at_last")["mean_ic"]
+
+    target_d = float(np.median(vol_rv[~np.isnan(vol_rv)]))
+    old_pre = np.full_like(returns, np.nan)
+    old_pre[:-1] = (returns[1:] - 0.5 * vol_rv[:-1] ** 2) * (target_d / vol_rv[:-1])          # the pre-DEC-87 formula
+    sigma_w = np.sqrt(day_count) * vol_rv
+    wrong_sign = np.full_like(returns, np.nan)
+    wrong_sign[:-1] = (returns[1:] - 0.5 * sigma_w[:-1] ** 2) * (np.nanmedian(sigma_w) / sigma_w[:-1])   # weekly units, drag subtracted
+    old_ic, wrong_ic = ic_of(old_pre), ic_of(wrong_sign)
+
+    se_ref = 1.0 / math.sqrt(k) / math.sqrt(len(weeks) - 1)
+    assert -2.0 * se_ref < new_ic < 3.5 * se_ref, (new_ic, se_ref)               # no advantage in the negative direction
+    assert new_ic - old_ic > 2.0 * se_ref, (new_ic, old_ic, se_ref)              # the old formula tilts negative
+    assert wrong_ic < -3.5 * se_ref, (wrong_ic, se_ref)                          # the sign error is a strong artifact
+
+    g5 = {"W1": 0.1, "W2": 0.1}
+    res, _c, ic_min = _fm8_hypothesis_run("vol_rv", "negative", vol_rv, returns, alive, symbols, outcome=new_outcome,
+                                          gate5=g5, n_reps_null=40)
+    assert res["verdict"]["verdict"] == "DROP"
+    for wn in ("W1", "W2"):
+        assert not res["verdict"]["per_window"][wn]["window_pass"]
+        assert res["payload"]["windows"][wn]["mean_ic"] > -ic_min                  # nothing in the hypothesis direction
+
+
+def _prd_positive_panel(*, k=200, seed=7, ic_mom1=0.06, ic_rev=0.06, n_sectors=8, sigma_f=0.06, rho_f=0.05,
+                        beta_sd=0.4, sigma_g=0.03, sigma_e=0.08):
+    """The PRD 5.3 positive-control fixture (Drittfassung draft 3/6): an injected cross-sectional IC of 0.06
+    (mom1 positive, rev_gap negative, i.e. a Lag-2 reversal), INDEPENDENT of beta, on a panel with a common BTC factor
+    (the market column IS the factor, DEC-85 (i)), heterogeneous betas and sector blocks (a common sector shock per
+    week). Union-panel-shaped dicts, no disk: ``panel`` (daily closes/turnover whose 7 daily returns sum exactly to
+    the weekly return) and ``weekly``."""
+    from datetime import timedelta
+    rng = np.random.default_rng(seed)
+    weeks_d, d0 = [], date(2024, 5, 6)
+    while d0 <= date(2026, 6, 29):
+        weeks_d.append(d0)
+        d0 += timedelta(days=7)
+    n_w, n = len(weeks_d), k + 1
+    symbols = ["BTCUSDT"] + [f"S{i:03d}USDT" for i in range(k)]
+    beta = np.concatenate([[1.0], 1.0 + beta_sd * rng.standard_normal(k)])
+    sector = np.concatenate([[-1], np.arange(k) % n_sectors])
+    f = np.empty(n_w)
+    f[0] = sigma_f * rng.standard_normal()
+    for t in range(1, n_w):
+        f[t] = rho_f * f[t - 1] + sigma_f * rng.standard_normal()
+    g = sigma_g * rng.standard_normal((n_w, n_sectors))
+    e = sigma_e * rng.standard_normal((n_w, n))
+    sigma_tot = math.sqrt(sigma_e ** 2 + sigma_g ** 2 + (beta_sd * sigma_f) ** 2)
+    c1 = ic_mom1 / math.sqrt(1 - ic_mom1 ** 2) * sigma_tot
+    c2 = ic_rev / math.sqrt(1 - ic_rev ** 2) * sigma_tot
+
+    def z(row):
+        x = row[1:]
+        sd = x.std(ddof=1)
+        return np.concatenate([[0.0], (x - x.mean()) / (sd if sd > 0 else 1.0)])
+
+    r = np.zeros((n_w, n))
+    for t in range(n_w):
+        row = beta * f[t] + np.where(sector >= 0, g[t, np.maximum(sector, 0)], 0.0) + e[t]
+        if t >= 1:
+            row = row + c1 * z(r[t - 1])
+        if t >= 2:
+            row = row - c2 * z(r[t - 2])
+        row[0] = f[t]
+        r[t] = row
+    daily_noise = 0.01 * rng.standard_normal((n_w, 7, n))
+    daily_noise -= daily_noise.mean(axis=1, keepdims=True)
+    dates, close_rows, turnover_rows = [], [], []
+    price = np.full(n, 100.0)
+    for t, wd in enumerate(weeks_d):
+        daily = r[t][None, :] / 7.0 + daily_noise[t]
+        for day in range(7):
+            price = price * np.exp(daily[day])
+            dates.append((wd + timedelta(days=day)).isoformat())
+            close_rows.append(price.copy())
+            turnover_rows.append(1e6 * np.exp(0.5 * rng.standard_normal(n)))
+    close = np.array(close_rows)
+    returns = np.zeros((n_w, n))
+    returns[1:] = np.log(close[6::7][1:] / close[6::7][:-1])
+    valid = np.ones((n_w, n), dtype=bool)
+    valid[0] = False
+    panel = {"symbols": symbols, "dates": dates, "close": close, "turnover": np.array(turnover_rows)}
+    weekly = {"weeks": [w.isoformat() for w in weeks_d], "returns": returns, "alive": np.ones((n_w, n), dtype=bool),
+              "returns_valid": valid}
+    return panel, weekly
+
+
+def _prd_registered(weekly, entries, *, n_reps=60):
+    reg = {"hypotheses": entries, "windows": {}, "beta_control": {"method": "fm_neutral_8w", "beta_window_weeks": 8},
+           "rules": {"seed": 53, "n_reps": n_reps, "n_reps_bootstrap": 200, "n_reps_permutation": 200}}
+    from bybit_edge.research.wp13_xsec import prelaunch as prelaunch_mod
+    for wn, (a, b) in {"W1": ("2024-07-01", "2025-06-30"), "W2": ("2025-07-01", "2026-06-30")}.items():
+        win = prelaunch_mod.slice_window(weekly["weeks"], a, b, weekly["returns"], weekly["alive"])
+        fl = nulls.analytic_permutation_floor(win["alive"], win["weeks"])
+        thr = nulls.ic_threshold(fl["e_floor"], 1.0, fl["w_judged"])
+        reg["windows"][wn] = {"start": a, "end": b, "ic_min_capped": {v: thr for v in characteristics.VARIANT_NAMES},
+                              "w_judged": fl["w_judged"], "calibration": _window_calibration(0.10, 0.45)}
+    return reg
+
+
+def test_dec87_prd_positive_fixture_passes_end_to_end_through_run_full():
+    """DEC-87 (T1/Positivkontrolle): the PRD 5.3 positive-control fixture -- injected IC 0.06 + common BTC factor/beta +
+    sector blocks -- through ``run_full`` with the registered ``fm_neutral_8w`` and the DEC-87 null constants: BOTH
+    injected variants (mom1 positive, rev_gap negative) PASS and their hypotheses aggregate to PASS; the H-30 entry
+    (vol_rv, NO injected vol/return relation, Gate (5) satisfied since turnover is independent of vol) does not."""
+    panel, weekly = _prd_positive_panel()
+    entries = {"H-28_mom1": {"hypothesis": "H-28", "variant": "mom1", "direction": "positive"},
+               "H-29_rev_gap": {"hypothesis": "H-29", "variant": "rev_gap", "direction": "negative"},
+               "H-30_vol_rv": {"hypothesis": "H-30", "variant": "vol_rv", "direction": "negative",
+                               "outcome": "vol_weighted"}}
+    report = run_mod.run_full(panel, weekly, _prd_registered(weekly, entries))
+    for eid in ("H-28_mom1", "H-29_rev_gap"):
+        v = report["results"][eid]["verdict"]
+        assert v["verdict"] == "PASS", (eid, v["labels"])
+        for wn in ("W1", "W2"):
+            w = report["results"][eid]["payload"]["windows"][wn]
+            assert abs(w["mean_ic"]) > 0.04 and abs(w["residualized_mean_ic"]) > abs(w["res_quantile_binding"])
+            assert w["selection_ceiling_mean_of_max"] < w["ic_min_capped"]
+    assert report["hypothesis_verdicts"]["H-28"]["verdict"] == "PASS" == report["hypothesis_verdicts"]["H-29"]["verdict"]
+    assert report["results"]["H-29_rev_gap"]["verdict"]["bounce_kill"] is False
+    h30 = report["results"]["H-30_vol_rv"]
+    assert h30["verdict"]["verdict"] == "DROP" and report["hypothesis_verdicts"]["H-30"]["verdict"] == "DROP"
+    assert all(h30["payload"]["windows"][wn]["gate5_median_spearman"] < 0.6 for wn in ("W1", "W2"))
+
+
+# ---- the synthetic end-to-end CLI run: --prelaunch + --emit-registered-template + --run -------------
+
+def test_dec87_cli_end_to_end_prelaunch_emit_run_produces_a_verdict_with_all_dec53_artifacts(tmp_path, monkeypatch):
+    """Abnahme: ``--prelaunch`` -> ``--emit-registered-template`` -> ``--run`` on the synthetic union tree. The pass
+    table's tolerance factors are relaxed (12-symbol panel, 5 replicates: the strict DEC-77 bounds reject everything,
+    see ``test_dec87_prelaunch_without_a_confirmed_method...``) so a method is confirmed; everything else is the real
+    pipeline: confirmation, frozen constants from ``nulls.run_configuration_null``, the YAML with sha256 lock,
+    per-window calibration, fingerprints measured on the loaded panel and checked, artifacts written and verified, a
+    verdict for every entry and every hypothesis."""
+    real = prelaunch_module.beta_control_pass_table
+
+    def relaxed(study, **kw):
+        kw.setdefault("null_mean_tol_factor", 1e6)
+        kw.setdefault("ceiling_tol_factor", 1e6)
+        return real(study, **kw)
+
+    monkeypatch.setattr(prelaunch_module, "beta_control_pass_table", relaxed)
+    _panel, _weekly, surv_base, _sm, del_base, _dm, _dd = _build_prelaunch_fixture_tree(tmp_path)
+    pre_out = tmp_path / "prelaunch"
+    ns = _ns_prelaunch(panel_base=str(surv_base), delisted_base=str(del_base), out=str(pre_out),
+                       gegenprobe_n_reps=10, gegenprobe_rel_tol=10.0, gegenprobe_z_max=1e9,
+                       no_gegenprobe_market_check=True, calibration_search_n_reps=5, calibration_search_rel_tol=10.0,
+                       calibration_search_max_iter=8)
+    assert WP13.cmd_prelaunch(ns) == 0
+    pre = json.loads((pre_out / "wp13a_prelaunch.json").read_text(encoding="utf-8"))
+    assert pre["beta_control_confirmation"]["confirmed_method"]
+    fps = pre["data_fingerprints"]
+    assert len(fps["union_range_fingerprint"]) == 64 and fps["delisting_dates_sha256"] == panel_load.sha256_file(del_base / "delisting_dates.json")
+    md = (pre_out / "wp13a_prelaunch.md").read_text(encoding="utf-8")
+    assert "## Gewinner-Bestaetigung" in md and "## Daten-Fingerprints" in md
+
+    template = tmp_path / "registered.yaml"
+    assert WP13.cmd_emit_registered_template(str(pre_out / "wp13a_prelaunch.json"), str(template)) == 0
+    reg = run_mod.load_registered_yaml(template)
+    assert reg["beta_control"]["method"] == pre["beta_control_confirmation"]["confirmed_method"]
+    assert reg["data_fingerprints"]["union_range_fingerprint"] == fps["union_range_fingerprint"]
+    assert reg["rules"]["n_reps"] == 5
+    # the orchestrator-side step: the test only shrinks the bootstrap/permutation reps (not frozen constants)
+    reg["rules"].update(n_reps_bootstrap=20, n_reps_permutation=20)
+    template.write_text(yaml.safe_dump(reg, sort_keys=False), encoding="utf-8")
+    sha = run_mod.sha256_of_file(template)
+
+    run_out = tmp_path / "run_out"
+    ns_run = WP13.argparse.Namespace(
+        run=True, prelaunch=False, registered=str(template), registered_sha256=sha,
+        panel_base=str(surv_base), delisted_base=str(del_base), delisted_manifest="", delisting_dates="",
+        start_year=2021, end_year=2026, as_of="2027-01-01", out=str(run_out), seed=53,
+        convention="close_at_last", allow_partial=False)
+    assert WP13.cmd_run(ns_run) == 0
+    main = json.loads((run_out / "wp13_run.json").read_text(encoding="utf-8"))
+    assert set(main["hypothesis_verdicts"]) == {"H-28", "H-29", "H-30"}
+    assert set(main["results"]) == set(reg["hypotheses"])
+    assert main["observed_fingerprints"]["union_range_fingerprint"] == fps["union_range_fingerprint"]
+    assert main["registered_sha256"] == sha and main["frozen_constants_complete"] is True
+    for eid, hcfg in reg["hypotheses"].items():
+        res = main["results"][eid]
+        assert res["verdict"]["verdict"] in ("PASS", "DROP")
+        if hcfg.get("status") == "gl012_pre_run":
+            assert res["computed"] is False
+            continue
+        for wn in ("W1", "W2"):
+            assert (run_out / f"wp13_run_{eid}_{wn}_ic_weekly.csv").is_file()
+            assert (run_out / f"wp13_run_{eid}_{wn}_ic_weekly_residualized.csv").is_file()
+    assert (run_out / "wp13_run_fingerprint.json").is_file() and (run_out / "wp13_run_L_window_sealed.json").is_file()
+    fp = json.loads((run_out / "wp13_run_fingerprint.json").read_text(encoding="utf-8"))
+    assert fp["data_fingerprints"]["delisting_dates_sha256"] == fps["delisting_dates_sha256"]
+    assert fp["code"]["code_sha256"] and fp["registered_sha256"] == sha
+
+    # a YAML pinned to a DIFFERENT panel fingerprint is refused before any verdict (V9): rc=1, no verdict file
+    bad = copy.deepcopy(reg)
+    bad["data_fingerprints"]["union_range_fingerprint"] = "0" * 64
+    bad_path = tmp_path / "registered_bad.yaml"
+    bad_path.write_text(yaml.safe_dump(bad, sort_keys=False), encoding="utf-8")
+    ns_bad = WP13.argparse.Namespace(**{**vars(ns_run), "registered": str(bad_path),
+                                        "registered_sha256": run_mod.sha256_of_file(bad_path),
+                                        "out": str(tmp_path / "run_bad")})
+    assert WP13.cmd_run(ns_bad) == 1
+    assert not (tmp_path / "run_bad" / "wp13_run.json").exists()
+    # the old global-calibration form is refused by the CLI pre-flight (rc=1), before the panel is read
+    old = copy.deepcopy(reg)
+    old["calibration"] = {"stress": {"rho_f": 0.1, "beta_sd_calibrated": 0.5}}
+    old_path = tmp_path / "registered_old.yaml"
+    old_path.write_text(yaml.safe_dump(old, sort_keys=False), encoding="utf-8")
+    ns_old = WP13.argparse.Namespace(**{**vars(ns_run), "registered": str(old_path),
+                                        "registered_sha256": run_mod.sha256_of_file(old_path),
+                                        "out": str(tmp_path / "run_old")})
+    assert WP13.cmd_run(ns_old) == 1 and not (tmp_path / "run_old").exists()
+    # a template without frozen constants (e.g. emitted when no method was confirmed) is refused by the pre-flight
+    unfrozen = copy.deepcopy(reg)
+    unfrozen["windows"]["W1"]["ceiling_method_stress"] = None
+    unfrozen_path = tmp_path / "registered_unfrozen.yaml"
+    unfrozen_path.write_text(yaml.safe_dump(unfrozen, sort_keys=False), encoding="utf-8")
+    ns_unfrozen = WP13.argparse.Namespace(**{**vars(ns_run), "registered": str(unfrozen_path),
+                                             "registered_sha256": run_mod.sha256_of_file(unfrozen_path),
+                                             "out": str(tmp_path / "run_unfrozen")})
+    assert WP13.cmd_run(ns_unfrozen) == 1 and not (tmp_path / "run_unfrozen").exists()

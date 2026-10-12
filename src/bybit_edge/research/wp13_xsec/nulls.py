@@ -170,6 +170,7 @@ The estimators here skip NaN; IC computations stay on ``returns``.
 """
 from __future__ import annotations
 
+import hashlib
 import math
 from typing import Any
 
@@ -195,6 +196,7 @@ __all__ = [
     "factor_share_gegenprobe", "calibrate_beta_sd_to_observed_share",
     "CALIBRATION_SEARCH_N_REPS_DEFAULT", "CALIBRATION_SEARCH_REL_TOL_DEFAULT",
     "CALIBRATION_SEARCH_MAX_ITER_DEFAULT", "estimation_returns",
+    "binding_quantile", "frozen_null_constants", "run_configuration_null", "REGISTERED_K",
 ]
 
 #: DEC-51/DEC-74 (d): per-window critical value (alpha 0.05 one-sided).
@@ -211,6 +213,10 @@ REGISTERED_DIRECTION: dict[str, str] = {
     "rev_gap": "negative",
     "vol_rv": "negative", "vol_max": "negative", "vol_beta": "negative",
 }
+
+#: DEC-73 Entscheidung 1 / DEC-87 (J): the F-XSEC1 selection family has K = 7 variants, a FIXED
+#: Benjamini-Hochberg denominator whether or not every variant is computed.
+REGISTERED_K = len(REGISTERED_DIRECTION)
 
 
 # ----------------------------------------------------------------------------
@@ -293,7 +299,9 @@ def fit_ar1_per_symbol(returns: np.ndarray, alive: np.ndarray, *,
     n_pairs = np.zeros(n_symbols, dtype=np.int64)
     n_obs = np.zeros(n_symbols, dtype=np.int64)
     for j in range(n_symbols):
-        idx = alive[:, j]
+        # DEC-87 (item 10): a NaN cell (``returns_est`` -- the symbol did not trade) is a missing
+        # observation, never a zero return; NaN-free input behaves exactly as before.
+        idx = alive[:, j] & ~np.isnan(returns[:, j])
         obs = returns[idx, j]
         n_obs[j] = obs.size
         if obs.size < 2:
@@ -392,6 +400,9 @@ def persistence_null(
     function only owns the AR(1) fit/simulate loop and the
     quantile/autocorrelation aggregation, never a parallel IC
     implementation.
+
+    **DEC-87 (item 10):** callers pass ``returns_est`` (:func:`estimation_returns`,
+    NaN where a symbol did not trade): :func:`fit_ar1_per_symbol` skips NaN cells.
     """
     ar1 = fit_ar1_per_symbol(returns, alive)
     phi, sigma = np.array(ar1["phi"]), np.array(ar1["sigma"])
@@ -1880,6 +1891,70 @@ def beta_control_method_study(
     }
 
 
+def binding_quantile(q_driftfree: float | None, q_drifting: float | None, direction: str) -> float | None:
+    """DEC-87 (E): of the two stress-null quantiles (drift 0 and
+    ``DRIFT_F_DRIFTING``) the one MORE EXTREME in the hypothesis direction is
+    binding -- the LARGER one for ``"positive"``, the SMALLER one for
+    ``"negative"`` (a stricter bar for the residualised mean IC). A missing/NaN
+    side is ignored; both missing -> ``None``."""
+    if direction not in ("positive", "negative"):
+        raise ValueError(f"direction must be 'positive' or 'negative', got {direction!r}")
+    vals = [q for q in (q_driftfree, q_drifting) if q is not None and not math.isnan(q)]
+    if not vals:
+        return None
+    return max(vals) if direction == "positive" else min(vals)
+
+
+def frozen_null_constants(driftfree: dict[str, Any], drifting: dict[str, Any]) -> dict[str, Any]:
+    """DEC-87 (A)/(E): the three kinds of constants the Drittfassung FREEZES per
+    window, derived from the two stress-null cells (:func:`beta_controlled_
+    factor_null` outputs for drift 0 / ``DRIFT_F_DRIFTING``):
+
+      * ``ceiling_method_stress`` -- the GL-012-binding selection ceiling =
+        ``ceiling_mean_of_max`` of the registered method under the window's
+        STRESS calibration, driftfree (A);
+      * ``res_quantile_driftfree`` / ``res_quantile_drifting`` -- the 99.36 %
+        one-sided quantile of the residualised mean IC per variant under drift 0
+        and drift 0.002/week (E);
+      * ``res_quantile_binding`` -- per variant the more extreme of the two (E).
+
+    The Vorlauf (freeze) and the Lauf (recompute, +-10 %) BOTH call this on cells
+    produced by :func:`run_configuration_null`, so the two are the same code."""
+    free_v, drift_v = driftfree["variants"], drifting["variants"]
+    q_free = {v: free_v[v]["quantile_one_sided"] for v in free_v}
+    q_drift = {v: drift_v[v]["quantile_one_sided"] for v in free_v}
+    q_bind = {v: binding_quantile(q_free[v], q_drift[v], free_v[v]["direction"]) for v in free_v}
+    return {"ceiling_method_stress": driftfree["ceiling_mean_of_max"],
+            "ceiling_method_stress_drifting_report_only": drifting["ceiling_mean_of_max"],
+            "res_quantile_driftfree": q_free, "res_quantile_drifting": q_drift,
+            "res_quantile_binding": q_bind}
+
+
+def run_configuration_null(
+    window_returns_est: np.ndarray, window_alive: np.ndarray, symbols: list[str], *, method: str,
+    rho_f: float, beta_sd: float | None, convention: ic.Convention = "close_at_last",
+    n_reps: int = FACTOR_NULL_N_REPS_DEFAULT, seed: int = FACTOR_NULL_SEED,
+    quantile: float = SELECTION_CEILING_ONE_SIDED_QUANTILE, market_symbol: str = "BTCUSDT",
+) -> dict[str, Any]:
+    """DEC-87 (A)/(E): THE null configuration of the Lauf -- the registered
+    ``method`` under the window's STRESS calibration (``rho_f``/``beta_sd``,
+    from the registered ``windows.<W>.calibration.stress``), ``n_reps``
+    replicates, seed 53, all 7 variants (K stays 7), TWICE: driftfree
+    (``DRIFT_F_DRIFTFREE``) and drifting (``DRIFT_F_DRIFTING``, 0.002/week, the
+    only registered drift). ``run.run_full`` recomputes with exactly this and
+    ``prelaunch.assemble_prelaunch_report`` freezes with exactly this, so the
+    frozen constants (:func:`frozen_null_constants`) ARE the Lauf configuration.
+    Returns ``{"driftfree": cell, "drifting": cell, "constants": ...}``."""
+    common = dict(method=method, convention=convention, n_reps=n_reps, seed=seed, quantile=quantile,
+                  market_symbol=market_symbol, rho_f=rho_f, beta_sd=beta_sd)
+    driftfree = beta_controlled_factor_null(
+        window_returns_est, window_alive, symbols, drift_f=DRIFT_F_DRIFTFREE, **common)
+    drifting = beta_controlled_factor_null(
+        window_returns_est, window_alive, symbols, drift_f=DRIFT_F_DRIFTING, **common)
+    return {"driftfree": driftfree, "drifting": drifting,
+            "constants": frozen_null_constants(driftfree, drifting)}
+
+
 def block_permute_week_index(n_weeks: int, block_size: int, rng: np.random.Generator) -> np.ndarray:
     """The index permutation :func:`block_permutation_null_draws` applies
     to the OUTCOME panel: partition ``0..n_weeks-1`` into consecutive
@@ -1937,11 +2012,14 @@ def block_permutation_pvalue(
     draws = block_permutation_null_draws(
         characteristic, returns, alive, convention=convention, block_size=block_size,
         n_reps=n_reps, seed=seed)
+    # DEC-87 (V7)/DEC-53: a content fingerprint of the replicates (seed + sha256 of the draws).
+    draws_sha256 = hashlib.sha256(np.ascontiguousarray(draws, dtype="<f8").tobytes()).hexdigest()
     finite = draws[~np.isnan(draws)]
     if finite.size == 0:
         return {"p_value": float("nan"), "n_reps": n_reps, "n_reps_finite": 0,
                 "draws_mean": float("nan"), "draws_sd": float("nan"),
-                "direction": direction, "block_size": block_size, "ic_real": ic_real}
+                "direction": direction, "block_size": block_size, "ic_real": ic_real,
+                "seed": seed, "draws_sha256": draws_sha256}
     if direction == "positive":
         count = int((finite >= ic_real).sum())
     else:
@@ -1951,4 +2029,5 @@ def block_permutation_pvalue(
         "p_value": p_value, "n_reps": n_reps, "n_reps_finite": int(finite.size),
         "draws_mean": float(finite.mean()), "draws_sd": float(finite.std(ddof=1)) if finite.size > 1 else float("nan"),
         "direction": direction, "block_size": block_size, "ic_real": ic_real,
+        "seed": seed, "draws_sha256": draws_sha256,
     }

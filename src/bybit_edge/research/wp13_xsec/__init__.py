@@ -65,5 +65,20 @@ mode reads the REGISTERED ``beta_control: {method, beta_window_weeks}``
 (``run.py``'s ``run_full``, C.14 loud fail if missing/empty/unknown) and
 applies EXACTLY that method via ``ic.apply_beta_control`` -- the SAME
 dispatcher the calibration study uses.
+
+**DEC-87 -- Drittfassung H-28..H-30, Vorlauf v5e / Lauf.** The winner method is
+CONFIRMED with 1.000 replicates per window against the unchanged DEC-77 rule, each
+window with its OWN calibration (``prelaunch.confirm_beta_control_winner``; the v5d
+defect reused W2's); the frozen Lauf constants (binding GL-012 ceiling
+``ceiling_method_stress``, driftfree and drift-0.002 residualised quantiles) are
+produced by ``nulls.run_configuration_null`` -- the same function ``run.run_full``
+recomputes with (+-10 %); the registered YAML carries the calibration PER WINDOW; H-30
+works in weekly units with the drag ADDED to the log outcome (``ic.vol_weighted_
+outcome_with_drag``); ``gates.evaluate`` kills a PASS on a bounce in any window,
+labels illiquidity per window and checks Gate (5); one entry per variant (BH
+denominator fixed 7, locked ``gl012_pre_run`` entries count with p = 1); DEC-53
+artifacts incl. the residualised series and a generator fingerprint, verified
+before any verdict is written (KEIN VERDIKT otherwise); data fingerprints of the
+loaded panel are checked against the YAML.
 """
 from __future__ import annotations

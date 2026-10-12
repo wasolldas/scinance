@@ -19,21 +19,16 @@ that performs that t -> t+1 lookup; nothing here shifts ``returns``
 itself.
 
 **Reversal Gap-Design deviation (PRD 5.3, verbatim: "Formation und
-Halteperiode um einen Tag getrennt", i.e. a ONE-DAY gap) -- documented
-here as required by the task brief, flagged for orchestrator confirmation
-before the Zweitfassung run.** WP-13 operates exclusively on the WEEKLY
-``panel_1d``/``panel_1d_delisted`` union (PRD 5.3: "Vollstaendig aus dem
-WP-7-``panel_1d``"); there is no daily signal/outcome pipeline in this
-package. The smallest gap representable on a weekly grid is therefore ONE
-WEEK, not one day: formation is week ``t-1``'s return, held for week
-``t+1``'s return, with week ``t`` entirely skipped as the gap (instead of
-skipping the final day of week ``t-1`` / first day of week ``t+1`` as the
-PRD's literal wording describes). This is a REAL, structural deviation
-from the registered PRD text, not a rounding choice -- it changes what
-the "Bid-Ask-Bounce" control actually eliminates (a full week of
-mean-reversion opportunity between formation and holding, instead of one
-day) and must be confirmed by the Orchestrator before the Zweitfassung
-registration cites it as satisfying PRD 5.3's Gap-Design requirement.
+Halteperiode um einen Tag getrennt", i.e. a ONE-DAY gap).** WP-13 operates
+on the WEEKLY ``panel_1d``/``panel_1d_delisted`` union (PRD 5.3: "Vollstaendig
+aus dem WP-7-``panel_1d``"); the whole null machinery (persistence null,
+factor null, calibration) has weekly proxies only, so the gap is ONE WEEK on
+the weekly grid: formation is week ``t-1``'s return, held for week ``t+1``'s
+return, week ``t`` entirely skipped. DEC-87 (B): a REGISTERED, LABELLED
+deviation from PRD 5.3 -- it eliminates the bid-ask bounce at least as
+strictly as a one-day gap (formation and outcome share no close) but tests a
+Lag-2 reversal, not the PRD one-day design ("PRD-Ein-Tages-Design nicht
+getestet").
 """
 from __future__ import annotations
 
@@ -52,7 +47,8 @@ __all__ = [
     "beta_characteristic", "weekly_turnover", "trailing_median_turnover",
     "decile_bucket", "compute_all_characteristics",
     "weekly_only_proxy_characteristic", "WEEKLY_ONLY_VARIANT_NAMES",
-    "weekly_valid_day_count",
+    "weekly_valid_day_count", "weekly_vol_from_daily", "GATE5_SPEARMAN_MAX",
+    "characteristic_turnover_spearman",
 ]
 
 #: PRD 5.3: momentum formation lengths 1/2/4 weeks.
@@ -61,6 +57,10 @@ MOMENTUM_TRAIL_WEEKS: tuple[int, ...] = (1, 2, 4)
 VOL_BETA_TRAIL_WEEKS = 8
 #: DEC-74 (f): liquidity decile from a trailing 8-week MEDIAN turnover, PIT.
 LIQUIDITY_TRAIL_WEEKS = 8
+
+#: DEC-74 (g) / PRD 5.3 Gate (5): the median weekly Spearman between an H-30
+#: characteristic's rank and the trailing-turnover rank must stay below this.
+GATE5_SPEARMAN_MAX = 0.60
 
 #: The K=7 F-XSEC1 cohort (DEC-73 Entscheidung 1), stable order used
 #: everywhere a per-variant table is built (BH-FDR unit, DEC-74 (e)).
@@ -207,6 +207,23 @@ def weekly_valid_day_count(panel: dict[str, Any], weeks: list[str], *,
     return out
 
 
+def weekly_vol_from_daily(vol_rv: np.ndarray, day_count: np.ndarray) -> np.ndarray:
+    """DEC-87 (G): the WEEKLY vol ``sigma_w[t] = sqrt(n_t) * vol_rv[t]`` --
+    ``vol_rv`` is the SD of the week's DAILY log returns
+    (:func:`realized_vol_characteristic`, daily units, NO scaling) and ``n_t``
+    the number of valid daily returns that week
+    (:func:`weekly_valid_day_count`). NaN wherever ``vol_rv`` is NaN or
+    ``n_t < 1``. Shape ``[n_weeks, n_symbols]`` like both inputs; C.14: a shape
+    mismatch is a loud ``ValueError``."""
+    if vol_rv.shape != day_count.shape:
+        raise ValueError(f"vol_rv shape {vol_rv.shape} != day_count shape {day_count.shape}")
+    n = day_count.astype(np.float64)
+    out = np.full(vol_rv.shape, np.nan, dtype=np.float64)
+    ok = ~np.isnan(vol_rv) & (n >= 1.0)
+    out[ok] = np.sqrt(n[ok]) * vol_rv[ok]
+    return out
+
+
 def beta_characteristic(returns: np.ndarray, symbols: list[str], *,
                          market_symbol: str = "BTCUSDT",
                          trail_win: int = VOL_BETA_TRAIL_WEEKS,
@@ -275,6 +292,36 @@ def trailing_median_turnover(weekly_turnover_arr: np.ndarray, *,
         lo = max(0, t - trail_win + 1)
         out[t] = np.median(weekly_turnover_arr[lo:t + 1], axis=0)
     return out
+
+
+def characteristic_turnover_spearman(
+    characteristic: np.ndarray, turnover_trail: np.ndarray, alive: np.ndarray,
+    weeks: list[str], *, min_universe: int = 10,
+) -> dict[str, Any]:
+    """DEC-74 (g) / DEC-87 (V5) Gate (5): per week the Spearman correlation
+    between the rank of ``characteristic[t]`` and the rank of the trailing
+    8-week median turnover (``turnover_trail[t]``, the size/volume axis)
+    among the week's alive symbols with both values finite. Two
+    CHARACTERISTICS only -- no outcome anywhere, so it is legal in
+    ``--prelaunch`` (reachability) and is the same number ``run_full`` feeds
+    ``gates.evaluate``. ``median`` is over the weeks with ``k >= min_universe``
+    (``None`` if there is none); the gate wants ``median < GATE5_SPEARMAN_MAX``."""
+    weekly: list[dict[str, Any]] = []
+    for t in range(len(weeks)):
+        mask = alive[t]
+        v, tn = characteristic[t, mask], turnover_trail[t, mask]
+        valid = ~np.isnan(v) & ~np.isnan(tn)
+        k = int(valid.sum())
+        if k < min_universe:
+            weekly.append({"week": weeks[t], "spearman": None, "k": k})
+            continue
+        weekly.append({"week": weeks[t], "spearman": pit_universe.spearman_rank_ic(v[valid], tn[valid]), "k": k})
+    vals = np.array([w["spearman"] for w in weekly if w["spearman"] is not None], dtype=np.float64)
+    if vals.size:
+        median, q25, q75 = (float(np.quantile(vals, p)) for p in (0.5, 0.25, 0.75))
+    else:
+        median = q25 = q75 = None
+    return {"weekly": weekly, "median": median, "q25": q25, "q75": q75, "n_weeks_used": int(vals.size)}
 
 
 def decile_bucket(values: np.ndarray, alive_row: np.ndarray) -> np.ndarray:
