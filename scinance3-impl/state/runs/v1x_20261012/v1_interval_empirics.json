@@ -1,0 +1,489 @@
+{
+ "as_of": "2026-09-28",
+ "n_symbols": 1138,
+ "n_symbols_survivors": 877,
+ "n_symbols_delisted": 261,
+ "date_range": [
+  "2021-01-01",
+  "2026-09-16"
+ ],
+ "deadzone_census_dec59": {
+  "overall_share": 0.5038522122092088,
+  "n_symbol_days_with_funding": 653261,
+  "n_deadzone_symbol_days": 329147,
+  "interval_class_counts": {
+   "funding_n=1 (unklassifiziert)": 101,
+   "funding_n=2 (unklassifiziert)": 1001,
+   "480min": 431173,
+   "funding_n=4 (unklassifiziert)": 631,
+   "funding_n=5 (unklassifiziert)": 225,
+   "240min": 196427,
+   "funding_n=7 (unklassifiziert)": 33,
+   "funding_n=8 (unklassifiziert)": 57,
+   "funding_n=9 (unklassifiziert)": 40,
+   "funding_n=10 (unklassifiziert)": 45,
+   "funding_n=11 (unklassifiziert)": 16,
+   "120min": 6723,
+   "funding_n=13 (unklassifiziert)": 12,
+   "funding_n=14 (unklassifiziert)": 16,
+   "funding_n=15 (unklassifiziert)": 41,
+   "funding_n=16 (unklassifiziert)": 6,
+   "funding_n=17 (unklassifiziert)": 33,
+   "funding_n=18 (unklassifiziert)": 52,
+   "funding_n=19 (unklassifiziert)": 20,
+   "funding_n=20 (unklassifiziert)": 27,
+   "funding_n=21 (unklassifiziert)": 31,
+   "funding_n=22 (unklassifiziert)": 11,
+   "funding_n=23 (unklassifiziert)": 8,
+   "60min": 16532
+  },
+  "by_decile": [
+   {
+    "decile": 1,
+    "n_symbol_weeks": 9318,
+    "n_symbol_days_with_funding": 64290,
+    "n_deadzone_symbol_days": 30426,
+    "deadzone_share": 0.47326178254783013
+   },
+   {
+    "decile": 2,
+    "n_symbol_weeks": 9471,
+    "n_symbol_days_with_funding": 65719,
+    "n_deadzone_symbol_days": 51702,
+    "deadzone_share": 0.7867131271017513
+   },
+   {
+    "decile": 3,
+    "n_symbol_weeks": 9429,
+    "n_symbol_days_with_funding": 65458,
+    "n_deadzone_symbol_days": 55195,
+    "deadzone_share": 0.8432124415655841
+   },
+   {
+    "decile": 4,
+    "n_symbol_weeks": 9473,
+    "n_symbol_days_with_funding": 65728,
+    "n_deadzone_symbol_days": 47181,
+    "deadzone_share": 0.7178219328140214
+   },
+   {
+    "decile": 5,
+    "n_symbol_weeks": 9482,
+    "n_symbol_days_with_funding": 65645,
+    "n_deadzone_symbol_days": 37636,
+    "deadzone_share": 0.5733262243887577
+   },
+   {
+    "decile": 6,
+    "n_symbol_weeks": 9408,
+    "n_symbol_days_with_funding": 65068,
+    "n_deadzone_symbol_days": 29458,
+    "deadzone_share": 0.45272637855781644
+   },
+   {
+    "decile": 7,
+    "n_symbol_weeks": 9432,
+    "n_symbol_days_with_funding": 65329,
+    "n_deadzone_symbol_days": 24619,
+    "deadzone_share": 0.3768464234872721
+   },
+   {
+    "decile": 8,
+    "n_symbol_weeks": 9470,
+    "n_symbol_days_with_funding": 65346,
+    "n_deadzone_symbol_days": 21162,
+    "deadzone_share": 0.3238453769167202
+   },
+   {
+    "decile": 9,
+    "n_symbol_weeks": 9430,
+    "n_symbol_days_with_funding": 64956,
+    "n_deadzone_symbol_days": 18861,
+    "deadzone_share": 0.29036578607057084
+   },
+   {
+    "decile": 10,
+    "n_symbol_weeks": 9587,
+    "n_symbol_days_with_funding": 65722,
+    "n_deadzone_symbol_days": 12907,
+    "deadzone_share": 0.1963878153434162
+   }
+  ],
+  "n_symbols": 1138,
+  "descriptive_only": true,
+  "by_interval_class": {
+   "60min": {
+    "n_symbol_days": 16532,
+    "n_mean_nan": 0,
+    "exact_hits_vs_candidate_I": {
+     "I_60min": {
+      "n": 4950,
+      "share": 0.29941930800871036
+     },
+     "I_120min": {
+      "n": 0,
+      "share": 0.0
+     },
+     "I_240min": {
+      "n": 0,
+      "share": 0.0
+     },
+     "I_480min": {
+      "n": 0,
+      "share": 0.0
+     }
+    },
+    "top5_daily_means": [
+     {
+      "value": 1.25e-05,
+      "n": 4949,
+      "share": 0.2993588192596177
+     },
+     {
+      "value": 1.8158e-06,
+      "n": 3,
+      "share": 0.00018146624727800629
+     },
+     {
+      "value": 7.6929e-06,
+      "n": 3,
+      "share": 0.00018146624727800629
+     },
+     {
+      "value": 1.04325e-05,
+      "n": 3,
+      "share": 0.00018146624727800629
+     },
+     {
+      "value": 1.10025e-05,
+      "n": 3,
+      "share": 0.00018146624727800629
+     }
+    ]
+   },
+   "120min": {
+    "n_symbol_days": 6723,
+    "n_mean_nan": 0,
+    "exact_hits_vs_candidate_I": {
+     "I_60min": {
+      "n": 0,
+      "share": 0.0
+     },
+     "I_120min": {
+      "n": 3315,
+      "share": 0.4930834448906738
+     },
+     "I_240min": {
+      "n": 0,
+      "share": 0.0
+     },
+     "I_480min": {
+      "n": 0,
+      "share": 0.0
+     }
+    },
+    "top5_daily_means": [
+     {
+      "value": 2.5e-05,
+      "n": 3315,
+      "share": 0.4930834448906738
+     },
+     {
+      "value": -5.34375e-05,
+      "n": 2,
+      "share": 0.00029748624126134165
+     },
+     {
+      "value": -4.67117e-05,
+      "n": 2,
+      "share": 0.00029748624126134165
+     },
+     {
+      "value": -4.5825e-05,
+      "n": 2,
+      "share": 0.00029748624126134165
+     },
+     {
+      "value": -4.451e-05,
+      "n": 2,
+      "share": 0.00029748624126134165
+     }
+    ]
+   },
+   "240min": {
+    "n_symbol_days": 196427,
+    "n_mean_nan": 0,
+    "exact_hits_vs_candidate_I": {
+     "I_60min": {
+      "n": 2,
+      "share": 1.0181899637015277e-05
+     },
+     "I_120min": {
+      "n": 1,
+      "share": 5.090949818507639e-06
+     },
+     "I_240min": {
+      "n": 104237,
+      "share": 0.5306653362317808
+     },
+     "I_480min": {
+      "n": 0,
+      "share": 0.0
+     }
+    },
+    "top5_daily_means": [
+     {
+      "value": 5e-05,
+      "n": 104237,
+      "share": 0.5306653362317808
+     },
+     {
+      "value": 0.0,
+      "n": 168,
+      "share": 0.0008552795695092834
+     },
+     {
+      "value": 4.13567e-05,
+      "n": 8,
+      "share": 4.072759854806111e-05
+     },
+     {
+      "value": 4.5575e-05,
+      "n": 8,
+      "share": 4.072759854806111e-05
+     },
+     {
+      "value": 2.53417e-05,
+      "n": 7,
+      "share": 3.563664872955347e-05
+     }
+    ]
+   },
+   "480min": {
+    "n_symbol_days": 431173,
+    "n_mean_nan": 0,
+    "exact_hits_vs_candidate_I": {
+     "I_60min": {
+      "n": 4,
+      "share": 9.277018737258594e-06
+     },
+     "I_120min": {
+      "n": 2,
+      "share": 4.638509368629297e-06
+     },
+     "I_240min": {
+      "n": 30,
+      "share": 6.957764052943945e-05
+     },
+     "I_480min": {
+      "n": 216645,
+      "share": 0.502454931083347
+     }
+    },
+    "top5_daily_means": [
+     {
+      "value": 0.0001,
+      "n": 216645,
+      "share": 0.502454931083347
+     },
+     {
+      "value": 0.0,
+      "n": 10266,
+      "share": 0.023809468589174182
+     },
+     {
+      "value": 1e-08,
+      "n": 260,
+      "share": 0.0006030062179218086
+     },
+     {
+      "value": 5e-05,
+      "n": 30,
+      "share": 6.957764052943945e-05
+     },
+     {
+      "value": 9.96333e-05,
+      "n": 13,
+      "share": 3.015031089609043e-05
+     }
+    ]
+   }
+  }
+ },
+ "interval_switching": {
+  "n_switch_distribution": {
+   "0": 754,
+   "1": 199,
+   "2-5": 170,
+   ">5": 15
+  },
+  "days_per_class_total": {
+   "240min": 196427,
+   "60min": 16532,
+   "480min": 431173,
+   "120min": 6723
+  },
+  "n_symbols": 1138,
+  "descriptive_only": true,
+  "episodes_summary": {
+   "reference_date": "2025-10-30",
+   "by_class": {
+    "60min": {
+     "before": {
+      "n_runs": 63,
+      "n_open_at_end": 0,
+      "n_closed_by_data_end": 8,
+      "duration_days": {
+       "n": 55,
+       "median": 224.0,
+       "q10": 60.40000000000001,
+       "q25": 137.5,
+       "q75": 272.0,
+       "q90": 327.0,
+       "max": 393.0
+      }
+     },
+     "from": {
+      "n_runs": 161,
+      "n_open_at_end": 3,
+      "n_closed_by_data_end": 2,
+      "duration_days": {
+       "n": 156,
+       "median": 8.0,
+       "q10": 1.0,
+       "q25": 2.75,
+       "q75": 49.25,
+       "q90": 92.0,
+       "max": 123.0
+      }
+     }
+    },
+    "120min": {
+     "before": {
+      "n_runs": 39,
+      "n_open_at_end": 0,
+      "n_closed_by_data_end": 1,
+      "duration_days": {
+       "n": 38,
+       "median": 134.5,
+       "q10": 1.0,
+       "q25": 4.0,
+       "q75": 335.75,
+       "q90": 381.3,
+       "max": 415.0
+      }
+     },
+     "from": {
+      "n_runs": 37,
+      "n_open_at_end": 0,
+      "n_closed_by_data_end": 1,
+      "duration_days": {
+       "n": 36,
+       "median": 1.0,
+       "q10": 1.0,
+       "q25": 1.0,
+       "q75": 1.0,
+       "q90": 2.5,
+       "max": 3.0
+      }
+     }
+    },
+    "240min": {
+     "before": {
+      "n_runs": 424,
+      "n_open_at_end": 208,
+      "n_closed_by_data_end": 88,
+      "duration_days": {
+       "n": 128,
+       "median": 152.5,
+       "q10": 1.0,
+       "q25": 11.5,
+       "q75": 315.75,
+       "q90": 425.9,
+       "max": 793.0
+      }
+     },
+     "from": {
+      "n_runs": 279,
+      "n_open_at_end": 205,
+      "n_closed_by_data_end": 11,
+      "duration_days": {
+       "n": 63,
+       "median": 32.0,
+       "q10": 3.0,
+       "q25": 10.0,
+       "q75": 69.0,
+       "q90": 141.0,
+       "max": 184.0
+      }
+     }
+    },
+    "480min": {
+     "before": {
+      "n_runs": 612,
+      "n_open_at_end": 152,
+      "n_closed_by_data_end": 145,
+      "duration_days": {
+       "n": 315,
+       "median": 242.0,
+       "q10": 1.0,
+       "q25": 43.0,
+       "q75": 463.5,
+       "q90": 1023.6,
+       "max": 1793.0
+      }
+     },
+     "from": {
+      "n_runs": 284,
+      "n_open_at_end": 260,
+      "n_closed_by_data_end": 5,
+      "duration_days": {
+       "n": 19,
+       "median": 1.0,
+       "q10": 1.0,
+       "q25": 1.0,
+       "q75": 5.5,
+       "q90": 85.4,
+       "max": 140.0
+      }
+     }
+    }
+   },
+   "transitions": {
+    "before": {
+     "120min->240min": 10,
+     "120min->480min": 1,
+     "120min->60min": 8,
+     "240min->120min": 21,
+     "240min->480min": 15,
+     "240min->60min": 29,
+     "480min->120min": 10,
+     "480min->240min": 262,
+     "480min->60min": 15,
+     "60min->120min": 5,
+     "60min->240min": 3,
+     "60min->480min": 7
+    },
+    "from": {
+     "120min->240min": 24,
+     "120min->480min": 1,
+     "120min->60min": 30,
+     "240min->120min": 28,
+     "240min->480min": 2,
+     "240min->60min": 96,
+     "480min->240min": 15,
+     "480min->60min": 32,
+     "60min->120min": 9,
+     "60min->240min": 158,
+     "60min->480min": 29
+    }
+   },
+   "n_symbols_with_60min_run": {
+    "before": 59,
+    "from": 129
+   }
+  }
+ },
+ "source": "panel_1d + panel_1d_delisted aus Harvest exports/scinance (INDEX sha256 im Bericht)",
+ "descriptive_only": true
+}

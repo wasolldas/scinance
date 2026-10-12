@@ -718,7 +718,8 @@ def _duration_stats(durations: list[int]) -> dict[str, Any]:
 
 
 def _episodes_summary(dates: list[str], minutes: np.ndarray,
-                      classified: np.ndarray) -> dict[str, Any]:
+                      classified: np.ndarray,
+                      is_delisted: np.ndarray | None = None) -> dict[str, Any]:
     """DEC-82 -- aggregate episode (run) statistics of the interval classes;
     no per-symbol list. Per symbol, a run is a maximal sequence of
     consecutive CLASSIFIED days of the same class. Unclassified days and
@@ -731,15 +732,15 @@ def _episodes_summary(dates: list[str], minutes: np.ndarray,
 
     Runs and transitions are split by the date the run STARTS
     (``< AUTO_SWITCH_REFERENCE_DATE`` -> "before", else "from"); a
-    transition belongs to the period in which its NEW run starts. A run is
-    open at the panel end iff it is its symbol's last run and ends on the
-    last panel date with any classified day; open runs are counted in
-    ``n_open_at_end`` and excluded from ``duration_days``. A symbol's last
-    run that ended earlier (delisting, data end) is ended by the data, not
-    by a switch: it is right-censored too, counted in
-    ``n_closed_by_data_end`` and likewise excluded from ``duration_days``
-    (which therefore measures time until the NEXT class only).
-    Descriptive only."""
+    transition belongs to the period in which its NEW run starts. A
+    symbol's LAST run is never a duration (time until the NEXT class only):
+    it is right-censored, either open at the panel end (``n_open_at_end``)
+    or ended by the data (``n_closed_by_data_end``, delisting). With
+    ``is_delisted`` (union panel) the split follows the symbol's delisting
+    status -- a survivor's last run is open even when the panel's last
+    days are ragged (real panel 2026-09: 829 symbols end 09-14, one runs
+    to 09-16); without it, a last run is open iff it ends on the last
+    panel date with any classified day. Descriptive only."""
     ref_iso = AUTO_SWITCH_REFERENCE_DATE.isoformat()
     ordinals = [date.fromisoformat(d).toordinal() for d in dates]
     n_symbols = classified.shape[1]
@@ -769,7 +770,9 @@ def _episodes_summary(dates: list[str], minutes: np.ndarray,
             m = int(cls[starts[k]])
             p = "from" if dates[s_row] >= ref_iso else "before"
             n_runs[(m, p)] += 1
-            if k == starts.size - 1 and e_row == panel_end_row:
+            is_open = (not bool(is_delisted[j]) if is_delisted is not None
+                       else e_row == panel_end_row)
+            if k == starts.size - 1 and is_open:
                 n_open[(m, p)] += 1
             elif k == starts.size - 1:
                 # ended by the data (delisting), not by a switch: right-censored
@@ -841,7 +844,8 @@ def interval_class_switching(panel: dict[str, Any]) -> dict[str, Any]:
     return {"per_symbol": per_symbol, "n_switch_distribution": n_switch_distribution,
             "days_per_class_total": days_per_class_total, "n_symbols": len(symbols),
             "descriptive_only": True,
-            "episodes_summary": _episodes_summary(panel["dates"], minutes, classified)}
+            "episodes_summary": _episodes_summary(panel["dates"], minutes, classified,
+                                                  panel.get("is_delisted"))}
 
 
 # ----------------------------------------------------------------------------

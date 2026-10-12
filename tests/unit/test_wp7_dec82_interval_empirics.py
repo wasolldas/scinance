@@ -238,6 +238,28 @@ def test_episodes_summary_counts_durations_transitions_and_open_runs():
     json.dumps(res)
 
 
+def test_episodes_summary_ragged_panel_end_uses_delisting_status():
+    """Real panel 2026-09: most symbols' funding ends 09-14 while one runs on to
+    09-16. With ``is_delisted`` a survivor's last run is open (not "ended by
+    data"), a delisted symbol's last run is closed by the data; neither is a
+    duration."""
+    start = date(2026, 9, 1)
+    n_days = 16
+    funding_n = np.full((n_days, 3), np.nan)
+    funding_n[:14, 0] = 3                       # survivor A, ends 09-14 (ragged)
+    funding_n[:, 1] = 3                         # survivor B, runs to 09-16
+    funding_n[:5, 2] = 3                        # delisted C, ends 09-05
+    panel = {"symbols": ["AUSDT", "BUSDT", "CUSDT"], "dates": _dates(start, n_days),
+             "funding_n": funding_n, "is_delisted": np.array([False, False, True])}
+    f480 = panel_load.interval_class_switching(panel)["episodes_summary"]["by_class"]["480min"]["from"]
+    assert (f480["n_runs"], f480["n_open_at_end"], f480["n_closed_by_data_end"]) == (3, 2, 1)
+    assert f480["duration_days"]["n"] == 0
+    # without the delisting status the old rule applies: only B ends on the last panel day
+    del panel["is_delisted"]
+    f480_old = panel_load.interval_class_switching(panel)["episodes_summary"]["by_class"]["480min"]["from"]
+    assert (f480_old["n_open_at_end"], f480_old["n_closed_by_data_end"]) == (1, 2)
+
+
 def test_episodes_summary_empty_panel_is_well_formed():
     panel = {"symbols": ["NONEUSDT"], "dates": _dates(date(2025, 11, 1), 3),
              "funding_n": np.full((3, 1), np.nan)}
