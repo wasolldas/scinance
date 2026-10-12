@@ -548,8 +548,15 @@ def cmd_emit_registered_template(prelaunch_json_path: str, out_yaml_path: str,
         if any(v is None for v in surv_block.values()):
             missing_dec89.append(f"{wname}.survivorship (survivorship_fixture)")
 
+        # DEC-89 E2 (Nachtrag): the calibrated null world's own scales (the study's measured sigma_f and
+        # idiosyncratic sigma_e_used) -- the positive control simulates exactly this world.
+        study_w = w.get("beta_control_method_study") or {}
+        null_scales = {"sigma_f": study_w.get("sigma_f"), "sigma_e_used": study_w.get("sigma_e_used")}
+        if not all(_finite_num(v) and v > 0 for v in null_scales.values()):
+            missing_dec89.append(f"{wname}.null_scales (beta_control_method_study.sigma_f/sigma_e_used)")
         windows_out[wname] = {
             "start": w["start"], "end": w["end"],
+            "null_scales": null_scales,
             "ic_min_capped": nf.get("ic_min_capped_per_variant", {}),
             "w_judged": nf.get("w_judged"),
             "bounce_sigma_true": sigma_true,

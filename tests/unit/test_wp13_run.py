@@ -907,6 +907,10 @@ def test_cli_emit_registered_template_writes_yaml_skeleton_from_prelaunch_artifa
         assert loaded["windows"][wn]["bounce_sigma_true"] == pre["factor_preserving_null"]["driftfree"]["sigma_e_median_symbol_weekly"]
         assert loaded["windows"][wn]["survivorship"] == {
             k: pre["survivorship_fixture"][k] for k in ("mom1_diff_in_ic_min_units", "rev_gap_diff_in_ic_min_units")}
+        # DEC-89 E2 Nachtrag: the calibrated null world's scales (study sigma_f / sigma_e_used) for the positive control
+        assert loaded["windows"][wn]["null_scales"] == {
+            "sigma_f": pre["beta_control_method_study"]["sigma_f"],
+            "sigma_e_used": pre["beta_control_method_study"]["sigma_e_used"]}
     # the emitted file passes the schema check (modulo a possibly empty method on this tiny fixture) ...
     run_mod.validate_registered(loaded)
     # ... and beta_control comes from the CONFIRMED recommendation only (empty if none was confirmed)
@@ -2462,6 +2466,8 @@ def _pc_registered(shape, symbols, *, n_reps_null: int = 40, rho_f: float = 0.09
             "start": a, "end": b, "ic_min_capped": {v: thr for v in characteristics.VARIANT_NAMES},
             "w_judged": fl["w_judged"], "bounce_sigma_true": BOUNCE_SIGMA[wn], "survivorship": copy.deepcopy(_SURV[wn]),
             "calibration": _window_calibration(rho_f, beta_sd),
+            # DEC-89 E2 Nachtrag: the scales of the null world the constants above were simulated in
+            "null_scales": {"sigma_f": 0.06, "sigma_e_used": 0.12},
             "ceiling_method_stress": c["ceiling_method_stress"],
             "res_quantile_driftfree": c["res_quantile_driftfree"], "res_quantile_drifting": c["res_quantile_drifting"]}
     return json.loads(json.dumps(reg))
@@ -2560,15 +2566,16 @@ def test_dec89_pc_takes_no_real_returns(pc_setup):
 
 
 def test_dec89_pc_world_scale_parameters_come_only_from_the_registered_yaml(pc_setup):
+    """DEC-89 E2 Nachtrag: the synthetic world uses the registered null scales (``null_scales``)."""
     _shape, _symbols, registered = pc_setup
     for wn in ("W1", "W2"):
         w = pc_mod.window_world(registered, wn)
         st = registered["windows"][wn]["calibration"]["stress"]
         assert w["rho_f"] == st["rho_f"] and w["beta_sd"] == st["beta_sd_calibrated"] and w["drift_f"] == 0.0
-        assert w["sigma_e"] == registered["windows"][wn]["bounce_sigma_true"]
-        # sigma_f inverts share = (beta_sd sigma_f)^2 / ((beta_sd sigma_f)^2 + sigma_e^2) for the stress target share
-        implied = (w["beta_sd"] * w["sigma_f"]) ** 2 / ((w["beta_sd"] * w["sigma_f"]) ** 2 + w["sigma_e"] ** 2)
-        assert implied == pytest.approx(st["target_factor_share"])
+        # DEC-89 E2 Nachtrag: the world's scales ARE the calibrated null's (measured sigma_f, idiosyncratic sigma_e_used),
+        # not a share inversion from the bounce vol (that gave a weaker factor world than the stress null)
+        assert w["sigma_e"] == registered["windows"][wn]["null_scales"]["sigma_e_used"]
+        assert w["sigma_f"] == registered["windows"][wn]["null_scales"]["sigma_f"]
         assert w["sigma_g"] == pytest.approx(pc_mod.SECTOR_SHOCK_REL * w["sigma_e"])
         assert w["sigma_tot"] == pytest.approx(math.sqrt(w["sigma_e"] ** 2 + w["sigma_g"] ** 2 + (w["beta_sd"] * w["sigma_f"]) ** 2))
     bad = copy.deepcopy(registered)
@@ -2576,9 +2583,13 @@ def test_dec89_pc_world_scale_parameters_come_only_from_the_registered_yaml(pc_s
     with pytest.raises(run_mod.RegisteredSchemaError, match="target_factor_share"):
         pc_mod.window_world(bad, "W1")
     bad = copy.deepcopy(registered)
-    bad["windows"]["W2"]["bounce_sigma_true"] = None
-    with pytest.raises(run_mod.RegisteredSchemaError, match="bounce_sigma_true"):
+    bad["windows"]["W2"]["null_scales"]["sigma_e_used"] = None
+    with pytest.raises(run_mod.RegisteredSchemaError, match="null_scales"):
         pc_mod.window_world(bad, "W2")
+    bad = copy.deepcopy(registered)
+    del bad["windows"]["W1"]["null_scales"]
+    with pytest.raises(run_mod.RegisteredSchemaError, match="null_scales"):
+        pc_mod.window_world(bad, "W1")
 
 
 def test_dec89_pc_synthetic_world_carries_the_injected_signal_and_the_negative_control_differs_only_by_it(pc_setup):

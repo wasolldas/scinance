@@ -99,27 +99,29 @@ def _finite(x: Any) -> bool:
 # ----------------------------------------------------------------------------
 
 def window_world(registered: dict[str, Any], wn: str) -> dict[str, float]:
-    """The scale parameters of window ``wn``'s synthetic world, ALL derived from the registered YAML: the stress
-    calibration (``rho_f``, ``beta_sd`` = ``beta_sd_calibrated``, ``share`` = ``target_factor_share``),
-    ``sigma_e`` = ``bounce_sigma_true`` (the window's measured median weekly symbol vol), ``sigma_f =
-    sqrt(share/(1-share)) * sigma_e / beta_sd`` (inverts ``share = (beta_sd sigma_f)^2 / ((beta_sd sigma_f)^2 +
-    sigma_e^2)``), ``sigma_g = SECTOR_SHOCK_REL * sigma_e`` and ``sigma_tot = sqrt(sigma_e^2 + sigma_g^2 +
-    (beta_sd sigma_f)^2)`` (the cross-sectional SD the injection is scaled to). A missing or out-of-range value is a
-    :class:`run.RegisteredSchemaError` (C.14)."""
+    """The scale parameters of window ``wn``'s synthetic world, ALL from the registered YAML: the stress
+    calibration (``rho_f``, ``beta_sd`` = ``beta_sd_calibrated``, ``share`` = ``target_factor_share``, report-only
+    here) and -- DEC-89 E2 Nachtrag -- the calibrated null world's own scales ``null_scales.sigma_f`` (measured
+    market vol) and ``null_scales.sigma_e_used`` (measured idiosyncratic vol), i.e. exactly the world the stress
+    calibration's ``beta_sd`` was searched in; ``sigma_g = SECTOR_SHOCK_REL * sigma_e`` and ``sigma_tot =
+    sqrt(sigma_e^2 + sigma_g^2 + (beta_sd sigma_f)^2)`` (the cross-sectional SD the injection is scaled to). A missing
+    or out-of-range value is a :class:`run.RegisteredSchemaError` (C.14)."""
     wcfg = registered["windows"][wn]
     stress = ((wcfg.get("calibration") or {}).get("stress")) or {}
     rho_f, beta_sd, share = stress.get("rho_f"), stress.get("beta_sd_calibrated"), stress.get("target_factor_share")
-    sigma_e = wcfg.get("bounce_sigma_true")
+    scales = wcfg.get("null_scales") or {}
+    sigma_e, sigma_f = scales.get("sigma_e_used"), scales.get("sigma_f")
     if not (_finite(rho_f) and _finite(beta_sd) and float(beta_sd) > 0.0):
         raise run.RegisteredSchemaError(f"windows.{wn}.calibration.stress.{{rho_f, beta_sd_calibrated}} fehlen/ungueltig "
                                         "(Positivkontrolle DEC-89 E2)")
     if not (_finite(share) and 0.0 < float(share) < 1.0):
         raise run.RegisteredSchemaError(f"windows.{wn}.calibration.stress.target_factor_share={share!r} fehlt oder liegt "
                                         "nicht in (0, 1) (Positivkontrolle DEC-89 E2: sigma_f wird daraus abgeleitet)")
-    if not (_finite(sigma_e) and float(sigma_e) > 0.0):
-        raise run.RegisteredSchemaError(f"windows.{wn}.bounce_sigma_true fehlt/ungueltig (DEC-89 E1/E2)")
-    rho_f, beta_sd, share, sigma_e = float(rho_f), float(beta_sd), float(share), float(sigma_e)
-    sigma_f = math.sqrt(share / (1.0 - share)) * sigma_e / beta_sd
+    if not (_finite(sigma_e) and float(sigma_e) > 0.0 and _finite(sigma_f) and float(sigma_f) > 0.0):
+        raise run.RegisteredSchemaError(f"windows.{wn}.null_scales.{{sigma_f, sigma_e_used}} fehlen/ungueltig "
+                                        "(Positivkontrolle DEC-89 E2: Welt der kalibrierten stress-Null)")
+    rho_f, beta_sd, share = float(rho_f), float(beta_sd), float(share)
+    sigma_e, sigma_f = float(sigma_e), float(sigma_f)
     sigma_g = SECTOR_SHOCK_REL * sigma_e
     sigma_tot = math.sqrt(sigma_e ** 2 + sigma_g ** 2 + (beta_sd * sigma_f) ** 2)
     return {"rho_f": rho_f, "beta_sd": beta_sd, "target_factor_share": share, "sigma_e": sigma_e, "sigma_f": sigma_f,
