@@ -30,14 +30,20 @@
 
 Tests: 1.992 passed / 3 failed (Legacy `test_execution_live.py`, Sandbox-bedingt, unveraendert) / 9 skipped.
 
-## 3. Naechste Schritte
+## 3. Ergebnis A3 und naechste Schritte (Stand Abend 2026-10-12)
 
-1. **Drittfassung H-28..H-30** (Herleitung durch einen Opus-Agenten, adversarisches Opus-Review, dann
-   Registrierung durch den Orchestrator): Methode `fm_neutral_8w` mit den v5d-Kalibrierungen; offene Punkte aus
-   DEC-86 (bindende Decke, Gap 1 Woche, Faktor 1/sqrt(2)); Gate-Text (1)-(7), zwoelf Pflichtzeilen, T0-T7;
-   YAML per `scripts/wp13_xsec.py --emit-registered-template <v5d-json> <yaml>`, sha256 in die Registrierung.
-2. **Lauf** `scripts/wp13_xsec.py --run --registered <yaml> --registered-sha256 <hash>` in der Cloud
-   (Positivkontrolle zuerst, laut Zustandsmaschine), dann Gate-Check und GL-032.
-3. A1 (Funding) danach: V-1 ist jetzt weitgehend belegt (DEC-84); Registrierung vorbereiten.
-4. Nebenbei: `persistence_null`, `h30_feasibility`, Survivorship-Fixture nutzen noch die null-aufgefuellten
-   Renditen (DEC-85-Builder-Hinweis, nicht urteilstragend) - bei Gelegenheit auf `returns_est` umstellen.
+- **A3 (H-28..H-30, Kohorte F-XSEC1) ist abgeschlossen: GL-032, alle sieben Varianten GL-012 vor dem Lauf.**
+  Drittfassung registriert (DEC-90, `state/registered/h28_h30_v3.yaml`), Positivkontrolle in Produktionskonfiguration
+  NICHT BESTANDEN (DEC-91): die Power-Zuordnung hatte mit dem Boden-SE statt der registrierten SE gerechnet; mit der
+  faktorbedingten IC-Streuung (W1 0,09/0,13 statt Boden 0,049) ist der Test in W1 bei Prior 0,03 zu schwach (Power
+  0,47/0,21). Feststellung im registrierten Design, KEIN Verdikt ueber die Effekte. Gate-Audit bestaetigt; kein
+  DEC-52-Zweig nachtraeglich (DEC-92). Keine reale IC berechnet, alle Siegel geschlossen.
+- **Methodische Lehre:** Power/MDE immer mit der SE-Regel des registrierten Tests inkl. faktorbedingter Streuung unter
+  der kalibrierten Null rechnen; Positivkontrolle in Produktionskonfiguration vor jedem Lauf (hat den Fehler gefangen).
+- **Naechster Kandidat: A1** (Funding-Long-Bein gegen Universums-Hedge, DEC-70). V-1 ist jetzt empirisch belegt
+  (DEC-84). Vor einer Registrierung: Herleitung mit Power auf der realistischen SE (Lehre oben), Positivkontroll-Plan.
+- Ein anderes A3-Design (z. B. fm8-neutralisierter IC als Primaerstatistik, gepoolte Fenster) nur als NEUE Hypothese
+  mit eigenem K (DEC-58 E2) und mit Offenlegung der gesehenen Zahlen (Etikett C.17).
+- Nebenbei: `persistence_null`/`h30_feasibility`/Survivorship auf `returns_est` sind erledigt (DEC-87); offene
+  Kosmetik: Docstring `positive_control.py` (Skalen) - aendert den Code-Hash, deshalb erst mit der naechsten Aenderung.
+- Data-Harvest Variante B (taeglicher Panel-Strom) beim Data-Harvest-Projekt; bis dahin Zip-Export (Stand 2026-09-28).

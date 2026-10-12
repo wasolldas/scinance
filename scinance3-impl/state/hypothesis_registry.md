@@ -1130,3 +1130,13 @@ python scripts/wp13_xsec.py --run \
 bleiben stehen. Die Registrierungsdatei ist per sha256 gepinnt; v5d und v5e bleiben als Artefakte.
 
 **Registriert:** 2026-10-12 durch den Orchestrator (DEC-90), nach Review v3 (`state/REVIEW_H28_H30_v3.md`, formales VETO durch B-1/B-2 aufgehoben). Registrierungsdatei `state/registered/h28_h30_v3.yaml`, sha256 `bd948f34516bb444f152287863e6096da6faf82712b579c6dfa211599015c299`. Kein Lauf erfolgt; als Naechstes die Positivkontrolle allein.
+
+---
+
+## Nachtrag zur Drittfassung H-28/H-29/H-30 (2026-10-12) - append-only, kein Lauf erfolgt
+
+Nach der Positivkontrolle (NICHT BESTANDEN, rc 3) und der korrigierten Power-Zuordnung mit dem registrierten SE sind
+**alle sieben Eintraege GL-012 vor dem Lauf** (DEC-92, GL-032). Feststellung: im registrierten Design (Roh-IC je
+Fenster, C.10 hart, W1/W2, Union-Panel) bei IC_prior 0,03 nicht testbar - kein Verdikt ueber die Effekte. Die
+Registrierungsdatei `state/registered/h28_h30_v3.yaml` (sha256 `bd948f34...c299`) bleibt unveraendert; `--run` entfaellt.
+Siegel bleiben geschlossen.
