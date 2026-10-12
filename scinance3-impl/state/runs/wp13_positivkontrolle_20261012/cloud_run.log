@@ -1,0 +1,26 @@
+[Startsperre bestanden] scinance3-impl/state/registered/h28_h30_v3.yaml sha256=bd948f34516bb444f152287863e6096da6faf82712b579c6dfa211599015c299
+[1/4] Union-Panel laden (as_of=2026-09-28)
+  1138 Symbole, 2085 Tage.
+[2/4] Woechentliche Renditen + PIT-Alive-Maske (Union), Daten-Fingerprints
+  299 Wochen (2020-12-28..2026-09-14)
+  union_range=a7e4dec7cb7475426f477c6d17359007b75026b2f8562b29e66457fed027793a delisting_dates=852bf75332fd1990b13b9a059fd871a75d7f71757b48e2bf102bc1f25c412933
+[3/4] Positivkontrolle (DEC-89 E2): Seeds [53, 54, 55], injizierte IC 0.06, synthetische Renditen auf der realen Fensterform, eingefrorene Konstanten, keine Null-Neuberechnung
+  Seed 53 positive H-28_mom1: DROP
+  Seed 53 positive H-29_rev_gap: PASS
+  Seed 53 negative H-28_mom1: DROP
+  Seed 53 negative H-29_rev_gap: DROP
+  Seed 54 positive H-28_mom1: PASS
+  Seed 54 positive H-29_rev_gap: PASS
+  Seed 54 negative H-28_mom1: DROP
+  Seed 54 negative H-29_rev_gap: DROP
+  Seed 55 positive H-28_mom1: DROP
+  Seed 55 positive H-29_rev_gap: PASS
+  Seed 55 negative H-28_mom1: DROP
+  Seed 55 negative H-29_rev_gap: DROP
+[4/4] Ergebnis
+  Positivkontrolle alle PASS: False; Negativkontrolle kein PASS: True
+  wp13_positive_control_json: scinance3-impl/state/runs/wp13_positivkontrolle_20261012/wp13_positive_control.json sha256=a700aa666914a1ed9762badd9fa663a534d424c84327800d0e01531106b9aac6
+  wp13_positive_control_md: scinance3-impl/state/runs/wp13_positivkontrolle_20261012/wp13_positive_control.md sha256=68792f48b729e94b2841ed8773407146c1782fc95d782dedfc454e1cd7a8cec0
+Report geschrieben: scinance3-impl/state/runs/wp13_positivkontrolle_20261012 (Laufzeit 8.072 s, result_sha256=b3daeea80a5426e310270d0036bd0667144cea44b3777dafc4dfd3a75814041d)
+Positivkontrolle NICHT BESTANDEN
+rc=3
