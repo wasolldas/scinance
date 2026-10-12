@@ -1,7 +1,8 @@
 # Scinance - Einstieg
 
 Neue Sitzung? Zuerst lesen:
-1. `scinance3-impl/UEBERGABE_2026-10-09.md` - Stand, offene Arbeit, Autopilot, Datenzugang.
+1. `scinance3-impl/UEBERGABE_2026-10-12.md` - aktueller Stand (Cloud-first, Panel via Thin Client, naechste Schritte);
+   dazu `scinance3-impl/UEBERGABE_2026-10-09.md` - Rollen, Regeln, Fallen, Datenzugang.
 2. `scinance3-impl/CLAUDE.md` - Verfassung von Scinance 3.0 (bindend).
 
 Harte Regeln, auch bevor du weiterliest:
