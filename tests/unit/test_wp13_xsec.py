@@ -437,7 +437,7 @@ def test_seal_prelaunch_never_calls_ic_with_real_returns(tmp_path, monkeypatch):
     report = prelaunch.assemble_prelaunch_report(
         panel, weekly, delisted_manifest_path=del_manifest, delisting_dates_path=dd_path,
         n_sims=5, n_reps_factor_null=5, n_reps_beta_control_study=5, n_reps_beta_control_winner=5, seed=53,
-        gegenprobe_n_reps=10, gegenprobe_rel_tol=10.0, gegenprobe_z_max=1e9,
+        gegenprobe_n_reps=10, gegenprobe_rel_tol=10.0, gegenprobe_z_max=1e9, gegenprobe_market_check=False,
         calibration_search_n_reps=5, calibration_search_rel_tol=10.0, calibration_search_max_iter=8)
     assert report["windows"]["W1"]["available"]
 
@@ -464,7 +464,7 @@ def test_seal_prelaunch_report_json_no_real_ic_key(tmp_path):
     report = prelaunch.assemble_prelaunch_report(
         panel, weekly, delisted_manifest_path=del_manifest, delisting_dates_path=dd_path,
         n_sims=5, n_reps_factor_null=5, n_reps_beta_control_study=5, n_reps_beta_control_winner=5, seed=53,
-        gegenprobe_n_reps=10, gegenprobe_rel_tol=10.0, gegenprobe_z_max=1e9,
+        gegenprobe_n_reps=10, gegenprobe_rel_tol=10.0, gegenprobe_z_max=1e9, gegenprobe_market_check=False,
         calibration_search_n_reps=5, calibration_search_rel_tol=10.0, calibration_search_max_iter=8)
     artifacts = prelaunch.write_prelaunch_artifacts(tmp_path / "out", report)
     payload = __import__("json").loads(
@@ -487,6 +487,16 @@ def test_seal_prelaunch_report_json_no_real_ic_key(tmp_path):
     assert any(k.endswith("/beta_sd_true") for k in _walk_keys(payload))
     assert any(k.endswith("/gegenprobe") or k.endswith("/gegenprobe_error") for k in _walk_keys(payload))
 
+    # DEC-85 (ii): the Gegenprobe's market-column bands are in the JSON and in the
+    # calibration table of the Markdown report (two new columns).
+    assert any(k.endswith("/gegenprobe/market_sd_band") for k in _walk_keys(payload))
+    assert any(k.endswith("/gegenprobe/market_rho_band") for k in _walk_keys(payload))
+    md = Path(artifacts["artifacts"]["wp13a_prelaunch_md"]["path"]).read_text(encoding="utf-8")
+    header = next(line for line in md.splitlines() if line.startswith("| Kalibrierung |"))
+    assert "Marktspalte SD-Band | rho-Band" in header
+    rows = [line for line in md.splitlines() if re.match(r"\| (measured|stress|zero) \|", line)]
+    assert rows and all(line.count("|") == header.count("|") for line in rows)
+
 
 # ============================================================================
 # end-to-end --prelaunch CLI on a synthetic union tree
@@ -503,7 +513,7 @@ def _ns_prelaunch(**overrides) -> argparse.Namespace:
         # for the Gegenprobe's own sampling noise, never for a real run.
         # DEC-81: the defaults are the nulls constants (400 replicates, z <= 3 on a standard-error basis).
         gegenprobe_n_reps=nulls.GEGENPROBE_N_REPS_DEFAULT, gegenprobe_rel_tol=nulls.GEGENPROBE_REL_TOL,
-        gegenprobe_z_max=nulls.GEGENPROBE_Z_MAX,
+        gegenprobe_z_max=nulls.GEGENPROBE_Z_MAX, no_gegenprobe_market_check=False,
         calibration_search_n_reps=nulls.CALIBRATION_SEARCH_N_REPS_DEFAULT,
         calibration_search_rel_tol=nulls.CALIBRATION_SEARCH_REL_TOL_DEFAULT,
         calibration_search_max_iter=nulls.CALIBRATION_SEARCH_MAX_ITER_DEFAULT,
@@ -956,6 +966,7 @@ def test_cli_prelaunch_end_to_end_synthetic_union_tree(tmp_path):
     # calibration_search_rel_tol), probes kept small.
     ns = _ns_prelaunch(panel_base=str(surv_base), delisted_base=str(del_base), out=str(out_dir),
                         gegenprobe_n_reps=10, gegenprobe_rel_tol=10.0, gegenprobe_z_max=1e9,
+                        no_gegenprobe_market_check=True,
                         calibration_search_n_reps=5, calibration_search_rel_tol=10.0,
                         calibration_search_max_iter=8)
 
@@ -1712,17 +1723,21 @@ def test_dec81_gegenprobe_is_never_looser_than_the_old_band(monkeypatch, rel_dev
 
 
 def test_dec81_gegenprobe_underpowered_with_tiny_n_reps_raises_unterpowert():
-    """DEC-81: a probe with 3 replicates cannot resolve a 25 % miscalibration. The target is
-    set to the probe's own share (z == 0), so ONLY the power condition can fail."""
+    """DEC-81: a probe with a handful of replicates cannot resolve a 25 % miscalibration. The
+    target is set to the probe's own share (z == 0), so ONLY the power condition can fail.
+
+    DEC-85: 4 replicates instead of 3 -- with the market column := factor the seed-5 trio of
+    replicates happens to agree closely (bootstrap SE 0.0025, i.e. 3*se < 0.25*share), so the
+    3-replicate probe no longer demonstrates the under-power; seed 5 / 4 replicates does."""
     n_weeks, n_symbols, symbols, kw = _dec81_small_case()
-    own = nulls._measure_simulated_share(n_weeks, n_symbols, symbols, n_reps=3, seed=5, **kw)
+    own = nulls._measure_simulated_share(n_weeks, n_symbols, symbols, n_reps=4, seed=5, **kw)
     with pytest.raises(nulls.FactorShareCalibrationError, match="unterpowert") as exc:
         nulls.factor_share_gegenprobe(n_weeks, n_symbols, symbols, target_share=own["simulated_share"],
-                                      n_reps=3, seed=5, **kw)
+                                      n_reps=4, seed=5, **kw)
     assert "Abweichung > z_max" not in str(exc.value)
     # with a widened resolvable deviation the very same probe passes at z == 0
     res = nulls.factor_share_gegenprobe(n_weeks, n_symbols, symbols, target_share=own["simulated_share"],
-                                        n_reps=3, seed=5, rel_tol=10.0, **kw)
+                                        n_reps=4, seed=5, rel_tol=10.0, **kw)
     assert res["ok"] is True and res["z"] == 0.0
 
 
@@ -1793,32 +1808,69 @@ def test_dec81_study_forwards_calibration_mask_to_searches_and_gegenproben(monke
 def test_dec81_prelaunch_passes_the_real_measurement_cross_section_as_calibration_mask(tmp_path, monkeypatch):
     """DEC-81 (F): per window the study gets exactly ``alive & finite beta_prev_26w & finite
     returns`` -- the cross-section ``factor_share_from_trailing_beta`` measures on real data
-    -- and the new ``gegenprobe_z_max`` knob."""
+    -- and the new ``gegenprobe_z_max`` knob.
+
+    DEC-85 (iii): "returns" and "beta_prev_26w" there are the ESTIMATION returns
+    (``returns_est = where(returns_valid, returns, NaN)``). The fixture's weekly dict is
+    altered so one alive symbol did not trade for 20 weeks inside each window (zero return,
+    ``returns_valid`` False): the mask must drop those cells (and the following 26 weeks of
+    that symbol's beta) although the zero-filled ``returns`` and ``alive`` still count them,
+    the study must receive ``returns_est`` itself, and the Gegenprobe results carry the new
+    DEC-85 (ii) market-column fields."""
     panel, weekly, _sb, _sm, _db, del_manifest, dd_path = _build_prelaunch_fixture_tree(tmp_path)
-    captured: list[dict] = []
+    weeks, returns, alive = weekly["weeks"], weekly["returns"].copy(), weekly["alive"]
+    valid = weekly["returns_valid"].copy()
+    j_silent = panel["symbols"].index("SYM03USDT")
+    for wname in ("W1", "W2"):
+        lo_hi = prelaunch.slice_window(weeks, *prelaunch.WINDOWS[wname], returns)
+        gap = slice(lo_hi["lo"] + 8, lo_hi["lo"] + 28)
+        assert alive[gap, j_silent].all() and valid[gap, j_silent].all()
+        valid[gap, j_silent] = False
+        returns[gap, j_silent] = 0.0
+    weekly_mod = dict(weekly, returns=returns, returns_valid=valid)
+
+    captured: list[tuple[tuple, dict]] = []
     orig = nulls.beta_control_method_study
 
     def spy(*a, **kw):
-        captured.append(dict(kw))
+        captured.append((a, dict(kw)))
         return orig(*a, **kw)
 
     monkeypatch.setattr(nulls, "beta_control_method_study", spy)
-    prelaunch.assemble_prelaunch_report(
-        panel, weekly, delisted_manifest_path=del_manifest, delisting_dates_path=dd_path,
+    report = prelaunch.assemble_prelaunch_report(
+        panel, weekly_mod, delisted_manifest_path=del_manifest, delisting_dates_path=dd_path,
         n_sims=5, n_reps_factor_null=5, n_reps_beta_control_study=5, n_reps_beta_control_winner=5, seed=53,
-        gegenprobe_n_reps=10, gegenprobe_rel_tol=10.0, gegenprobe_z_max=1e9,
+        gegenprobe_n_reps=10, gegenprobe_rel_tol=10.0, gegenprobe_z_max=1e9, gegenprobe_market_check=False,
         calibration_search_n_reps=5, calibration_search_rel_tol=10.0, calibration_search_max_iter=8)
     assert len(captured) == 2                                   # W1 and W2 (never L)
-    weeks, returns, alive = weekly["weeks"], weekly["returns"], weekly["alive"]
-    beta_prev = nulls.trailing_pit_beta_excluding_current_week(returns, panel["symbols"])
-    for kw, wname in zip(captured, ("W1", "W2")):
+    returns_est = nulls.estimation_returns(weekly_mod)
+    assert np.isnan(returns_est[~valid]).all() and np.array_equal(returns_est[valid], returns[valid])
+    beta_prev = nulls.trailing_pit_beta_excluding_current_week(returns_est, panel["symbols"])
+    beta_prev_zero_filled = nulls.trailing_pit_beta_excluding_current_week(returns, panel["symbols"])
+    for (args, kw), wname in zip(captured, ("W1", "W2")):
         lo_hi = prelaunch.slice_window(weeks, *prelaunch.WINDOWS[wname], returns, alive)
         lo, hi = lo_hi["lo"], lo_hi["hi"]
-        expected = alive[lo:hi] & ~np.isnan(beta_prev[lo:hi]) & ~np.isnan(returns[lo:hi])
+        expected = alive[lo:hi] & ~np.isnan(beta_prev[lo:hi]) & ~np.isnan(returns_est[lo:hi])
         mask = kw["calibration_mask"]
         assert mask.dtype == bool and np.array_equal(mask, expected)
         assert 0 < mask.sum() < mask.size
         assert kw["gegenprobe_z_max"] == 1e9
+        # DEC-85 (iii): the silent symbol's cells (and its next 26 weeks of beta) are out ...
+        assert not mask[8:28, j_silent].any() and not mask[28:34, j_silent].any()
+        # ... whereas the old zero-filled construction would have kept them
+        old_mask = alive[lo:hi] & ~np.isnan(beta_prev_zero_filled[lo:hi]) & ~np.isnan(returns[lo:hi])
+        assert old_mask[8:28, j_silent].all() and (mask <= old_mask).all() and not np.array_equal(mask, old_mask)
+        # the study's window returns are the estimation returns, not the zero-filled outcome array
+        assert np.array_equal(args[0], returns_est[lo:hi], equal_nan=True)
+        # DEC-85 (ii): the Gegenprobe results carry the market-column bands and targets
+        study = report["windows"][wname]["beta_control_method_study"]
+        for cal in nulls.FACTOR_NULL_CALIBRATIONS:
+            gp = study["calibrations"][cal]["gegenprobe"]
+            for key in ("market_sd_band", "market_rho_band", "market_sd_ok", "market_rho_ok",
+                        "target_sigma_f", "target_rho_f"):
+                assert key in gp
+            assert len(gp["market_sd_band"]) == 2 and len(gp["market_rho_band"]) == 2
+            assert gp["target_sigma_f"] is None and gp["market_sd_ok"] is None    # check switched off here
 
 
 # ============================================================================
@@ -2094,3 +2146,314 @@ def test_beta_control_recommendation_none_when_no_method_passes_everywhere():
     rec = prelaunch.beta_control_recommendation(windows_out)
     assert rec["recommended_method"] is None
     assert "GL-012" in rec["note"]
+
+
+# ============================================================================
+# DEC-85 (i) -- the simulated market column IS the factor
+# ============================================================================
+
+def test_dec85_simulate_factor_panel_market_column_equals_factor_exactly():
+    """DEC-85 (i): ``market_index=k`` -> column k == f exactly, beta[k] == 1; every other
+    column, ``f`` and the rng stream are unchanged; the default ``None`` is the old behaviour
+    (the market column is an ordinary ``beta*f + e`` column)."""
+    kw = dict(sigma_f=0.05, sigma_e=0.03, rho_f=0.1, drift_f=0.0, beta_sd=0.4)
+    sim = nulls.simulate_factor_panel(30, 12, rng=np.random.default_rng(5), market_index=7, **kw)
+    base = nulls.simulate_factor_panel(30, 12, rng=np.random.default_rng(5), **kw)
+    assert np.array_equal(sim["returns"][:, 7], sim["f"])
+    assert sim["beta"][7] == 1.0
+    assert np.array_equal(np.delete(sim["returns"], 7, axis=1), np.delete(base["returns"], 7, axis=1))
+    assert np.array_equal(sim["f"], base["f"])
+    assert np.array_equal(np.delete(sim["beta"], 7), np.delete(base["beta"], 7))
+    assert not np.array_equal(base["returns"][:, 7], base["f"]) and base["beta"][7] != 1.0
+    for bad in (-1, 12):
+        with pytest.raises(ValueError, match="market_index"):
+            nulls.simulate_factor_panel(30, 12, rng=np.random.default_rng(5), market_index=bad, **kw)
+
+
+# ============================================================================
+# DEC-85 (ii) -- the Gegenprobe checks the market column's SD and lag-1 autocorrelation
+# ============================================================================
+
+def _dec85_market_case(n_weeks: int = 53, n_symbols: int = 30):
+    symbols = [f"s{i}" for i in range(n_symbols - 1)] + ["BTCUSDT"]
+    return n_weeks, n_symbols, symbols
+
+
+def test_dec85_measure_simulated_share_market_estimators_are_those_of_measure_market_factor():
+    """DEC-85 (ii): per replicate the SD (ddof=1) and the lag-1 autocorrelation collected
+    from the simulated market column are exactly ``measure_market_factor``'s estimators, the
+    bands are the 2.5/97.5 % quantiles of those draws, and there is no market column ->
+    no bands."""
+    n_weeks, n_symbols, symbols = _dec85_market_case()
+    kw = dict(sigma_f=0.05, sigma_e=0.12, rho_f=0.2, beta_sd=0.3)
+    got = nulls._measure_simulated_share(n_weeks, n_symbols, symbols, n_reps=40, seed=11, **kw)
+    rng = np.random.default_rng(11)
+    sds, rhos = [], []
+    for _ in range(40):
+        sim = nulls.simulate_factor_panel(n_weeks, n_symbols, sigma_f=0.05, sigma_e=0.12, rho_f=0.2,
+                                          drift_f=nulls.DRIFT_F_DRIFTFREE, rng=rng, beta_sd=0.3,
+                                          market_index=n_symbols - 1)
+        m = nulls.measure_market_factor(sim["returns"], symbols)
+        sds.append(m["sigma_f"])
+        rhos.append(m["rho_f_measured"])
+    assert got["market_sd_draws"] == pytest.approx(sds) and got["market_rho_draws"] == pytest.approx(rhos)
+    assert got["market_sd_band"] == pytest.approx(np.quantile(sds, [0.025, 0.975]).tolist())
+    assert got["market_rho_band"] == pytest.approx(np.quantile(rhos, [0.025, 0.975]).tolist())
+    # the simulated market column carries NO idiosyncratic noise: its SD sits near sigma_f
+    # (not near sqrt(sigma_f^2 + sigma_e^2) = 0.13)
+    assert 0.04 < np.mean(sds) < 0.06
+
+    no_market = nulls._measure_simulated_share(
+        n_weeks, n_symbols, [f"s{i}" for i in range(n_symbols)], n_reps=3, seed=11, **kw)
+    assert no_market["market_sd_band"] is None and no_market["market_rho_band"] is None
+    assert no_market["market_sd_draws"] is None and no_market["market_rho_draws"] is None
+
+
+def _dec85_gegenprobe_kwargs(n_weeks, n_symbols, symbols, n_reps=80, **overrides):
+    kw = dict(sigma_f=0.067, sigma_e=0.12, rho_f=0.05, beta_sd=0.3, n_reps=n_reps, seed=7,
+              rel_tol=10.0, market_symbol="BTCUSDT")
+    kw.update(overrides)
+    own = nulls._measure_simulated_share(
+        n_weeks, n_symbols, symbols, sigma_f=kw["sigma_f"], sigma_e=kw["sigma_e"], rho_f=kw["rho_f"],
+        beta_sd=kw["beta_sd"], n_reps=n_reps, seed=kw["seed"])
+    return kw, own["simulated_share"]
+
+
+def test_dec85_gegenprobe_market_column_consistent_passes_and_reports_bands():
+    """DEC-85 (ii): with the market column := factor, the measured sigma_f / rho_f lie inside
+    the replicate bands (despite sigma_e = 0.12 >> sigma_f = 0.067); the result carries the
+    bands, the per-target verdicts and the targets."""
+    n_weeks, n_symbols, symbols = _dec85_market_case()
+    kw, share = _dec85_gegenprobe_kwargs(n_weeks, n_symbols, symbols)
+    res = nulls.factor_share_gegenprobe(n_weeks, n_symbols, symbols, target_share=share,
+                                        target_sigma_f=0.067, target_rho_f=0.05, **kw)
+    assert res["ok"] is True and res["market_sd_ok"] is True and res["market_rho_ok"] is True
+    assert res["target_sigma_f"] == 0.067 and res["target_rho_f"] == 0.05
+    sd_lo, sd_hi = res["market_sd_band"]
+    rho_lo, rho_hi = res["market_rho_band"]
+    assert sd_lo <= 0.067 <= sd_hi and rho_lo <= 0.05 <= rho_hi
+    # no targets given -> not checked (None), bands still reported
+    res0 = nulls.factor_share_gegenprobe(n_weeks, n_symbols, symbols, target_share=share, **kw)
+    assert res0["market_sd_ok"] is None and res0["market_rho_ok"] is None
+    assert res0["target_sigma_f"] is None and res0["market_sd_band"] == res["market_sd_band"]
+
+
+def test_dec85_gegenprobe_v5c_defect_market_column_with_idiosyncratic_vol_fails_loud(monkeypatch):
+    """DEC-85 regression test of the v5c defect: with the OLD construction (market column
+    = an ordinary ``beta*f + e`` column, ``market_index=None``) and sigma_e >> sigma_f its SD
+    is ~sqrt(sigma_f^2 + sigma_e^2) = 0.137, the measured sigma_f = 0.067 falls out of the
+    95 % band -> loud 'Marktspalte inkonsistent' naming target and band. The rho target is
+    checked independently (a target of 0.9 is outside its band as well)."""
+    n_weeks, n_symbols, symbols = _dec85_market_case()
+    kw, share = _dec85_gegenprobe_kwargs(n_weeks, n_symbols, symbols)
+    orig = nulls.simulate_factor_panel
+    monkeypatch.setattr(nulls, "simulate_factor_panel",
+                        lambda *a, **k: orig(*a, **{**k, "market_index": None}))
+    with pytest.raises(nulls.FactorShareCalibrationError) as exc:
+        nulls.factor_share_gegenprobe(n_weeks, n_symbols, symbols, target_share=share,
+                                      target_sigma_f=0.067, target_rho_f=0.05, **kw)
+    msg = str(exc.value)
+    assert msg.startswith("Gegenprobe fehlgeschlagen") and "Marktspalte inkonsistent" in msg
+    assert "sigma_f-Ziel 0.067" in msg and "Band" in msg
+    assert "rho_f-Ziel" not in msg                       # the rho target (0.05) is inside its band
+    monkeypatch.setattr(nulls, "simulate_factor_panel", orig)
+    # with the DEC-85 construction the very same call passes ...
+    assert nulls.factor_share_gegenprobe(n_weeks, n_symbols, symbols, target_share=share,
+                                         target_sigma_f=0.067, target_rho_f=0.05, **kw)["ok"] is True
+    # ... and an inconsistent rho target alone fails loud, naming the rho target
+    with pytest.raises(nulls.FactorShareCalibrationError, match="Marktspalte inkonsistent") as exc2:
+        nulls.factor_share_gegenprobe(n_weeks, n_symbols, symbols, target_share=share,
+                                      target_sigma_f=0.067, target_rho_f=0.9, **kw)
+    assert "rho_f-Ziel 0.9" in str(exc2.value) and "sigma_f-Ziel" not in str(exc2.value)
+
+
+def test_dec85_gegenprobe_market_target_without_market_symbol_and_nan_target_are_loud():
+    """DEC-85 (ii): a market target without a market symbol has nothing to check (loud), a NaN
+    target is never ok (C.14)."""
+    n_weeks, n_symbols, symbols = _dec85_market_case()
+    kw, share = _dec85_gegenprobe_kwargs(n_weeks, n_symbols, symbols, n_reps=20)
+    with pytest.raises(nulls.FactorShareCalibrationError, match="Gegenprobe fehlgeschlagen"):
+        nulls.factor_share_gegenprobe(n_weeks, n_symbols, [f"s{i}" for i in range(n_symbols)],
+                                      target_share=share, target_sigma_f=0.067, **kw)
+    with pytest.raises(nulls.FactorShareCalibrationError, match="Marktspalte inkonsistent"):
+        nulls.factor_share_gegenprobe(n_weeks, n_symbols, symbols, target_share=share,
+                                      target_sigma_f=float("nan"), **kw)
+
+
+def test_dec85_study_hands_each_calibration_its_market_targets(monkeypatch):
+    """DEC-85 (ii): ``beta_control_method_study`` calls the Gegenprobe per calibration with
+    target_sigma_f = the measured sigma_f (all three) and target_rho_f = measured / 2x / 0;
+    the result fields are set; ``gegenprobe_market_check=False`` drops the targets only."""
+    w, k = 53, 30
+    rng = np.random.default_rng(13)
+    returns = rng.normal(0, 0.03, size=(w, k))
+    alive = np.ones((w, k), dtype=bool)
+    symbols = [f"s{i}" for i in range(k - 1)] + ["BTCUSDT"]
+    seen: list[dict] = []
+    orig_gp = nulls.factor_share_gegenprobe
+
+    def spy_gp(*a, **kw):
+        seen.append(dict(kw, rho_f_arg=kw["rho_f"]))
+        return orig_gp(*a, **kw)
+
+    monkeypatch.setattr(nulls, "factor_share_gegenprobe", spy_gp)
+    common = dict(rho_f_measured=0.1, factor_share_measured=0.02, variants=("mom1",), methods=("none",),
+                  n_reps=2, seed=53, gegenprobe_n_reps=20, gegenprobe_rel_tol=10.0, gegenprobe_z_max=1e9,
+                  calibration_search_n_reps=5, calibration_search_rel_tol=10.0, calibration_search_max_iter=4)
+    study = nulls.beta_control_method_study(returns, alive, symbols, **common)
+    assert len(seen) == 3
+    sigma_f = study["sigma_f"]
+    assert sigma_f == pytest.approx(float(np.std(returns[:, -1], ddof=1)))
+    expected_rho = {"measured": 0.1, "stress": 0.2, "zero": 0.0}
+    for kw, cal in zip(seen, nulls.FACTOR_NULL_CALIBRATIONS):
+        assert kw["target_sigma_f"] == sigma_f
+        assert kw["target_rho_f"] == pytest.approx(expected_rho[cal]) and kw["rho_f_arg"] == kw["target_rho_f"]
+        gp = study["calibrations"][cal]["gegenprobe"]
+        assert gp["target_sigma_f"] == sigma_f and gp["target_rho_f"] == pytest.approx(expected_rho[cal])
+        assert gp["market_sd_ok"] is True and gp["market_rho_ok"] is True
+        lo, hi = gp["market_sd_band"]
+        assert lo <= sigma_f <= hi
+
+    seen.clear()
+    nulls.beta_control_method_study(returns, alive, symbols, gegenprobe_market_check=False, **common)
+    assert [(kw["target_sigma_f"], kw["target_rho_f"]) for kw in seen] == [(None, None)] * 3
+
+
+def test_dec85_study_aborts_loud_when_the_market_column_misses_the_measured_sigma_f():
+    """DEC-85 (ii): the simulated factor has innovation SD sigma_f, so a strongly persistent
+    calibration (stress rho_f = 1.5 * 0.4 = 0.6, marginal SD 1.25 * sigma_f) cannot reproduce the
+    measured sigma_f of a 300-week white-noise BTC column inside its 95 % band -> the study
+    aborts with the loud market-column message (instead of silently calibrating on it)."""
+    w, k = 300, 30
+    rng = np.random.default_rng(13)
+    returns = rng.normal(0, 0.03, size=(w, k))
+    alive = np.ones((w, k), dtype=bool)
+    symbols = [f"s{i}" for i in range(k - 1)] + ["BTCUSDT"]
+    kw = dict(rho_f_measured=0.4, factor_share_measured=0.02, stress_multiplier=1.5, variants=("mom1",),
+              methods=("none",), n_reps=2, seed=53, gegenprobe_n_reps=60, gegenprobe_rel_tol=10.0,
+              gegenprobe_z_max=1e9, calibration_search_n_reps=5, calibration_search_rel_tol=10.0,
+              calibration_search_max_iter=4)
+    with pytest.raises(nulls.FactorShareCalibrationError, match="Marktspalte inkonsistent") as exc:
+        nulls.beta_control_method_study(returns, alive, symbols, **kw)
+    assert "sigma_f-Ziel" in str(exc.value)
+    # the same study passes with the check switched off (the test knob), bands still reported
+    study = nulls.beta_control_method_study(returns, alive, symbols, gegenprobe_market_check=False, **kw)
+    assert study["calibrations"]["stress"]["gegenprobe"]["market_sd_ok"] is None
+
+
+# ============================================================================
+# DEC-85 (iii) -- not-trading symbol-weeks are NaN for beta and vol estimation
+# ============================================================================
+
+def test_dec85_estimation_returns_helper_and_loud_failures():
+    """DEC-85 (iii): ``returns_est = where(returns_valid, returns, NaN)``; a weekly dict
+    without ``returns_valid`` (or with a wrong shape) is a loud ValueError, never a silent
+    fall back to the zero-filled array."""
+    returns = np.array([[0.0, 0.0], [0.1, 0.0], [0.2, -0.3]])
+    valid = np.array([[False, False], [True, False], [True, True]])
+    est = nulls.estimation_returns({"returns": returns, "returns_valid": valid})
+    assert np.array_equal(est, np.array([[np.nan, np.nan], [0.1, np.nan], [0.2, -0.3]]), equal_nan=True)
+    assert np.array_equal(returns, np.array([[0.0, 0.0], [0.1, 0.0], [0.2, -0.3]]))     # input untouched
+    with pytest.raises(ValueError, match="returns_valid"):
+        nulls.estimation_returns({"returns": returns})
+    with pytest.raises(ValueError, match="shape"):
+        nulls.estimation_returns({"returns": returns, "returns_valid": valid[:2]})
+
+
+def test_dec85_sigma_f_sigma_e_skip_never_trading_symbols_and_match_the_hand_median():
+    """DEC-85 (iii): on ``returns_est`` never-trading columns (all NaN), a 1-week and a 2-week
+    symbol do not move the medians; the result equals the by-hand median over the valid
+    columns, and equals the result on the matrix with those columns DELETED. The zero-filled
+    matrix (the pre-DEC-85 input) gives a smaller median (never-trading symbols enter at SD 0)."""
+    rng = np.random.default_rng(3)
+    w = 40
+    symbols = ["BTCUSDT", "A", "B", "C", "D", "N1", "N2", "N3", "ONE", "TWO"]
+    f = rng.normal(0, 0.06, size=w)
+    valid_cols = {"A": 1.2, "B": 0.6, "C": 1.8, "D": 0.9}
+    est = np.full((w, len(symbols)), np.nan)
+    est[:, 0] = f
+    for name, beta in valid_cols.items():
+        est[:, symbols.index(name)] = beta * f + rng.normal(0, 0.03 + 0.01 * beta, size=w)
+    est[5, symbols.index("ONE")] = 0.04                       # a single valid week
+    est[[5, 6], symbols.index("TWO")] = [0.04, -0.02]          # two valid weeks (< 3 pairs)
+    zero_filled = np.where(np.isnan(est), 0.0, est)
+
+    res = nulls.window_sigma_f_sigma_e(est, symbols)
+    assert res["sigma_f"] == pytest.approx(float(np.std(f, ddof=1)))
+    # by hand: total vol = median SD over the symbols with >= 2 valid weeks (BTC, A..D, TWO)
+    total_sds = [np.std(f, ddof=1)] + [np.std(est[:, symbols.index(n)], ddof=1) for n in valid_cols]
+    total_sds.append(np.std([0.04, -0.02], ddof=1))
+    assert res["sigma_e_total"] == pytest.approx(float(np.median(total_sds)))
+    # by hand: idiosyncratic vol = median residual SD of the OLS on BTC, symbols with >= 3 pairs
+    resid_sds = []
+    for name in valid_cols:
+        y = est[:, symbols.index(name)]
+        x_c, y_c = f - f.mean(), y - y.mean()
+        resid = y_c - (x_c @ y_c) / (x_c @ x_c) * x_c
+        resid_sds.append(resid.std(ddof=1))
+    assert res["sigma_e_idiosyncratic"] == pytest.approx(float(np.median(resid_sds)))
+    assert res["sigma_e_used"] == res["sigma_e_idiosyncratic"]
+
+    keep = [j for j, s in enumerate(symbols) if s in ("BTCUSDT", "A", "B", "C", "D")]
+    ref = nulls.window_sigma_f_sigma_e(est[:, keep], [symbols[j] for j in keep])
+    assert res["sigma_e_idiosyncratic"] == pytest.approx(ref["sigma_e_idiosyncratic"])
+    assert res["sigma_f"] == pytest.approx(ref["sigma_f"])
+
+    zero = nulls.window_sigma_f_sigma_e(zero_filled, symbols)
+    assert zero["sigma_e_idiosyncratic"] < res["sigma_e_idiosyncratic"]
+    assert zero["sigma_e_total"] < res["sigma_e_total"]
+
+
+def test_dec85_pit_beta_with_returns_est_needs_the_full_window_of_valid_returns():
+    """DEC-85 (iii): a symbol with only 10 valid weeks gets NaN at trail_win=26 (it had a
+    damped, finite beta on the zero-filled returns); a symbol valid from week 20 on gets its
+    first finite beta exactly 26 weeks later; a symbol valid throughout is unchanged."""
+    rng = np.random.default_rng(8)
+    w = 60
+    symbols = ["BTCUSDT", "FULL", "YOUNG", "MID"]
+    f = rng.normal(0, 0.05, size=w)
+    est = np.full((w, 4), np.nan)
+    est[:, 0] = f
+    est[:, 1] = 1.3 * f + rng.normal(0, 0.03, size=w)
+    est[50:, 2] = 0.8 * f[50:] + rng.normal(0, 0.03, size=10)       # 10 valid weeks
+    est[20:, 3] = 1.1 * f[20:] + rng.normal(0, 0.03, size=w - 20)   # valid from week 20
+    zero_filled = np.where(np.isnan(est), 0.0, est)
+
+    beta_est = nulls.trailing_pit_beta_excluding_current_week(est, symbols, trail_win=26)
+    beta_zero = nulls.trailing_pit_beta_excluding_current_week(zero_filled, symbols, trail_win=26)
+    assert np.isfinite(beta_zero[-1, 2]) and np.isnan(beta_est[:, 2]).all()      # 10 weeks old
+    assert int(np.flatnonzero(np.isfinite(beta_est[:, 3])).min()) == 20 + 26
+    assert np.isfinite(beta_zero[30, 3])                                          # damped, pre-DEC-85
+    assert np.isnan(beta_est[:26, 1]).all() and np.isfinite(beta_est[26:, 1]).all()
+    assert np.allclose(beta_est[26:, 1], beta_zero[26:, 1])                       # full history: identical
+
+
+def test_dec85_beta_characteristic_gives_nan_to_symbols_with_nan_in_the_window():
+    """DEC-85 (iii): ``characteristics.beta_characteristic`` needs no change -- a symbol with a
+    NaN anywhere in the trailing window gets NaN, a fully valid one a finite beta."""
+    rng = np.random.default_rng(2)
+    w = 30
+    f = rng.normal(0, 0.05, size=w)
+    est = np.column_stack([f, 1.5 * f + rng.normal(0, 0.02, size=w), 0.5 * f + rng.normal(0, 0.02, size=w)])
+    est[:12, 2] = np.nan                                    # third symbol starts trading in week 12
+    out = characteristics.beta_characteristic(est, ["BTCUSDT", "X", "Y"], trail_win=8, min_weeks=8)
+    assert np.isfinite(out[7:, 1]).all()
+    assert np.isnan(out[:19, 2]).all() and np.isfinite(out[19:, 2]).all()           # 12 + 8 - 1 = 19
+
+
+def test_dec85_factor_calibration_report_uses_the_estimation_returns_cross_section():
+    """DEC-85 (iii): ``factor_share_from_trailing_beta`` skips symbol-weeks whose
+    ``returns_est`` is NaN (they are not in the cross-section), so the per-week K shrinks by
+    exactly the not-trading symbols."""
+    rng = np.random.default_rng(4)
+    w, k = 50, 20
+    symbols = [f"s{i}" for i in range(k - 1)] + ["BTCUSDT"]
+    est = rng.normal(0, 0.04, size=(w, k))
+    est[:, :5] = np.nan                                     # five symbols never trade
+    alive = np.ones((w, k), dtype=bool)
+    beta_prev = nulls.trailing_pit_beta_excluding_current_week(est, symbols, trail_win=10)
+    share = nulls.factor_share_from_trailing_beta(est, alive, beta_prev)
+    ks = {row["k"] for row in share["per_week"] if row["r2"] is not None}
+    assert ks == {k - 5}
+    calib = nulls.factor_calibration_report(est, alive, symbols, beta_prev)
+    assert math.isfinite(calib["market_factor"]["sigma_f"]) and math.isfinite(calib["sigma_e_used"])

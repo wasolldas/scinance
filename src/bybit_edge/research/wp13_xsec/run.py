@@ -612,7 +612,15 @@ def run_full(
     method's own implied trailing window all raise :class:`ValueError`
     BEFORE any panel arithmetic runs, so a registered file emitted by
     ``--emit-registered-template`` (``method: ""``) can never silently
-    reach a verdict without the orchestrator filling it in."""
+    reach a verdict without the orchestrator filling it in.
+
+    **DEC-85.** (i) The null simulations' market column is the factor itself
+    (``nulls.simulate_factor_panel`` ``market_index``, set inside
+    :func:`nulls.beta_controlled_factor_null`). (iii) ``weekly["returns_valid"]``
+    is REQUIRED (loud ``ValueError``): the real PIT betas behind
+    ``ic.apply_beta_control`` and the null's ``sigma_f``/``sigma_e`` come from
+    ``returns_est`` (NaN where a symbol did not trade); IC outcomes and
+    characteristics keep the zero-filled ``returns``."""
     from . import prelaunch  # local import: prelaunch.slice_window, avoids a module cycle at import time
 
     rules = registered.get("rules", {})
@@ -645,16 +653,21 @@ def run_full(
     weeks = weekly["weeks"]
     symbols = panel["symbols"]
     returns, alive = weekly["returns"], weekly["alive"]
+    # DEC-85 (iii): not-trading symbol-weeks are NaN for every beta / vol ESTIMATE (loud
+    # ValueError without weekly["returns_valid"]); IC outcomes/characteristics keep `returns`.
+    returns_est = nulls.estimation_returns(weekly)
     all_char = build_all_characteristics_full_panel(returns, panel, weeks, symbols)
     turnover_weekly = characteristics.weekly_turnover(panel, weeks)
     turnover_trail = characteristics.trailing_median_turnover(turnover_weekly)
     beta_8w_pit = all_char["vol_beta"]
     # DEC-77 Entscheidung 2: the registered method's OWN trailing-window PIT beta, built on the
     # FULL panel first (DEC-75 (8) discipline), sliced per window below -- "none" needs none.
+    # DEC-85 (iii): estimated from returns_est -> a symbol needs the method's FULL window of
+    # valid returns (the real PIT beta ic.apply_beta_control uses).
     beta_control_pit_full = None
     if beta_control_trail_win is not None:
         beta_control_pit_full = characteristics.beta_characteristic(
-            returns, symbols, market_symbol="BTCUSDT", trail_win=beta_control_trail_win,
+            returns_est, symbols, market_symbol="BTCUSDT", trail_win=beta_control_trail_win,
             min_weeks=beta_control_trail_win)
 
     windows: dict[str, dict[str, Any]] = {}
@@ -664,6 +677,7 @@ def run_full(
             continue
         window = prelaunch.slice_window(weeks, wcfg["start"], wcfg["end"], returns, alive)
         lo, hi = window["lo"], window["hi"]
+        window["returns_est"] = returns_est[lo:hi]      # DEC-85 (iii)
         window["characteristics"] = {v: arr[lo:hi] for v, arr in all_char.items()}
         window["turnover_trail"] = turnover_trail[lo:hi]
         window["symbols"] = symbols
@@ -706,7 +720,7 @@ def run_full(
         # variants. rho_f/beta_sd come from calibration_source above (SAME pair for both
         # windows).
         bcn = nulls.beta_controlled_factor_null(
-            w["returns"], w["alive"], symbols, method=beta_control_method,
+            w["returns_est"], w["alive"], symbols, method=beta_control_method,
             variants=characteristics.VARIANT_NAMES, convention=convention,
             n_reps=n_reps_factor_null, seed=seed, quantile=null_quantile_level,
             rho_f=stress_rho_f, drift_f=nulls.DRIFT_F_DRIFTFREE, beta_sd=stress_beta_sd)

@@ -82,7 +82,12 @@ def slice_window(weeks: list[str], start_iso: str, end_iso: str,
     entry in ``weeks`` is already a Monday-aligned ISO week start, so
     plain string comparison is exact and needs no date parsing).
     Raises :class:`ValueError` if the window has no overlap with
-    ``weeks`` at all (a loud failure, never a silently empty window)."""
+    ``weeks`` at all (a loud failure, never a silently empty window).
+
+    DEC-85 (iii): the optional 7th array is ``returns_est`` (``nulls.
+    estimation_returns``: NaN where a symbol did not trade), the return
+    array every real-data beta / sigma_f / sigma_e estimate of a window uses;
+    ``window["returns"]`` stays the zero-filled outcome array."""
     idx = [i for i, w in enumerate(weeks) if start_iso <= w <= end_iso]
     if not idx:
         raise ValueError(f"window [{start_iso}, {end_iso}] has no overlap with the loaded "
@@ -90,10 +95,19 @@ def slice_window(weeks: list[str], start_iso: str, end_iso: str,
     lo, hi = idx[0], idx[-1] + 1
     out: dict[str, Any] = {"weeks": weeks[lo:hi], "lo": lo, "hi": hi,
                             "start_iso": start_iso, "end_iso": end_iso}
-    names = ("returns", "alive", "vol_rv", "turnover_trail", "day_count", "beta_prev_26w")
+    names = ("returns", "alive", "vol_rv", "turnover_trail", "day_count", "beta_prev_26w", "returns_est")
     for name, arr in zip(names[:len(arrays)], arrays):
         out[name] = arr[lo:hi]
     return out
+
+
+def _estimation_returns(window: dict[str, Any]) -> np.ndarray:
+    """DEC-85 (iii): the window's ``returns_est`` (NaN where a symbol did not
+    trade), which every real-data beta / sigma_f / sigma_e estimate uses.
+    ``assemble_prelaunch_report`` always sets it (``slice_window``); the
+    fallback to ``window["returns"]`` exists only for hand-built synthetic
+    windows that carry no ``returns_valid`` information."""
+    return window["returns_est"] if "returns_est" in window else window["returns"]
 
 
 # ----------------------------------------------------------------------------
@@ -524,11 +538,13 @@ def factor_preserving_report(
     driftfree raw ceiling, drifting residualized ceiling, driftfree
     residualized quantile) is REPORT-ONLY, labelled as such below.
     """
+    # DEC-85 (iii): the descriptive sigma_f/sigma_e scalars come from returns_est.
+    est = _estimation_returns(window)
     drifting = nulls.factor_preserving_null(
-        window["returns"], window["alive"], symbols, variants=variants,
+        est, window["alive"], symbols, variants=variants,
         convention=convention, n_reps=n_reps, seed=seed, drift_f=nulls.DRIFT_F_DRIFTING)
     driftfree = nulls.factor_preserving_null(
-        window["returns"], window["alive"], symbols, variants=variants,
+        est, window["alive"], symbols, variants=variants,
         convention=convention, n_reps=n_reps, seed=seed, drift_f=nulls.DRIFT_F_DRIFTFREE)
     return {
         "drifting": drifting, "driftfree": driftfree,
@@ -665,6 +681,7 @@ def assemble_prelaunch_report(
     calibration_search_n_reps: int = nulls.CALIBRATION_SEARCH_N_REPS_DEFAULT,
     calibration_search_rel_tol: float = nulls.CALIBRATION_SEARCH_REL_TOL_DEFAULT,
     calibration_search_max_iter: int = nulls.CALIBRATION_SEARCH_MAX_ITER_DEFAULT,
+    gegenprobe_market_check: bool = True,
 ) -> dict[str, Any]:
     """Assemble the full ``--prelaunch`` report (DEC-74 Entscheidung 2/3),
     given an ALREADY LOADED union panel (``panel`` from
@@ -724,12 +741,28 @@ def assemble_prelaunch_report(
     **DEC-81 (Vorlauf v5c), calibration cross-section.** Per window the
     calibration search and the Gegenprobe run on the SAME cross-section the
     real share measurement uses: ``calibration_mask = alive & finite
-    beta_prev_26w & finite returns`` (the mask
+    beta_prev_26w & finite returns_est`` (the mask
     :func:`nulls.factor_share_from_trailing_beta` builds per week on real
     data), so the simulated weekly R^2 has the real K per week instead of
     all ``n_symbols`` columns. The Gegenprobe is judged on a
     standard-error basis (:func:`nulls.factor_share_gegenprobe`) and a
     search that does not converge aborts the run.
+
+    **DEC-85 (Vorlauf v5d).** (i) The simulated market column is the factor
+    itself in every factor-null simulation (:func:`nulls.simulate_factor_
+    panel` ``market_index``). (ii) Each calibration's Gegenprobe additionally
+    requires the measured ``sigma_f``/``rho_f`` inside the central 95 % band of
+    the simulated market column's SD / lag-1 autocorrelation
+    (:func:`nulls.beta_control_method_study`; ``gegenprobe_market_check=False``
+    drops the two targets -- a TEST knob for tiny synthetic panels, like
+    ``gegenprobe_z_max``, never for a real run). (iii) ``weekly["returns_valid"]``
+    (True where a return was computed from two consecutive weekly closes)
+    gives ``returns_est = where(returns_valid, returns, NaN)``, used for EVERY
+    real-data beta and vol estimate here (the 26-week PIT beta behind the
+    target factor share, the factor calibration, ``sigma_f``/``sigma_e``, the
+    calibration mask); IC-related inputs (the persistence null's AR(1) fits,
+    ``h30_feasibility``, the survivorship fixture) keep the zero-filled
+    ``returns``.
 
     **Runtime, measured BEFORE DEC-81 (all numbers in the two paragraphs
     below are pre-DEC-81; DEC-81 vectorised :func:`characteristics.
@@ -798,6 +831,9 @@ def assemble_prelaunch_report(
     weeks = weekly["weeks"]
     symbols = panel["symbols"]
     returns, alive = weekly["returns"], weekly["alive"]
+    # DEC-85 (iii): not-trading symbol-weeks are NaN for every beta / vol ESTIMATE below
+    # (loud ValueError without weekly["returns_valid"]); `returns` stays the outcome array.
+    returns_est = nulls.estimation_returns(weekly)
     vol_rv = characteristics.realized_vol_characteristic(panel, weeks)
     turnover_weekly = characteristics.weekly_turnover(panel, weeks)
     turnover_trail = characteristics.trailing_median_turnover(turnover_weekly)
@@ -805,14 +841,15 @@ def assemble_prelaunch_report(
     # DEC-77 Entscheidung 1 (a)(b): the calibration beta -- 26-week trailing, STRICTLY
     # excluding week t itself (module docstring of nulls.trailing_pit_beta_excluding_
     # current_week) -- built on the FULL panel first, DEC-75 (8) discipline, then sliced.
+    # DEC-85 (iii): estimated from returns_est, so a symbol needs 26 VALID weeks.
     beta_prev_26w = nulls.trailing_pit_beta_excluding_current_week(
-        returns, symbols, market_symbol="BTCUSDT", trail_win=nulls.CALIBRATION_BETA_TRAIL_WEEKS)
+        returns_est, symbols, market_symbol="BTCUSDT", trail_win=nulls.CALIBRATION_BETA_TRAIL_WEEKS)
 
     windows_out: dict[str, Any] = {}
     for name, (start, end) in WINDOWS.items():
         try:
             window = slice_window(weeks, start, end, returns, alive, vol_rv, turnover_trail, day_count,
-                                   beta_prev_26w)
+                                   beta_prev_26w, returns_est)
         except ValueError as exc:
             windows_out[name] = {"available": False, "note": str(exc)}
             continue
@@ -836,7 +873,7 @@ def assemble_prelaunch_report(
 
             # DEC-77 Entscheidung 1 (a)/(b)/(c), revised by DEC-78 Entscheidung 1/Nachtrag -- Vorlauf v5.
             calib = nulls.factor_calibration_report(
-                window["returns"], window["alive"], symbols, window["beta_prev_26w"],
+                window["returns_est"], window["alive"], symbols, window["beta_prev_26w"],
                 market_symbol="BTCUSDT")
             # DEC-78 Nachtrag (orchestrator decision): beta_sd is now BISECTION-CALIBRATED so the
             # Gegenprobe passes BY CONSTRUCTION -- its own C.14 loud fail (FactorShareCalibration
@@ -845,15 +882,17 @@ def assemble_prelaunch_report(
             # other loud fail in this package.
             # DEC-81: the search/Gegenprobe cross-section is EXACTLY the one the real share
             # measurement (nulls.factor_share_from_trailing_beta) runs over each week.
+            # DEC-85 (iii): finite returns_est (not the zero-filled returns), exactly as
+            # factor_share_from_trailing_beta sees it.
             calibration_mask = (window["alive"] & ~np.isnan(window["beta_prev_26w"])
-                                & ~np.isnan(window["returns"]))
+                                & ~np.isnan(window["returns_est"]))
             study = nulls.beta_control_method_study(
-                window["returns"], window["alive"], symbols,
+                window["returns_est"], window["alive"], symbols,
                 rho_f_measured=calib["market_factor"]["rho_f_measured"],
                 factor_share_measured=calib["factor_share"]["factor_share_median"],
                 convention=convention, n_reps=n_reps_beta_control_study, seed=seed,
                 gegenprobe_n_reps=gegenprobe_n_reps, gegenprobe_rel_tol=gegenprobe_rel_tol,
-                gegenprobe_z_max=gegenprobe_z_max,
+                gegenprobe_z_max=gegenprobe_z_max, gegenprobe_market_check=gegenprobe_market_check,
                 calibration_search_n_reps=calibration_search_n_reps,
                 calibration_search_rel_tol=calibration_search_rel_tol,
                 calibration_search_max_iter=calibration_search_max_iter,
@@ -885,14 +924,14 @@ def assemble_prelaunch_report(
             if not w.get("available") or "beta_control_method_study" not in w:
                 continue
             window = slice_window(weeks, *WINDOWS[wn], returns, alive, vol_rv, turnover_trail, day_count,
-                                   beta_prev_26w)
+                                   beta_prev_26w, returns_est)
             # DEC-78 Entscheidung 1/Nachtrag: reuse the STUDY's own (rho_f, beta_sd_calibrated)
             # per calibration -- never a fresh re-derivation/re-search -- so the winner re-run is
             # EXACTLY the same calibration the grid/decision table already validated (Gegenprobe
             # included).
             high_rep = {
                 cal: nulls.beta_controlled_factor_null(
-                    window["returns"], window["alive"], symbols, method=best, convention=convention,
+                    window["returns_est"], window["alive"], symbols, method=best, convention=convention,
                     n_reps=n_reps_beta_control_winner, seed=seed,
                     rho_f=study["calibrations"][cal]["rho_f"], drift_f=nulls.DRIFT_F_DRIFTFREE,
                     beta_sd=study["calibrations"][cal]["beta_sd_calibrated"])
@@ -939,6 +978,17 @@ def _fmt5(v: float | None) -> str:
     return "n/a (kein Marktsymbol)" if v is None else f"{v:.5f}"
 
 
+def _fmt_band(band: list[float] | None, target: float | None, ok: bool | None) -> str:
+    """DEC-85 (ii): ``[lo, hi] (Ziel x: ok|FAIL)`` for the Gegenprobe's market-column
+    band table cells; ``n/a`` for an older artifact / a window without a market column."""
+    if band is None:
+        return "n/a"
+    txt = f"[{band[0]:.5f}, {band[1]:.5f}]"
+    if target is not None:
+        txt += f" (Ziel {target:.5f}: {'ok' if ok else 'FAIL'})"
+    return txt
+
+
 def _beta_control_calibration_markdown(w: dict[str, Any]) -> list[str]:
     """DEC-77 Entscheidung 1/task brief item 7, extended by DEC-78
     Entscheidung 1: ONE window's calibration block (``rho_f_measured``,
@@ -977,8 +1027,8 @@ def _beta_control_calibration_markdown(w: dict[str, Any]) -> list[str]:
                       "beta_sd (kalibriert) | Ziel-Faktoranteil | erreichter Faktoranteil "
                       "(Suche) | wahrer Faktoranteil (Suche) | Iterationen | konvergiert | "
                       "Gegenprobe simuliert | Gegenprobe rel. Abw. | Gegenprobe se_diff | "
-                      "Gegenprobe z | Gegenprobe |")
-        lines.append("|---|---|---|---|---|---|---|---|---|---|---|---|---|---|")
+                      "Gegenprobe z | Marktspalte SD-Band | rho-Band | Gegenprobe |")
+        lines.append("|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|")
         for cal in ("measured", "stress", "zero"):
             c = study["calibrations"][cal]
             g = c["gegenprobe"]
@@ -990,6 +1040,8 @@ def _beta_control_calibration_markdown(w: dict[str, Any]) -> list[str]:
                 f"{'ja' if s['converged'] else 'nein'} | "
                 f"{_fmt5(g['simulated_factor_share'])} | {_fmt5(g['rel_diff'])} | "
                 f"{_fmt5(g.get('se_diff', float('nan')))} | {_fmt5(g.get('z', float('nan')))} | "
+                f"{_fmt_band(g.get('market_sd_band'), g.get('target_sigma_f'), g.get('market_sd_ok'))} | "
+                f"{_fmt_band(g.get('market_rho_band'), g.get('target_rho_f'), g.get('market_rho_ok'))} | "
                 f"{'OK' if g['ok'] else 'FAIL'} |")
         lines.append("")
 

@@ -1224,3 +1224,59 @@ def test_get_retries_on_rate_limit_then_succeeds_and_fails_loudly_after_backoff(
     raw, text = br._get("https://x/y", {"a": 1}, always, backoff_s=(0.01, 0.02), sleep=sleeps.append)
     with pytest.raises(br.BybitFieldLayoutError, match="10006"):
         br.unwrap_result(_json.loads(text))
+
+
+# ============================================================================
+# DEC-85 (iii) -- panel_load.returns_valid: where a weekly return was computed
+# ============================================================================
+
+def _dec85_weekly_panel():
+    """10 ISO weeks (Mondays from 2024-01-01), daily bars constant within a week:
+    A trades all 10 weeks; B starts trading in week 4; C has week 3 missing (a gap);
+    D stops after week 6; E never trades (all NaN)."""
+    n_weeks = 10
+    start = date(2024, 1, 1)
+    dates = [(start + timedelta(days=i)).isoformat() for i in range(7 * n_weeks)]
+    symbols = ["AUSDT", "BUSDT", "CUSDT", "DUSDT", "EUSDT"]
+    trading = {
+        "AUSDT": set(range(10)),
+        "BUSDT": set(range(4, 10)),
+        "CUSDT": set(range(10)) - {3},
+        "DUSDT": set(range(0, 7)),
+        "EUSDT": set(),
+    }
+    close = np.full((len(dates), len(symbols)), np.nan)
+    for j, sym in enumerate(symbols):
+        for w in trading[sym]:
+            close[7 * w:7 * w + 7, j] = 100.0 + 3.0 * (j + 1) * w + w
+    return {"symbols": symbols, "dates": dates, "close": close}, n_weeks
+
+
+def test_dec85_returns_valid_marks_exactly_the_computed_weekly_returns():
+    """DEC-85 (iii): ``returns_valid`` is True exactly where a return came from two
+    CONSECUTIVE weekly closes (listing week, gap week and the week after a gap, post-delisting
+    weeks and a never-trading symbol are False), while ``returns`` keeps its zero fill.
+    Both wrappers (plain and union) carry the same field."""
+    panel, n_weeks = _dec85_weekly_panel()
+    expected_valid = {
+        "AUSDT": set(range(1, 10)),
+        "BUSDT": set(range(5, 10)),            # listing week 4 has no previous close
+        "CUSDT": {1, 2, 5, 6, 7, 8, 9},       # week 3 missing, week 4 follows a gap
+        "DUSDT": set(range(1, 7)),            # nothing after the last bar in week 6
+        "EUSDT": set(),
+    }
+    weekly = panel_load.weekly_returns_and_mask(panel)
+    union = panel_load.weekly_returns_and_mask_union(
+        panel, [None, None, None, "2024-02-14", None])      # DUSDT: last alive day inside week 6
+    for res in (weekly, union):
+        valid, returns, close = res["returns_valid"], res["returns"], res["close"]
+        assert valid.dtype == bool and valid.shape == returns.shape == (n_weeks, 5)
+        for j, sym in enumerate(panel["symbols"]):
+            assert set(np.flatnonzero(valid[:, j]).tolist()) == expected_valid[sym], sym
+            for t in range(n_weeks):
+                if valid[t, j]:
+                    assert returns[t, j] == pytest.approx(math.log(close[t, j] / close[t - 1, j]))
+                else:
+                    assert returns[t, j] == 0.0          # backward compatible zero fill
+    assert np.array_equal(weekly["returns"], union["returns"])
+    assert np.array_equal(weekly["returns_valid"], union["returns_valid"])

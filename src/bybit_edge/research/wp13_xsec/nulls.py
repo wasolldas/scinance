@@ -138,15 +138,35 @@ against. DEC-76 Entscheidung 1 therefore fixes each null's ROLE:
       the choice explicit even if a future caller changes the fallback).
 
 **"Simulated BTC column" convention (task brief: "document how the market
-column is chosen").** :func:`factor_preserving_null` simulates ONE column
-per REAL symbol (``n_symbols = len(symbols)``, same order); the "simulated
-BTC column" used for both the idiosyncratic-vol regression and the
-per-replicate beta-residualisation is simply ``sim_returns[:,
-symbols.index(market_symbol)]`` -- the simulated draw that LANDS at
-BTCUSDT's own real position in the symbol list, never a separately
-re-derived series. This mirrors :func:`ic.residualize_outcome`'s own
-``r_btc = returns[:, symbols.index(market_symbol)]`` convention exactly,
-just applied to the simulated panel instead of the real one.
+column is chosen"), REVISED by DEC-85 (i).** Every factor-null simulation
+(:func:`factor_preserving_null`, :func:`beta_controlled_factor_null`, the
+calibration search and its Gegenprobe) simulates ONE column per REAL symbol
+(``n_symbols = len(symbols)``, same order); the "simulated BTC column" used
+for both the idiosyncratic-vol regression and the per-replicate
+beta-residualisation is ``sim_returns[:, symbols.index(market_symbol)]`` --
+the column that LANDS at BTCUSDT's own real position in the symbol list,
+never a separately re-derived series (this mirrors :func:`ic.residualize_
+outcome`'s own ``r_btc = returns[:, symbols.index(market_symbol)]``
+convention, applied to the simulated panel instead of the real one).
+
+**DEC-85 (i): that column IS the factor.** Until v5c it was an ordinary
+simulation column ``(1 + s*z)*f + e`` with the full idiosyncratic vol, so its
+SD was ``sqrt(sigma_f^2 + sigma_e^2)`` (0.088/0.091 against a measured
+0.067/0.055) and its autocorrelation a fraction of ``rho_f`` -- but DEC-77 (a)
+sets ``sigma_f``/``rho_f`` EQUAL to the real BTC series' and every real beta
+and factor share is measured against BTC. :func:`simulate_factor_panel`
+therefore takes ``market_index``: ``returns[:, market_index] = f`` (beta 1,
+no idiosyncratic component). The Gegenprobe (:func:`factor_share_gegenprobe`)
+additionally checks that the measured ``sigma_f``/``rho_f`` lie in the central
+95 % band of the SAME estimators on the simulated market column (DEC-85
+(ii)), so a column that misses its own calibration targets fails loudly.
+
+**DEC-85 (iii) -- not-trading symbol-weeks are NaN for beta/vol estimation.**
+``panel_load`` keeps ``returns = 0`` where no return is computable (before
+listing, after delisting, across gaps) and adds ``returns_valid``;
+:func:`estimation_returns` turns the pair into ``returns_est`` (NaN where
+invalid), the array EVERY real-data beta / sigma_f / sigma_e estimate uses.
+The estimators here skip NaN; IC computations stay on ``returns``.
 """
 from __future__ import annotations
 
@@ -174,7 +194,7 @@ __all__ = [
     "STRESS_MULTIPLIER", "GEGENPROBE_REL_TOL", "FactorShareCalibrationError",
     "factor_share_gegenprobe", "calibrate_beta_sd_to_observed_share",
     "CALIBRATION_SEARCH_N_REPS_DEFAULT", "CALIBRATION_SEARCH_REL_TOL_DEFAULT",
-    "CALIBRATION_SEARCH_MAX_ITER_DEFAULT",
+    "CALIBRATION_SEARCH_MAX_ITER_DEFAULT", "estimation_returns",
 ]
 
 #: DEC-51/DEC-74 (d): per-window critical value (alpha 0.05 one-sided).
@@ -474,6 +494,7 @@ def simulate_factor_panel(
     n_weeks: int, n_symbols: int, *, sigma_f: float, sigma_e: float,
     rho_f: float = 0.2, drift_f: float = 0.002, rng: np.random.Generator,
     beta_pool: np.ndarray | None = None, beta_sd: float | None = None,
+    market_index: int | None = None,
 ) -> dict[str, Any]:
     """Task brief item 3, verbatim construction: ``returns = beta_i * f_t +
     e_it`` -- ``beta_i ~ U(0.5, 2.0)`` drawn ONCE (fixed per symbol for
@@ -523,9 +544,19 @@ def simulate_factor_panel(
     time-INVARIANT) beta loading -- exactly the review's B-1 adversarial
     case, deliberately reproduced as the null itself.
 
+    **DEC-85 (i), additive:** ``market_index`` (default ``None`` = the old
+    behaviour, kept only for backward compatibility/regression tests) --
+    when set, column ``market_index`` IS the factor: ``returns[:,
+    market_index] = f`` (beta 1, no idiosyncratic component) and ``beta[
+    market_index] = 1.0`` in the returned value. The random draws (beta, f,
+    e_it) are made exactly as before and the column is overwritten
+    afterwards, so the rng stream is unchanged by this argument.
+
     Returns ``{"returns", "beta", "f"}`` -- ``returns`` is ``[n_weeks,
     n_symbols]``, ``beta`` is ``[n_symbols]``, ``f`` is ``[n_weeks]``.
     """
+    if market_index is not None and not (0 <= market_index < n_symbols):
+        raise ValueError(f"market_index {market_index!r} outside [0, {n_symbols})")
     if beta_sd is not None:
         beta = 1.0 + beta_sd * rng.standard_normal(size=n_symbols)
     elif beta_pool is not None and beta_pool.size > 0:
@@ -539,6 +570,11 @@ def simulate_factor_panel(
         f[t] = drift_f + rho_f * f[t - 1] + sigma_f * rng.standard_normal()
     e_it = sigma_e * rng.standard_normal(size=(n_weeks, n_symbols))
     returns = beta[None, :] * f[:, None] + e_it
+    if market_index is not None:
+        # DEC-85 (i): the market symbol's column is the factor itself.
+        returns[:, market_index] = f
+        beta = beta.copy()
+        beta[market_index] = 1.0
     return {"returns": returns, "beta": beta, "f": f}
 
 
@@ -613,6 +649,26 @@ def _mean_of_max(draws: dict[str, list[float]], variants: tuple[str, ...], n_rep
     return float(finite_max.mean()) if finite_max.size else float("nan")
 
 
+def estimation_returns(weekly: dict[str, Any]) -> np.ndarray:
+    """DEC-85 (iii): ``returns_est = where(returns_valid, returns, NaN)`` --
+    the weekly return array every REAL-data beta / ``sigma_f`` / ``sigma_e``
+    estimate uses (``weekly`` from ``panel_load.weekly_returns_and_mask*``).
+    ``panel_load`` keeps ``returns = 0`` where no return is computable (before
+    listing, after delisting, across gaps) because many callers rely on it;
+    for a beta or vol ESTIMATE such a cell is a missing observation, not a
+    zero return. IC computations keep using ``weekly["returns"]``. C.14: a
+    ``weekly`` dict without ``returns_valid`` (or with a mismatching shape) is
+    a loud ``ValueError``, never a silent fall back to the zero-filled array."""
+    if "returns_valid" not in weekly:
+        raise ValueError("weekly lacks 'returns_valid' (DEC-85 (iii)): build it with "
+                         "panel_load.weekly_returns_and_mask / weekly_returns_and_mask_union")
+    returns = np.asarray(weekly["returns"], dtype=np.float64)
+    valid = np.asarray(weekly["returns_valid"], dtype=bool)
+    if valid.shape != returns.shape:
+        raise ValueError(f"returns_valid shape {valid.shape} != returns shape {returns.shape}")
+    return np.where(valid, returns, np.nan)
+
+
 def window_sigma_f_sigma_e(
     window_returns: np.ndarray, symbols: list[str], *, market_symbol: str = "BTCUSDT",
 ) -> dict[str, Any]:
@@ -625,19 +681,24 @@ def window_sigma_f_sigma_e(
     TOTAL median per-symbol vol if the idiosyncratic estimate is not
     finite). Pulled out to module scope so both simulation entry points
     compute these REAL-data descriptive scalars IDENTICALLY, never two
-    subtly different re-derivations."""
+    subtly different re-derivations.
+
+    **DEC-85 (iii):** callers pass ``returns_est`` (:func:`estimation_returns`,
+    NaN where a symbol did not trade): NaN cells are skipped, a symbol with
+    fewer than 2 valid weeks is left out of the ``sigma_e`` medians (never
+    enters as SD 0)."""
     n_weeks, n_symbols = window_returns.shape
-    if market_symbol in symbols:
-        btc_col = window_returns[:, symbols.index(market_symbol)]
-        sigma_f = float(np.nanstd(btc_col[~np.isnan(btc_col)], ddof=1)) if np.isfinite(btc_col).sum() > 1 else 0.05
-    else:
-        per_symbol_sd = np.nanstd(window_returns, axis=0, ddof=1)
-        sigma_f = float(np.nanmedian(per_symbol_sd[np.isfinite(per_symbol_sd)])) if np.isfinite(per_symbol_sd).any() else 0.05
     per_symbol_sd = np.array([
         np.nanstd(window_returns[:, j][~np.isnan(window_returns[:, j])], ddof=1)
         if int((~np.isnan(window_returns[:, j])).sum()) > 1 else np.nan
         for j in range(n_symbols)
     ])
+    if market_symbol in symbols:
+        btc_col = window_returns[:, symbols.index(market_symbol)]
+        sigma_f = float(np.nanstd(btc_col[~np.isnan(btc_col)], ddof=1)) if np.isfinite(btc_col).sum() > 1 else 0.05
+    else:
+        sigma_f = (float(np.nanmedian(per_symbol_sd[np.isfinite(per_symbol_sd)]))
+                   if np.isfinite(per_symbol_sd).any() else 0.05)
     finite_sd = per_symbol_sd[~np.isnan(per_symbol_sd)]
     sigma_e_total = float(np.median(finite_sd)) if finite_sd.size else 0.03
     idio_report = idiosyncratic_vol_from_beta_regression(window_returns, symbols, market_symbol=market_symbol)
@@ -720,7 +781,7 @@ def factor_preserving_null(
 
     for _rep in range(n_reps):
         sim = simulate_factor_panel(n_weeks, n_symbols, sigma_f=sigma_f, sigma_e=sigma_e_used,
-                                     rho_f=rho_f, drift_f=drift_f, rng=rng)
+                                     rho_f=rho_f, drift_f=drift_f, rng=rng, market_index=market_idx)
         sim_returns = sim["returns"]
         resid_returns = None
         if has_market:
@@ -793,8 +854,8 @@ def factor_preserving_null(
         "n_weeks": n_weeks, "n_symbols": n_symbols,
         "market_column_convention": (
             "Simulierte BTC-Spalte = sim_returns[:, symbols.index(market_symbol)] -- dieselbe "
-            "Position wie das echte BTCUSDT in der Symbolliste, nie eine separat hergeleitete Serie "
-            "(siehe nulls.py Modul-Docstring)."),
+            "Position wie das echte BTCUSDT in der Symbolliste; seit DEC-85 (i) ist diese Spalte "
+            "der Faktor f selbst (Beta 1, keine Eigenkomponente; siehe nulls.py Modul-Docstring)."),
         "label": ("faktorerhaltende Null (DEC-75 (2)/DEC-76 (1)/(2)): returns = beta_i*f_t + e_it, "
                   f"signalfrei; rho_f={rho_f}, drift_f={drift_f} "
                   f"({'drifting' if drift_f != 0.0 else 'driftfree'})."),
@@ -853,7 +914,13 @@ def trailing_pit_beta_excluding_current_week(
     week (``out[t] = beta_all[t-1]``, ``out[0] = NaN``) so ``out[t]`` uses
     ONLY weeks strictly before ``t`` -- built on the FULL panel (DEC-75
     (8) discipline), sliced afterward by the caller, exactly like every
-    other characteristic in this package."""
+    other characteristic in this package.
+
+    **DEC-85 (iii):** on real data ``returns`` is ``returns_est``
+    (:func:`estimation_returns`); :func:`characteristics.beta_characteristic`
+    gives NaN to any symbol with a NaN in the trailing window, so a symbol
+    needs the FULL ``trail_win`` of valid returns (a 10-week-old symbol has no
+    26-week beta instead of a damped finite one)."""
     beta_all = characteristics.beta_characteristic(
         returns, symbols, market_symbol=market_symbol, trail_win=trail_win, min_weeks=trail_win)
     out = np.full_like(beta_all, np.nan)
@@ -984,7 +1051,10 @@ def factor_calibration_report(
     ``factor_share_median``) -- the "measured" calibration's TRUE beta
     dispersion, reported here purely descriptively (the value the study
     itself derives independently, for the SAME window, is what actually
-    feeds the simulation)."""
+    feeds the simulation).
+
+    **DEC-85 (iii):** ``window_returns`` is ``returns_est`` (NaN where a
+    symbol did not trade); ``beta_prev`` is built from the same array."""
     mkt = measure_market_factor(window_returns, symbols, market_symbol=market_symbol)
     share = factor_share_from_trailing_beta(window_returns, window_alive, beta_prev, min_universe=min_universe)
     disp = beta_dispersion_from_trailing_beta(beta_prev, window_alive)
@@ -1065,6 +1135,12 @@ GEGENPROBE_Z_MAX = 3.0
 #: DEC-81: the Gegenprobe draws from ``seed + GEGENPROBE_SEED_OFFSET`` so it is
 #: independent of the calibration search's (common-random-number) draws.
 GEGENPROBE_SEED_OFFSET = 1_000_003
+
+#: DEC-85 (ii): the central 95 % band (2.5 % .. 97.5 %) of the replicate
+#: distribution of the SD / lag-1 autocorrelation of the simulated market
+#: column that the measured ``sigma_f`` / ``rho_f`` must fall into.
+MARKET_BAND_LOWER = 0.025
+MARKET_BAND_UPPER = 0.975
 
 #: DEC-81: bootstrap draws (over REPLICATES, with replacement) behind the
 #: standard error of the pooled-median share estimator.
@@ -1164,15 +1240,37 @@ def _measure_simulated_share(
     (:func:`_pooled_median_se_bootstrap`, bootstrap over REPLICATES,
     ``NaN`` below 2 replicates with R^2 values); ``n_reps_with_r2`` counts
     those replicates. ``simulated_share`` itself is computed exactly as
-    before."""
+    before.
+
+    **DEC-85 (i)/(ii).** When ``market_symbol`` is in ``symbols`` the market
+    column of every replicate IS the factor (``simulate_factor_panel``'s
+    ``market_index``), and per replicate the SD (``ddof=1``) and the lag-1
+    autocorrelation (:func:`_lag_autocorr`) of that simulated market column
+    over the ``n_weeks`` window weeks are collected -- the SAME estimators
+    :func:`measure_market_factor` applies to the real BTC series. The result
+    carries ``market_sd_draws``/``market_rho_draws`` (finite values only) and
+    their central 95 % bands ``market_sd_band``/``market_rho_band`` =
+    ``[q2.5 %, q97.5 %]`` (``None`` without a market column; ``[nan, nan]``
+    with fewer than 2 finite draws)."""
     mask = _check_calibration_mask(mask, n_weeks, n_symbols)
     rng = np.random.default_rng(seed)
     alive = np.ones((n_weeks, n_symbols), dtype=bool) if mask is None else mask
+    market_index = symbols.index(market_symbol) if market_symbol in symbols else None
     rep_r2: list[np.ndarray] = []
     true_r2: list[float] = []
+    sd_draws: list[float] = []
+    rho_draws: list[float] = []
     for _ in range(n_reps):
         sim = simulate_factor_panel(n_weeks, n_symbols, sigma_f=sigma_f, sigma_e=sigma_e,
-                                     rho_f=rho_f, drift_f=drift_f, rng=rng, beta_sd=beta_sd)
+                                     rho_f=rho_f, drift_f=drift_f, rng=rng, beta_sd=beta_sd,
+                                     market_index=market_index)
+        if market_index is not None:
+            mkt_col = sim["returns"][:, market_index]
+            if mkt_col.size > 1:
+                sd_draws.append(float(mkt_col.std(ddof=1)))
+            rho_rep = _lag_autocorr(mkt_col, 1)
+            if rho_rep is not None:
+                rho_draws.append(rho_rep)
         beta_prev = trailing_pit_beta_excluding_current_week(
             sim["returns"], symbols, market_symbol=market_symbol, trail_win=beta_trail_win)
         share = factor_share_from_trailing_beta(sim["returns"], alive, beta_prev, min_universe=min_universe)
@@ -1191,9 +1289,21 @@ def _measure_simulated_share(
     pooled_r2 = np.concatenate(rep_r2) if rep_r2 else np.empty(0, dtype=np.float64)
     simulated_share = float(np.median(pooled_r2)) if pooled_r2.size else float("nan")
     true_share = float(np.mean(true_r2)) if true_r2 else float("nan")
+
+    def _band(draws: list[float]) -> list[float] | None:
+        if market_index is None:
+            return None
+        if len(draws) < 2:
+            return [float("nan"), float("nan")]
+        lo, hi = np.quantile(np.array(draws, dtype=np.float64), [MARKET_BAND_LOWER, MARKET_BAND_UPPER])
+        return [float(lo), float(hi)]
+
     return {"simulated_share": simulated_share, "true_share": true_share,
             "n_r2_pooled": int(pooled_r2.size), "n_true_r2_pooled": len(true_r2),
-            "se_bootstrap": _pooled_median_se_bootstrap(rep_r2, seed), "n_reps_with_r2": len(rep_r2)}
+            "se_bootstrap": _pooled_median_se_bootstrap(rep_r2, seed), "n_reps_with_r2": len(rep_r2),
+            "market_sd_draws": sd_draws if market_index is not None else None,
+            "market_rho_draws": rho_draws if market_index is not None else None,
+            "market_sd_band": _band(sd_draws), "market_rho_band": _band(rho_draws)}
 
 
 def factor_share_gegenprobe(
@@ -1203,6 +1313,7 @@ def factor_share_gegenprobe(
     n_reps: int = GEGENPROBE_N_REPS_DEFAULT, seed: int = FACTOR_NULL_SEED,
     rel_tol: float = GEGENPROBE_REL_TOL, min_universe: int = 10,
     search_se: float = 0.0, mask: np.ndarray | None = None, z_max: float = GEGENPROBE_Z_MAX,
+    target_sigma_f: float | None = None, target_rho_f: float | None = None,
 ) -> dict[str, Any]:
     """DEC-78 Entscheidung 1, Gegenprobe (task brief item 2, verbatim,
     LITERAL per the DEC-78 Nachtrag -- never loosened): measures the
@@ -1244,11 +1355,43 @@ def factor_share_gegenprobe(
     never looser than the old ``|rel_diff| <= rel_tol``. NaN anywhere
     (too few replicates, NaN share) is "not ok". ``mask`` is forwarded to
     :func:`_measure_simulated_share`; the caller draws the Gegenprobe from a
-    seed independent of the search (``seed + GEGENPROBE_SEED_OFFSET``)."""
+    seed independent of the search (``seed + GEGENPROBE_SEED_OFFSET``).
+
+    **DEC-85 (ii), market-column check (loud, additive).** ``target_sigma_f``
+    / ``target_rho_f`` (default ``None`` = not checked) are the MEASURED
+    ``sigma_f`` / ``rho_f`` the simulated market column must reproduce. When
+    given, each must lie in the central 95 % band ``[q2.5 %, q97.5 %]`` of the
+    replicate distribution of the SAME estimator (SD ``ddof=1`` /
+    :func:`_lag_autocorr` lag 1 over the window weeks) on the simulated market
+    column -- one measurement against the distribution of its estimator, not
+    mean against measurement (the lag-1 autocorrelation of ~53 weeks is biased
+    by about ``-(1 + 3 rho)/T``). A target outside its band raises
+    :class:`FactorShareCalibrationError` ("Marktspalte inkonsistent", naming
+    target and band) in addition to, and independent of, the factor-share
+    criterion above (unchanged). Needs ``market_symbol`` in ``symbols`` (else
+    a loud error: nothing to check). The result carries ``market_sd_band``,
+    ``market_rho_band``, ``market_sd_ok``, ``market_rho_ok`` (``None`` where
+    the target was not given), ``target_sigma_f``, ``target_rho_f``."""
+    if (target_sigma_f is not None or target_rho_f is not None) and market_symbol not in symbols:
+        raise FactorShareCalibrationError(
+            "Gegenprobe fehlgeschlagen (DEC-85): Marktspalte-Pruefung verlangt, aber das Marktsymbol "
+            f"{market_symbol!r} steht nicht in den Symbolen -- keine simulierte Marktspalte, nichts zu pruefen.")
     measured = _measure_simulated_share(
         n_weeks, n_symbols, symbols, sigma_f=sigma_f, sigma_e=sigma_e, rho_f=rho_f, beta_sd=beta_sd,
         market_symbol=market_symbol, drift_f=drift_f, beta_trail_win=beta_trail_win,
         n_reps=n_reps, seed=seed, min_universe=min_universe, mask=mask)
+    sd_band, rho_band = measured.get("market_sd_band"), measured.get("market_rho_band")
+
+    def _in_band(target: float | None, band: list[float] | None) -> bool | None:
+        if target is None:
+            return None
+        if band is None or math.isnan(target) or any(math.isnan(b) for b in band):
+            return False                     # NaN anywhere is "not ok" (C.14), never a pass
+        return bool(band[0] <= target <= band[1])
+
+    market_sd_ok = _in_band(target_sigma_f, sd_band)
+    market_rho_ok = _in_band(target_rho_f, rho_band)
+    market_ok = market_sd_ok is not False and market_rho_ok is not False
     simulated_share = measured["simulated_share"]
     if math.isnan(simulated_share) or math.isnan(target_share) or target_share == 0.0:
         rel_diff = float("nan")
@@ -1265,7 +1408,8 @@ def factor_share_gegenprobe(
     power_z = min(z_max, GEGENPROBE_Z_MAX)
     power_ok = (not (math.isnan(se_diff) or math.isnan(target_share))) and power_z * se_diff <= rel_tol * target_share
     z_ok = (not math.isnan(z)) and z <= z_max
-    ok = bool(z_ok and power_ok)
+    share_ok = bool(z_ok and power_ok)
+    ok = bool(share_ok and market_ok)
     result = {
         "simulated_factor_share": simulated_share, "target_factor_share": target_share,
         "true_share": measured["true_share"],
@@ -1273,23 +1417,43 @@ def factor_share_gegenprobe(
         "ok": ok, "sigma_f": sigma_f, "sigma_e": sigma_e, "rho_f": rho_f, "beta_sd": beta_sd,
         "se_gegenprobe": se_gegenprobe, "search_se": float(search_se), "se_diff": se_diff,
         "z": z, "z_max": z_max, "power_ok": bool(power_ok), "seed": seed,
+        # DEC-85 (ii): the market column's own consistency with the measured sigma_f / rho_f.
+        "market_sd_band": sd_band, "market_rho_band": rho_band,
+        "market_sd_ok": market_sd_ok, "market_rho_ok": market_rho_ok,
+        "target_sigma_f": target_sigma_f, "target_rho_f": target_rho_f,
     }
     if not ok:
-        reasons = []
-        if not z_ok:
-            reasons.append(f"Abweichung > z_max Standardfehler (z={z!r}, z_max={z_max!r})"
-                           if not math.isnan(z) else "z nicht berechenbar (NaN, z. B. weniger als 2 Replikate)")
-        if not power_ok:
-            reasons.append(f"unterpowert: n_reps erhoehen ({power_z!r}*se_diff={power_z * se_diff!r} > "
-                           f"rel_tol*Ziel={rel_tol * target_share!r})")
-        raise FactorShareCalibrationError(
-            "Gegenprobe fehlgeschlagen (DEC-81, Standardfehler-Kriterium auf DEC-78 Entscheidung 1/"
-            f"Nachtrag): simulierter Faktoranteil {simulated_share!r}, Ziel {target_share!r} "
-            f"(rel_diff={rel_diff!r}, z={z!r}, se_diff={se_diff!r}, z_max={z_max!r}) -- "
-            + "; ".join(reasons)
-            + f" -- sigma_f={sigma_f!r}, sigma_e={sigma_e!r}, rho_f={rho_f!r}, beta_sd={beta_sd!r}, "
-            f"n_reps={n_reps}. Ein Fehlschlag ist ein ECHTER BUG (falsche Kalibrierung) oder eine "
-            "zu ungenaue Gegenprobe, kein akzeptiertes Ergebnis.")
+        messages = []
+        if not share_ok:
+            reasons = []
+            if not z_ok:
+                reasons.append(f"Abweichung > z_max Standardfehler (z={z!r}, z_max={z_max!r})"
+                               if not math.isnan(z) else "z nicht berechenbar (NaN, z. B. weniger als 2 Replikate)")
+            if not power_ok:
+                reasons.append(f"unterpowert: n_reps erhoehen ({power_z!r}*se_diff={power_z * se_diff!r} > "
+                               f"rel_tol*Ziel={rel_tol * target_share!r})")
+            messages.append(
+                "Gegenprobe fehlgeschlagen (DEC-81, Standardfehler-Kriterium auf DEC-78 Entscheidung 1/"
+                f"Nachtrag): simulierter Faktoranteil {simulated_share!r}, Ziel {target_share!r} "
+                f"(rel_diff={rel_diff!r}, z={z!r}, se_diff={se_diff!r}, z_max={z_max!r}) -- "
+                + "; ".join(reasons)
+                + f" -- sigma_f={sigma_f!r}, sigma_e={sigma_e!r}, rho_f={rho_f!r}, beta_sd={beta_sd!r}, "
+                f"n_reps={n_reps}. Ein Fehlschlag ist ein ECHTER BUG (falsche Kalibrierung) oder eine "
+                "zu ungenaue Gegenprobe, kein akzeptiertes Ergebnis.")
+        if not market_ok:
+            bad = []
+            if market_sd_ok is False:
+                bad.append(f"sigma_f-Ziel {target_sigma_f!r} ausserhalb des 95-%-Bandes {sd_band!r} der "
+                           "SD der simulierten Marktspalte")
+            if market_rho_ok is False:
+                bad.append(f"rho_f-Ziel {target_rho_f!r} ausserhalb des 95-%-Bandes {rho_band!r} der "
+                           "Lag-1-Autokorrelation der simulierten Marktspalte")
+            messages.append(
+                "Gegenprobe fehlgeschlagen (DEC-85 (ii)): Marktspalte inkonsistent -- " + "; ".join(bad)
+                + f" -- sigma_f={sigma_f!r}, sigma_e={sigma_e!r}, rho_f={rho_f!r}, beta_sd={beta_sd!r}, "
+                f"n_reps={n_reps}. Die simulierte Marktspalte verfehlt die gemessenen Kalibrierungsziele "
+                "(DEC-77 (a)); kein akzeptiertes Ergebnis.")
+        raise FactorShareCalibrationError(" || ".join(messages))
     return result
 
 
@@ -1436,6 +1600,12 @@ def beta_controlled_factor_null(
     see that function's docstring for the ``beta_sd``/``beta_pool``
     precedence.
 
+    **DEC-85 (i):** the simulated market column (``symbols.index(
+    market_symbol)``) IS the factor in every replicate
+    (``simulate_factor_panel(market_index=...)``); ``window_returns`` should
+    be ``returns_est`` (DEC-85 (iii), :func:`estimation_returns`) -- it only
+    feeds the descriptive ``sigma_f``/``sigma_e`` scalars.
+
     Per replicate: :func:`simulate_factor_panel` draws a fresh panel (this
     call's ``rho_f``/``drift_f``/``beta_pool``/``beta_sd``), the SIMULATED beta at
     ``method``'s trailing window is estimated from the SIMULATED panel's
@@ -1455,6 +1625,8 @@ def beta_controlled_factor_null(
     sigmas = window_sigma_f_sigma_e(window_returns, symbols, market_symbol=market_symbol)
     sigma_f, sigma_e_used = sigmas["sigma_f"], sigmas["sigma_e_used"]
 
+    market_index = symbols.index(market_symbol) if market_symbol in symbols else None   # DEC-85 (i)
+
     rng = np.random.default_rng(seed)
     per_week_ic_pool: dict[str, list[float]] = {v: [] for v in variants}
     mean_ic_draws: dict[str, list[float]] = {v: [] for v in variants}
@@ -1463,7 +1635,7 @@ def beta_controlled_factor_null(
     for _rep in range(n_reps):
         sim = simulate_factor_panel(n_weeks, n_symbols, sigma_f=sigma_f, sigma_e=sigma_e_used,
                                      rho_f=rho_f, drift_f=drift_f, rng=rng, beta_pool=beta_pool,
-                                     beta_sd=beta_sd)
+                                     beta_sd=beta_sd, market_index=market_index)
         sim_returns = sim["returns"]
         beta_pit = None
         if trail_win is not None:
@@ -1527,6 +1699,7 @@ def beta_control_method_study(
     calibration_search_rel_tol: float = CALIBRATION_SEARCH_REL_TOL_DEFAULT,
     calibration_search_max_iter: int = CALIBRATION_SEARCH_MAX_ITER_DEFAULT,
     calibration_mask: np.ndarray | None = None, gegenprobe_z_max: float = GEGENPROBE_Z_MAX,
+    gegenprobe_market_check: bool = True,
 ) -> dict[str, Any]:
     """DEC-78 Entscheidung 1, calibration construction revised by the
     DEC-78 Nachtrag (supersedes DEC-77 Entscheidung 1 (b)'s calibration
@@ -1597,10 +1770,28 @@ def beta_control_method_study(
     silently). (4) ``calibration_mask`` (bool ``[n_weeks, n_symbols]``,
     default ``None`` = all symbols alive) is the real measurement's
     cross-section; it goes to all three searches and Gegenproben, and
-    each calibration reports ``calibration_mask_k_median``."""
+    each calibration reports ``calibration_mask_k_median``.
+
+    **DEC-85.** (i) The market column is the factor in every simulation
+    below (search, Gegenprobe, grid). (ii) Each calibration's Gegenprobe is
+    called with ``target_sigma_f`` = the measured ``sigma_f`` (all three
+    calibrations) and ``target_rho_f`` = that calibration's ``rho_f``, so a
+    market column inconsistent with them aborts the study
+    (:func:`factor_share_gegenprobe`). ``gegenprobe_market_check=False``
+    (default ``True``) drops those two targets -- a TEST knob for tiny
+    synthetic panels (like ``gegenprobe_z_max=1e9``), never for a real run;
+    the bands are still measured and reported. (iii) ``window_returns`` is
+    ``returns_est`` (:func:`estimation_returns`): the ``sigma_f``/``sigma_e``
+    estimates skip not-trading symbol-weeks."""
     sigmas = window_sigma_f_sigma_e(window_returns, symbols, market_symbol=market_symbol)
     sigma_f, sigma_e_used = sigmas["sigma_f"], sigmas["sigma_e_used"]
     n_weeks, n_symbols = window_returns.shape
+    # DEC-85 (ii): the Gegenprobe's market-column targets -- the MEASURED sigma_f in ALL three
+    # calibrations (it is never a calibration axis), rho_f = the calibration's own rho_f
+    # (measured: measured; stress: multiplier x measured; zero: 0). Only checkable when the
+    # market symbol is among the symbols (otherwise there is no simulated market column).
+    check_market = gegenprobe_market_check and market_symbol in symbols
+    market_target_sigma_f = sigma_f if check_market else None
 
     stress_rho_f = stress_multiplier * rho_f_measured
     stress_share = stress_multiplier * factor_share_measured
@@ -1658,7 +1849,9 @@ def beta_control_method_study(
             rho_f=cfg["rho_f"], beta_sd=cfg["beta_sd"], target_share=cfg["target_share"],
             market_symbol=market_symbol, n_reps=gegenprobe_n_reps, seed=seed + GEGENPROBE_SEED_OFFSET,
             rel_tol=gegenprobe_rel_tol, search_se=search["achieved_share_se"],
-            mask=calibration_mask, z_max=gegenprobe_z_max)
+            mask=calibration_mask, z_max=gegenprobe_z_max,
+            target_sigma_f=market_target_sigma_f,
+            target_rho_f=cfg["rho_f"] if check_market else None)
         methods_out: dict[str, Any] = {}
         for method in methods:
             methods_out[method] = beta_controlled_factor_null(

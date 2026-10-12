@@ -173,6 +173,7 @@ def cmd_prelaunch(a: argparse.Namespace) -> int:
         seed=a.seed, convention=a.convention,
         gegenprobe_n_reps=a.gegenprobe_n_reps, gegenprobe_rel_tol=a.gegenprobe_rel_tol,
         gegenprobe_z_max=a.gegenprobe_z_max,
+        gegenprobe_market_check=not a.no_gegenprobe_market_check,
         calibration_search_n_reps=a.calibration_search_n_reps,
         calibration_search_rel_tol=a.calibration_search_rel_tol,
         calibration_search_max_iter=a.calibration_search_max_iter)
@@ -451,6 +452,10 @@ def main() -> int:
                      help="DEC-81: groesstes zulaessiges |simuliert - Ziel| / se_diff der Gegenprobe "
                           "(se_diff aus Gegenprobe- und Suchfehler) -- Default 3,0. NUR fuer Tests "
                           "auf kleinen synthetischen Panels lockern.")
+    ap.add_argument("--no-gegenprobe-market-check", action="store_true",
+                     help="DEC-85 (ii): schaltet die Marktspalten-Pruefung der Gegenprobe (gemessenes "
+                          "sigma_f/rho_f im 95-%%-Band der simulierten Marktspalte) ab -- NUR fuer Tests "
+                          "auf kleinen synthetischen Panels; ein echter Lauf laeuft immer mit Pruefung.")
     ap.add_argument("--calibration-search-n-reps", type=int, default=nulls.CALIBRATION_SEARCH_N_REPS_DEFAULT,
                      help="DEC-78 Nachtrag, DEC-81: Replikate je Bisektions-Iteration der beta_sd-Suche "
                           "(gemeinsame Zufallszahlen in allen Iterationen) -- Default 400.")

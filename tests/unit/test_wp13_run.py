@@ -703,7 +703,7 @@ def test_cli_emit_registered_template_writes_yaml_skeleton_from_prelaunch_artifa
     prelaunch_report = prelaunch_mod.assemble_prelaunch_report(
         panel, weekly, delisted_manifest_path=del_manifest, delisting_dates_path=dd_path,
         n_sims=5, n_reps_factor_null=5, n_reps_beta_control_study=5, n_reps_beta_control_winner=5, seed=53,
-        gegenprobe_n_reps=10, gegenprobe_rel_tol=10.0, gegenprobe_z_max=1e9,
+        gegenprobe_n_reps=10, gegenprobe_rel_tol=10.0, gegenprobe_z_max=1e9, gegenprobe_market_check=False,
         calibration_search_n_reps=5, calibration_search_rel_tol=10.0, calibration_search_max_iter=8)
     artifacts = prelaunch_mod.write_prelaunch_artifacts(tmp_path / "prelaunch_out", prelaunch_report)
     prelaunch_json = artifacts["artifacts"]["wp13a_prelaunch_json"]["path"]
@@ -819,6 +819,62 @@ def test_run_full_uses_registered_beta_control_method_end_to_end(tmp_path):
     assert w1["beta_control_method"] == "fm_neutral_13w"
     if w1["beta_control_coverage"] is not None:
         assert 0.0 <= w1["beta_control_coverage"]["coverage_fraction"] <= 1.0
+
+
+def test_dec85_run_full_requires_returns_valid_loud(tmp_path):
+    """DEC-85 (iii): the run mode needs ``weekly["returns_valid"]`` (real PIT betas and the
+    null's sigma_f/sigma_e are estimated on ``returns_est``) -- a weekly dict without it is a
+    loud ValueError, never a silent fall back to the zero-filled array."""
+    panel, weekly = _build_run_fixture_tree_large(tmp_path)
+    weekly_old = {k: v for k, v in weekly.items() if k != "returns_valid"}
+    with pytest.raises(ValueError, match="returns_valid"):
+        run_mod.run_full(panel, weekly_old, _registered_for_large_fixture())
+
+
+def test_dec85_run_full_estimates_real_betas_and_null_scalars_on_returns_est(tmp_path, monkeypatch):
+    """DEC-85 (iii), run mode: the real PIT beta handed to ``ic.apply_beta_control`` and the
+    ``returns`` array the null's sigma_f/sigma_e are measured on are built from
+    ``returns_est`` (NaN where a symbol did not trade); the IC outcome array stays the
+    zero-filled ``returns``. One alive symbol is made silent for 30 weeks of W1."""
+    panel, weekly = _build_run_fixture_tree_large(tmp_path)
+    returns, valid = weekly["returns"].copy(), weekly["returns_valid"].copy()
+    j_silent = panel["symbols"].index("SYM03USDT")
+    lo_w1 = weekly["weeks"].index("2024-07-01")
+    gap = slice(lo_w1 + 5, lo_w1 + 35)
+    assert weekly["alive"][gap, j_silent].all() and valid[gap, j_silent].all()
+    valid[gap, j_silent] = False
+    returns[gap, j_silent] = 0.0
+    weekly_mod = dict(weekly, returns=returns, returns_valid=valid)
+    returns_est = np.where(valid, returns, np.nan)
+
+    seen_hyp: list[dict] = []
+    seen_null: list[np.ndarray] = []
+    orig_hyp, orig_null = run_mod.run_hypothesis, nulls.beta_controlled_factor_null
+
+    def spy_hyp(*a, **kw):
+        seen_hyp.append({"returns_by_window": a[4], "beta_pit": kw["beta_control_pit_by_window"]})
+        return orig_hyp(*a, **kw)
+
+    def spy_null(window_returns, *a, **kw):
+        seen_null.append(window_returns)
+        return orig_null(window_returns, *a, **kw)
+
+    monkeypatch.setattr(run_mod, "run_hypothesis", spy_hyp)
+    monkeypatch.setattr(nulls, "beta_controlled_factor_null", spy_null)
+    registered = _registered_for_large_fixture()
+    registered["beta_control"] = {"method": "fm_neutral_13w", "beta_window_weeks": 13}
+    run_mod.run_full(panel, weekly_mod, registered)
+
+    beta_est = characteristics.beta_characteristic(returns_est, panel["symbols"], trail_win=13, min_weeks=13)
+    beta_zero = characteristics.beta_characteristic(returns, panel["symbols"], trail_win=13, min_weeks=13)
+    assert len(seen_hyp) == 1 and len(seen_null) == 2                      # one hypothesis; W1 + W2 nulls
+    lo, hi = lo_w1, lo_w1 + len(seen_hyp[0]["beta_pit"]["W1"])
+    assert np.array_equal(seen_hyp[0]["beta_pit"]["W1"], beta_est[lo:hi], equal_nan=True)
+    assert np.isnan(seen_hyp[0]["beta_pit"]["W1"][5:35 + 12, j_silent]).all()   # window + 12 following weeks
+    assert np.isfinite(beta_zero[lo + 17:lo + 40, j_silent]).all()               # zero-filled would be finite
+    assert np.array_equal(seen_null[0], returns_est[lo:hi], equal_nan=True)
+    # the IC outcome array is untouched (zero fill, no NaN for the silent symbol)
+    assert np.array_equal(seen_hyp[0]["returns_by_window"]["W1"], returns[lo:hi])
 
 
 # ============================================================================

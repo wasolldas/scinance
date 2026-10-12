@@ -262,17 +262,24 @@ def combined_range_fingerprint(
 
 def _daily_close_to_weekly(
     panel: dict[str, Any],
-) -> tuple[list[str], np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+) -> tuple[list[str], np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
     """Shared core of ``weekly_returns_and_mask``/``weekly_returns_and_mask_
     union``: daily ``panel['close']`` -> ``(weeks, close_mat, returns,
-    first_week, last_week)``, all ``[n_weeks, n_symbols]`` (or
-    ``[n_symbols]`` for the two week-index arrays), ``panel['symbols']``
+    first_week, last_week, returns_valid)``, all ``[n_weeks, n_symbols]``
+    (or ``[n_symbols]`` for the two week-index arrays), ``panel['symbols']``
     column order. A gap never manufactures a weekly return (only
     CONSECUTIVE week indices get one, same discipline as
     ``pair_corr.log_returns``). Factored out so the union path (WP-12b)
     reuses the EXACT same close->weekly arithmetic instead of a parallel
     reimplementation -- the two callers only differ in how they turn
-    ``first_week``/``last_week`` into an alive mask afterward."""
+    ``first_week``/``last_week`` into an alive mask afterward.
+
+    DEC-85 (iii): ``returns`` keeps its historical ``0.0`` fill where no
+    return is computable (before listing, after delisting, across gaps) --
+    many callers rely on it. ``returns_valid`` (bool, same shape) is True
+    EXACTLY where a return was computed from two consecutive weekly closes,
+    so beta / vol estimators can treat the remaining cells as NaN instead
+    of as observed zero returns."""
     symbols, dates, close = panel["symbols"], panel["dates"], panel["close"]
     n_days, n_symbols = close.shape
 
@@ -295,6 +302,7 @@ def _daily_close_to_weekly(
             close_mat[week_pos[w], j] = c
 
     returns = np.zeros((n_weeks, n_symbols), dtype=np.float64)
+    returns_valid = np.zeros((n_weeks, n_symbols), dtype=bool)
     first_week = np.full(n_symbols, n_weeks, dtype=np.int64)
     last_week = np.full(n_symbols, -1, dtype=np.int64)
     for j in range(n_symbols):
@@ -309,8 +317,9 @@ def _daily_close_to_weekly(
             c0, c1 = close_mat[t0, j], close_mat[t1, j]
             if c0 > 0 and c1 > 0:
                 returns[t1, j] = math.log(c1 / c0)
+                returns_valid[t1, j] = True
 
-    return all_weeks, close_mat, returns, first_week, last_week
+    return all_weeks, close_mat, returns, first_week, last_week, returns_valid
 
 
 def weekly_returns_and_mask(
@@ -320,14 +329,17 @@ def weekly_returns_and_mask(
     alive mask, all ``[n_weeks, n_symbols]`` (ISO-week rows, ascending,
     ``panel['symbols']`` column order). A gap never manufactures a weekly
     return (only CONSECUTIVE week indices get one, same discipline as
-    ``pair_corr.log_returns``)."""
+    ``pair_corr.log_returns``). DEC-85 (iii), additive: ``returns_valid``
+    (bool, same shape) is True exactly where ``returns`` holds a computed
+    return; ``returns`` itself keeps its ``0.0`` fill elsewhere."""
     symbols = panel["symbols"]
-    weeks, close_mat, returns, first_week, last_week = _daily_close_to_weekly(panel)
+    weeks, close_mat, returns, first_week, last_week, returns_valid = _daily_close_to_weekly(panel)
     n_weeks = len(weeks)
     alive = pit_universe.pit_alive_mask(first_week, last_week, n_weeks,
                                          min_weeks_history=min_weeks_history)
     return {"weeks": weeks, "close": close_mat, "returns": returns, "alive": alive,
-            "first_week": first_week, "last_week": last_week, "symbols": symbols}
+            "first_week": first_week, "last_week": last_week, "symbols": symbols,
+            "returns_valid": returns_valid}
 
 
 def momentum_signal(returns: np.ndarray, *, trail_win: int = 4) -> np.ndarray:
@@ -1249,9 +1261,14 @@ def weekly_returns_and_mask_union(
         would be a SEPARATE, not-yet-registered choice, per the task
         brief -- this function implements ONLY the cap + natural-alive-
         mask-exclusion convention above, nothing else).
+
+    DEC-85 (iii), additive: the result carries ``returns_valid`` (bool,
+    same shape as ``returns``; True exactly where a return was computed
+    from two consecutive weekly closes -- not capped by the delisting-week
+    convention above, which only shapes ``alive``); ``returns`` is unchanged.
     """
     symbols = panel["symbols"]
-    weeks, close_mat, returns, first_week, last_week = _daily_close_to_weekly(panel)
+    weeks, close_mat, returns, first_week, last_week, returns_valid = _daily_close_to_weekly(panel)
     n_weeks = len(weeks)
     week_pos = {w: i for i, w in enumerate(weeks)}
 
@@ -1290,7 +1307,8 @@ def weekly_returns_and_mask_union(
     return {"weeks": weeks, "close": close_mat, "returns": returns, "alive": alive,
             "first_week": first_week, "last_week": capped_last_week,
             "last_week_uncapped": last_week, "symbols": symbols,
-            "last_alive_day": last_alive_day, "relisted_gaps": gaps}
+            "last_alive_day": last_alive_day, "relisted_gaps": gaps,
+            "returns_valid": returns_valid}
 
 
 def union_range_fingerprint(
