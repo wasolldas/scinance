@@ -1,0 +1,16 @@
+[1/4] Union-Panel laden (panel_1d + panel_1d_delisted, as_of=2026-09-28)
+  1138 Symbole (877 Ueberlebende + 261 delistet), 2085 Tage.
+[2/4] Woechentliche Renditen + PIT-Alive-Maske (Union)
+  299 Wochen (2020-12-28..2026-09-14)
+[3/4] Vorlauf-Report zusammenstellen (n_sims=1000, seed=53, convention=close_at_last) -- KEINE reale Signal-Outcome-IC
+  Fenster W1: 53 Wochen, Delisting-Symbol-Wochen=80, Gate(5) erreichbar=True
+  Fenster W2: 52 Wochen, Delisting-Symbol-Wochen=140, Gate(5) erreichbar=True
+  Fenster L: 174 Wochen, Delisting-Symbol-Wochen=17, Gate(5) erreichbar=True
+[4/4] DEC-53-Artefakte schreiben
+  wp13a_prelaunch_json: scinance3-impl/state/runs/wp13a_20261012/wp13a_prelaunch.json sha256=fe3b16500080eceb44db39206197172130048c3dedcc7bcb97b4eb49775c553b
+  l_window_sealed_json: scinance3-impl/state/runs/wp13a_20261012/wp13a_prelaunch_L_window_sealed.json sha256=694402aa4dc7e06e1a0c12e9ea164027e38a66f9ec71fe7109a5f5c0c7de1a4a
+  wp13a_prelaunch_md: scinance3-impl/state/runs/wp13a_20261012/wp13a_prelaunch.md sha256=cbf7014710da07e18c3c2997d8f809641d6077234e95d74342fce8053d96e4e0
+Report geschrieben: scinance3-impl/state/runs/wp13a_20261012
+KEIN VERDIKT -- Vorlauf berechnet keine reale Signal-Outcome-Verknuepfung (DEC-74 Entscheidung 3).
+rc=0 end=11:56:55 start=10:16:08
+Panel: Harvest exports/scinance/scinance_panel_1d_2026-09-28.zip sha256=03dc0e7cfce96737c31cd6d59bce1767f1bb112a74ac539c2ed5b091c49b16cb; Code-Stand 2f8c6a0; Aufruf: scripts/wp13_xsec.py --prelaunch --start-year 2021 --end-year 2026 --as-of 2026-09-28 --seed 53 --n-sims 1000 --convention close_at_last --n-reps-beta-control-study 300 --n-reps-beta-control-winner 1000 --stress-rel state/runs/stress_rel.json --stress-abs state/runs/stress_abs.json --allow-partial
