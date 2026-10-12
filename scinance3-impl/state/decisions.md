@@ -418,3 +418,24 @@
 - **Vorlauf v5e (outcome-frei, Cloud):** W1-Gewinner mit W1-Kalibrierung (1.000 Rep.), eingefrorene Konstanten je Fenster aus genau der Lauf-Konfiguration, Drift-Quantil, H-30-Feasibility in Wocheneinheiten, Gate-(5)-Erreichbarkeit, Daten-Fingerprints des Harvest-Panels (V9). **Bindung:** Besteht `fm_neutral_8w` im korrekt kalibrierten W1-Gewinnerlauf (1.000 Rep.) die DEC-77-Regel nicht, wird nach derselben vorab fixierten Auswahlregel die naechste in v5d zugelassene Methode gewaehlt und ebenso mit 1.000 Rep. bestaetigt; besteht keine, gilt DEC-77 E1 (c). Kein Wechsel aus anderen Gruenden.
 - **Danach:** mechanische Zuordnung (F), finales YAML + sha256, adversarisches Review, Registrierung; Positivkontrolle allein und zuerst, dann der Lauf.
 - **Rueckbauweg:** Code mit Tests; Herleitungsdokumente als Akte.
+
+---
+
+### DEC-88 · Vorlauf v5e: Gewinner `fm_neutral_8w` bestaetigt; bindende Decken; H-30 vor dem Lauf GL-012; mechanische Power-Zuordnung - gerechnet werden H-28_mom1 und H-29_rev_gap, K bleibt 7
+- **Anlass:** `state/runs/wp13a_20261012_v5e/` (Cloud, Code `92607da`, Panel aus Harvest-exports, 2 h 08 min; Daten-Fingerprints union_range `a7e4dec7...793a`, delisting_dates `852bf753...2933`). L-Siegeldatei nicht geoeffnet.
+- **Gewinner-Bestaetigung (DEC-87, 1.000 Rep., je Fenster eigene Kalibrierung):** `fm_neutral_8w` besteht die unveraenderte DEC-77-Regel in W1 und W2. W1: Null-Mittel measured 0,00072 / **stress 0,00165** (Grenze 0,00168 - sehr knapp, ~0,1 SE; nach Regel bestanden, festgehalten als Schwachstelle), Decken 0,00757 / 0,00834 (Grenze 0,01378). W2: 0,00022 / 0,00084 (Grenze 0,00147), Decken 0,00637 / 0,00685 (Grenze 0,01167).
+- **Bindende GL-012-Decke (DEC-87 (A)):** W1 **0,00834**, W2 **0,00685** - unter jedem IC_min (W1 0,0168..0,0197, W2 0,0146..0,0174): kein Vor-Verdikt-Kill.
+- **Beta-Kontroll-Quantile (DEC-87 (E), bindend das extremere aus driftfrei/0,002):** W1 mom1 0,02244, mom2 0,02780, mom4 0,03331, rev_gap -0,01666; W2 mom1 0,01700, mom2 0,02043, mom4 0,02506, rev_gap -0,01546.
+- **H-30 (DEC-87 (G)):** Feasibility auf L in Wocheneinheiten Spread(D10-D1)/Kante **2,764** (> 0,5), SE/Kante 0,175 -> **GL-012 fuer H-30 vor dem Lauf** (vol_rv, vol_max); vol_beta zusaetzlich strukturell (DEC-87 (H)). Gate (5) waere fuer alle Vol-Charakteristiken erreichbar (Median-Spearman 0,05..0,16).
+- **Mechanische Power-Zuordnung (DEC-87 (F), Formeln aus `herleitung_h28_h30_v3/ENTSCHEIDUNGSVORLAGEN.md` F; IC_prior 0,03):** P_ICmin = Phi(0,03*2,4865/IC_min - 2,4865); P_beta = Phi((0,03 - max(IC_min, |q|))/sd), q/sd aus dem fm8-stress-Gewinnerlauf (bindende Driftvariante); P_voll = min; MDE80 = max(1,3385*IC_min, max(IC_min,|q|) + 0,8416*sd).
+
+  | Variante | W1 P_voll / MDE80 | W2 P_voll / MDE80 | Zuordnung |
+  |---|---|---|---|
+  | mom1 | 0,832 / 0,0291 | 0,963 / 0,0233 | **C.10 hart** |
+  | mom2 | 0,597 / 0,0353 | 0,912 / 0,0264 | GL-012 (MDE80 > 0,03 in W1) |
+  | mom4 | 0,380 / 0,0424 | 0,722 / 0,0321 | GL-012 (beide Fenster) |
+  | rev_gap | 0,949 / 0,0238 | 0,986 / 0,0210 | **C.10 hart** (DEC-52 zulaessig, nicht genutzt) |
+  | vol_rv, vol_max | - | - | GL-012 (H-30-Feasibility) |
+  | vol_beta | - | - | GL-012 (strukturell, C.4) |
+- **Entscheidung:** Die Drittfassung registriert alle sieben Varianten; fuenf tragen `status: gl012_pre_run` mit obigem Grund, gerechnet werden nur `H-28_mom1` und `H-29_rev_gap`. K = 7 bleibt in Decke (Mittel des Maximums ueber 7) und BH-Nenner. H-30 ist damit vor dem Lauf ein Feasibility-DROP (kein Verdikt ueber die Vol-Anomalie selbst).
+- **Rueckbauweg:** additiv.

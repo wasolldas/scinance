@@ -1,0 +1,18 @@
+[1/4] Union-Panel laden (panel_1d + panel_1d_delisted, as_of=2026-09-28)
+  1138 Symbole (877 Ueberlebende + 261 delistet), 2085 Tage.
+[2/4] Woechentliche Renditen + PIT-Alive-Maske (Union)
+  299 Wochen (2020-12-28..2026-09-14)
+  Daten-Fingerprints (DEC-87 V9): union_range=a7e4dec7cb7475426f477c6d17359007b75026b2f8562b29e66457fed027793a delisting_dates=852bf75332fd1990b13b9a059fd871a75d7f71757b48e2bf102bc1f25c412933
+[3/4] Vorlauf-Report zusammenstellen (n_sims=1000, seed=53, convention=close_at_last) -- KEINE reale Signal-Outcome-IC
+  Fenster W1: 53 Wochen, Delisting-Symbol-Wochen=80, Gate(5) erreichbar=True
+  Fenster W2: 52 Wochen, Delisting-Symbol-Wochen=140, Gate(5) erreichbar=True
+  Fenster L: 174 Wochen, Delisting-Symbol-Wochen=17, Gate(5) erreichbar=True
+  Gewinner-Bestaetigung (DEC-87): Gewinner bestaetigt: fm_neutral_8w besteht die unveraenderte DEC-77-Regel mit 1000 Replikaten in W1 und W2 (je Fenster eigene Kalibrierung)
+[4/4] DEC-53-Artefakte schreiben
+  wp13a_prelaunch_json: scinance3-impl/state/runs/wp13a_20261012_v5e/wp13a_prelaunch.json sha256=94d655599b90a0841fef3e3a77404e12f216e2c7281e337208042c0a475ae3b2
+  l_window_sealed_json: scinance3-impl/state/runs/wp13a_20261012_v5e/wp13a_prelaunch_L_window_sealed.json sha256=1d0b20bdf3c2043350ff92d78a027f29ac50dc6dba9833d5a52a910aa41b32a4
+  wp13a_prelaunch_md: scinance3-impl/state/runs/wp13a_20261012_v5e/wp13a_prelaunch.md sha256=dede4f050010fe773685b3f6af6f8b8a01781a50ec40f51f6920182f009bf4fb
+Report geschrieben: scinance3-impl/state/runs/wp13a_20261012_v5e
+KEIN VERDIKT -- Vorlauf berechnet keine reale Signal-Outcome-Verknuepfung (DEC-74 Entscheidung 3).
+rc=0 end=21:46:34 start=19:38:37
+Panel: Harvest exports/scinance/scinance_panel_1d_2026-09-28.zip sha256=03dc0e7cfce96737c31cd6d59bce1767f1bb112a74ac539c2ed5b091c49b16cb; Code-Stand 92607da (DEC-87); Aufruf wie v5d; erster Versuch am Werkzeug-Zeitlimit (2 h) abgebrochen, ohne Artefakt, neu gestartet als eigenstaendiger Prozess
