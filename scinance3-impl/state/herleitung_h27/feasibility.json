@@ -1,0 +1,141 @@
+{
+ "status": "WARTET_AUF_DATEN",
+ "stand_utc": "2026-10-13",
+ "stopp_grund": "deribit/dvol im Katalog erst ab 2025-08-01 (Backfill 2021-03-24..2025-07-31 nicht sichtbar)",
+ "katalog": {
+  "generated_at_utc": "2026-10-12T10:50:14Z",
+  "partitionen": 329442,
+  "dvol": {
+   "BTC": {
+    "n_partitions": 234,
+    "first_date": "2025-08-01",
+    "last_date": "2026-10-11",
+    "n_in_range": 165,
+    "n_gaps_in_range": 1791
+   },
+   "ETH": {
+    "n_partitions": 234,
+    "first_date": "2025-08-01",
+    "last_date": "2026-10-11",
+    "n_in_range": 165,
+    "n_gaps_in_range": 1791
+   }
+  },
+  "dvol_ab_2021_03_24": false,
+  "strom_luecken": [
+   [
+    "2025-09-01",
+    "2026-03-19"
+   ],
+   [
+    "2026-08-02",
+    "2026-08-03"
+   ],
+   [
+    "2026-09-20",
+    "2026-09-20"
+   ]
+  ],
+  "w2_tage_abgedeckt_nach_bestelltem_backfill": 165,
+  "w2_tage_soll": 365
+ },
+ "schema_strom": {
+  "zeilen_je_tag": 24,
+  "payload_schluessel": [
+   "close",
+   "high",
+   "low",
+   "open",
+   "timestamp"
+  ],
+  "timestamp": "Kerzenbeginn UTC",
+  "topic": "dvol.<SYM>"
+ },
+ "panel": {
+  "BTCUSDT": {
+   "n_rows": 2083,
+   "first_day": "2021-01-01",
+   "last_day": "2026-09-14",
+   "duplicate_days": 0,
+   "start_ms_not_midnight": 0,
+   "nonpositive_or_null_close": 0,
+   "missing_days_in_range": 0,
+   "missing_head": []
+  },
+  "ETHUSDT": {
+   "n_rows": 2010,
+   "first_day": "2021-03-15",
+   "last_day": "2026-09-14",
+   "duplicate_days": 0,
+   "start_ms_not_midnight": 0,
+   "nonpositive_or_null_close": 0,
+   "missing_days_in_range": 14,
+   "missing_head": [
+    "2021-03-01",
+    "2021-03-02",
+    "2021-03-03",
+    "2021-03-04",
+    "2021-03-05",
+    "2021-03-06",
+    "2021-03-07",
+    "2021-03-08",
+    "2021-03-09",
+    "2021-03-10",
+    "2021-03-11",
+    "2021-03-12",
+    "2021-03-13",
+    "2021-03-14"
+   ]
+  }
+ },
+ "rv_quelle": "panel_1d BTCUSDT/ETHUSDT Tagesschluss (Bybit-Linear-Perp), RV_fwd30 = 100*sqrt(365/30*sum r^2), r = ln(C_s/C_{s-1})",
+ "iv_tagesschluss": "close der Stundenkerze 23:00 UTC (Wert um 24:00 UTC)",
+ "annualisierung_tage": 365,
+ "prior": {
+  "L1": {
+   "quelle": "Almeida/Grith/Miftachov/Wang 2024, arXiv 2410.15195",
+   "stichprobe": "Deribit BTC 2017-07..2022-12",
+   "bvrp_varianz": 0.14,
+   "status": "sek (Suchmaschinen-Auszug), Volltext nicht einsehbar"
+  },
+  "L2": {
+   "quelle": "Deribit Insights/Amberdata, Decoding Option Flows Q2 2023",
+   "median_vrp_volpunkte_brutto": 14,
+   "status": "sek, Praktiker, Stichprobe UNBELEGT"
+  },
+  "umrechnung_band": {
+   "iv_annahme": [
+    0.65,
+    0.75,
+    0.85
+   ],
+   "vol_netto": [
+    11.85,
+    10.0,
+    8.68
+   ],
+   "log": [
+    0.2012,
+    0.1431,
+    0.1077
+   ]
+  },
+  "eth": "UNBELEGT"
+ },
+ "vorab_regeln": "FEASIBILITY.md Abschnitt 3 (P-1..P-9), fixiert vor jeder Nuisance-Zahl",
+ "zuordnung": null,
+ "unbelegt": [
+  "DVOL 2021-03-24..2025-07-31 im Katalog",
+  "DVOL 2025-09-01..2026-03-19 (W2-Luecke, nicht bestellt)",
+  "L1-Volltext",
+  "IV-Niveau der L1-Stichprobe",
+  "ETH-Prior",
+  "Nuisance-SD, c, Jensen-J, SE_null"
+ ],
+ "skripte_sha256": {
+  "catalog_check.py": "72fe11167ce5efafdc25459460242a9d6d95af403e560b41a7bbd14459d2dbdd",
+  "h27_common.py": "4093396d3183f9b6e591e3faa0777ef32c234d8e32b943be3956a8c507e085ee",
+  "panel_coverage.py": "7d6db01c2f7ce4d6f2f549eaa9d136a2916f27d8bcfbd0e263858a4d3f15f22e",
+  "schema_probe_stream.py": "bce42a8192fddad6ab6ce6dfaf88174cd51ae0b31cada28d3d9980431e0c2c9f"
+ }
+}
