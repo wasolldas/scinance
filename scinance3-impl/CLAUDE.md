@@ -60,6 +60,14 @@
   KEIN VERDIKT); DEC-54 Repo-Struktur; DEC-55/56 Stress-Kanon (STRESS_REL
   als Abdeckungs-Nachweis, STRESS_ABS fuer Liquiditaetsfragen); DEC-57
   GPU-Default 0.
+- **Seit 2026-10-13 (DEC-94, Programmregel P-1, prospektiv, Etikett
+  "Lockerung"):** Schwelle = kritischer Wert zum registrierten alpha
+  (1,6449 je Fenster; DEC-52 gepoolt 2,5287), Power/MDE/Zuordnung mit genau
+  der SE des registrierten Tests, Autokorrelation der Teststatistik
+  (stationaerer Bootstrap, c >= 1), DEC-52-Zweig bei Per-Fenster-Power
+  < 0,80, wenn das DEC-52-Gate (Produktrechnung) Power >= 0,80 hat, sonst
+  GL-012. Geht den Altzeilen von DEC-52 und PRD 5.1-5.4 fuer kuenftige
+  Registrierungen (inkl. H-27) vor.
 - **Zwoelf Pflichtzeilen jeder Registrierung** (PRD Par. 3.3): Power,
   Entscheidungsrelevanz (mit oekonomischer Mindestmagnitude als ETIKETT),
   Cluster-Einheit, Selektions-Deflation, adversariales Fixture,

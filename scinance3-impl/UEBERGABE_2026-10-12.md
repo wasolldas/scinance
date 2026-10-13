@@ -64,3 +64,16 @@ Tests: 1.992 passed / 3 failed (Legacy `test_execution_live.py`, Sandbox-bedingt
   (WP-9) liegt auf dem PC. Weg wie beim Panel: Export ueber den Thin Client (Data-Harvest) anfragen. Danach
   Feasibility zuerst (Power mit der SE des registrierten Tests, geltende Konstanten), dann Herleitung + Review.
 - Naechste freie Hypothesen-Nummer: H-32 (H-31 vermerkt, nicht registriert).
+
+## 5. Nachtrag 2026-10-13 (spaeter): Programmregel P-1 beschlossen (DEC-94), DVOL-Anfrage gestellt
+
+- **DEC-94 (P-1, prospektiv, Etikett "Lockerung"):** Schwelle = kritischer Wert zum registrierten alpha (1,6449 je
+  Fenster, DEC-52 gepoolt 2,5287), Power/MDE/Zuordnung mit derselben SE, Autokorrelation der Teststatistik (c >= 1),
+  DEC-52 bei Fenster-Power < 0,80 nur wenn das DEC-52-Gate (Produktrechnung) Power >= 0,80 hat; Doppelausweis unter
+  A3-Praxis in jeder Registrierung. Gilt ab sofort inkl. H-27; GL-032/GL-033 unveraendert. Akte:
+  `state/herleitung_programmregel_p1/` (Entwurf, Review ZUSTIMMUNG MIT AUFLAGEN). Code-Bau (Power-Funktion, z_krit aus
+  dem YAML, stationaerer Bootstrap) steht noch aus - vor der H-27-Registrierung.
+- **H-27-Daten:** Anfrage `state/ANFRAGE_DATA_HARVEST_DVOL_2026-10-13.md` (Nutzer leitet weiter). Harvest-Katalog fuehrt
+  `deribit/dvol` erst ab 2025-08-01. Achtung Ergebnisblindheit: im Repo liegt die WP-10(A2)-Serie IV-RV
+  (`state/runs/wp10a2_20260910/wp10a_ivrv_backfill_*_daily.csv`, 2021-03-24..2026-07-31) - vor der H-27-Registrierung
+  nicht auf Niveau/Streuung auswerten ausser nach den Regeln der H-27-Herleitung (DEC-94 Feststellung).
