@@ -77,3 +77,16 @@ Tests: 1.992 passed / 3 failed (Legacy `test_execution_live.py`, Sandbox-bedingt
   `deribit/dvol` erst ab 2025-08-01. Achtung Ergebnisblindheit: im Repo liegt die WP-10(A2)-Serie IV-RV
   (`state/runs/wp10a2_20260910/wp10a_ivrv_backfill_*_daily.csv`, 2021-03-24..2026-07-31) - vor der H-27-Registrierung
   nicht auf Niveau/Streuung auswerten ausser nach den Regeln der H-27-Herleitung (DEC-94 Feststellung).
+
+## 6. Nachtrag 2026-10-13 (Abend): H-27 auf blinden Fenstern ab 2026-07-01 (DEC-95/96)
+
+- DVOL-Historie kommt per Data-Harvest Variante B (DEC-95); Backfill 2021-03-24..2025-07-31 war im Katalog-Export
+  2026-10-12 noch nicht sichtbar. Nachtrags-Anfrage wegen Luecken (2025-09-01..2026-03-19, 2026-08-02..03, 2026-09-20):
+  `state/ANFRAGE_DATA_HARVEST_DVOL_NACHTRAG_2026-10-13.md` (Nutzer leitet weiter).
+- **DEC-96:** H-27 wird nicht auf W1/W2 registriert (nicht blind), sondern auf zwei gleich langen, prospektiven Fenstern
+  ab 2026-07-01 (L in {6, 9, 12} Monaten, kleinstes L mit Zuordnung C10/DEC52 aus der Nuisance 2021-03-24..2024-05-31).
+  **Blind-Siegel programmweit:** keine DVOL- und keine BTC/ETH-Vol-/Renditestreuungs-Statistik ab 2026-07-01 bis zum
+  H-27-Lauf (Panel in anderen Paketen bei 2026-06-30 abschneiden).
+- Herleitung `state/herleitung_h27/` (Stufe 0 fertig; Stufe 1 wartet auf den Backfill im Katalog). RV-Quelle: Panel-
+  Tagesschluesse BTCUSDT/ETHUSDT (Katalog hat keinen kompakten Intraday-Preisstrom). Prior [sek]: BVRP 0,14 (BTC,
+  Deribit 2017-07..2022-12, arXiv 2410.15195), Volltext vor Registrierung im Original pruefen (Egress gesperrt).
