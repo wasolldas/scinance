@@ -22,3 +22,19 @@ _(noch keine Eintraege)_
 - K = 7 bleibt (p = 1, BH/F-WEEK). YAML bitgleich, --run entfaellt; kein PC-Neulauf, keine Teilkohorte, kein Prior-Wechsel.
   L-Siegel und alle Siegeldateien bleiben geschlossen. Anderes Design nur als neue Hypothese mit eigenem K (DEC-58 E2).
 - Akte: DEC-91, DEC-92; Audit `state/REVIEW_GATE_AUDIT_PC_v3_2026-10-12.md`; Gate-Auditor: BESTAETIGT.
+
+## GL-033 - 2026-10-13 - A1 (H-31, Funding-Long-Bein D1 gegen Universums-Hedge, DEC-70) - GL-012 vor der Registrierung, nicht registriert
+- Anlass: Feasibility vor dem Design (C.12), `state/herleitung_a1/` (FEASIBILITY sha `b4680f7c...ca72d9e`), ergebnisblind
+  (keine A1-Outcome-Groesse ab 2024-07-01). Formationsseitig W1/W2: K 343..511 / 512..600 (Kill (3) nein), Schluessel-
+  Autokorrelation 0,403 / 0,303 (Kill (4) formal nein, W2 an der Grenze), D1 nicht degeneriert (0,52 / 0,71), Spread
+  175,8 / 339,6 bp/Woche. Nuisance 2022-04..2024-06 (nur Streuung): SD 354 bp, rho_1 -0,25, phi 0,573.
+- Prior: prem = Spread x phi x theta; theta (nicht kompensierter Anteil) UNBELEGT. Bei theta = 1: prem W1/W2 100,7 / 194,5,
+  gepoolt 147,6 bp.
+- Zuordnung nach geltender Regel (DEC-67 E4, fuer A1 bestaetigt DEC-70 E1: W_eff = 0,41 W): 3,168 x SE_gepoolt = 176,5 bp
+  > 147,6 bp -> GL-012 schon bei theta = 1 (theta_min 1,196). Guenstigste Lesart (c = max(1, gemessen)) braucht theta
+  >= 0,766, ohne Quelle -> blockiert; W1 Power 0,80 bei keinem theta <= 1.
+- Review `state/herleitung_a1/REVIEW_A1.md`: VETO gegen "knapp testbar", Zahlen bestaetigt; Orchestrator-Nachrechnung mit
+  eigenem Code bestaetigt (Spread 174,0 / 336,3; SD 354,4; phi 0,568). Keine A1-spezifische Regelaenderung (DEC-93 E3).
+- Feststellung: A1 in der Konstruktion DEC-70 unter den geltenden Beschluessen nicht testbar; nicht registriert. KEIN
+  Verdikt ueber den Funding-Carry; DROP-Relevanzzeile greift nicht. Stufe 2 Akte ohne Rechtswirkung. Siegel unberuehrt.
+- Akte: DEC-93; Reviewer: VETO (gegen Testbarkeit) angenommen.

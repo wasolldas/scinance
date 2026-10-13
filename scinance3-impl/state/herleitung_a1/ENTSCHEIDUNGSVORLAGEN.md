@@ -1,5 +1,10 @@
 # Entscheidungsvorlagen A1 (H-31) - Funding-Long-Bein D1 gegen Universums-Hedge
 
+> **ORCHESTRATOR-VERMERK 2026-10-13 (DEC-93, GL-033):** Ersetzt durch die Feststellung des Reviews (`REVIEW_A1.md`):
+> A1 ist unter den geltenden Beschluessen (DEC-67 E4, fuer A1 bestaetigt in DEC-70 E1: W_eff = 0,41 W) vor der
+> Registrierung GL-012 (176,5 > 147,6 bp schon bei theta = 1) und zusaetzlich theta-UNBELEGT. Die Aussage "Stopp-Regel
+> greift nicht" unten ist damit hinfaellig; Stufe 2 ist Akte ohne Rechtswirkung. Kein Verdikt ueber den Funding-Carry.
+
 > ENTWURF der Herleitung, 2026-10-13. Nichts hier ist registriert oder beschlossen; entscheiden und registrieren darf
 > nur der Orchestrator. Keine A1-Outcome-Groesse ab 2024-07-01, keine Siegeldatei geoeffnet.
 > Zahlen und Kuerzel wie in `FEASIBILITY.md` (`[fj]`, `[fj:A]`, `[fj:B]`, `[S:...]`, `[abg.]`).

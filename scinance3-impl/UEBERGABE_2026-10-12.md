@@ -47,3 +47,20 @@ Tests: 1.992 passed / 3 failed (Legacy `test_execution_live.py`, Sandbox-bedingt
 - Nebenbei: `persistence_null`/`h30_feasibility`/Survivorship auf `returns_est` sind erledigt (DEC-87); offene
   Kosmetik: Docstring `positive_control.py` (Skalen) - aendert den Code-Hash, deshalb erst mit der naechsten Aenderung.
 - Data-Harvest Variante B (taeglicher Panel-Strom) beim Data-Harvest-Projekt; bis dahin Zip-Export (Stand 2026-09-28).
+
+## 4. Nachtrag 2026-10-13: A1 nicht registriert (DEC-93, GL-033)
+
+- **A1 (Funding-Long-Bein D1 gegen Universums-Hedge, DEC-70) ist unter den geltenden Beschluessen vor der
+  Registrierung GL-012:** mit W_eff = 0,41 W (DEC-67 E4, fuer A1 bestaetigt in DEC-70 E1) schon bei theta = 1
+  (Preisbein kompensiert nichts) 176,5 > 147,6 bp. Zusaetzlich ist theta (nicht kompensierter Anteil des
+  Funding-Vorteils) UNBELEGT; selbst die guenstigste Lesart braucht theta >= 0,77. KEIN Verdikt ueber den Carry.
+  Akte: `state/herleitung_a1/` (Feasibility, Review mit VETO gegen "knapp testbar", Stufe 2 ohne Rechtswirkung).
+- **Lehre (zusaetzlich zu DEC-92):** Feasibility-Pruefungen rechnen mit den GELTENDEN Konstanten; eine methodisch
+  bessere Regel wird programmweit und vor dem Kandidaten beschlossen, der sie braucht, nie danach. Merkposten fuer
+  eine programmweite DEC: DEC-67 E4 (Schluessel- statt Statistik-Persistenz), PRD-5.1-Schwelle (MDE-Faktor statt
+  kritischer Wert), WP-7-Null-Auffuellung der Funding-Autokorrelation, Sonderpaare I = 0 (DEC-93 Merkposten).
+- **Naechster Kandidat: H-27 (VRP auf DVOL-Backfill, DEC-61).** Datenzugang ist offen: die oeffentliche Deribit-API
+  ist aus der Cloud durch die Proxy-Richtlinie gesperrt (2026-10-13 geprueft); die DVOL-REST-Historie ab 2021-03-24
+  (WP-9) liegt auf dem PC. Weg wie beim Panel: Export ueber den Thin Client (Data-Harvest) anfragen. Danach
+  Feasibility zuerst (Power mit der SE des registrierten Tests, geltende Konstanten), dann Herleitung + Review.
+- Naechste freie Hypothesen-Nummer: H-32 (H-31 vermerkt, nicht registriert).

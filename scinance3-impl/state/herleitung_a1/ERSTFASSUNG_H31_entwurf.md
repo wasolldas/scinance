@@ -1,5 +1,10 @@
 ## H-31 - Erstfassung (ENTWURF 2026-10-13): A1 Funding-Long-Bein D1 gegen Universums-Hedge, Klasse P, kapitalfrei
 
+> **ORCHESTRATOR-VERMERK 2026-10-13 (DEC-93, GL-033):** Ersetzt durch die Feststellung des Reviews (`REVIEW_A1.md`):
+> A1 ist unter den geltenden Beschluessen (DEC-67 E4, fuer A1 bestaetigt in DEC-70 E1: W_eff = 0,41 W) vor der
+> Registrierung GL-012 (176,5 > 147,6 bp schon bei theta = 1) und zusaetzlich theta-UNBELEGT. Die Aussage "Stopp-Regel
+> greift nicht" unten ist damit hinfaellig; Stufe 2 ist Akte ohne Rechtswirkung. Kein Verdikt ueber den Funding-Carry.
+
 **Status:** ENTWURF der Herleitung, NICHT registriert und **bedingt**. Registrieren darf nur der Orchestrator, nach
 adversarischem Review und erst nach den Vorbedingungen in Abschnitt 0. Der Entwurf existiert, weil die Stopp-Regel
 der Feasibility (GL-012 bei theta = 1,0) in Konfiguration A mit gemessener SE nicht greift (`FEASIBILITY.md` 8).

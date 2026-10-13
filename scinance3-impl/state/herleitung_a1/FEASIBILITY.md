@@ -1,5 +1,10 @@
 # A1 (H-31) - Stufe 1: Feasibility-Befund (C.12) vor jedem Design
 
+> **ORCHESTRATOR-VERMERK 2026-10-13 (DEC-93, GL-033):** Ersetzt durch die Feststellung des Reviews (`REVIEW_A1.md`):
+> A1 ist unter den geltenden Beschluessen (DEC-67 E4, fuer A1 bestaetigt in DEC-70 E1: W_eff = 0,41 W) vor der
+> Registrierung GL-012 (176,5 > 147,6 bp schon bei theta = 1) und zusaetzlich theta-UNBELEGT. Die Aussage "Stopp-Regel
+> greift nicht" unten ist damit hinfaellig; Stufe 2 ist Akte ohne Rechtswirkung. Kein Verdikt ueber den Funding-Carry.
+
 > ENTWURF der Herleitung, Stand 2026-10-13. Nichts hier ist registriert oder beschlossen; entscheiden und
 > registrieren darf nur der Orchestrator. Keine A1-Outcome-Groesse auf Daten ab 2024-07-01 berechnet, angesehen oder
 > gespeichert; keine Siegeldatei geoeffnet; keine Tagesdaten nach 2026-06-28 geladen.

@@ -1140,3 +1140,12 @@ Nach der Positivkontrolle (NICHT BESTANDEN, rc 3) und der korrigierten Power-Zuo
 Fenster, C.10 hart, W1/W2, Union-Panel) bei IC_prior 0,03 nicht testbar - kein Verdikt ueber die Effekte. Die
 Registrierungsdatei `state/registered/h28_h30_v3.yaml` (sha256 `bd948f34...c299`) bleibt unveraendert; `--run` entfaellt.
 Siegel bleiben geschlossen.
+
+---
+
+## Vermerk H-31 (A1, 2026-10-13) - NICHT registriert
+
+Die Nummer H-31 wurde in der Herleitung A1 (`state/herleitung_a1/`, Entwurf `ERSTFASSUNG_H31_entwurf.md`) benutzt.
+A1 ist unter den geltenden Beschluessen vor der Registrierung GL-012 (DEC-67 E4 / DEC-70 E1) und zusaetzlich
+theta-UNBELEGT (DEC-93, GL-033). Es gibt keinen registrierten Eintrag H-31, kein K, keinen Lauf; der Entwurf hat
+keine Rechtswirkung. Die naechste Registrierung beginnt bei H-32.
