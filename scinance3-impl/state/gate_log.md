@@ -38,3 +38,17 @@ _(noch keine Eintraege)_
 - Feststellung: A1 in der Konstruktion DEC-70 unter den geltenden Beschluessen nicht testbar; nicht registriert. KEIN
   Verdikt ueber den Funding-Carry; DROP-Relevanzzeile greift nicht. Stufe 2 Akte ohne Rechtswirkung. Siegel unberuehrt.
 - Akte: DEC-93; Reviewer: VETO (gegen Testbarkeit) angenommen.
+
+## GL-034 - 2026-10-17 - H-27 (VRP auf DVOL-Backfill, blinde Fenster ab 2026-07-01, EV-0c/DEC-96) - GL-012 vor der Registrierung, nicht registriert
+- Anlass: Feasibility vor dem Design (C.12), `state/herleitung_h27/` (Kontamination, Datenprobe, Feasibility), ergebnisblind
+  (keine RV ab 2024-06-01, keine DVOL-Niveaus ab 2024-07-01, Blind-Siegel ab 2026-07-01). W1/W2 nicht blind (DEC-96).
+- Daten: DVOL BTC/ETH 2021-03-24..2026-10-16 lueckenlos (Katalog 2026-10-17); Panel-close = letzter Trade vor 00:00 UTC.
+- Nuisance 2021-03-24..2024-05-31 (nur Streuung): SD S1 18,60 VP, c 28,2 (Regel P-3, Batch-Means), Jensen ~2,1 VP.
+  Prior 9,47 VP aus BVRP 0,14 [sek] (Band 7,0..13,7).
+- Zuordnung DEC-94/DEC-96 E2: L 6/9/12 -> GL012/GL012/GL012 (P-1 und A3-Praxis); L 12: Fenster-Power 0,575,
+  DEC-52-Gate 0,359, MDE80 12,85 VP; C10 braeuchte >= 672 Tage je Fenster.
+- Review `REVIEW_H27.md`: ZUSTIMMUNG MIT AUFLAGEN (umgesetzt, DEC-97); Orchestrator-Gegenprobe bestaetigt.
+- Feststellung: H-27 nicht registriert. KEIN Verdikt ueber die Volatilitaets-Risikopraemie; DROP-Relevanzzeile greift
+  nicht; H-26 (2.0) unberuehrt. Testbarkeit nur ueber nicht beschlossene Lesarten (Prior-Rand, c ohne Batch-Means,
+  Hochfrequenz-RV), jede nur unter DEC-94. Siegel unberuehrt; Blind-Siegel DEC-96 E3 bleibt.
+- Akte: DEC-95, DEC-96 (Nachtraege 1-3), DEC-97; Reviewer: ZUSTIMMUNG MIT AUFLAGEN.

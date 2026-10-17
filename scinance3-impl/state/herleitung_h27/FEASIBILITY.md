@@ -1,5 +1,11 @@
 # H-27 (VRP auf DVOL-Backfill) - Stufe 1: Feasibility (C.12) - STAND 2026-10-17: GL-012 VOR DER REGISTRIERUNG
 
+> **ORCHESTRATOR-VERMERK 2026-10-17 (DEC-97, GL-034):** Befund GL-012 vor der Registrierung beschlossen (Review
+> ZUSTIMMUNG MIT AUFLAGEN, `REVIEW_H27.md`). Auflagen A-1..A-3 sind in DEC-97 umgesetzt: Gabelung Hochfrequenz-RV
+> (UNBELEGT) ergaenzt; c = 28,17 ist das Maximum der Regel P-3 (Konsens 18,6, Richtung Strenge); Offenlegung der
+> Orchestrator-Sicht auf publicTrade-Metadaten im Blindbereich und der vermeidbaren Bytesummen; DVOL-Cache ab
+> 2024-07-01 am 2026-10-17 geloescht.
+
 > ENTWURF der Herleitung. Nichts hier ist registriert oder beschlossen; entscheiden und registrieren darf nur der
 > Orchestrator. Gerechnet nach DEC-96 (EV-0c, blinde Fenster W3/W4 ab 2026-07-01, Fensterlaengen-Regel E2,
 > Blind-Siegel E3) und den VOR jeder Nuisance-Zahl fixierten Regeln P-1..P-9 (Anhang A, Abschnitt A-3; dort

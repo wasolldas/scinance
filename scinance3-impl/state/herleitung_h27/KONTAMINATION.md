@@ -1,5 +1,11 @@
 # H-27 (VRP auf DVOL-Backfill) - Stufe 0: Kontaminations-Inventur (Etikett C.17)
 
+> **ORCHESTRATOR-VERMERK 2026-10-17 (DEC-97, GL-034):** Befund GL-012 vor der Registrierung beschlossen (Review
+> ZUSTIMMUNG MIT AUFLAGEN, `REVIEW_H27.md`). Auflagen A-1..A-3 sind in DEC-97 umgesetzt: Gabelung Hochfrequenz-RV
+> (UNBELEGT) ergaenzt; c = 28,17 ist das Maximum der Regel P-3 (Konsens 18,6, Richtung Strenge); Offenlegung der
+> Orchestrator-Sicht auf publicTrade-Metadaten im Blindbereich und der vermeidbaren Bytesummen; DVOL-Cache ab
+> 2024-07-01 am 2026-10-17 geloescht.
+
 > **ORCHESTRATOR-VERMERK 2026-10-13 (DEC-96):** EV-0c beschlossen - H-27 auf blinden, prospektiven Fenstern ab
 > 2026-07-01 (Laenge nach vorab fixierter Regel L in {6, 9, 12} Monaten, nur aus Nuisance), W1/W2 nur Aera-Profil;
 > Blind-Siegel auf DVOL- und BTC/ETH-Vol-Statistik ab 2026-07-01. Getroffen vor jeder H-27-Power-/Nuisance-Zahl.

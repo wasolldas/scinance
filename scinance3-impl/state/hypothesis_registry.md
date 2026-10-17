@@ -1149,3 +1149,11 @@ Die Nummer H-31 wurde in der Herleitung A1 (`state/herleitung_a1/`, Entwurf `ERS
 A1 ist unter den geltenden Beschluessen vor der Registrierung GL-012 (DEC-67 E4 / DEC-70 E1) und zusaetzlich
 theta-UNBELEGT (DEC-93, GL-033). Es gibt keinen registrierten Eintrag H-31, kein K, keinen Lauf; der Entwurf hat
 keine Rechtswirkung. Die naechste Registrierung beginnt bei H-32.
+
+---
+
+## Vermerk H-27 (VRP, 2026-10-17) - NICHT registriert
+
+H-27 (VRP auf DVOL-Backfill, eroeffnet DEC-61) wurde nach DEC-96 auf blinden, prospektiven Fenstern ab 2026-07-01
+hergeleitet (`state/herleitung_h27/`) und ist vor der Registrierung GL-012 (DEC-97, GL-034). Es gibt keinen
+registrierten Eintrag H-27, kein K, keinen Lauf. Naechste freie Nummer bleibt H-32.

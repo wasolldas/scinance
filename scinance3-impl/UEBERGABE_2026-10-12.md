@@ -90,3 +90,17 @@ Tests: 1.992 passed / 3 failed (Legacy `test_execution_live.py`, Sandbox-bedingt
 - Herleitung `state/herleitung_h27/` (Stufe 0 fertig; Stufe 1 wartet auf den Backfill im Katalog). RV-Quelle: Panel-
   Tagesschluesse BTCUSDT/ETHUSDT (Katalog hat keinen kompakten Intraday-Preisstrom). Prior [sek]: BVRP 0,14 (BTC,
   Deribit 2017-07..2022-12, arXiv 2410.15195), Volltext vor Registrierung im Original pruefen (Egress gesperrt).
+
+## 7. Nachtrag 2026-10-17: H-27 GL-012 vor der Registrierung (DEC-97, GL-034) - Stand des Programms
+
+- Katalog wieder taeglich (Data-Harvest DEC-53..56); DVOL BTC/ETH 2021-03-24..2026-10-16 lueckenlos.
+- **H-27 nicht registriert:** auf blinden Fenstern ab 2026-07-01 erreicht keine Laenge 6/9/12 Monate die Power
+  (L 12: 0,575; MDE80 12,9 VP gegen Prior 9,5 VP; C10 braeuchte ~22 Monate je Fenster). Kein Verdikt ueber die VRP.
+  Blind-Siegel DEC-96 E3 bleibt (Fenster ab 2026-07-01 fuer jede kuenftige VRP-Hypothese blind).
+- **Bilanz:** A3 (GL-032), A1 (GL-033) und H-27 (GL-034) sind alle an der Power gescheitert, nicht an Daten oder Code:
+  mit zwei Jahresfenstern, C.10 hart und Power 0,80 sind Effekte in Literaturgroesse auf diesem Bestand nicht testbar.
+  A2 (V-5c), A4 (recording-first) und A5 (E.6) bleiben gesperrt.
+- **Naechster Schritt (Vorschlag):** Programm-Bilanz mit Power-Zensus ueber die verbleibenden Klassen (wo ist bei
+  gegebener Datenlage ueberhaupt Power >= 0,80 erreichbar - laengere blinde Aufzeichnung, Ereignis-Designs mit vielen
+  unabhaengigen Einheiten, Hochfrequenz-RV, A4-Aufzeichnung) als Entscheidungsvorlage fuer den Nutzer (PRD Par. 8),
+  bevor weitere Einzelherleitungen Kosten erzeugen.
