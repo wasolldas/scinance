@@ -149,3 +149,25 @@ tragen. Die Feasibility (Stufe 1) wird fuer EV-0a gerechnet; ihre Power-/MDE-Zah
   gespeichert; ebenso wird kein DVOL-Mittel der Vorperiode ausgegeben, damit das Praemienmittel nicht aus zwei Niveaus
   ableitbar ist (RV-Niveaus der Vorperiode sind fuer die Nullwelt-Kalibrierung zulaessig und werden ausgegeben).
 - K-4, K-5, K-6 bleiben ungeoeffnet.
+
+---
+
+## Nachtrag 2026-10-17 (Fortsetzung nach DEC-96)
+
+- **DEC-96 E1/E3:** Der Orchestrator hat EV-0c gewaehlt (blinde Fenster ab 2026-07-01) und das Blind-Siegel ab
+  2026-07-01 beschlossen. Die Inventur oben bleibt fuer W1/W2 gueltig (dort nur noch Aera-Profil, Etikett "nicht
+  blind"); fuer W3/W4 gilt sie nicht, ausser den in DEC-96 E3 genannten Punkten (STRESS_ABS-Tag 2026-08-19; K-4 und
+  K-6 mit Werten bis 2026-07-31 bzw. 2026-08-13, weiterhin ungeoeffnet).
+- **Was diese Fortsetzung ab 2026-07-01 gesehen hat:** nur Vollstaendigkeit - Katalogzeilen, Luecken, Status,
+  Zeilenzahlen, Zeitstempel, Schema von `deribit/dvol` (keine Werte, keine Stetigkeitspruefung ab 2026-07-01) und
+  `bybit/publicTrade`. **Offengelegt, weil schwacher Aktivitaets-Stellvertreter:** die Katalog-Bytesummen von
+  `bybit/publicTrade` 2026-07-01..2026-10-16 wurden ausgegeben (BTCUSDT 7.909 MB, ETHUSDT 8.826 MB in 108 Tagen, also
+  ~73 / ~82 MB je Tag; zum Vergleich Median 2024-06..2026-07 ~71 MB je Tag, `DATENPROBE.md` A.2). Die Handelsmenge
+  korreliert mit der Volatilitaet; die Zahl ist eine grobe Tagesdurchschnitts-Groesse ohne Renditebezug und wird
+  hier als "gesehen" gefuehrt. Weitere Bytesummen ab 2026-07-01 wurden nicht ausgegeben.
+- **2024-07-01..2026-06-30 (DVOL-Niveau-Regel):** nur Gleichheitszaehlungen close/open an Stunden- und Tagesnaehten
+  (keine Betraege), Naht 2025-07-31/08-01 als ja/nein.
+- **Vorperiode:** RV-Niveau (rms RV_fwd30 BTC 61,55 %, ETH 79,32 %), Streuung, Autokorrelation und Varianzfaktoren der
+  Praemie, Nullwelt-Kalibrierung aus Renditen bis 2024-05-31 - kein Praemienmittel, kein DVOL-Mittel (Waechter
+  `no_mean`); Pruefungstage der Konventionsprobe liegen alle vor 2024-06-01.
+- Keine neue Web-Suche in der Fortsetzung.

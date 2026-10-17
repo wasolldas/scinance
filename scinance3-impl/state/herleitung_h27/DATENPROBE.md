@@ -107,3 +107,49 @@ Damit sind alle 31 Tagesschluesse fuer jedes t in 2021-03-24..2026-06-30 vorhand
    dem Tagesschluss des REST-1D-Backfills ist, ist nur auf dem PC pruefbar (Variante A); in der Cloud entfaellt sie,
    die Gleichheit ist durch WP-9 belegt (176 Tage, Differenz 0).
 4. Vorperiode: Nuisance nach `FEASIBILITY.md` Abschnitt 3.
+
+## C. Datenteil - Fortsetzung 2026-10-17 (Daten vollstaendig; B.4 hiermit ausgefuehrt)
+
+### C.1 Katalog (einmal geladen, [S:catalog_check2.py])
+
+- Export **2026-10-17T10:39:26Z** (`partitions-20261017T101504Z.parquet`, 17,6 MB, sha256 `031bc308...14c7d7`),
+  349.961 Partitionen.
+- `deribit/dvol` BTC und ETH: je **2.033 Partitionen 2021-03-24..2026-10-16, 0 Luecken (`hd.gaps`), alle DONE, je 24
+  Zeilen**. Die W2-Luecke 2025-09-01..2026-03-19 und die Tage 2026-08-02..03, 2026-09-20 sind geschlossen.
+- `bybit/publicTrade` BTCUSDT/ETHUSDT 2026-07-01..2026-10-16: je 108 Tage, 0 Luecken (ETHUSDT ein Tag `RUNNING`);
+  2021-03-01..2024-05-31: je 1.188 Tage, 0 Luecken. (Katalog-Bytesummen siehe `KONTAMINATION.md` Nachtrag.)
+
+### C.2 DVOL-Inhaltsprobe ohne Niveaus ([S:dvol_probe.py], Ergebnis `scratchpad/h27_herleitung/dvol_probe.json`)
+
+| Pruefung | BTC | ETH |
+|---|---|---|
+| Zeilen / Tage | 48.792 / 2.033, jeder Tag 24 Stunden | identisch |
+| doppelte Stunden, Zeitstempel nicht auf voller Stunde, nicht-numerische OHLC | 0 / 0 / 0 | 0 / 0 / 0 |
+| Tage ohne 23:00-Kerze | 0 | 0 |
+| Payload-Schluessel | `close,high,low,open,timestamp` in allen vier Perioden (Vorperiode, Backfill 2024-07..2025-07, Strom 2025-08..2026-06, blind ab 2026-07) | identisch |
+| `topic` | `dvol.BTC` in allen Perioden | `dvol.ETH` |
+| `ts_exchange_ms` = Payload-`timestamp` (Kerzenbeginn) | 48.792 / 48.792 | 48.792 / 48.792 |
+| **Naht 2025-07-31 23h close = 2025-08-01 00h open** | **gleich** | **gleich** |
+| Tagesnaht close(23h, d) = open(00h, d+1): Vorperiode / 2024-07..2025-07 / 2025-08..2026-06 | 1.156 gleich, 39 abweichend / 382 : 14 / 329 : 4 | 1.111 : 84 / 381 : 15 / 326 : 7 |
+| max. Abweichung an der Tagesnaht (nur Vorperiode ausgegeben) | 0,01 Vol-Punkte | 0,05 Vol-Punkte |
+| Stundennaht close(h) = open(h+1) gleich (Vorperiode) | 26.509 : 976 (max 5,23) | 25.560 : 1.925 (max 1,91) |
+
+Lesart: Backfill und Strom sind dieselbe Quelle und Konvention (Schema, `topic`, Zeitstempel gleich, Stetigkeitsquoten aehnlich;
+DEC-61/DEC-95 E1 erfuellt). Tagesschluss = close der 23:00-Kerze; die Wahl gegen den open der Folgestunde ist in der
+Vorperiode hoechstens 0,05 Vol-Punkte wert (an 3..7 % der Tage) und damit fuer die Statistik unerheblich. Ab
+2026-07-01 wurden nur Zeilen, Zeitstempel und Schema geprueft (Blind-Siegel DEC-96 E3).
+
+### C.3 RV-Konvention Panel gegen `publicTrade` ([S:conv_check.py], vor 2024-06-01)
+
+| Symbol | Tage | Panel-close = letzter Trade vor 00:00 UTC | rel. Abweichung | letzter Trade vor Mitternacht |
+|---|---|---|---|---|
+| BTCUSDT | 2021-06-15, 2022-11-09, 2023-03-15, 2023-09-15, 2023-12-15, 2024-03-15 | 6 / 6 | 0 | 0,15 .. 1,0 s |
+| ETHUSDT | dieselben Tage | 6 / 6 | 0 | 0,01 .. 6,3 s |
+
+Archivformat: eine Zeile je Trade, `payload_json` mit `timestamp` (Sekunden mit Nachkommastellen; 2022 teils ganze
+Sekunden), `price`, `trdMatchID`. Am letzten Zeitstempel koennen mehrere Trades liegen (2022-11-09: 37 BTC- / 86
+ETH-Trades in derselben Sekunde); der Gleichstand wurde nach Dateireihenfolge aufgeloest und ergab den Panel-close.
+Folge: Die RV-Definition der Vorperiode (Panel) und der Fenster W3/W4 (`publicTrade`, Live-Frames ab 2026-07 mit
+`data[]`-Listen) ist dieselbe, wenn der Lauf-Lader den letzten Trade des UTC-Tages in Boersen-Reihenfolge nimmt
+(Zeitstempel, dann Position im Frame/in der Datei); die Regel gehoert in die Lauf-Spezifikation (C.14: Gleichstand
+ohne eindeutige Reihenfolge -> laut scheitern).
