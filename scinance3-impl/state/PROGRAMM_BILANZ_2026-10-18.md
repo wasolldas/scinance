@@ -1,5 +1,13 @@
 # Programm-Bilanz Scinance 3.0: Power-Zensus - wo ist auf unserem Bestand Power 0,80 erreichbar? (Stand 2026-10-18)
 
+> **ORCHESTRATOR-VERMERK 2026-10-18 (DEC-98):** Angenommen mit vier Korrekturen aus `REVIEW_PROGRAMM_BILANZ_2026-10-18.md`:
+> (A-1) A3 mit beta-neutralisiertem IC auf W1/W2 ist heute C10-faehig, sobald ein Prior >= 0,020 belegt ist (neue
+> Hypothese, Etikett C.17) - die Bilanz war hier zu pessimistisch; (A-2) A3/A1-Fenster ab 2026-07-01 unterliegen dem
+> Blind-Siegel DEC-96 E3 (BTC-Renditestreuung in Kalibrierung/fm8) - die Daten 2027-08/2030-01 sind bedingt; (A-3) die
+> Zwei-Fenster-Regel kostet bei gleicher Fehlerrate UND gleicher Power +26 %, der Satz "kein Zeitfresser" ist
+> zurueckgenommen; "Einmal-Gut" gilt je Zeitabschnitt fuer alle vorher registrierten Hypothesen; (A-4) H-26 bleibt
+> gesperrt (Default R-1), done_days-Inventur beauftragt.
+
 > Herleitungs-Akte P-2 (Power, Rauschboden, Gate-Design). ENTWURF: nichts hier ist beschlossen oder registriert;
 > entscheiden darf nur der Orchestrator, die Programmrichtung waehlt der Nutzer (PRD Par. 8). Keine Aussage dieser
 > Akte lockert eine Regel zugunsten eines Kandidaten; Regelaenderungen erscheinen nur als programmweite Optionen mit

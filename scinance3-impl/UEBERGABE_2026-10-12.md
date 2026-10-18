@@ -104,3 +104,17 @@ Tests: 1.992 passed / 3 failed (Legacy `test_execution_live.py`, Sandbox-bedingt
   gegebener Datenlage ueberhaupt Power >= 0,80 erreichbar - laengere blinde Aufzeichnung, Ereignis-Designs mit vielen
   unabhaengigen Einheiten, Hochfrequenz-RV, A4-Aufzeichnung) als Entscheidungsvorlage fuer den Nutzer (PRD Par. 8),
   bevor weitere Einzelherleitungen Kosten erzeugen.
+
+## 8. Nachtrag 2026-10-18: Programm-Bilanz (DEC-98), Nutzer-Stand, Datenauftraege
+
+- `STAND_2026-10-18.md` (fuer den Nutzer), `state/PROGRAMM_BILANZ_2026-10-18.md` + Review + DEC-98 (Power-Zensus: wann
+  waere wo Power 0,80 erreichbar; Hebel; Datenbedarf; fuenf Optionen). Kernzahlen: VRP 672 Tage je Fenster (2030-04),
+  A3 Roh-IC 119/57 Wochen (stress/measured), A1 nur mit theta, A4 ab 2029-06; A3 mit beta-neutralem IC auf W1/W2
+  HEUTE C10-faehig bei belegtem Prior >= 0,020 (UNBELEGT) - neue Hypothese H-32.
+- **Blindperiode ab 2026-07-01 ist je Groesse einmal vergebbar** (VRP vs. Klasse W/A1 vs. H-26) - Nutzer-Entscheidung
+  offen; Default: niemand rechnet dort, H-26 bleibt gesperrt (R-1), keine Regelaenderung.
+- Datenauftraege freigegeben (`state/AUFTRAG_DATA_HARVEST_2026-10-18.md`, Data-Harvest setzt selbst um): B-0 done_days-
+  Inventur H-26, B-1 Panel-Strom aller Perps + Instruments-Schnappschuss + Funding (irreversibel), B-2 A4-Quotes +
+  Inhaltsproben, B-3 1-min-Kerzen BTC/ETH ab 2021, B-4 Deribit-Verfallskalender.
+- Naechste Arbeit des Orchestrators (ohne Nutzer-Entscheidung moeglich): Recherche-Belege (Prior beta-neutraler IC,
+  theta, V-5b/c, V-4; Volltexte per Nutzer-Upload), HF-RV-Streuung auf der Vorperiode nach B-3 (nur Streuung).
