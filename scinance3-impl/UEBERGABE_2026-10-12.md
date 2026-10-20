@@ -118,3 +118,28 @@ Tests: 1.992 passed / 3 failed (Legacy `test_execution_live.py`, Sandbox-bedingt
   Inhaltsproben, B-3 1-min-Kerzen BTC/ETH ab 2021, B-4 Deribit-Verfallskalender.
 - Naechste Arbeit des Orchestrators (ohne Nutzer-Entscheidung moeglich): Recherche-Belege (Prior beta-neutraler IC,
   theta, V-5b/c, V-4; Volltexte per Nutzer-Upload), HF-RV-Streuung auf der Vorperiode nach B-3 (nur Streuung).
+
+## 9. Nachtrag 2026-10-20: DEC-99 (Pilot-Schaetzfenster), H-32 gebaut, DEC-100 (Panel-Luecke), Datenlieferungen
+
+- **DEC-99 (Nutzer-Zustimmung):** REZENZ als notwendige Bedingung, aeltere Daten vorab registriert als Pilot-Schaetzfenster
+  oder zusaetzliches Urteilsfenster; genau ein Pilotlauf; F-WEEK zaehlt nur getestete Hypothesen; W2 endet 2026-06-28.
+  Nachtrag 1: F-WEEK-p aus den Replikaten der faktorerhaltenden Null (Permutation kontaminiert, DEC-77).
+- **H-32 (A3 mit beta-neutralem IC, Zweistufen-Design):** Herleitung + Review (`state/herleitung_h32/`, ZUSTIMMUNG MIT
+  AUFLAGEN, eingearbeitet). Treiber gebaut und abgenommen: `src/bybit_edge/research/h32_fm8/`, `scripts/h32_fm8.py`,
+  Tests `tests/unit/test_h32_*.py` (Commit f7dd471; Gesamtsuite 2.248 passed / 3 bekannte Altfaelle / 9 skipped).
+  Modi: `--prelaunch` (v6, outcome-frei, Panel-Schnitt <= 2026-06-28), `--emit-template`, `--pilot` (Schnitt <= 2024-06-30,
+  Uebergaberegel U, mu_sel, Genau-ein-Pilot-Sperre), `--positive-control`, `--run`. Folgebau laeuft (p-Replikate in v6,
+  `scripts/h32_build_delisted_tree.py`). NICHT registriert; kein Lauf auf Realdaten bisher.
+- **DEC-100:** 45 delistete lineare USDT-Perps fehlen im Union-Panel (31 mit letztem Handelstag in W2) - Ueberlebenden-
+  Verzerrung; Register-Datum kuenftig = letzter Handelstag (Data-Harvest `bybit/delisting_dates`); 6 Symbole bei uns
+  faelschlich als delistet. **H-32-Registrierung wartet auf das Nachladen** (`state/AUFTRAG_DATA_HARVEST_PANEL_DELISTED_
+  2026-10-20.md`); danach Delisted-Baum neu bauen, Fingerprints, Vorlauf v6, Registrierung, Positivkontrolle, Pilot, Test.
+- **Datenlieferungen (DEC-98 Nachtrag 4):** Panel-Strom aller Perps ab 2026-09-29 (`rest.kline1d`, `rest.fundingRateAll`,
+  `rest.instruments` ab 2026-10-20), A4-Quotes `rest.tickers15m` ab 2026-10-20 (Korrektur: Ticker-Strom hatte keine
+  datierten Futures), 1-min-Kerzen BTC/ETH (ETH ab 2021-03-15), Deribit `rest.settlements` ab 2017, Options-Lueckenkarte.
+  H-26 bleibt gesperrt (strenge Lesart unerfuellbar; naechste Lesart fruehestens 2027-04-06).
+- **PDF-Belege (DEC-98 Nachtrag 2):** beta-neutraler IC-Prior nur als Band 0,004..0,033 (Universum entscheidet) -> Pilot
+  ersetzt den Literatur-Prior; VRP-Prior 7,1 VP; V-5c primaer belegt; theta offen. Fehlende PDFs: LTW JF 2022, Weiss 2026 u. a.
+- **Naechste Schritte:** (1) Data-Harvest-Backfill abwarten -> Delisted-Baum -> v6 -> Registrierung H-32 (YAML + sha,
+  Registry-Eintrag, Doppelausweise) -> Positivkontrolle -> Pilot -> Uebergabe -> Test; (2) Check-in 2026-10-21 12:40 UTC:
+  neue Stroeme im Katalog -> HF-RV-Nuisance (nur <= 2024-05-31) und A2-Ereigniszensus; (3) Blind-Siegel DEC-96 E3 gilt.
