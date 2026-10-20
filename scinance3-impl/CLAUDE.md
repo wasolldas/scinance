@@ -68,6 +68,11 @@
   < 0,80, wenn das DEC-52-Gate (Produktrechnung) Power >= 0,80 hat, sonst
   GL-012. Geht den Altzeilen von DEC-52 und PRD 5.1-5.4 fuer kuenftige
   Registrierungen (inkl. H-27) vor.
+- **Seit 2026-10-20 (DEC-99, Nutzer-Zustimmung):** REZENZ ist notwendige
+  Bedingung (juengstes Fenster muss bestehen), aeltere Daten vorab registriert
+  als Pilot-Schaetzfenster oder zusaetzliches Urteilsfenster; genau ein
+  Pilotlauf, Panel-Waechter, Doppelausweis; F-WEEK zaehlt nur getestete
+  Hypothesen; W2 endet 2026-06-28. Etikett "Lockerung".
 - **Zwoelf Pflichtzeilen jeder Registrierung** (PRD Par. 3.3): Power,
   Entscheidungsrelevanz (mit oekonomischer Mindestmagnitude als ETIKETT),
   Cluster-Einheit, Selektions-Deflation, adversariales Fixture,
