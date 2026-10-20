@@ -38,6 +38,16 @@ class ArtifactError(H32Abort):
     """DEC-53: a mandatory artifact is missing or does not reproduce the estimators -- NO HAND-OVER / NO VERDICT."""
 
 
+class ReplicatesError(H32Abort):
+    """The p replicates of the v6 factor-preserving null (DEC-99 p convention) are missing, differ from the pinned sha256,
+    or do not belong to the frozen v6 constants -- NO VERDICT."""
+
+
+class DelistedTreeError(H32Abort):
+    """DEC-100: the Data-Harvest backfill partitions / register cannot be turned into a ``panel_1d_delisted`` tree, or the
+    tree on disk differs from its fingerprint file."""
+
+
 class NullCalibrationError(H32Abort):
     """The re-computed null constants deviate more than +-10 % from the frozen ones (P6)."""
 

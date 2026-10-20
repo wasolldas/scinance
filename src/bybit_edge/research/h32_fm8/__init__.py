@@ -20,9 +20,13 @@ Modes (``scripts/h32_fm8.py``), every one of them gated before any data is read:
     statement, DEC-53 artifacts, ``h32_pilot.json`` + sha256.
   * ``--positive-control`` (``positive_control.py``) -- PRD 3.3.8 control, alone and before the test, synthetic returns
     on the real week shape, injection calibrated on the REALISED effect.
-  * ``--run`` (``testrun.py``, ``gate.py``, ``permutation.py``, ``fweek.py``) -- stage T on the handed-over variants
-    only: pilot lock, panel cut <= 2026-06-28, pure gate function (T4), block-permutation p (max-p), BH (denominator 4)
-    and F-WEEK (BY, DEC-99 (7)) with the double statement m = 11.
+  * ``--run`` (``testrun.py``, ``gate.py``, ``pnull.py``, ``permutation.py``, ``fweek.py``) -- stage T on the handed-over
+    variants only: pilot lock, replicate lock, panel cut <= 2026-06-28, pure gate function (T4), the binding p from the
+    pinned v6 replicates of the factor-preserving null (DEC-99 p convention; max-p over W1/W2; the block permutation and the
+    normal approximation are report-only), BH (denominator 4) and F-WEEK (BY, DEC-99 (7)) with the double statement m = 11.
+
+DEC-100: ``delisted_tree.py`` / ``scripts/h32_build_delisted_tree.py`` build the ``panel_1d_delisted`` tree from the
+Data-Harvest delisting register and backfill partitions; the modes quote and check ``delisting_register_sha256``.
 
 Every number the run checks against the registered YAML is frozen (T5 pin, ``constants.py``).  Nothing here opens the
 sealed files of the programme and nothing computes a raw IC, a lag profile or a beta-calibration IC.

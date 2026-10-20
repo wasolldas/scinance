@@ -41,10 +41,13 @@ def simulate_fm8_cell(
     win: Window, *, rho_f: float, beta_sd: float, drift_f: float, sigma_f: float, sigma_e: float, n_reps: int,
     seed: int = C.SEED, floor_fm8: float | None = None, n_boot: int = C.N_BOOT_MIN, mean_block: float = C.MEAN_BLOCK,
     boot_seed: int = C.SEED, variants: tuple[str, ...] = C.VARIANTS,
-    progress: Callable[[int], None] | None = None,
+    progress: Callable[[int], None] | None = None, keep_draws: bool = False,
 ) -> dict[str, Any]:
     """One null cell (one ``rho_f`` / ``beta_sd`` / drift configuration), ``n_reps`` replicates, all ``variants``.
-    ``floor_fm8`` ``None`` skips the SE-rule expectation (``e_se_rule`` is then NaN)."""
+    ``floor_fm8`` ``None`` skips the SE-rule expectation (``e_se_rule`` is then NaN).  ``keep_draws`` adds the replicate
+    window means in the registered direction (``y = s * IC``, NaN kept) as ``variants[v]["draws"]`` (ndarray): the p
+    replicates of the DEC-99 p convention.  The sequence of draws depends only on ``seed`` and the cell, never on
+    ``n_reps`` (a longer run starts with the shorter one)."""
     symbols = win.symbols
     n_sym = len(symbols)
     lead = win.alive_ext.shape[0] - win.n_weeks
@@ -95,6 +98,8 @@ def simulate_fm8_cell(
             "n_reps_finite": int(yf.size), "n_ic_pooled": int(pooled.size),
             "draws_sha256": est.series_sha256(y),
         }
+        if keep_draws:
+            out_v[v]["draws"] = y.copy()
     ceiling = est.signed_selection_ceiling({v: raw_means[v] for v in variants}, {v: C.SIGN[C.DIRECTION[v]] for v in variants})
     return {"variants": out_v, "ceiling_k4": ceiling, "rho_f": float(rho_f), "beta_sd": float(beta_sd),
             "drift_f": float(drift_f), "sigma_f": float(sigma_f), "sigma_e": float(sigma_e), "n_reps": int(n_reps),
@@ -105,16 +110,17 @@ def simulate_fm8_cell(
 def window_null_constants(
     win: Window, *, rho_f: float, beta_sd: float, sigma_f: float, sigma_e: float, n_reps: int, seed: int = C.SEED,
     floor_fm8: float | None, n_boot: int = C.N_BOOT_MIN, mean_block: float = C.MEAN_BLOCK, boot_seed: int = C.SEED,
-    variants: tuple[str, ...] = C.VARIANTS, progress: Callable[[str, int], None] | None = None,
+    variants: tuple[str, ...] = C.VARIANTS, progress: Callable[[str, int], None] | None = None, keep_draws: bool = False,
 ) -> dict[str, Any]:
     """Both cells (driftfree, drift 0.002) of a window and the frozen constants derived from them.  Pure function of the
-    window arrays and the numbers passed in (the run re-computes with exactly this, P6)."""
+    window arrays and the numbers passed in (the run re-computes with exactly this, P6).  ``keep_draws`` keeps the replicate
+    window means in the cells (see :func:`simulate_fm8_cell`)."""
     cells = {}
     for name, drift in DRIFTS.items():
         cells[name] = simulate_fm8_cell(
             win, rho_f=rho_f, beta_sd=beta_sd, drift_f=drift, sigma_f=sigma_f, sigma_e=sigma_e, n_reps=n_reps, seed=seed,
             floor_fm8=floor_fm8, n_boot=n_boot, mean_block=mean_block, boot_seed=boot_seed, variants=variants,
-            progress=None if progress is None else (lambda i, nm=name: progress(nm, i)))
+            progress=None if progress is None else (lambda i, nm=name: progress(nm, i)), keep_draws=keep_draws)
     free, drifting = cells["driftfree"]["variants"], cells["drifting"]["variants"]
 
     def worse(key: str, v: str) -> float:

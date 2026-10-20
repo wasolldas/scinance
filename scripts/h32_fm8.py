@@ -7,12 +7,14 @@ Fuenf Modi, genau EINEN waehlen.  Jeder Modus, der Realdaten liest, prueft vorhe
 Fingerprint-Pruefung und VOR jeder Rechnung auf das Stichtagsdatum geschnitten (Maximaldatum-Waechter).
 
   python scripts/h32_fm8.py --prelaunch --panel-base data/panel_1d --delisted-base data/panel_1d_delisted --out DIR
-        [--cut-date 2026-06-28] [--n-reps 1000] [--n-boot 1000] [--seed 53] [--v5e-reference state/registered/h28_h30_v3.yaml]
-        [--stress-rel P] [--stress-abs P]
+        [--cut-date 2026-06-28] [--n-reps 1000] [--p-reps R] [--n-boot 1000] [--seed 53]
+        [--v5e-reference state/registered/h28_h30_v3.yaml] [--stress-rel P] [--stress-abs P]
     Vorlauf v6, outcome-frei: Fenster P / W1 / W2, faktorerhaltende Null mit 8 Beta-Vorlaufwochen (K = 4, driftfrei und Drift
     0,002), Kalibrierung je Fenster (W2 neu auf dem geschnittenen Fenster, W1 als Determinismus-Kontrolle gegen v5e, P nur
     stress und ohne Mittel), eingefrorene Konstanten (sd_week, se_mean, e_se_rule, null_mean, q95, ceiling_k4, floor_fm8,
-    v_fm8, K_fm8-Reihen, m_P). Berechnet NIE eine reale Charakteristik-gegen-Outcome-IC.
+    v_fm8, K_fm8-Reihen, m_P) und die Replikat-Fenstermittel der Null fuer p (h32_prelaunch_p_replicates.json, DEC-53; je
+    Fenster/Variante die Zelle mit dem groesseren Null-Mittel; --p-reps > --n-reps = feinere p-Aufloesung, z. B. 10000).
+    Berechnet NIE eine reale Charakteristik-gegen-Outcome-IC.
 
   python scripts/h32_fm8.py --emit-template DIR/h32_prelaunch.json OUT.yaml [--spread-census scinance3-impl/state/runs/wp7_20260921/spread_census.json]
     schreibt das Skelett von state/registered/h32_v1.yaml (kein Panel-Zugriff, keine Registrierung).
@@ -31,10 +33,17 @@ Fingerprint-Pruefung und VOR jeder Rechnung auf das Stichtagsdatum geschnitten (
     rc 0 nur bei BESTANDEN, 3 bei NICHT BESTANDEN, 1 bei Abbruch.
 
   python scripts/h32_fm8.py --run --registered Y.yaml --registered-sha256 SHA --pilot-result h32_pilot.json --pilot-result-sha256 SHA
-        --panel-base ... --delisted-base ... --out DIR [--wave-p NAME=P[,NAME=P...]]
-    Stufe T, nur uebergebene Varianten: Pilot-Sperre (Uebergabe wird bitgleich nachgerechnet), Panel-Schnitt <= 2026-06-28, Null-
-    Nachrechnung (+-10 %), Gate als reine Funktion, Block-Permutations-p (Max-p, 10.000), BH (Nenner 4, report-only), F-WEEK
-    (BY, m = getestete Eintraege; Doppelausweis m = 11), DEC-53-Artefakte vor dem Verdikt. rc 1 = KEIN VERDIKT.
+        --p-replicates DIR/h32_prelaunch_p_replicates.json --panel-base ... --delisted-base ... --out DIR
+        [--wave-p NAME=P[,NAME=P...]]
+    Stufe T, nur uebergebene Varianten: Pilot-Sperre (Uebergabe wird bitgleich nachgerechnet), Replikat-Sperre (sha256 =
+    fdr.replicates_sha256), Panel-Schnitt <= 2026-06-28, Null-Nachrechnung (+-10 %), Gate als reine Funktion, bindendes p aus
+    den gepinnten Null-Replikaten (Max-p ueber W1/W2); Blockpermutation (10.000) und Normalnaeherung report-only; BH (Nenner 4,
+    report-only), F-WEEK (BY, m = getestete Eintraege; Doppelausweis m = 11), DEC-53-Artefakte vor dem Verdikt. rc 1 = KEIN VERDIKT.
+
+DEC-100 (Panel-Vollstaendigkeit): der Delisted-Baum (``--delisted-base``) kommt aus dem Data-Harvest-Register und den
+Backfill-Partitionen (``scripts/h32_build_delisted_tree.py``); jeder Modus, der das Panel liest, misst zusaetzlich
+``data_fingerprints.delisting_register_sha256`` (sha256 der Register-Kopie ``delisting_register.csv`` im Baum) und prueft den
+Baum gegen seine ``delisted_tree_fingerprint.json``; die Registrierung pinnt den Wert.
 
 Zugangsdaten nie hier: der Panel-Bezug laeuft ueber die Harvest-Exporte (Umgebungs-Secrets), nie ueber diese Datei.
 """
@@ -50,8 +59,8 @@ import yaml
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
-from bybit_edge.research.h32_fm8 import (artifacts, checks, panel_cut, pilot as pilot_mod, positive_control as pc_mod,  # noqa: E402
-                                         schema, testrun, vorlauf)
+from bybit_edge.research.h32_fm8 import (artifacts, checks, delisted_tree, panel_cut, pilot as pilot_mod, pnull,  # noqa: E402
+                                         positive_control as pc_mod, schema, testrun, vorlauf)
 from bybit_edge.research.h32_fm8 import constants as C  # noqa: E402
 from bybit_edge.research.h32_fm8.errors import H32Abort  # noqa: E402
 from bybit_edge.research.wp13_xsec import nulls  # noqa: E402
@@ -76,7 +85,9 @@ def data_fingerprints(a: argparse.Namespace, panel: dict, delisted_base: Path, d
     surv_syms = [sym for sym, dl in zip(panel["symbols"], panel["is_delisted"]) if not dl]
     fp = panel_load.union_range_fingerprint(a.panel_base, delisted_base, surv_syms, panel["delisted_symbols"],
                                             year_start=a.start_year, year_end=a.end_year, as_of=as_of)
+    tree = delisted_tree.observed_tree_fingerprints(delisted_base)             # DEC-100; raises if the tree differs from its fingerprint file
     return {"union_range_fingerprint": fp["sha256"], "delisting_dates_sha256": panel_load.sha256_file(delisting_dates_path),
+            "delisting_register_sha256": tree["delisting_register_sha256"], "delisted_tree_sha256": tree["delisted_tree_sha256"],
             "union_range_detail": {"year_range": fp["year_range"], "n_partitions": fp["n_partitions"], "n_symbols": len(fp["symbols"]),
                                    "as_of": as_of.isoformat()}}
 
@@ -104,8 +115,13 @@ def load_union_panel(a: argparse.Namespace):
     except (panel_store.PanelStoreError, panel_load.PanelLoadError) as exc:
         log(f"FEHLER (loud fail): {exc}")
         return None
-    observed = data_fingerprints(a, panel, delisted_base, dd_path, as_of)
-    log(f"  {len(panel['symbols'])} Symbole, {len(panel['dates'])} Tage; union_range={observed['union_range_fingerprint']}")
+    try:
+        observed = data_fingerprints(a, panel, delisted_base, dd_path, as_of)
+    except H32Abort as exc:
+        log(f"FEHLER (loud fail): {exc}")
+        return None
+    log(f"  {len(panel['symbols'])} Symbole, {len(panel['dates'])} Tage; union_range={observed['union_range_fingerprint']}; "
+        f"delisting_register={observed['delisting_register_sha256']}")
     return panel, observed
 
 
@@ -184,7 +200,8 @@ def cmd_prelaunch(a: argparse.Namespace) -> int:
                 f"({C.N_REPS_MIN} / {C.N_BOOT_MIN}); die Modi --pilot/--run lehnen ein so erzeugtes Skelett ab.")
         report = vorlauf.assemble_prelaunch(
             panel, observed, cut_date=a.cut_date, n_reps=a.n_reps, n_boot=a.n_boot, seed=a.seed, calibration_kwargs=ck,
-            stress_rel_path=a.stress_rel or None, stress_abs_path=a.stress_abs or None, v5e_reference=ref, log=log)
+            stress_rel_path=a.stress_rel or None, stress_abs_path=a.stress_abs or None, v5e_reference=ref, log=log,
+            p_reps=a.p_reps or None)
         out = vorlauf.write_prelaunch_artifacts(a.out, report)
     except (H32Abort, ValueError, nulls.FactorShareCalibrationError) as exc:
         log(f"FEHLER ({type(exc).__name__}): {exc}\nKEIN VORLAUF-ERGEBNIS.")
@@ -331,6 +348,18 @@ def cmd_run(a: argparse.Namespace) -> int:
     except ValueError:
         log(f"FEHLER: --wave-p {a.wave_p!r} ist keine Liste NAME=P")
         return 1
+    p_rep = None
+    if pilot["handed"]:                                  # P4': the pinned v6 p replicates -- before the panel is touched
+        if not a.p_replicates:
+            log("FEHLER (Replikat-Sperre): --p-replicates (h32_prelaunch_p_replicates.json des Vorlaufs) ist Pflicht, sobald eine "
+                "Variante uebergeben ist.\nKEIN VERDIKT.")
+            return 1
+        try:
+            p_rep = pnull.load_replicates(a.p_replicates, registered)
+        except (H32Abort, ValueError, KeyError) as exc:
+            log(f"FEHLER (Replikat-Sperre): {exc}\nKEIN VERDIKT.")
+            return 1
+        log(f"[Replikat-Sperre bestanden] {a.p_replicates} sha256={p_rep['_file_sha256']} (R={p_rep['n_reps']})")
     panel = observed = None
     if pilot["handed"]:
         loaded = load_union_panel(a)
@@ -340,8 +369,8 @@ def cmd_run(a: argparse.Namespace) -> int:
     else:
         log("Kein Eintrag uebergeben: kein Test, das Panel wird nicht gelesen (GL-012 (Pilot)).")
     try:
-        report = testrun.run_test(panel, registered, pilot, observed, registered_sha256=sha, wave_p=wave_p, log=log)
-        written = testrun.write_run_artifacts(a.out, report, registered, pilot_sha256=pilot["_file_sha256"])
+        report = testrun.run_test(panel, registered, pilot, observed, registered_sha256=sha, wave_p=wave_p, p_replicates=p_rep, log=log)
+        written = testrun.write_run_artifacts(a.out, report, registered, pilot_sha256=pilot["_file_sha256"], p_replicates=p_rep)
     except (H32Abort, ValueError) as exc:
         log(f"FEHLER ({type(exc).__name__}): {exc}\nKEIN VERDIKT.")
         return 1
@@ -374,6 +403,10 @@ def build_parser() -> argparse.ArgumentParser:
     ap.add_argument("--pilot-result-sha256", default="", help="sha256 des Pilot-Ergebnisses")
     ap.add_argument("--pilot-rerun-dec", default=None, help="DEC-nn, die einen Pilot-Neulauf nach nachgewiesenem Fehler erlaubt (DEC-99 (3))")
     ap.add_argument("--wave-p", default="", help="weitere getestete Hypothesen der Welle fuer F-WEEK: NAME=P[,NAME=P...]")
+    ap.add_argument("--p-replicates", default="", help="h32_prelaunch_p_replicates.json des Vorlaufs (sha256 = fdr.replicates_sha256; "
+                                                          "Pflicht fuer --run, sobald eine Variante uebergeben ist)")
+    ap.add_argument("--p-reps", type=int, default=0, help="Replikate fuer p im Vorlauf (Standard = --n-reps; groesser = feinere "
+                                                          "p-Aufloesung, die ersten --n-reps sind die der Konstanten)")
     ap.add_argument("--cut-date", default=C.CUT_TEST, help="Stichtag des Panel-Schnitts im Vorlauf (Sonntag, <= 2026-06-28)")
     ap.add_argument("--v5e-reference", default="", help="YAML mit den v5e-W1-Kalibrierungswerten (W1-Determinismus-Kontrolle)")
     ap.add_argument("--panel-base", default="data/panel_1d")

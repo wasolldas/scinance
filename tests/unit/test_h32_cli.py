@@ -30,6 +30,7 @@ def _load_script(name: str):
 
 H32 = _load_script("h32_fm8.py")
 FP = dict(F.FAKE_FINGERPRINTS)
+P_REPS = 32                                  # more p replicates than the 24 of the shrunk constants (finer p resolution path)
 
 
 class Spy:
@@ -71,8 +72,9 @@ def e2e(tmp_path_factory):
         mp.setattr(H32, "load_union_panel", spy)
         stress = tmp / "stress_rel.json"
         stress.write_text(json.dumps({"days": ["2024-08-05", "2025-04-07", "2026-06-20", "2026-07-01", "2026-08-19"]}), encoding="utf-8")
-        out["rc"]["prelaunch"] = H32.main(_prelaunch_argv(tmp / "pre", **{"--stress-rel": stress}))
+        out["rc"]["prelaunch"] = H32.main(_prelaunch_argv(tmp / "pre", **{"--stress-rel": stress, "--p-reps": P_REPS}))
         out["pre_json"] = tmp / "pre" / "h32_prelaunch.json"
+        out["p_args"] = ["--p-replicates", str(tmp / "pre" / C.P_REPLICATES_FILE)]
         out["rc"]["template"] = H32.main(["--emit-template", str(out["pre_json"]), str(tmp / "h32_v1.yaml"), "--spread-census", str(_write_census(tmp))])
         out["yaml"] = tmp / "h32_v1.yaml"
         out["sha"] = artifacts.sha256_file(out["yaml"])
@@ -84,7 +86,7 @@ def e2e(tmp_path_factory):
         pil = ["--pilot-result", str(out["pilot_json"]), "--pilot-result-sha256", out["pilot_sha"]]
         out["pil_args"] = pil
         out["rc"]["pc"] = H32.main(["--positive-control", *reg, *pil, "--out", str(tmp / "pc")])
-        out["rc"]["run"] = H32.main(["--run", *reg, *pil, "--out", str(tmp / "run")])
+        out["rc"]["run"] = H32.main(["--run", *reg, *pil, *out["p_args"], "--out", str(tmp / "run")])
         out["spy"], out["panel"] = spy, panel
     return out
 
@@ -93,7 +95,7 @@ def test_cli_e2e_every_mode_succeeds_and_writes_its_artifacts(e2e):
     assert e2e["rc"] == {"prelaunch": 0, "template": 0, "pilot": 0, "pc": 0, "run": 0}
     tmp = e2e["tmp"]
     assert {p.name for p in (tmp / "pre").iterdir()} >= {"h32_prelaunch.json", "h32_prelaunch.md", "h32_prelaunch_P_k_fm8.csv",
-                                                         "h32_prelaunch_W1_k_fm8.csv", "h32_prelaunch_W2_k_fm8.csv"}
+                                                         "h32_prelaunch_W1_k_fm8.csv", "h32_prelaunch_W2_k_fm8.csv", C.P_REPLICATES_FILE}
     pilot_files = {p.name for p in (tmp / "pilot").iterdir()}
     assert {"h32_pilot.json", "h32_pilot.md", "h32_pilot.sha256", "h32_pilot_fingerprint.json"} <= pilot_files
     assert (tmp / "pilot" / "h32_pilot.sha256").read_text().split()[0] == e2e["pilot_sha"]
@@ -123,6 +125,10 @@ def test_cli_e2e_template_validates_and_carries_the_spread_the_fingerprints_and_
     for block in ("pilot_window", "handover_rule", "fweek_counting", "fdr", "seal", "positive_control"):
         assert block in reg
     assert reg["pilot_window"]["pilot_result_sha256"] is None and reg["z_krit"] == 1.6448536 and reg["fdr"]["n_perm"] == C.N_PERM
+    fdr = reg["fdr"]
+    assert fdr["p_source"] == "factor_preserving_null_replicates" and fdr["n_reps"] == P_REPS > reg["rules"]["n_reps"] == 24
+    assert fdr["replicates_sha256"] == artifacts.sha256_file(e2e["tmp"] / "pre" / C.P_REPLICATES_FILE)
+    assert fdr["report_only"] == ["block_permutation_fm8_window_mean", "normal_approximation"]
 
 
 def test_cli_e2e_pilot_hands_over_and_a_second_pilot_is_refused_without_a_dec(e2e, shrunk, monkeypatch):
@@ -153,6 +159,44 @@ def test_cli_e2e_positive_control_is_bestanden_and_the_run_gives_the_verdict(e2e
     assert fp["pilot_sha256"] == e2e["pilot_sha"] and fp["panel_cut"] == C.CUT_TEST and fp["seed"] == 53
     md = (e2e["tmp"] / "run" / "h32_run.md").read_text(encoding="utf-8")
     assert md.isascii() and "F-WEEK" in md and "m = 11" in md
+
+
+def test_cli_e2e_run_reports_both_p_sources_and_the_binding_one_comes_from_the_pinned_null_replicates(e2e, shrunk):
+    from bybit_edge.research.h32_fm8 import pnull
+    reg = schema.load_registered_yaml(e2e["yaml"])
+    rep = pnull.load_replicates(e2e["tmp"] / "pre" / C.P_REPLICATES_FILE, reg)
+    run = json.loads((e2e["tmp"] / "run" / "h32_run.json").read_text(encoding="utf-8"))
+    assert run["p_replicates"] == {"p_source": C.P_SOURCE, "file_sha256": reg["fdr"]["replicates_sha256"], "n_reps": P_REPS}
+    fp = json.loads((e2e["tmp"] / "run" / "h32_run_fingerprint.json").read_text(encoding="utf-8"))
+    assert fp["p_replicates_sha256"] == reg["fdr"]["replicates_sha256"]
+    for e in ("H-32_mom1", "H-32_rev_gap"):
+        res = run["results"][e]
+        ps = []
+        for wn in ("W1", "W2"):
+            y = res["payload"]["windows"][wn]["y"]
+            expect = pnull.replicate_pvalue(y, pnull.draws_for(rep, wn, res["variant"]))
+            assert res["details"][wn]["p_null"]["p_value"] == expect["p_value"] and res["details"][wn]["p_null"]["n_reps"] == P_REPS
+            assert res["details"][wn]["p_null"]["cell"] in ("driftfree", "drifting")
+            assert res["details"][wn]["permutation"]["report_only"] is True
+            ps.append(expect["p_value"])
+        assert res["p_max"] == max(ps) and set(res["p_report_only"]) == {"block_permutation_max_p", "normal_approximation_max_p"}
+        assert res["payload"]["constants"]["p_source"] == C.P_SOURCE and res["payload"]["constants"]["n_reps_p"] == P_REPS
+    md = (e2e["tmp"] / "run" / "h32_run.md").read_text(encoding="utf-8")
+    assert "Null-Replikate" in md and "Permutation / Normal" in md and run["results"]["H-32_mom1"]["verdict"]["bh_report_only"]["m"] == 4
+
+
+def test_cli_run_refuses_missing_or_other_p_replicates_before_the_panel(e2e, shrunk, monkeypatch, tmp_path):
+    spy = Spy(e2e["panel"])
+    monkeypatch.setattr(H32, "load_union_panel", spy)
+    base = ["--run", *e2e["reg_args"], *e2e["pil_args"], "--out", str(tmp_path / "r")]
+    assert H32.main(base) == 1                                                                              # replicates are mandatory
+    good = (e2e["tmp"] / "pre" / C.P_REPLICATES_FILE).read_text(encoding="utf-8")
+    other = tmp_path / "p_other.json"
+    other.write_text(good.replace("0.", "0.0", 1), encoding="utf-8")                                         # any other byte: other sha256
+    assert H32.main([*base, "--p-replicates", str(other)]) == 1
+    assert H32.main([*base, "--p-replicates", str(tmp_path / "none.json")]) == 1
+    assert H32.main([*base, "--p-replicates", str(tmp_path / "x_L_window_sealed.json")]) == 1
+    assert spy.calls == 0 and not (tmp_path / "r").exists()
 
 
 def test_cli_start_lock_refuses_before_any_panel_byte(e2e, shrunk, monkeypatch, tmp_path):
@@ -199,7 +243,7 @@ def test_cli_leak_through_a_bypassed_cut_is_a_loud_fail_without_output(e2e, shru
     monkeypatch.setattr(H32, "load_union_panel", Spy(e2e["panel"]))
     monkeypatch.setattr(panel_cut, "cut_panel_days", lambda panel, cut_date, **kw: (panel, {"cut_date": cut_date, "n_days_removed": 0}))
     assert H32.main(["--pilot", *e2e["reg_args"], "--out", str(tmp_path / "p")]) == 1
-    assert H32.main(["--run", *e2e["reg_args"], *e2e["pil_args"], "--out", str(tmp_path / "r")]) == 1
+    assert H32.main(["--run", *e2e["reg_args"], *e2e["pil_args"], *e2e["p_args"], "--out", str(tmp_path / "r")]) == 1
     assert H32.main(["--positive-control", *e2e["reg_args"], *e2e["pil_args"], "--out", str(tmp_path / "c")]) == 1
     assert not (tmp_path / "p" / "h32_pilot.json").exists() and not (tmp_path / "r" / "h32_run.json").exists()
     assert not (tmp_path / "c" / "h32_positive_control.json").exists()

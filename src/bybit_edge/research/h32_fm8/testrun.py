@@ -6,6 +6,8 @@ Gates in this order (rc 1, NO VERDICT):
   P0'  pilot lock (:func:`load_pilot_result`): the pilot JSON has the given sha256, belongs to this registration and its
        hand-over is re-derived with rule U from the registered constants and must be bit-identical;
   P1   schema; P3 data fingerprints; P4 pins (w_judged 52 / 50, K_fm8 series, K minimum, n_perm, seed, block, replicates);
+  P4'  the p replicates of the v6 factor-preserving null (:func:`pnull.load_replicates`, CLI, before the panel is touched):
+       sha256 = ``fdr.replicates_sha256``, ``n_reps`` = ``fdr.n_reps``, belonging to the frozen ``null_mean``;
   P0'' panel cut <= ``seal.panel_cut_test`` (2026-06-28) BEFORE anything is built, maximum-date guard;
   P6   the null constants (se_mean, e_se_rule, null_mean, q95, ceiling_k4) are re-computed per window with the v6
        configuration and must lie within +-10 % of the frozen ones (judged against the FROZEN values);
@@ -13,8 +15,10 @@ Gates in this order (rc 1, NO VERDICT):
        beta-calibration IC); P8 DEC-53 artifacts written and verified before the verdict is published.
 
 Per handed-over entry: fm8 weekly IC series per window, SE_W by rule P-1 (4), the pure gate (``gate.evaluate``), the
-block-permutation p (max-p over the windows), BH (denominator 4, report-only), F-WEEK (BY, m = tested entries; double
-statement m = 11), end power, report-only labels (bounce for rev_gap, liquidity, survivorship).
+binding p (DEC-99 p convention: exceedance share of the pinned v6 replicates of the factor-preserving null, max-p over the
+windows), BH (denominator 4, report-only), F-WEEK (BY, m = tested entries; double statement m = 11), end power,
+report-only: block-permutation p (outcome rows, block 4, 10,000) and normal approximation, labels (bounce for rev_gap,
+liquidity, survivorship, contaminated permutation null).
 """
 from __future__ import annotations
 
@@ -27,11 +31,11 @@ from typing import Any, Callable
 import numpy as np
 
 from ..wp13_xsec import run as wp13_run
-from . import artifacts, checks, fm8, fweek, gate, handover, labels, nullsim, panel_cut, permutation, schema
+from . import artifacts, checks, fm8, fweek, gate, handover, labels, nullsim, panel_cut, permutation, pnull, schema
 from . import constants as C
 from . import estimators as est
 from . import weekly as wkl
-from .errors import ArtifactError, NullCalibrationError, PilotLockError
+from .errors import ArtifactError, NullCalibrationError, PilotLockError, ReplicatesError
 
 __all__ = ["load_pilot_result", "run_test", "write_run_artifacts", "verify_run_artifacts", "render_run_markdown",
            "assert_null_value", "pilot_core_hash"]
@@ -117,15 +121,23 @@ def _null_recheck(win: wkl.Window, registered: dict[str, Any], log: Callable[[st
 
 def run_test(panel: dict[str, Any] | None, registered: dict[str, Any], pilot: dict[str, Any],
              observed_fingerprints: dict[str, Any] | None, *, registered_sha256: str | None = None,
-             wave_p: dict[str, float] | None = None, log: Callable[[str], None] | None = None) -> dict[str, Any]:
+             wave_p: dict[str, float] | None = None, p_replicates: dict[str, Any] | None = None,
+             log: Callable[[str], None] | None = None) -> dict[str, Any]:
     """The test on an UNCUT daily union panel (the pilot lock was passed by :func:`load_pilot_result`).  ``panel`` may be
-    ``None`` only if no variant was handed over (then nothing is computed and the verdict is GL-012 (Pilot))."""
+    ``None`` only if no variant was handed over (then nothing is computed and the verdict is GL-012 (Pilot)).
+    ``p_replicates`` is the payload returned by :func:`pnull.load_replicates` (sha256-pinned, P4'); it is required as soon as
+    a variant is handed over."""
     say = log or (lambda _m: None)
     schema.validate_registered(registered)
     handed = [v for v in C.VARIANTS if pilot["variants"][v]["handover"]["handed_over"]]
+    if handed and (not isinstance(p_replicates, dict) or p_replicates.get("_file_sha256") != str(registered["fdr"]["replicates_sha256"]).lower()):
+        raise ReplicatesError("the p replicates were not loaded through pnull.load_replicates against fdr.replicates_sha256 -- "
+                              "no test without the pinned v6 replicates")
     base: dict[str, Any] = {
         "schema": C.RUN_SCHEMA, "mode": "run", "registered_sha256": registered_sha256, "data_fingerprints": observed_fingerprints,
         "pilot": {"result_sha256": pilot.get("result_sha256"), "file_sha256": pilot.get("_file_sha256"), "handed": handed},
+        "p_replicates": {"p_source": C.P_SOURCE, "file_sha256": str(registered["fdr"]["replicates_sha256"]).lower(),
+                         "n_reps": int(registered["fdr"]["n_reps"])},
         "handed": handed,
         "not_handed": {v: pilot["variants"][v]["handover"]["reason"] for v in C.VARIANTS if v not in handed},
     }
@@ -193,36 +205,44 @@ def run_test(panel: dict[str, Any] | None, registered: dict[str, Any], pilot: di
                                                 sigma_true=float(registered["windows"][wn]["bounce_sigma_true"]), seed=seed,
                                                 convention=C.CONVENTION)
                 bounce = float(bf["ic_bounce"])
-            perm_p = permutation.permutation_pvalue(y, draws_by_window[wn][v])
+            perm_p = permutation.permutation_pvalue(y, draws_by_window[wn][v])                      # report-only
             p_norm = float(_NORM.cdf(-y / se["se"])) if (math.isfinite(y) and math.isfinite(se["se"]) and se["se"] > 0.0) else float("nan")
             perm_p["p_normal_approx_report_only"] = p_norm
             perm_p["null_sd_over_se_w"] = (perm_p.get("draws_sd", float("nan")) / se["se"]) if se["se"] > 0.0 else float("nan")
+            perm_p["report_only"] = True
+            p_null = pnull.replicate_pvalue(y, pnull.draws_for(p_replicates, wn, v))                # binding (DEC-99 p convention)
+            p_null["cell"] = p_replicates["windows"][wn]["cell"][v]
             liq = labels.liquidity_means(win, v, sign)
             wpay[wn] = {"y": y, "mean_ic": mean_ic, "se_w": se["se"], "q95": float(fz["q95"][v]), "ceiling_k4": float(fz["ceiling_k4"]),
                         "threshold_frozen": thr_frozen, "bounce_ic": bounce, "w_judged": win.w_judged}
             wdet[wn] = {"se_detail": {k: se[k] for k in ("floor_term", "sd_term", "stat_term", "sd_ic", "n_finite")},
-                        "bootstrap_means_sha256": se["bootstrap_means_sha256"], "permutation": perm_p, "liquidity": liq,
+                        "bootstrap_means_sha256": se["bootstrap_means_sha256"], "p_null": p_null, "permutation": perm_p, "liquidity": liq,
                         "ic_weekly_sha256": est.series_sha256(ic_w), "k": wkl.k_summary(wkl.k_alive_series(win))}
             series[entry][wn] = {"ic": ic_w, "perm_draws": draws_by_window[wn][v]}
         payload = {"entry": entry, "variant": v, "direction": C.DIRECTION[v], "z_krit": float(C.Z_KRIT), "windows": wpay,
                    "constants": {"alpha": C.ALPHA, "w_judged": {wn: wins[wn].w_judged for wn in wins}, "n_boot": n_boot,
                                  "mean_block": mean_block, "seed": seed, "n_perm": n_perm, "block_len": int(registered["fdr"]["block_len"]),
-                                 "panel_cut_test": cut_date,
+                                 "panel_cut_test": cut_date, "p_source": C.P_SOURCE, "n_reps_p": int(registered["fdr"]["n_reps"]),
+                                 "replicates_sha256": str(registered["fdr"]["replicates_sha256"]).lower(),
                                  "frozen": {wn: {"e_se_rule": float(registered["windows"][wn]["frozen_v6"]["e_se_rule"][v]),
                                                  "null_mean": float(registered["windows"][wn]["frozen_v6"]["null_mean"][v]),
                                                  "q95": float(registered["windows"][wn]["frozen_v6"]["q95"][v]),
                                                  "ceiling_k4": float(registered["windows"][wn]["frozen_v6"]["ceiling_k4"]),
                                                  "floor_fm8": float(registered["windows"][wn]["frozen_v6"]["floor_fm8"])} for wn in wins}}}
         verdict = gate.evaluate(payload)
-        p_max = max((wdet[wn]["permutation"]["p_value"] for wn in wins), default=float("nan"))
+        p_max = max((wdet[wn]["p_null"]["p_value"] for wn in wins), default=float("nan"))
         p_by_entry[entry] = 1.0 if not math.isfinite(p_max) else p_max
+        perm_max = max((wdet[wn]["permutation"]["p_value"] for wn in wins), default=float("nan"))
+        norm_max = max((wdet[wn]["permutation"]["p_normal_approx_report_only"] for wn in wins), default=float("nan"))
+        p_report_only = {"block_permutation_max_p": perm_max, "normal_approximation_max_p": norm_max}
         # report-only labels
-        lab: list[str] = []
+        lab: list[str] = [f"p aus der faktorerhaltenden Null (v6, R = {int(registered['fdr']['n_reps'])}); Blockpermutation und "
+                          "Normalnaeherung report-only"]
         for wn in wins:
             ratio = wdet[wn]["permutation"]["null_sd_over_se_w"]
             if math.isfinite(ratio) and ratio > PERM_NULL_SD_FLAG:
                 lab.append(f"Permutations-Null in {wn} breiter als SE_W ({ratio:.2f} x): Block-Permutation der Outcome-Wochen "
-                           "paart Charakteristik und eigene Rendite (mom4 / rev_gap) -- p konservativ; Normal-p report-only: "
+                           "paart Charakteristik und eigene Rendite (mom4 / rev_gap) -- report-only, nicht bindend; Normal-p report-only: "
                            f"{wdet[wn]['permutation']['p_normal_approx_report_only']:.4f}")
         for wn in wins:
             ybx = wdet[wn]["liquidity"]["y_without_b1"]
@@ -241,7 +261,7 @@ def run_test(panel: dict[str, Any] | None, registered: dict[str, Any], pilot: di
         lab += ["zugelassen nur durch DEC-99 (Pilot-Prior)", "fm8-Skala (Daempfung ~25 %)"]
         verdict["labels"].extend(lab)
         entry_results[entry] = {"entry": entry, "variant": v, "computed": True, "payload": payload, "verdict": verdict,
-                                "p_max": p_by_entry[entry], "details": wdet, "survivorship": surv,
+                                "p_max": p_by_entry[entry], "p_report_only": p_report_only, "details": wdet, "survivorship": surv,
                                 "pilot": {"x_p": ho["x_p"], "se_p": ho["se_p"], "mu_sel": ho["mu_sel"], "m_star": ho["m_star"],
                                           "mde80_star": ho["mde80_star"]}}
         say(f"  {entry}: {verdict['verdict']} (p_max {p_by_entry[entry]:.4f})")
@@ -271,7 +291,8 @@ def run_test(panel: dict[str, Any] | None, registered: dict[str, Any], pilot: di
         "windows": {wn: wkl.window_geometry_report(win) for wn, win in wins.items()},
         "null_calibration": null_cal, "results": results, "bh": bh, "fweek": fw, "hypothesis_verdict": hyp,
         "parameters": {"mean_block": mean_block, "n_boot": n_boot, "seed": seed, "n_perm": n_perm, "z_krit": C.Z_KRIT,
-                       "alpha": C.ALPHA, "wave_p": dict(wave_p or {}), "m_tested": m_tested},
+                       "alpha": C.ALPHA, "wave_p": dict(wave_p or {}), "m_tested": m_tested, "p_source": C.P_SOURCE,
+                       "n_reps_p": int(registered["fdr"]["n_reps"])},
         "not_computed": ["raw_ic", "lag_profile", "beta_calibration_ic", "persistence_null"],
     })
     base["result_sha256"] = artifacts.canonical_sha256(base)
@@ -283,16 +304,22 @@ def run_test(panel: dict[str, Any] | None, registered: dict[str, Any], pilot: di
 # artifacts (DEC-53), round trip (T7), markdown
 # ----------------------------------------------------------------------------
 
-def verify_run_artifacts(out_dir: Path | str, report: dict[str, Any], registered: dict[str, Any]) -> dict[str, Any]:
+def verify_run_artifacts(out_dir: Path | str, report: dict[str, Any], registered: dict[str, Any], *,
+                         p_replicates: dict[str, Any] | None = None) -> dict[str, Any]:
     """T7: from the written series (+ seed) re-derive, bit for bit, the window mean, SE_W (floor, SD, stationary bootstrap and
-    its replicate fingerprint), the permutation p (from the stored draws) and the gate verdict of every computed entry.
+    its replicate fingerprint), the binding p (from the pinned v6 replicates ``p_replicates``, required as soon as an entry
+    was computed), the report-only permutation p (from the stored draws) and the gate verdict of every computed entry.
     Anything missing or different is :class:`ArtifactError` (NO VERDICT)."""
     out = Path(out_dir)
+    if any(r.get("computed") for r in report["results"].values()):
+        if not isinstance(p_replicates, dict) or p_replicates.get("_file_sha256") != str(registered["fdr"]["replicates_sha256"]).lower():
+            raise ArtifactError("NO VERDICT: the pinned p replicates are not available to the artifact round trip")
     fp_path = out / "h32_run_fingerprint.json"
     if not fp_path.is_file():
         raise ArtifactError("NO VERDICT: mandatory artifact h32_run_fingerprint.json missing (generator fingerprint)")
     fp = json.loads(fp_path.read_text(encoding="utf-8"))
-    for key in ("seed", "code", "parameters", "entries", "result_sha256", "data_fingerprints", "panel_cut", "pilot_sha256"):
+    for key in ("seed", "code", "parameters", "entries", "result_sha256", "data_fingerprints", "panel_cut", "pilot_sha256",
+                "p_replicates_sha256"):
         if key not in fp:
             raise ArtifactError(f"NO VERDICT: generator fingerprint without field {key!r}")
     if not fp["code"].get("code_sha256"):
@@ -326,6 +353,13 @@ def verify_run_artifacts(out_dir: Path | str, report: dict[str, Any], registered
             pp = permutation.permutation_pvalue(w["y"], np.asarray(draws))
             if pp["p_value"] != res["details"][wn]["permutation"]["p_value"] or pp["draws_sha256"] != res["details"][wn]["permutation"]["draws_sha256"]:
                 raise ArtifactError(f"NO VERDICT: permutation p from {pd_path.name} does not reproduce the payload")
+            pn = pnull.replicate_pvalue(w["y"], pnull.draws_for(p_replicates, wn, res["variant"]))
+            stored = res["details"][wn]["p_null"]
+            if (pn["p_value"] != stored["p_value"] or pn["draws_sha256"] != stored["draws_sha256"] or pn["count_ge"] != stored["count_ge"]
+                    or pn["n_reps"] != int(registered["fdr"]["n_reps"])):
+                raise ArtifactError(f"NO VERDICT: the p from the pinned null replicates does not reproduce the payload ({key})")
+            if fp["p_replicates_sha256"] != str(registered["fdr"]["replicates_sha256"]).lower():
+                raise ArtifactError("NO VERDICT: the generator fingerprint names other p replicates than the registration")
             if fp["entries"][key]["ic_file_sha256"] != artifacts.sha256_file(ic_path) or fp["entries"][key]["perm_file_sha256"] != artifacts.sha256_file(pd_path):
                 raise ArtifactError(f"NO VERDICT: artifact fingerprint {key} differs")
             n += 1
@@ -349,13 +383,18 @@ def render_run_markdown(report: dict[str, Any]) -> str:
     if report["handed"]:
         pn = report["panel"]
         lines += [f"- Panel-Schnitt {pn['cut_date']}, letzte Woche {pn['last_week']}, Daten bis {pn['max_date']}", "",
-                  "## Eintraege", "", "| Eintrag | Verdikt | p (Max-p) | W1: y / SE / q95 | W2: y / SE / q95 | Etiketten |", "|---|---|---|---|---|---|"]
+                  f"- p-Quelle (bindend): {report['p_replicates']['p_source']}, R = {report['p_replicates']['n_reps']}, "
+                  f"Replikate sha256 `{report['p_replicates']['file_sha256']}`; Max-p ueber W1 / W2", "",
+                  "## Eintraege", "", "| Eintrag | Verdikt | p (bindend, Null-Replikate) | p report-only: Permutation / Normal | "
+                  "W1: y / SE / q95 | W2: y / SE / q95 | Etiketten |", "|---|---|---|---|---|---|---|"]
         for e, res in report["results"].items():
             if not res.get("computed"):
-                lines.append(f"| {e} | {res['verdict']['verdict']} | 1 | - | - | {res['reason']} |")
+                lines.append(f"| {e} | {res['verdict']['verdict']} | 1 | - | - | - | {res['reason']} |")
                 continue
             w1, w2 = res["payload"]["windows"]["W1"], res["payload"]["windows"]["W2"]
-            lines.append(f"| {e} | {res['verdict']['verdict']} | {f(res['p_max'], 4)} | {f(w1['y'])} / {f(w1['se_w'])} / {f(w1['q95'])} | "
+            ro = res["p_report_only"]
+            lines.append(f"| {e} | {res['verdict']['verdict']} | {f(res['p_max'], 4)} | {f(ro['block_permutation_max_p'], 4)} / "
+                         f"{f(ro['normal_approximation_max_p'], 4)} | {f(w1['y'])} / {f(w1['se_w'])} / {f(w1['q95'])} | "
                          f"{f(w2['y'])} / {f(w2['se_w'])} / {f(w2['q95'])} | {' / '.join(res['verdict']['labels'])} |")
         fw = report["fweek"]
         if fw and fw["by"]:
@@ -373,10 +412,11 @@ def render_run_markdown(report: dict[str, Any]) -> str:
 
 
 def write_run_artifacts(out_dir: Path | str, report: dict[str, Any], registered: dict[str, Any], *,
-                        pilot_sha256: str | None = None) -> dict[str, Any]:
+                        pilot_sha256: str | None = None, p_replicates: dict[str, Any] | None = None) -> dict[str, Any]:
     """DEC-53 artifacts in this order: weekly fm8 IC series and permutation draws per computed entry and window,
-    ``h32_run_fingerprint.json`` (seed, bit generator, code hash, data fingerprints, panel cut date, pilot sha256), the round
-    trip :func:`verify_run_artifacts` (an error means NO VERDICT and no result file), then ``h32_run.json`` / ``.md``."""
+    ``h32_run_fingerprint.json`` (seed, bit generator, code hash, data fingerprints, panel cut date, pilot sha256, sha256 of the
+    pinned p replicates), the round trip :func:`verify_run_artifacts` (an error means NO VERDICT and no result file), then
+    ``h32_run.json`` / ``.md``."""
     out = Path(out_dir)
     artifacts.refuse_unsafe_path(out / "x", writing=True)
     out.mkdir(parents=True, exist_ok=True)
@@ -393,11 +433,12 @@ def write_run_artifacts(out_dir: Path | str, report: dict[str, Any], registered:
           "parameters": public.get("parameters"), "code": artifacts.code_fingerprint(), "git_commit": artifacts.git_commit(),
           "data_fingerprints": public.get("data_fingerprints"), "registered_sha256": public.get("registered_sha256"),
           "panel_cut": (public.get("panel") or {}).get("cut_date"), "pilot_sha256": pilot_sha256,
+          "p_replicates_sha256": str(registered["fdr"]["replicates_sha256"]).lower(),
           "entries": entries_fp, "result_sha256": public["result_sha256"]}
     art = artifacts.write_json(out / "h32_run_fingerprint.json", fp)
     arts[art["file"]] = art["sha256"]
     if public["handed"]:
-        verify_run_artifacts(out, public, registered)                                  # may raise: NO VERDICT
+        verify_run_artifacts(out, public, registered, p_replicates=p_replicates)       # may raise: NO VERDICT
     main = dict(public)
     main["artifacts"] = dict(arts)
     main["code"] = artifacts.code_fingerprint()

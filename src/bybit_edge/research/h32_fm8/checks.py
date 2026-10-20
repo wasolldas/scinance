@@ -16,14 +16,18 @@ DEC_PATTERN = re.compile(r"^DEC-\d+$")
 
 
 def check_data_fingerprints(registered: dict[str, Any], observed: dict[str, Any] | None) -> None:
-    """The loaded panel's fingerprints (union range, ``delisting_dates.json``) must equal the registered ones (PP2 / P3).
-    ``observed`` ``None`` (not checkable) is a loud fail as well."""
+    """The loaded panel's fingerprints (union range, ``delisting_dates.json``, the Data-Harvest delisting register of DEC-100
+    and -- if the registration pins it -- the file-level sha256 of the delisted tree) must equal the registered ones
+    (PP2 / P3).  ``observed`` ``None`` (not checkable) is a loud fail as well."""
     reg = registered.get("data_fingerprints")
     if not isinstance(reg, dict):
         raise DataFingerprintError("registered YAML without data_fingerprints")
     if observed is None:
         raise DataFingerprintError("data fingerprints of the loaded panel were not supplied -- not checkable")
-    for key in ("union_range_fingerprint", "delisting_dates_sha256"):
+    keys = ["union_range_fingerprint", "delisting_dates_sha256", "delisting_register_sha256"]
+    if reg.get("delisted_tree_sha256") is not None:
+        keys.append("delisted_tree_sha256")
+    for key in keys:
         if str(observed.get(key)).lower() != str(reg.get(key)).lower():
             raise DataFingerprintError(f"data fingerprint {key} differs: panel {observed.get(key)!r} vs registered {reg.get(key)!r}")
 

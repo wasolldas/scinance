@@ -104,5 +104,14 @@ PRELAUNCH_SCHEMA = "H-32 Vorlauf v6 (outcome-free)"
 PILOT_GL012 = "GL-012 (Pilot)"
 PILOT_HANDED = "UEBERGEBEN"
 
+#: DEC-99 amendment (p convention, binding): p_W,v is the exceedance share of the replicate window means of the v6
+#: factor-preserving null (stress; the cell with the larger null mean of driftfree / drift).  The block permutation of the
+#: real outcome rows and the normal approximation are report-only (DEC-76/77: market persistence contaminates permutations).
+P_SOURCE = "factor_preserving_null_replicates"
+P_STATISTIC = "null_replicate_exceedance_fm8_window_mean"
+P_REPORT_ONLY = ("block_permutation_fm8_window_mean", "normal_approximation")
+P_REPLICATES_SCHEMA = "H-32 null replicate window means for p (DEC-99, factor-preserving null)"
+P_REPLICATES_FILE = "h32_prelaunch_p_replicates.json"
+
 #: the sealed file name patterns of the programme: no code path here opens a path matching one of them.
 SEALED_PATTERNS: tuple[str, ...] = ("*_L_window_sealed.json", "weekly_ic_series.csv", "ic_series_*_UNION_REAL.csv")

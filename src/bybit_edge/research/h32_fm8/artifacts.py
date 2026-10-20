@@ -21,7 +21,7 @@ from . import constants as C
 from .errors import ArtifactError, SealError
 
 __all__ = ["canonical_sha256", "sha256_file", "write_series_csv", "read_series_csv", "write_json", "refuse_unsafe_path",
-           "code_fingerprint", "git_commit", "series_float_sha256"]
+           "code_fingerprint", "git_commit", "series_float_sha256", "json_bytes", "json_file_sha256"]
 
 
 def refuse_unsafe_path(path: Path | str, *, writing: bool = False) -> None:
@@ -69,9 +69,19 @@ def read_series_csv(path: Path | str, *, value_name: str = "ic") -> tuple[list[f
     return vals, ks
 
 
+def json_bytes(obj: Any) -> bytes:
+    """The exact bytes :func:`write_json` writes (UTF-8, ``\\n`` newlines on every platform)."""
+    return json.dumps(obj, indent=1, sort_keys=True, default=str, allow_nan=True).encode("utf-8")
+
+
+def json_file_sha256(obj: Any) -> str:
+    """sha256 of the file :func:`write_json` would write -- known before the file exists (the registration pins it)."""
+    return hashlib.sha256(json_bytes(obj)).hexdigest()
+
+
 def write_json(path: Path, obj: Any) -> dict[str, str]:
     refuse_unsafe_path(path, writing=True)
-    Path(path).write_text(json.dumps(obj, indent=1, sort_keys=True, default=str, allow_nan=True), encoding="utf-8")
+    Path(path).write_bytes(json_bytes(obj))
     return {"file": Path(path).name, "sha256": sha256_file(path)}
 
 

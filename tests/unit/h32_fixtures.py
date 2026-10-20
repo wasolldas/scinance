@@ -21,12 +21,12 @@ import numpy as np
 import pytest
 import yaml
 
-from bybit_edge.research.h32_fm8 import artifacts, checks, pilot as pilot_mod, testrun, vorlauf
+from bybit_edge.research.h32_fm8 import artifacts, checks, pilot as pilot_mod, pnull, testrun, vorlauf
 from bybit_edge.research.h32_fm8 import constants as C
 
 START = date(2021, 10, 4)               # a Monday
 END = date(2026, 9, 27)                 # a Sunday, after the test cut (2026-06-28)
-FAKE_FINGERPRINTS = {"union_range_fingerprint": "ab" * 32, "delisting_dates_sha256": "cd" * 32}
+FAKE_FINGERPRINTS = {"union_range_fingerprint": "ab" * 32, "delisting_dates_sha256": "cd" * 32, "delisting_register_sha256": "ef" * 32}
 
 
 def _zscore(x: np.ndarray, members: np.ndarray) -> np.ndarray:
@@ -193,8 +193,12 @@ def get_bundle(kind: str) -> dict[str, Any]:
         pilot_mod.write_pilot_artifacts(tmp / "pilot", pr, registered, lock)
         pj = tmp / "pilot" / "h32_pilot.json"
         pil = testrun.load_pilot_result(pj, artifacts.sha256_file(pj), registered, REGISTERED_SHA)
+        (tmp / "prelaunch").mkdir()
+        pp = tmp / "prelaunch" / C.P_REPLICATES_FILE
+        artifacts.write_json(pp, report["_p_payload"])
+        p_rep = pnull.load_replicates(pp, registered)
     return {"panel": panel, "report": report, "registered": registered, "pilot_report": pr, "pilot": pil, "pilot_json": pj,
-            "pilot_sha": artifacts.sha256_file(pj), "tmp": tmp}
+            "pilot_sha": artifacts.sha256_file(pj), "tmp": tmp, "p_rep": p_rep, "p_rep_path": pp}
 
 
 @pytest.fixture

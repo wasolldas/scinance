@@ -18,10 +18,10 @@ import pytest
 
 from bybit_edge.research import power_p1 as pp
 from bybit_edge.research.h32_fm8 import (artifacts, checks, estimators as est, fm8, handover, nullsim, panel_cut, permutation, pilot as pilot_mod,
-                                         positive_control as pc, schema, testrun, vorlauf, weekly as wkl)
+                                         pnull, positive_control as pc, schema, testrun, vorlauf, weekly as wkl)
 from bybit_edge.research.h32_fm8 import constants as C
 from bybit_edge.research.h32_fm8.errors import (ArtifactError, DataFingerprintError, H32Abort, KMinError, NullCalibrationError, PanelCutError,
-                                                PilotLockError, PinError, PositiveControlAbort, SealError)
+                                                PilotLockError, PinError, PositiveControlAbort, ReplicatesError, SealError)
 from bybit_edge.research.wp13_xsec import characteristics, ic, nulls
 
 from tests.unit import h32_fixtures as F
@@ -139,6 +139,56 @@ def test_t2_null_cell_and_window_constants_are_deterministic_n3_with_fingerprint
     assert nullsim.window_null_constants(win_w1, **{**kw, "seed": 54})["frozen"]["null_mean"] != runs[0]["frozen"]["null_mean"]
     assert set(runs[0]["cells"]) == {"driftfree", "drifting"}
     assert runs[0]["cells"]["driftfree"]["drift_f"] == 0.0 and runs[0]["cells"]["drifting"]["drift_f"] == 0.002
+
+
+def test_vorlauf_null_draws_are_the_registered_direction_window_means_and_a_longer_run_starts_with_the_shorter(win_w1, shrunk):
+    kw = dict(rho_f=0.04, beta_sd=0.3, drift_f=0.0, sigma_f=0.06, sigma_e=0.09, seed=53, variants=("mom1", "rev_gap"))
+    short = nullsim.simulate_fm8_cell(win_w1, n_reps=3, floor_fm8=None, keep_draws=True, **kw)
+    longer = nullsim.simulate_fm8_cell(win_w1, n_reps=5, floor_fm8=None, keep_draws=True, **kw)
+    with_se = nullsim.simulate_fm8_cell(win_w1, n_reps=3, floor_fm8=0.08, n_boot=30, keep_draws=True, **kw)      # the SE-rule RNG is separate
+    plain = nullsim.simulate_fm8_cell(win_w1, n_reps=3, floor_fm8=None, **kw)
+    for v in ("mom1", "rev_gap"):
+        assert longer["variants"][v]["draws"].shape == (5,)
+        assert np.array_equal(longer["variants"][v]["draws"][:3], short["variants"][v]["draws"])
+        assert np.array_equal(with_se["variants"][v]["draws"], short["variants"][v]["draws"])
+        assert est.series_sha256(short["variants"][v]["draws"]) == short["variants"][v]["draws_sha256"]
+        assert "draws" not in plain["variants"][v]
+    # y = s * IC: the rev_gap draws carry the sign of the registered (negative) direction
+    s = C.SIGN[C.DIRECTION["rev_gap"]]
+    assert s == -1 and short["variants"]["rev_gap"]["null_mean"] == pytest.approx(float(np.mean(short["variants"]["rev_gap"]["draws"])))
+
+
+def test_vorlauf_report_carries_the_p_replicates_of_the_binding_cells(sig, shrunk):
+    rep = sig["report"]
+    pr, payload = rep["p_replicates"], rep["_p_payload"]
+    n = sig["registered"]["rules"]["n_reps"]
+    assert pr["p_source"] == C.P_SOURCE and pr["n_reps"] == payload["n_reps"] == n == pr["n_reps_constants"]
+    assert pr["file_sha256"] == artifacts.json_file_sha256(payload) and set(payload["windows"]) == {"W1", "W2"}     # no replicates for P
+    for wn in ("W1", "W2"):
+        fz = rep["windows"][wn]["frozen_v6"]
+        for v in C.VARIANTS:
+            a, b = fz["null_mean_driftfree"][v], fz["null_mean_drifting"][v]
+            cell = payload["windows"][wn]["cell"][v]
+            assert cell == pr["binding_cell"][wn][v] == ("drifting" if b > a else "driftfree")           # the larger null mean binds
+            draws = np.asarray(payload["windows"][wn]["variants"][v])
+            assert draws.size == n and float(np.nanmean(draws[:n])) == pytest.approx(fz["null_mean"][v], rel=1e-12)
+            assert pr["null_mean_of_replicates"][wn][v] == pytest.approx(fz["null_mean"][v], rel=1e-12)
+    assert "draws" not in rep["windows"]["W1"]["null"]["cells"]["driftfree"]["variants"]["mom1"]               # not published inside the report
+    assert "p_replicates" in json.dumps({k: v for k, v in rep.items() if k != "_p_payload"})
+
+
+def test_vorlauf_artifacts_write_the_p_replicates_file_that_the_registration_pins(sig, shrunk, tmp_path):
+    written = vorlauf.write_prelaunch_artifacts(tmp_path / "pre", sig["report"])
+    pf = tmp_path / "pre" / C.P_REPLICATES_FILE
+    assert pf.is_file() and written["artifacts"]["p_replicates"]["sha256"] == artifacts.sha256_file(pf) == sig["registered"]["fdr"]["replicates_sha256"]
+    main = (tmp_path / "pre" / "h32_prelaunch.json").read_text(encoding="utf-8")
+    assert "_p_payload" not in main and sig["report"]["p_replicates"]["file_sha256"] in main
+    md = (tmp_path / "pre" / "h32_prelaunch.md").read_text(encoding="utf-8")
+    assert md.isascii() and "Replikate fuer p" in md
+    with pytest.raises(ReplicatesError):
+        vorlauf.write_prelaunch_artifacts(tmp_path / "pre2", {k: v for k, v in sig["report"].items() if k != "_p_payload"})
+    with pytest.raises(H32Abort, match="p_reps"):
+        vorlauf.assemble_prelaunch(sig["panel"], FP, n_reps=6, n_boot=20, p_reps=5)
 
 
 def test_vorlauf_t2_full_report_is_deterministic(nul, shrunk):
@@ -474,7 +524,7 @@ def test_t4_pilot_lock_rederives_the_handover_bit_for_bit_and_refuses_tampering(
 def run_sig(sig):
     with pytest.MonkeyPatch.context() as mp:
         F.shrink_constants(mp)
-        return testrun.run_test(sig["panel"], sig["registered"], sig["pilot"], FP, registered_sha256=REGISTERED_SHA)
+        return testrun.run_test(sig["panel"], sig["registered"], sig["pilot"], FP, registered_sha256=REGISTERED_SHA, p_replicates=sig["p_rep"])
 
 
 def test_run_signal_panel_tests_only_the_handed_variants_and_the_gate_passes(run_sig, sig, shrunk):
@@ -515,6 +565,15 @@ def test_t4_run_gate_and_fweek_arithmetic_on_the_conserved_test_payload(run_sig,
             w = payload["windows"][wn]
             assert w["threshold_frozen"] == pytest.approx(schema.threshold_frozen(F.get_bundle("signal")["registered"], wn, payload["variant"]))
     p = {e: run_sig["results"][e]["p_max"] for e in ("H-32_mom1", "H-32_rev_gap")}
+    # the binding p is a pure function of the conserved payload (y per window) and the pinned replicates (DEC-99 p convention)
+    sig = F.get_bundle("signal")
+    for e in p:
+        res = run_sig["results"][e]
+        redo = [pnull.replicate_pvalue(res["payload"]["windows"][wn]["y"], pnull.draws_for(sig["p_rep"], wn, res["variant"]))["p_value"]
+                for wn in ("W1", "W2")]
+        assert max(redo) == res["p_max"] and [res["details"][wn]["p_null"]["p_value"] for wn in ("W1", "W2")] == redo
+        assert res["p_max"] >= 1.0 / (1 + sig["registered"]["fdr"]["n_reps"])                    # the resolution floor 1 / (1 + R)
+        assert res["p_max"] < 0.2                                                                # the injected signal is far in the null tail
     verdicts = {e: gate.evaluate(run_sig["results"][e]["payload"]) for e in p}
     again = fweek.apply_fweek(verdicts, p)
     assert again["by"]["reject"] == run_sig["fweek"]["by"]["reject"] and again["demoted"] == []
@@ -530,6 +589,7 @@ def test_t5_run_payload_carries_the_registered_constants(run_sig, sig, shrunk):
         c = run_sig["results"][e]["payload"]["constants"]
         assert c["n_perm"] == pins["n_perm"] == C.N_PERM and c["seed"] == pins["seed"] == 53 and c["mean_block"] == 4 and c["n_boot"] == pins["n_boot"]
         assert c["w_judged"] == {"W1": 52, "W2": 50} and c["panel_cut_test"] == pins["panel_cut_test"] and c["block_len"] == 4
+        assert c["p_source"] == pins["p_source"] == C.P_SOURCE and c["n_reps_p"] == pins["n_reps_p"] and c["replicates_sha256"] == pins["replicates_sha256"]
         v = run_sig["results"][e]["variant"]
         for wn in ("W1", "W2"):
             fz = c["frozen"][wn]
@@ -551,10 +611,14 @@ def test_run_signal_free_pilot_runs_no_test_and_reads_no_panel(nul, shrunk):
 def test_run_guards_leak_data_fingerprints_and_null_deviation(sig, shrunk, monkeypatch):
     reg = sig["registered"]
     with pytest.raises(DataFingerprintError):
-        testrun.run_test(sig["panel"], reg, sig["pilot"], {**FP, "delisting_dates_sha256": "00" * 32}, registered_sha256=REGISTERED_SHA)
+        testrun.run_test(sig["panel"], reg, sig["pilot"], {**FP, "delisting_dates_sha256": "00" * 32}, registered_sha256=REGISTERED_SHA, p_replicates=sig["p_rep"])
+    with pytest.raises(DataFingerprintError, match="delisting_register_sha256"):                     # DEC-100: the register is pinned too
+        testrun.run_test(sig["panel"], reg, sig["pilot"], {**FP, "delisting_register_sha256": "00" * 32}, registered_sha256=REGISTERED_SHA, p_replicates=sig["p_rep"])
+    with pytest.raises(DataFingerprintError, match="delisting_register_sha256"):
+        testrun.run_test(sig["panel"], reg, sig["pilot"], {k: v for k, v in FP.items() if k != "delisting_register_sha256"}, registered_sha256=REGISTERED_SHA, p_replicates=sig["p_rep"])
     monkeypatch.setattr(panel_cut, "cut_panel_days", lambda panel, cut_date, **kw: (panel, {"cut_date": cut_date, "n_days_removed": 0}))
     with pytest.raises(PanelCutError, match="not cut"):
-        testrun.run_test(sig["panel"], reg, sig["pilot"], FP, registered_sha256=REGISTERED_SHA)
+        testrun.run_test(sig["panel"], reg, sig["pilot"], FP, registered_sha256=REGISTERED_SHA, p_replicates=sig["p_rep"])
 
 
 def test_run_p6_null_recomputation_deviation_is_a_loud_fail_and_the_tolerance_arithmetic(sig, shrunk):
@@ -567,13 +631,13 @@ def test_run_p6_null_recomputation_deviation_is_a_loud_fail_and_the_tolerance_ar
     bad = copy.deepcopy(sig["registered"])
     bad["windows"]["W2"]["frozen_v6"]["ceiling_k4"] *= 1.5
     with pytest.raises(NullCalibrationError, match="ceiling_k4"):
-        testrun.run_test(sig["panel"], bad, sig["pilot"], FP, registered_sha256=REGISTERED_SHA)
+        testrun.run_test(sig["panel"], bad, sig["pilot"], FP, registered_sha256=REGISTERED_SHA, p_replicates=sig["p_rep"])
 
 
 def test_t7_run_artifacts_round_trip_and_tampering(run_sig, sig, shrunk, tmp_path):
     reg = sig["registered"]
     out = tmp_path / "run"
-    w = testrun.write_run_artifacts(out, run_sig, reg, pilot_sha256=sig["pilot_sha"])
+    w = testrun.write_run_artifacts(out, run_sig, reg, pilot_sha256=sig["pilot_sha"], p_replicates=sig["p_rep"])
     names = {p.name for p in out.iterdir()}
     assert {"h32_run.json", "h32_run.md", "h32_run_fingerprint.json"} <= names
     for e in ("H-32_mom1", "H-32_rev_gap"):
@@ -581,7 +645,7 @@ def test_t7_run_artifacts_round_trip_and_tampering(run_sig, sig, shrunk, tmp_pat
             assert f"h32_run_{e}_{wn}_ic_weekly.csv" in names and f"h32_run_{e}_{wn}_perm_draws.csv" in names
     assert not any("sealed" in n for n in names)
     pub = {k: v for k, v in run_sig.items() if k != "_series"}
-    assert testrun.verify_run_artifacts(out, pub, reg)["n_entry_windows_checked"] == 4
+    assert testrun.verify_run_artifacts(out, pub, reg, p_replicates=sig["p_rep"])["n_entry_windows_checked"] == 4
     fp = json.loads((out / "h32_run_fingerprint.json").read_text(encoding="utf-8"))
     assert fp["seed"] == 53 and fp["code"]["bit_generator"] == "PCG64" and fp["panel_cut"] == C.CUT_TEST and fp["pilot_sha256"] == sig["pilot_sha"]
     assert fp["data_fingerprints"] == FP and fp["registered_sha256"] == REGISTERED_SHA and fp["code"]["code_sha256"]
@@ -594,7 +658,7 @@ def test_t7_run_artifacts_round_trip_and_tampering(run_sig, sig, shrunk, tmp_pat
     lines[3] = b"2,0.01"
     f.write_bytes(b"\r\n".join(lines))
     with pytest.raises(ArtifactError):
-        testrun.verify_run_artifacts(out, pub, reg)
+        testrun.verify_run_artifacts(out, pub, reg, p_replicates=sig["p_rep"])
     f.write_bytes(orig)
     d = out / "h32_run_H-32_rev_gap_W2_perm_draws.csv"
     dorig = d.read_bytes()
@@ -602,25 +666,71 @@ def test_t7_run_artifacts_round_trip_and_tampering(run_sig, sig, shrunk, tmp_pat
     dl[2] = b"1,9.0"
     d.write_bytes(b"\r\n".join(dl))
     with pytest.raises(ArtifactError):
-        testrun.verify_run_artifacts(out, pub, reg)
+        testrun.verify_run_artifacts(out, pub, reg, p_replicates=sig["p_rep"])
     d.write_bytes(dorig)
-    testrun.verify_run_artifacts(out, pub, reg)
+    testrun.verify_run_artifacts(out, pub, reg, p_replicates=sig["p_rep"])
     d.unlink()
     with pytest.raises(ArtifactError, match="missing"):
-        testrun.verify_run_artifacts(out, pub, reg)
+        testrun.verify_run_artifacts(out, pub, reg, p_replicates=sig["p_rep"])
     # a writer with a broken artifact publishes no verdict file
     out2 = tmp_path / "run2"
     broken = copy.deepcopy(pub)
     broken["results"]["H-32_mom1"]["payload"]["windows"]["W1"]["se_w"] += 1e-9
     broken["_series"] = run_sig["_series"]
     with pytest.raises(ArtifactError):
-        testrun.write_run_artifacts(out2, broken, reg, pilot_sha256=sig["pilot_sha"])
+        testrun.write_run_artifacts(out2, broken, reg, pilot_sha256=sig["pilot_sha"], p_replicates=sig["p_rep"])
     assert not (out2 / "h32_run.json").exists()
+
+
+def test_t7_run_requires_the_pinned_replicates_and_re_derives_the_binding_p(run_sig, sig, shrunk, tmp_path):
+    reg = sig["registered"]
+    out = tmp_path / "run"
+    testrun.write_run_artifacts(out, run_sig, reg, pilot_sha256=sig["pilot_sha"], p_replicates=sig["p_rep"])
+    pub = {k: v for k, v in run_sig.items() if k != "_series"}
+    fp = json.loads((out / "h32_run_fingerprint.json").read_text(encoding="utf-8"))
+    assert fp["p_replicates_sha256"] == reg["fdr"]["replicates_sha256"]
+    with pytest.raises(ArtifactError, match="not available"):
+        testrun.verify_run_artifacts(out, pub, reg)                                                       # no replicates, no round trip
+    unloaded = copy.deepcopy(sig["p_rep"])
+    unloaded["_file_sha256"] = "00" * 32
+    with pytest.raises(ArtifactError, match="not available"):
+        testrun.verify_run_artifacts(out, pub, reg, p_replicates=unloaded)
+    forged = copy.deepcopy(sig["p_rep"])                                                                  # right hash label, other numbers
+    forged["windows"]["W1"]["variants"]["mom1"] = [9.0] * len(forged["windows"]["W1"]["variants"]["mom1"])
+    with pytest.raises(ArtifactError, match="pinned null replicates"):
+        testrun.verify_run_artifacts(out, pub, reg, p_replicates=forged)
+    broken = copy.deepcopy(pub)
+    broken["results"]["H-32_mom1"]["details"]["W1"]["p_null"]["p_value"] = 0.5
+    with pytest.raises(ArtifactError, match="pinned null replicates"):
+        testrun.verify_run_artifacts(out, broken, reg, p_replicates=sig["p_rep"])
+    # the run itself refuses to start without the replicates that the registration pins
+    with pytest.raises(ReplicatesError):
+        testrun.run_test(sig["panel"], reg, sig["pilot"], FP, registered_sha256=REGISTERED_SHA)
+    with pytest.raises(ReplicatesError):
+        testrun.run_test(sig["panel"], reg, sig["pilot"], FP, registered_sha256=REGISTERED_SHA, p_replicates={"windows": sig["p_rep"]["windows"]})
+    # nothing handed over: no replicates needed (and the panel is not read)
+    nul = F.get_bundle("null")
+    assert testrun.run_test(None, nul["registered"], nul["pilot"], None, registered_sha256=REGISTERED_SHA)["handed"] == []
+
+
+def test_run_p_source_is_the_null_replicates_and_the_permutation_and_normal_p_are_report_only(run_sig, sig, shrunk):
+    """The binding p of an entry is the max over the windows of the null-replicate p; the permutation and the normal p are
+    reported next to it (report-only) and the report states the p source."""
+    for e in ("H-32_mom1", "H-32_rev_gap"):
+        res = run_sig["results"][e]
+        assert res["p_max"] == max(res["details"][wn]["p_null"]["p_value"] for wn in ("W1", "W2"))
+        ro = res["p_report_only"]
+        assert ro["block_permutation_max_p"] == max(res["details"][wn]["permutation"]["p_value"] for wn in ("W1", "W2"))
+        assert ro["normal_approximation_max_p"] == max(res["details"][wn]["permutation"]["p_normal_approx_report_only"] for wn in ("W1", "W2"))
+        assert any(lab.startswith("p aus der faktorerhaltenden Null") for lab in res["verdict"]["labels"])
+    assert run_sig["parameters"]["p_source"] == C.P_SOURCE and run_sig["p_replicates"]["file_sha256"] == sig["registered"]["fdr"]["replicates_sha256"]
+    md = testrun.render_run_markdown({k: v for k, v in run_sig.items() if k != "_series"})
+    assert "Null-Replikate" in md and "report-only" in md and md.isascii()
 
 
 def test_t2_run_is_deterministic_n3_with_fingerprint(sig, shrunk, monkeypatch):
     monkeypatch.setattr(testrun, "_null_recheck", lambda win, registered, log: {"within_tolerance": True, "rows": {}, "n_reps": 0, "seed": 53})
-    shas = [testrun.run_test(sig["panel"], sig["registered"], sig["pilot"], FP, registered_sha256=REGISTERED_SHA)["result_sha256"] for _ in range(3)]
+    shas = [testrun.run_test(sig["panel"], sig["registered"], sig["pilot"], FP, registered_sha256=REGISTERED_SHA, p_replicates=sig["p_rep"])["result_sha256"] for _ in range(3)]
     assert len(set(shas)) == 1
 
 

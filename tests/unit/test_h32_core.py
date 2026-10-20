@@ -6,6 +6,7 @@ from __future__ import annotations
 
 import ast
 import copy
+import json
 import math
 import subprocess
 import sys
@@ -17,10 +18,11 @@ import pytest
 from scipy import integrate
 
 from bybit_edge.research import power_p1 as pp
-from bybit_edge.research.h32_fm8 import calibration, estimators as est, fm8, fweek, gate, handover, panel_cut, permutation, schema
+from bybit_edge.research.h32_fm8 import (artifacts, calibration, estimators as est, fm8, fweek, gate, handover, panel_cut, permutation,
+                                         pnull, schema)
 from bybit_edge.research.h32_fm8 import constants as C
 from bybit_edge.research.h32_fm8 import vorlauf, weekly as wkl
-from bybit_edge.research.h32_fm8.errors import PanelCutError, PinError, SchemaError, SealError
+from bybit_edge.research.h32_fm8.errors import PanelCutError, PinError, ReplicatesError, SchemaError, SealError
 from bybit_edge.research.wp13_xsec import characteristics, ic, nulls
 from bybit_edge.research.wp7_universe import pit_universe
 
@@ -453,6 +455,15 @@ def _set(path, value):
     (_set(("beta_control", "method"), "ts_resid_8w"), PinError), (_set(("primary_statistic",), "raw_ic"), PinError),
     (_set(("positive_control", "criteria", "pass_share_min"), 0.5), PinError), (_set(("positive_control", "seeds"), [53, 100]), PinError),
     (_set(("fweek_counting", "double_statement_m"), 7), PinError), (_set(("fdr", "over_family", "double_statement_m"), 7), PinError),
+    # DEC-99 p convention: the binding p comes from the pinned v6 replicates
+    (_set(("fdr", "p_source"), "block_permutation"), PinError), (_drop(("fdr", "p_source")), PinError),
+    (_set(("fdr", "p_statistic"), "block_permutation_fm8_window_mean"), SchemaError), (_set(("fdr", "n_reps"), 5), PinError),
+    (_set(("fdr", "n_reps"), 1.5), PinError), (_set(("fdr", "report_only"), []), PinError),
+    (_set(("fdr", "replicates_sha256"), "xyz"), SchemaError), (_drop(("fdr", "replicates_sha256")), SchemaError),
+    # DEC-100: fingerprint over the Data-Harvest delisting register (and the optional file-level tree hash)
+    (_set(("data_fingerprints", "delisting_register_sha256"), None), SchemaError),
+    (_drop(("data_fingerprints", "delisting_register_sha256")), SchemaError),
+    (_set(("data_fingerprints", "delisted_tree_sha256"), "xyz"), SchemaError),
 ])
 def test_t5_pre_flight_refuses_missing_or_changed_constants(reg_bundle, shrunk, mutate, exc):
     reg = copy.deepcopy(reg_bundle["registered"])
@@ -474,6 +485,104 @@ def test_t5_a_hypothesis_set_other_than_the_four_variants_is_refused(reg_bundle,
     reg3["hypotheses"]["H-32_mom2"]["status"] = "gl012_pre_run"
     with pytest.raises(SchemaError):
         schema.validate_registered(reg3)
+
+
+# ============================================================================
+# p convention (DEC-99): exceedance share of the pinned v6 null replicates
+# ============================================================================
+
+def test_t0_p_formula_is_the_exceedance_share_with_the_plus_one_convention():
+    d = np.array([0.01, 0.02, 0.03, 0.04, 0.05])
+    r = pnull.replicate_pvalue(0.03, d)                                              # >= : 0.03, 0.04, 0.05
+    assert r["count_ge"] == 3 and r["p_value"] == pytest.approx(4 / 6) and r["n_reps"] == 5 and r["n_nan"] == 0
+    assert pnull.replicate_pvalue(0.06, d)["p_value"] == pytest.approx(1 / 6)         # nothing exceeds: the floor 1 / (1 + R)
+    assert pnull.replicate_pvalue(-1.0, d)["p_value"] == 1.0                          # everything exceeds
+    assert pnull.replicate_pvalue(0.05, d)["count_ge"] == 1                           # a tie counts (>=)
+    nan_d = np.array([0.01, np.nan, 0.03])
+    rn = pnull.replicate_pvalue(0.02, nan_d)
+    assert rn["count_ge"] == 2 and rn["p_value"] == pytest.approx(3 / 4) and rn["n_nan"] == 1       # a NaN replicate is an exceedance
+    assert math.isnan(pnull.replicate_pvalue(float("nan"), d)["p_value"]) and math.isnan(pnull.replicate_pvalue(0.1, np.empty(0))["p_value"])
+    assert pnull.replicate_pvalue(1e9, np.arange(1000.0))["p_value"] == pytest.approx(1 / 1001)       # R = 1000: resolution 0.001
+    ys = np.linspace(-0.1, 0.1, 21)
+    ps = [pnull.replicate_pvalue(float(y), np.linspace(-0.05, 0.05, 101))["p_value"] for y in ys]
+    assert all(a >= b for a, b in zip(ps, ps[1:]))                                    # non-increasing in the observed mean
+    assert pnull.replicate_pvalue(0.03, list(d))["p_value"] == r["p_value"]           # lists are accepted, same hash of the draws
+    assert pnull.replicate_pvalue(0.03, list(d))["draws_sha256"] == r["draws_sha256"]
+
+
+def test_t0_binding_cell_is_the_one_with_the_larger_null_mean():
+    free = {"mom1": 0.001, "mom2": 0.004, "mom4": 0.002, "rev_gap": 0.0}
+    drift = {"mom1": 0.003, "mom2": 0.004, "mom4": 0.001, "rev_gap": float("nan")}
+    assert pnull.binding_cells(free, drift) == {"mom1": "drifting", "mom2": "driftfree", "mom4": "driftfree", "rev_gap": "driftfree"}
+    assert pnull.binding_cells({**free, "mom1": float("nan")}, drift)["mom1"] == "drifting"
+    with pytest.raises(ReplicatesError):
+        pnull.binding_cells({**free, "mom1": float("nan")}, {**drift, "mom1": float("nan")})
+
+
+def _p_variant(bundle, tmp_path, mutate_payload=None, mutate_reg=None):
+    """Write a (possibly tampered) replicates file and a registration pinned to it (or not)."""
+    payload = json.loads(bundle["p_rep_path"].read_text(encoding="utf-8"))
+    if mutate_payload:
+        mutate_payload(payload)
+    path = tmp_path / "p.json"
+    artifacts.write_json(path, payload)
+    reg = copy.deepcopy(bundle["registered"])
+    reg["fdr"]["replicates_sha256"] = artifacts.sha256_file(path)
+    if mutate_reg:
+        mutate_reg(reg)
+    return path, reg
+
+
+def test_t5_p_replicates_load_pin_and_belong_to_the_frozen_constants(reg_bundle, shrunk, tmp_path):
+    reg = reg_bundle["registered"]
+    p = pnull.load_replicates(reg_bundle["p_rep_path"], reg)
+    assert p["_file_sha256"] == reg["fdr"]["replicates_sha256"] and p["n_reps"] == reg["fdr"]["n_reps"] == C.N_REPS_MIN
+    for wn in ("W1", "W2"):
+        for v in C.VARIANTS:
+            d = pnull.draws_for(p, wn, v)
+            assert d.size == p["n_reps"] and p["windows"][wn]["cell"][v] in ("driftfree", "drifting")
+            fin = d[:reg["rules"]["n_reps"]]
+            assert float(np.nanmean(fin)) == pytest.approx(reg["windows"][wn]["frozen_v6"]["null_mean"][v], rel=1e-12)
+    # the file must hash to the pinned sha256: any other byte is refused
+    other = tmp_path / "other.json"
+    other.write_bytes(reg_bundle["p_rep_path"].read_bytes() + b" ")
+    with pytest.raises(ReplicatesError, match="sha256"):
+        pnull.load_replicates(other, reg)
+    with pytest.raises(ReplicatesError, match="not found"):
+        pnull.load_replicates(tmp_path / "none.json", reg)
+    with pytest.raises(SealError):
+        pnull.load_replicates(tmp_path / "ic_series_W1_UNION_REAL.csv", reg)
+    # consistent pin, but the content does not belong to this registration
+    path, reg2 = _p_variant(reg_bundle, tmp_path, mutate_reg=lambda r: r["fdr"].__setitem__("n_reps", r["fdr"]["n_reps"] + 1))
+    with pytest.raises(ReplicatesError, match="n_reps"):
+        pnull.load_replicates(path, reg2)
+    path, reg3 = _p_variant(reg_bundle, tmp_path, mutate_reg=lambda r: r["windows"]["W1"]["frozen_v6"]["null_mean"].__setitem__("mom1", 0.123))
+    with pytest.raises(ReplicatesError, match="null_mean"):
+        pnull.load_replicates(path, reg3)
+    path, reg4 = _p_variant(reg_bundle, tmp_path, mutate_payload=lambda d: d.__setitem__("cut_date", "2026-06-21"))
+    with pytest.raises(ReplicatesError, match="cut date"):
+        pnull.load_replicates(path, reg4)
+    path, reg5 = _p_variant(reg_bundle, tmp_path, mutate_payload=lambda d: d["windows"].pop("W2"))
+    with pytest.raises(ReplicatesError, match="W2"):
+        pnull.load_replicates(path, reg5)
+    path, reg6 = _p_variant(reg_bundle, tmp_path, mutate_payload=lambda d: d["windows"]["W1"]["variants"]["mom2"].pop())
+    with pytest.raises(ReplicatesError, match="mom2"):
+        pnull.load_replicates(path, reg6)
+    path, reg7 = _p_variant(reg_bundle, tmp_path, mutate_payload=lambda d: d.__setitem__("p_source", "block_permutation"))
+    with pytest.raises(ReplicatesError, match="not an H-32"):
+        pnull.load_replicates(path, reg7)
+
+
+def test_t5_p_replicates_payload_is_deterministic_and_its_hash_is_known_before_the_file_exists(reg_bundle, shrunk, tmp_path):
+    rep = reg_bundle["report"]
+    assert rep["p_replicates"]["file_sha256"] == artifacts.json_file_sha256(rep["_p_payload"]) == reg_bundle["registered"]["fdr"]["replicates_sha256"]
+    out = tmp_path / "o"
+    out.mkdir()
+    assert artifacts.write_json(out / "x.json", rep["_p_payload"])["sha256"] == rep["p_replicates"]["file_sha256"]
+    with pytest.raises(ReplicatesError):
+        pnull.build_payload({"W1": {"cell": dict.fromkeys(C.VARIANTS, "driftfree"), "draws": dict.fromkeys(C.VARIANTS, np.zeros(3))},
+                             "W2": {"cell": dict.fromkeys(C.VARIANTS, "driftfree"), "draws": dict.fromkeys(C.VARIANTS, np.zeros(4))}},
+                            cut_date=C.CUT_TEST, n_reps=3, n_reps_constants=3, seed=53)
 
 
 # ============================================================================

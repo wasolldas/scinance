@@ -23,9 +23,9 @@ from ..wp13_xsec import nulls
 from . import artifacts
 from . import calibration as cal
 from . import constants as C
-from . import nullsim, panel_cut, schema
+from . import nullsim, panel_cut, pnull, schema
 from . import weekly as wkl
-from .errors import H32Abort, PinError
+from .errors import H32Abort, PinError, ReplicatesError
 
 __all__ = ["assemble_prelaunch", "stress_coverage_filtered", "build_template", "render_prelaunch_markdown",
            "write_prelaunch_artifacts", "w1_determinism_control", "template_yaml_text"]
@@ -84,12 +84,21 @@ def assemble_prelaunch(
     n_reps: int = C.N_REPS_MIN, n_boot: int = C.N_BOOT_MIN, seed: int = C.SEED,
     calibration_kwargs: dict[str, Any] | None = None, stress_rel_path: Path | str | None = None,
     stress_abs_path: Path | str | None = None, v5e_reference: dict[str, Any] | None = None,
-    log: Callable[[str], None] | None = None,
+    log: Callable[[str], None] | None = None, p_reps: int | None = None,
 ) -> dict[str, Any]:
     """Vorlauf v6 on the UNCUT daily union panel (fingerprints were checked on the files by the caller).  The hard cut at
     ``cut_date`` (<= 2026-06-28, a Sunday) happens here, before anything is calculated, followed by the maximum-date guard.
-    Returns the report dict (JSON-serialisable)."""
+    Returns the report dict (JSON-serialisable); the p replicates (DEC-99 p convention) travel in ``report["_p_payload"]``
+    and are written, not published inside the report, by :func:`write_prelaunch_artifacts`.
+
+    ``p_reps`` (default ``n_reps``): number of replicates of the p artifact; ``p_reps > n_reps`` re-runs both drift cells
+    without the SE-rule expectation for the finer p resolution (the first ``n_reps`` replicates are those of the constants)."""
     say = log or (lambda _m: None)
+    p_reps = int(n_reps if p_reps is None else p_reps)
+    if p_reps < int(n_reps):
+        raise H32Abort(f"p_reps {p_reps} below n_reps {n_reps}: the p replicates include the replicates of the constants")
+    p_windows: dict[str, Any] = {}
+    p_binding: dict[str, Any] = {}
     ck = dict(calibration_kwargs or {})
     panel, cut_report = panel_cut.cut_panel_days(panel, cut_date, limit=C.CUT_TEST)
     panel_cut.assert_panel_max_date(panel, cut_date)
@@ -121,7 +130,25 @@ def assemble_prelaunch(
         nul = nullsim.window_null_constants(
             win, rho_f=stress["rho_f"], beta_sd=stress["beta_sd_calibrated"], sigma_f=c_rep["null_scales"]["sigma_f"],
             sigma_e=c_rep["null_scales"]["sigma_e_used"], n_reps=n_reps, seed=seed, floor_fm8=None if wn == "P" else floor,
-            n_boot=n_boot, mean_block=C.MEAN_BLOCK, boot_seed=seed)
+            n_boot=n_boot, mean_block=C.MEAN_BLOCK, boot_seed=seed, keep_draws=wn != "P")
+        if wn != "P":                                            # the p replicates: take the draws out of the published cells
+            cell_draws = {name: {v: cell["variants"][v].pop("draws") for v in C.VARIANTS} for name, cell in nul["cells"].items()}
+            fzn = nul["frozen"]
+            binding = pnull.binding_cells(fzn["null_mean_driftfree"], fzn["null_mean_drifting"])
+            if p_reps > int(n_reps):
+                say(f"window {wn}: p replicates {p_reps} (constants {n_reps})")
+                extra = {name: nullsim.simulate_fm8_cell(
+                    win, rho_f=stress["rho_f"], beta_sd=stress["beta_sd_calibrated"], drift_f=drift, sigma_f=c_rep["null_scales"]["sigma_f"],
+                    sigma_e=c_rep["null_scales"]["sigma_e_used"], n_reps=p_reps, seed=seed, floor_fm8=None, keep_draws=True)
+                    for name, drift in nullsim.DRIFTS.items()}
+                for name in extra:
+                    for v in C.VARIANTS:
+                        longer = extra[name]["variants"][v]["draws"]
+                        if not np.array_equal(longer[:n_reps], cell_draws[name][v], equal_nan=True):
+                            raise ReplicatesError(f"{wn}/{name}/{v}: the longer replicate run does not start with the replicates of the constants")
+                cell_draws = {name: {v: extra[name]["variants"][v]["draws"] for v in C.VARIANTS} for name in extra}
+            p_windows[wn] = {"cell": binding, "draws": {v: cell_draws[binding[v]][v] for v in C.VARIANTS}}
+            p_binding[wn] = dict(binding)
         entry: dict[str, Any] = {
             "geometry": wkl.window_geometry_report(win), "k": k_summary, "k_fm8_series": [int(x) for x in k8],
             "k_fm8_series_sha256": wkl.int_series_sha256(k8), "floor_fm8": floor, "v_fm8": v_fm8,
@@ -153,6 +180,7 @@ def assemble_prelaunch(
         if not control["ok"]:
             raise H32Abort("W1 determinism control failed: the recomputed W1 calibration does not hit the v5e reference "
                            f"({[k for k, r in control['rows'].items() if not r['ok']]}) -- the v6 constants are not registrable")
+    p_payload = pnull.build_payload(p_windows, cut_date=cut_date, n_reps=p_reps, n_reps_constants=int(n_reps), seed=seed)
     core = {
         "schema": C.PRELAUNCH_SCHEMA, "mode": "prelaunch",
         "label": ("Vorlauf v6 (DEC-99, ERSTFASSUNG 12.1): outcome-frei -- kein realer Charakteristik-gegen-Outcome-IC; "
@@ -164,8 +192,13 @@ def assemble_prelaunch(
         "parameters": {"n_reps": int(n_reps), "n_boot": int(n_boot), "seed": int(seed), "mean_block": C.MEAN_BLOCK,
                        "null_level": C.NULL_LEVEL, "lead_weeks": C.LEAD_WEEKS, "calibration": ck},
         "windows": windows_out, "w1_determinism_control": control,
+        "p_replicates": {"p_source": C.P_SOURCE, "file": C.P_REPLICATES_FILE, "file_sha256": artifacts.json_file_sha256(p_payload),
+                         "n_reps": p_reps, "n_reps_constants": int(n_reps), "seed": int(seed), "binding_cell": p_binding,
+                         "null_mean_of_replicates": {wn: {v: float(np.nanmean(p_windows[wn]["draws"][v][:int(n_reps)]))
+                                                          for v in C.VARIANTS} for wn in p_windows}},
     }
     core["result_sha256"] = artifacts.canonical_sha256(core)
+    core["_p_payload"] = p_payload
     return core
 
 
@@ -176,6 +209,9 @@ def build_template(report: dict[str, Any], *, bounce_spread: float) -> dict[str,
     p = wins["P"]
     fps = report.get("data_fingerprints") or {}
     prm = report["parameters"]
+    pr = report.get("p_replicates")
+    if not isinstance(pr, dict) or not schema.is_hex64(pr.get("file_sha256")):
+        raise ValueError("the Vorlauf artifact carries no p replicates block (re-run --prelaunch): fdr.replicates_sha256 cannot be set")
 
     def window_block(wn: str) -> dict[str, Any]:
         w = wins[wn]
@@ -203,7 +239,11 @@ def build_template(report: dict[str, Any], *, bounce_spread: float) -> dict[str,
         "mde_faktor": C.MDE_FAKTOR,
         "seal": {"panel_cut_test": C.CUT_TEST, "panel_cut_pilot": C.CUT_PILOT, "stress_list_date_filter": True},
         "fdr": {
-            "p_statistic": "block_permutation_fm8_window_mean", "sided": "one", "combine": "max_p",
+            "p_source": C.P_SOURCE, "p_statistic": C.P_STATISTIC, "sided": "one", "combine": "max_p",
+            "p_formula": "p = (1 + #{null replicate window means >= observed window mean, registered direction}) / (1 + R)",
+            "n_reps": int(pr["n_reps"]), "replicates_sha256": pr["file_sha256"],
+            "replicates_cell": "per window and variant the drift cell (driftfree / 0.002) with the larger null mean",
+            "report_only": list(C.P_REPORT_ONLY),
             "block_len": C.PERM_BLOCK, "n_perm": C.N_PERM, "seed": C.SEED,
             "family": {"name": "F-H32", "method": "BH", "alpha": C.BH_ALPHA, "denominator": C.BH_DENOMINATOR, "report_only": True},
             "over_family": {"name": "F-WEEK", "method": "BY", "alpha": C.BY_ALPHA, "binding": True,
@@ -264,7 +304,8 @@ def build_template(report: dict[str, Any], *, bounce_spread: float) -> dict[str,
             "report_only": ["prd_sector_world_0375", "joint_c10_share"],
         },
         "data_fingerprints": {"union_range_fingerprint": fps.get("union_range_fingerprint"),
-                              "delisting_dates_sha256": fps.get("delisting_dates_sha256")},
+                              "delisting_dates_sha256": fps.get("delisting_dates_sha256"),
+                              "delisting_register_sha256": fps.get("delisting_register_sha256")},
     }
     return tpl
 
@@ -281,7 +322,8 @@ def template_yaml_text(template: dict[str, Any], report: dict[str, Any], *, sour
     ctl = report.get("w1_determinism_control")
     header.append("# W1-Determinismus-Kontrolle gegen v5e: " + ("bestanden" if ctl and ctl["ok"] else "nicht angefordert"))
     fps = template.get("data_fingerprints") or {}
-    if not (schema.is_hex64(fps.get("union_range_fingerprint")) and schema.is_hex64(fps.get("delisting_dates_sha256"))):
+    if not (schema.is_hex64(fps.get("union_range_fingerprint")) and schema.is_hex64(fps.get("delisting_dates_sha256"))
+            and schema.is_hex64(fps.get("delisting_register_sha256"))):
         header.append("# WARNUNG: Vorlauf ohne Daten-Fingerprints -- data_fingerprints ist unvollstaendig, die Modi lehnen ab.")
     return "\n".join(header) + "\n" + yaml.safe_dump(template, sort_keys=False, allow_unicode=False)
 
@@ -334,6 +376,16 @@ def render_prelaunch_markdown(report: dict[str, Any]) -> str:
                 s = report["windows"][wn][key]
                 lines.append(f"- {key}: " + (f"{s['n_days_in_window']} Tage im Fenster (Datumsfilter <= {s['date_filter']})"
                                              if s.get("available") else s.get("note", "nicht vorhanden")))
+    pr = report.get("p_replicates")
+    if pr:
+        lines += ["", "## Replikate fuer p (DEC-99, faktorerhaltende Null)", "",
+                  f"- Datei `{pr['file']}` sha256 `{pr['file_sha256']}`; R = {pr['n_reps']} (Konstanten aus den ersten {pr['n_reps_constants']}), Seed {pr['seed']}",
+                  "- p = (1 + #{Replikat-Fenstermittel >= beobachtetes Fenstermittel in Richtung}) / (1 + R); je Fenster und Variante die Zelle "
+                  "mit dem groesseren Null-Mittel; Max-p ueber W1 / W2. Blockpermutation und Normalnaeherung sind report-only.", "",
+                  "| Fenster | Variante | Zelle | Null-Mittel der Replikate |", "|---|---|---|---|"]
+        for wn in pr["binding_cell"]:
+            for v in C.VARIANTS:
+                lines.append(f"| {wn} | {v} | {pr['binding_cell'][wn][v]} | {_f(pr['null_mean_of_replicates'][wn][v])} |")
     ctl = report.get("w1_determinism_control")
     lines += ["", "## W1-Determinismus-Kontrolle gegen v5e", "",
               ("bestanden" if ctl and ctl["ok"] else "nicht angefordert (--v5e-reference)"), "",
@@ -349,7 +401,14 @@ def write_prelaunch_artifacts(out_dir: Path | str, report: dict[str, Any]) -> di
     arts: dict[str, Any] = {}
     for wn, w in report["windows"].items():
         arts[f"k_fm8_{wn}"] = artifacts.write_series_csv(out / f"h32_prelaunch_{wn}_k_fm8.csv", w["k_fm8_series"], value_name="k")
-    full = dict(report)
+    full = {k: v for k, v in report.items() if k != "_p_payload"}
+    payload = report.get("_p_payload")
+    if payload is None:
+        raise ReplicatesError("the report holds no p replicates payload (DEC-53: no Vorlauf artifact without it)")
+    pa = artifacts.write_json(out / C.P_REPLICATES_FILE, payload)
+    if pa["sha256"] != report["p_replicates"]["file_sha256"]:
+        raise ReplicatesError("the written p replicates file does not hash to the sha256 recorded in the report")
+    arts["p_replicates"] = pa
     full["code"] = artifacts.code_fingerprint()
     arts["json"] = artifacts.write_json(out / "h32_prelaunch.json", full)
     md = out / "h32_prelaunch.md"

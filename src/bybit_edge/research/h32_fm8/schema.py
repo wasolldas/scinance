@@ -88,8 +88,16 @@ def validate_registered(reg: dict[str, Any]) -> None:
     _pin(seal.get("stress_list_date_filter") is True, "seal.stress_list_date_filter must be true")
     # --- fdr
     fdr = _get(reg, "fdr")
-    _need(fdr.get("p_statistic") == "block_permutation_fm8_window_mean" and fdr.get("sided") == "one"
-          and fdr.get("combine") == "max_p", "fdr: p_statistic / sided / combine malformed")
+    _pin(fdr.get("p_source") == C.P_SOURCE, f"fdr.p_source must be {C.P_SOURCE!r} (DEC-99 p convention: the binding p comes "
+         "from the v6 replicates of the factor-preserving null)")
+    _need(fdr.get("p_statistic") == C.P_STATISTIC and fdr.get("sided") == "one" and fdr.get("combine") == "max_p",
+          f"fdr: p_statistic must be {C.P_STATISTIC!r}, sided one, combine max_p")
+    _pin(list(fdr.get("report_only") or []) == list(C.P_REPORT_ONLY),
+         f"fdr.report_only must be {list(C.P_REPORT_ONLY)} (block permutation and normal approximation are report-only)")
+    _pin(isinstance(fdr.get("n_reps"), int) and not isinstance(fdr.get("n_reps"), bool) and fdr["n_reps"] >= C.N_REPS_MIN
+         and isinstance(reg.get("rules"), dict) and isinstance(reg["rules"].get("n_reps"), int) and fdr["n_reps"] >= reg["rules"]["n_reps"],
+         f"fdr.n_reps must be an integer >= max({C.N_REPS_MIN}, rules.n_reps) (number of p replicates)")
+    _need(is_hex64(fdr.get("replicates_sha256")), "fdr.replicates_sha256 must be a sha256 (the v6 p replicates artifact)")
     _pin(fdr.get("block_len") == C.PERM_BLOCK, f"fdr.block_len must be {C.PERM_BLOCK}")
     _pin(fdr.get("n_perm") == C.N_PERM and isinstance(fdr.get("n_perm"), int), f"fdr.n_perm must be {C.N_PERM}")
     _pin(fdr.get("seed") == C.SEED, f"fdr.seed must be {C.SEED}")
@@ -195,8 +203,12 @@ def validate_registered(reg: dict[str, Any]) -> None:
          "positive_control seed ranges must be 53..252 / 1000..1049 / 2000..2049")
     # --- data fingerprints
     fp = _get(reg, "data_fingerprints")
-    _need(is_hex64(fp.get("union_range_fingerprint")) and is_hex64(fp.get("delisting_dates_sha256")),
-          "data_fingerprints.{union_range_fingerprint, delisting_dates_sha256} must be sha256 strings")
+    _need(is_hex64(fp.get("union_range_fingerprint")) and is_hex64(fp.get("delisting_dates_sha256"))
+          and is_hex64(fp.get("delisting_register_sha256")),
+          "data_fingerprints.{union_range_fingerprint, delisting_dates_sha256, delisting_register_sha256} must be sha256 strings "
+          "(DEC-100: fingerprint over the Data-Harvest delisting register)")
+    _need(fp.get("delisted_tree_sha256") is None or is_hex64(fp.get("delisted_tree_sha256")),
+          "data_fingerprints.delisted_tree_sha256 must be absent or a sha256")
 
 
 def window_constants(reg: dict[str, Any], wn: str) -> dict[str, Any]:
@@ -219,6 +231,7 @@ def frozen_pin_table(reg: dict[str, Any]) -> dict[str, Any]:
     out: dict[str, Any] = {
         "alpha": reg["alpha"], "z_krit": reg["z_krit"], "mde_faktor": reg["mde_faktor"],
         "n_perm": reg["fdr"]["n_perm"], "block_len": reg["fdr"]["block_len"], "seed": reg["rules"]["seed"],
+        "p_source": reg["fdr"]["p_source"], "n_reps_p": reg["fdr"]["n_reps"], "replicates_sha256": reg["fdr"]["replicates_sha256"],
         "mean_block": reg["rules"]["mean_block"], "n_boot": reg["rules"]["n_boot"], "n_reps": reg["rules"]["n_reps"],
         "panel_cut_test": reg["seal"]["panel_cut_test"], "panel_cut_pilot": reg["seal"]["panel_cut_pilot"],
         "w_pilot": reg["pilot_window"]["w_pilot"], "m_P": dict(reg["pilot_window"]["frozen_v6"]["m_P"]),
