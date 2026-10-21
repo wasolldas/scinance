@@ -19,3 +19,8 @@
    kein Problem; falls ihr sie fuer A4 ohnehin sammelt (`rest.tickers15m`), reicht das.
 4. **Bitte weiter:** Stroeme unveraendert taeglich fortschreiben; `delisting_dates` und `rest.instruments` taeglich
    (irreversibel). Kein neuer Zip-Export noetig.
+5. **Rueckfrage `deribit/rest.settlements`:** Im Extrakt 2017-05-25..2026-10-20 enden die Options-Deliveries
+   (`type = delivery`, Instrumente `BTC-DDMMMYY-STRIKE-C/P`) am **2026-07-31**; vom 2026-08-01 bis 2026-10-20 (81 Tage)
+   stehen nur Futures-Deliveries und taegliche Settlements. Bitte pruefen, ob der Sammler die Options-Deliveries seit
+   August nicht mehr abholt (Endpunkt `get_last_settlements_by_currency`, Typ `delivery`, Pagination/`count`-Limit?)
+   und, falls es eine Luecke ist, nachladen. Nur Zaehlung noetig, keine Preise.
