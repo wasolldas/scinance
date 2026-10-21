@@ -650,10 +650,12 @@ def test_dec101_e5_power_line_matches_the_hand_calculation():
         assert x["mde80_star"] == max(max(p[0], p[1]) for p in per.values())
         m_star = max(0.0, m_p[v], per["W1"][3], per["W2"][3])
         u = max(p[2] for p in per.values())
-        assert x["m_star"] == m_star and x["mde80_star_u"] == pytest.approx(u) and x["handover_threshold_on_point"] == pytest.approx(u + m_star)
+        assert x["m_star"] == m_star and x["mde80_star_u"] == pytest.approx(u)
+        assert x["handover_threshold_u"] == pytest.approx(u + m_star)
+        assert x["handover_threshold_on_point"] == pytest.approx(max(u + m_star, max(p[1] for p in per.values())))   # U-3
         margin = (u + m_star) - max(p[1] for p in per.values())
         assert x["rule_u_covers_1c"]["margin"] == pytest.approx(margin) and x["rule_u_covers_1c"]["covers"] is (margin >= 0.0)
-        assert x["margin_against_gate_mde80_star"] == pytest.approx((u + m_star) - x["mde80_star"])
+        assert x["margin_against_gate_mde80_star"] == pytest.approx(x["handover_threshold_on_point"] - x["mde80_star"])
         assert "Regel U deckt (1c)" in x["rule_u_covers_1c"]["line"] and ("ja" if margin >= 0 else "nein") in x["rule_u_covers_1c"]["line"]
         for m in C.POWER_M_GRID:
             bound = 0.10 / (m * sum(1.0 / i for i in range(1, m + 1)))
@@ -725,7 +727,7 @@ def test_dec101_e5_vorlauf_report_carries_the_power_line(sig, shrunk):
             assert x["windows"][wn]["mde80_1b"] == pytest.approx(C.Z_KRIT * fz["e_se_rule"][v] + C.Z_POWER * fz["se_mean"][v] + max(0.0, fz["null_mean"][v]), abs=1e-15)
         assert x["m_star"] == max(0.0, reg["pilot_window"]["frozen_v6"]["m_P"][v], reg["windows"]["W1"]["frozen_v6"]["null_mean"][v],
                                   reg["windows"]["W2"]["frozen_v6"]["null_mean"][v])
-        assert x["handover_threshold_on_point"] == pytest.approx(x["mde80_star_u"] + x["m_star"])
+        assert x["handover_threshold_on_point"] == pytest.approx(max(x["mde80_star_u"] + x["m_star"], max(x["windows"][wn]["mde80_1c"] for wn in ("W1", "W2"))))
         assert set(x["end_power_after_f_week_replicates"]) == {"1", "2", "3", "4", "11"}
     assert "power_line" not in reg                                                                  # report-only: not a registered field
 

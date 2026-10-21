@@ -38,7 +38,7 @@ def se_t_sd_t(consts: dict[str, Any], inputs: dict[str, Any]) -> dict[str, dict[
         w = consts["windows"][wn]
         se_pilot = math.sqrt(inputs["c_real"]) * math.sqrt(w["v_fm8"] + inputs["f2_real"]) / math.sqrt(w["w_judged"])
         out[wn] = {"se_w_pilot": se_pilot, "se_t": max(w["e_se_rule"], se_pilot), "sd_t": max(w["se_mean"], se_pilot),
-                   "null_mean": w["null_mean"], "w_judged": w["w_judged"]}
+                   "null_mean": w["null_mean"], "w_judged": w["w_judged"], "q95": float(w["q95"])}
     return out
 
 
@@ -50,14 +50,15 @@ def handover_constants(registered: dict[str, Any], variant: str) -> dict[str, An
         fz = w["frozen_v6"]
         wins[wn] = {"v_fm8": float(fz["v_fm8"]), "e_se_rule": float(fz["e_se_rule"][variant]),
                     "se_mean": float(fz["se_mean"][variant]), "null_mean": float(fz["null_mean"][variant]),
-                    "w_judged": int(w["w_judged"])}
+                    "q95": float(fz["q95"][variant]), "w_judged": int(w["w_judged"])}
     return {"windows": wins, "m_p": float(registered["pilot_window"]["frozen_v6"]["m_P"][variant]),
             "z_krit": float(C.Z_KRIT), "z_power": float(C.Z_POWER), "t_min": float(registered["handover_rule"]["t_min"])}
 
 
 def evaluate_handover(inputs: dict[str, Any], consts: dict[str, Any]) -> dict[str, Any]:
-    """Rule U for one variant.  ``inputs``: ``x_p``, ``se_p``, ``f2_real``, ``c_real``; ``consts`` as in
-    :func:`handover_constants`.  Pure."""
+    """Rule U (version U-3, DEC-101 Teil 2) for one variant.  ``inputs``: ``x_p``, ``se_p``, ``f2_real``, ``c_real``;
+    ``consts`` as in :func:`handover_constants`.  Condition (ii): ``x_P >= max(m* + max_W(z_krit SE_T,W + z_80 SD_T,W),
+    max_W(q95_W,v + z_80 SD_T,W))`` -- the MDE80 of both gate conditions (1b with credit, 1c).  Pure."""
     x_p, se_p = float(inputs["x_p"]), float(inputs["se_p"])
     t_p = x_p / se_p
     z, zp = float(consts["z_krit"]), float(consts["z_power"])
@@ -66,9 +67,14 @@ def evaluate_handover(inputs: dict[str, Any], consts: dict[str, Any]) -> dict[st
     m_star = max(0.0, float(consts["m_p"]), *nm.values())
     comp = {wn: z * per_w[wn]["se_t"] + zp * per_w[wn]["sd_t"] for wn in WINDOW_NAMES}
     mde80_star = max(comp.values())
-    c_v = mde80_star + m_star
+    threshold_u = mde80_star + m_star
+    # DEC-101 Teil 2 (U-3, Review A-4): condition (ii) also covers gate condition (1c) -- MDE80 of (1c) = frozen q95 + z_80 SD_T;
+    # the threshold on the pilot point is the maximum of both (it can only rise; strictness, fixed before any pilot number).
+    comp_1c = {wn: per_w[wn]["q95"] + zp * per_w[wn]["sd_t"] for wn in WINDOW_NAMES}
+    threshold_1c = max(comp_1c.values())
+    c_v = max(threshold_u, threshold_1c)
     cond_i = bool(x_p > 0.0)
-    cond_ii = bool(x_p - m_star >= mde80_star)
+    cond_ii = bool(x_p >= c_v)
     cond_iii = bool(t_p >= float(consts["t_min"]))
     handed = cond_i and cond_ii and cond_iii
 
@@ -80,7 +86,9 @@ def evaluate_handover(inputs: dict[str, Any], consts: dict[str, Any]) -> dict[st
     out: dict[str, Any] = {
         "x_p": x_p, "se_p": se_p, "t_p": t_p, "f2_real": float(inputs["f2_real"]), "c_real": float(inputs["c_real"]),
         "per_window": per_w, "m_p": float(consts["m_p"]), "m_star": m_star, "mde80_star_components": comp,
-        "mde80_star": mde80_star, "threshold_on_point": c_v,
+        "mde80_star": mde80_star, "threshold_u": threshold_u, "threshold_1c_components": comp_1c, "threshold_1c": threshold_1c,
+        "threshold_on_point": c_v, "threshold_binding": "1c" if threshold_1c > threshold_u else "U",
+        "rule_version": C.HANDOVER_VERSION,
         "conditions": {"i": cond_i, "ii": cond_ii, "iii": cond_iii}, "handed_over": handed,
         "pi_v": x_p, "regime_p1": regime_p1, "regime_a3_practice": regime_a3,
         "regime_p1_consistent": (regime_p1["regime"] == power_p1.REGIME_C10) if cond_ii else None,

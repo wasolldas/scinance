@@ -56,9 +56,10 @@ def build_power_line(frozen: dict[str, dict[str, Any]], m_p: dict[str, float], d
         mde80_star = max(w["mde80_w"] for w in per_w.values())
         mde80_u = max(w["rule_u_component"] for w in per_w.values())
         m_star = max(0.0, float(m_p[v]), *(w["null_mean"] for w in per_w.values()))
-        c_v = mde80_u + m_star
+        threshold_u = mde80_u + m_star
         max_1c = max(w["mde80_1c"] for w in per_w.values())
-        margin_1c = c_v - max_1c
+        margin_1c = threshold_u - max_1c
+        c_v = max(threshold_u, max_1c)                      # U-3 (DEC-101 Teil 2): the hand-over threshold covers (1c) by construction
         windows_in = {wn: {"se_t": per_w[wn]["se_t"], "sd_t": per_w[wn]["sd_t"], "null_mean": per_w[wn]["null_mean"],
                            "q95": per_w[wn]["q95"], "draws": np.asarray(draws[wn][v], dtype=np.float64)} for wn in wnames}
         windows_na = {wn: {k: windows_in[wn][k] for k in ("se_t", "sd_t", "null_mean")} for wn in wnames}
@@ -73,10 +74,12 @@ def build_power_line(frozen: dict[str, dict[str, Any]], m_p: dict[str, float], d
             end_na[str(m)] = {"joint": na["joint"], "window_power": na["window_power"]}
         out_v[v] = {
             "windows": per_w, "mde80_star": mde80_star, "mde80_star_u": mde80_u, "m_p": float(m_p[v]), "m_star": m_star,
-            "handover_threshold_on_point": c_v,
+            "handover_threshold_u": threshold_u, "handover_threshold_on_point": c_v,
+            "handover_threshold_binding": "1c" if max_1c > threshold_u else "U",
             "rule_u_covers_1c": {"max_w_mde80_1c": max_1c, "margin": margin_1c, "covers": bool(margin_1c >= 0.0),
                                  "line": f"Regel U deckt (1c): Marge = Schwelle_U - max_W MDE80_1c = {margin_1c:.6f} "
-                                         f"(>= 0: {'ja' if margin_1c >= 0.0 else 'nein'})"},
+                                         f"(>= 0: {'ja' if margin_1c >= 0.0 else 'nein'}); U-3-Schwelle auf x_P = "
+                                         f"max({threshold_u:.6f}, {max_1c:.6f}) = {c_v:.6f} (bindend {'1c' if max_1c > threshold_u else 'U'})"},
             "margin_against_gate_mde80_star": c_v - mde80_star,
             "end_power_after_f_week_replicates": end_rep,
             "end_power_after_f_week_normal_approximation_report_only": end_na,

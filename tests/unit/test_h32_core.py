@@ -239,8 +239,11 @@ def test_t0_by_threshold_harmonic_number_and_end_power_reproduce_the_herleitung(
 # hand-over rule U (T0 each condition, T4 purity, monotonicity)
 # ============================================================================
 
-def _consts(m_p=0.0005, null_mean=(0.0009, 0.0005), e_se=(0.0079, 0.0064), se_mean=(0.0079, 0.0064), v_fm8=(0.0025, 0.0020)):
-    wins = {wn: {"v_fm8": v_fm8[i], "e_se_rule": e_se[i], "se_mean": se_mean[i], "null_mean": null_mean[i], "w_judged": (52, 50)[i]}
+def _consts(m_p=0.0005, null_mean=(0.0009, 0.0005), e_se=(0.0079, 0.0064), se_mean=(0.0079, 0.0064), v_fm8=(0.0025, 0.0020),
+            q95=(0.0110, 0.0095)):
+    # q95 small enough that the U component binds in the base case (U-3, DEC-101 Teil 2: threshold = max(U + m*, q95 + z_80 SD_T))
+    wins = {wn: {"v_fm8": v_fm8[i], "e_se_rule": e_se[i], "se_mean": se_mean[i], "null_mean": null_mean[i], "w_judged": (52, 50)[i],
+                 "q95": q95[i]}
             for i, wn in enumerate(("W1", "W2"))}
     return {"windows": wins, "m_p": m_p, "z_krit": C.Z_KRIT, "z_power": C.Z_POWER, "t_min": 2.0}
 
@@ -406,7 +409,7 @@ def test_t5_emitted_template_validates_and_pins_equal_the_code_constants(reg_bun
     assert reg["z_krit"] == round(C.Z_KRIT, 7) and reg["alpha"] == 0.05 and reg["mde_faktor"] == 2.4865
     for key in ("pilot_window", "handover_rule", "fweek_counting", "fdr", "seal", "windows", "positive_control", "beta_control", "rules"):
         assert key in reg
-    assert reg["handover_rule"]["version"] == "U-2" and reg["fdr"]["n_perm"] == C.N_PERM and reg["fdr"]["over_family"]["double_statement_m"] == 11
+    assert reg["handover_rule"]["version"] == "U-3" and reg["fdr"]["n_perm"] == C.N_PERM and reg["fdr"]["over_family"]["double_statement_m"] == 11
     for wn in ("W1", "W2"):
         fz = reg["windows"][wn]["frozen_v6"]
         for key in schema.FROZEN_VARIANT_KEYS:
@@ -766,3 +769,22 @@ def test_t6_the_a3_code_is_only_imported_never_changed():
     wp13_dir = Path(nulls.__file__).resolve().parent
     for f in wp13_dir.glob("*.py"):
         assert "h32" not in f.read_text(encoding="utf-8").lower(), f
+
+
+
+def test_u3_threshold_covers_condition_1c_and_binds_when_q95_is_large():
+    """DEC-101 Teil 2 (U-3, Review A-4): the hand-over threshold on x_P is max(m* + MDE80*_U, max_W(q95 + z_80 SD_T)); with a
+    large frozen q95 the (1c) term binds, the pilot point below it is NOT handed over although it clears the U component."""
+    base = handover.evaluate_handover(_inputs(x_p=0.04), _consts())
+    assert base["rule_version"] == "U-3" and base["threshold_binding"] == "U"
+    assert base["threshold_on_point"] == pytest.approx(max(base["threshold_u"], base["threshold_1c"]))
+    assert base["threshold_u"] == pytest.approx(base["mde80_star"] + base["m_star"])
+    big = _consts(q95=(0.030, 0.028))
+    probe = handover.evaluate_handover(_inputs(x_p=0.04), big)
+    exp_1c = max(0.030 + C.Z_POWER * probe["per_window"]["W1"]["sd_t"], 0.028 + C.Z_POWER * probe["per_window"]["W2"]["sd_t"])
+    assert probe["threshold_1c"] == pytest.approx(exp_1c) and probe["threshold_binding"] == "1c"
+    assert probe["threshold_on_point"] == pytest.approx(exp_1c) and probe["threshold_on_point"] > probe["threshold_u"]
+    below = handover.evaluate_handover(_inputs(x_p=probe["threshold_on_point"] - 1e-6), big)
+    above = handover.evaluate_handover(_inputs(x_p=probe["threshold_on_point"] + 1e-6), big)
+    assert below["conditions"]["ii"] is False and not below["handed_over"]
+    assert above["conditions"]["ii"] is True and above["handed_over"]

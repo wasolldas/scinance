@@ -95,7 +95,10 @@ PC_N_SECTORS = 8
 PC_PRD_SECTOR_REL = 0.375
 
 #: schema markers
-HANDOVER_VERSION = "U-2"
+HANDOVER_VERSION = "U-3"
+#: DEC-101 Teil 2 (Review A-4): condition (ii) of rule U covers BOTH gate conditions -- (1b) with the null-mean credit and (1c)
+#: (frozen q95 + z_80 * SD_T); the threshold on the pilot point can only rise (direction: strictness, fixed before any pilot number).
+HANDOVER_COND_II = "x_P >= max(m* + max_W(z_krit * SE_T,W + z_80 * SD_T,W), max_W(q95_W,v + z_80 * SD_T,W))"
 PILOT_SCHEMA = "H-32 pilot result (DEC-99)"
 RUN_SCHEMA = "H-32 test run (DEC-99, DEC-94)"
 PC_SCHEMA = "H-32 positive control (PRD 3.3.8, DEC-94 (5))"
