@@ -187,3 +187,12 @@ Tests: 1.992 passed / 3 failed (Legacy `test_execution_live.py`, Sandbox-bedingt
   Nachpruefung Gate-Auditor (Pruefpunkte 1-5) -> Registrierung (DEC-101 Teil 2) -> `--pilot --out
   scinance3-impl/state/runs/h32_pilot_v1` -> Positivkontrolle -> `--run`. Neue CLI-Pflicht: Runner-Argumente
   (`--as-of 2026-09-28 --start-year 2021 --end-year 2026 --allow-partial`) muessen den YAML-Pins entsprechen.
+- **Nachtrag 10c (19:40 UTC): v6b bitgleich, U-3, PP3 bestanden, Nachpruefung laeuft.** Vorlauf v6b zweimal gerechnet,
+  alle Artefakte bitgleich (result_sha256 eee9ced9..., `state/runs/h32_20261021_v6b/`); Universum 1.066 Symbole
+  (P K 126/206/339, W1 343/416/500, W2 501/526/545). Power-Zeile zeigte: Regel U deckte (1c) bei mom4 nicht (Marge
+  -0,0006) -> **Regel U-3** (Commit f07d060, DEC-101 Teil 2): Schwelle auf x_P = max(m* + MDE80*_U, max_W(q95 + z_80
+  SD_T)); Schwellen mom1 0,0205, mom2 0,0230, mom4 0,0280, rev_gap 0,0185. Vorlage `h32_v1_TEMPLATE.yaml` sha256
+  a3079cf9...; PP3-Trockenprobe BESTANDEN (K-Reihen P/W1/W2 = Pins, keine IC). Entwurf Fassung 2
+  (`REGISTRIERUNG_H32_entwurf.md`). Nachpruefung der Pruefpunkte 1-5 durch den Gate-Auditor angefordert; danach
+  Registrierung (DEC-101 Teil 2, Kopie nach `state/registered/h32_v1.yaml`, Registry-Eintrag), dann Pilot
+  (`--pilot --out scinance3-impl/state/runs/h32_pilot_v1`, genau einmal).
