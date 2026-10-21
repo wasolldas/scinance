@@ -70,6 +70,7 @@ Zaehlungen, Daten).
 | Register 2026-10-21 | 339 Zeilen, sha256 `a28c7eb7...4d639b22`; 306 selektiert (linear USDT, <= 2026-09-28, Closed), 6 `Relisted` ausgelassen und benannt |
 | Eingaben | `rest.kline1d` 2.097 Partitionen / 692.628 Zeilen, `rest.fundingRateAll` 2.097 / 3.119.696; 0 identische, 0 widerspruechliche Duplikate |
 | Baum | 305 Symbole mit Historie, 772 Partitionen: 747 DONE, 25 PARTIAL (Listungstag ohne Kerze, Abschnitt 2), 1 FAILED (LAYERUSDT NO_HISTORY); Baum-sha256 `250a923b...6427e401`; kein Symbol ohne Funding; keine Zeilen nach dem letzten Handelstag |
+| Determinismus | Zweitbau in ein neues Verzeichnis (13:40 UTC): Baum-sha256, Dateiliste und `delisting_dates.json`-Hash identisch |
 | Union (Produktions-Loader `load_panel_union`, as_of 2026-09-28, allow_partial) | 1.182 Spalten = 877 Ueberlebende + 305 Delistete; laedt ohne Fehler |
 | Union gegen Strom, lineare USDT-Perps lebend je Tag | **identisch** an allen Pruefungstagen (2022-04-18: 153/153; 2023-01-02: 181/181; 2024-07-01: 381/381; 2025-07-01: 530/530; 2025-11-03: 557/557; 2026-06-26: 599/599); Jahres-Mediane 2022..2025 identisch (173 / 222 / 381 / 529); 2026 weicht nur nach dem Ende des Ueberlebenden-Baums (2026-09-14) ab - fuer den H-32-Schnitt 2026-06-28 ohne Belang |
 

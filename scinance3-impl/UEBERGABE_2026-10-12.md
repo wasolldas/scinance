@@ -159,7 +159,7 @@ Tests: 1.992 passed / 3 failed (Legacy `test_execution_live.py`, Sandbox-bedingt
   Der Baum selbst liegt im Scratchpad (`panel_delisted_v2`), bei neuer Sitzung aus dem Harvest-Cache neu bauen:
   `scripts/h32_build_delisted_tree.py --register state/data_harvest_delisting_register_2026-10-21.csv --partitions-dir
   <cache>/raw/bybit --out <neu> --cut 2026-09-28 --start-year 2021` (rc 3 = benannte Luecken; Hash muss 250a923b... sein).
-- **Vorlauf v6 gestartet** (13:33 UTC): `scripts/h32_fm8.py --prelaunch --cut-date 2026-06-28 --n-reps 1000 --n-boot 1000
+- **Vorlauf v6 gestartet** (13:28 UTC): `scripts/h32_fm8.py --prelaunch --cut-date 2026-06-28 --n-reps 1000 --n-boot 1000
   --p-reps 10000 --seed 53 --allow-partial --as-of 2026-09-28`, Ausgabe `state/runs/h32_20261021_v6/`. OHNE
   `--v5e-reference`: die W1-Determinismus-Kontrolle setzt ein unveraendertes W1-Panel voraus, das DEC-100 geaendert hat
   (5 Symbole in W1 neu) - sie wuerde hart abbrechen; Ersatz: Zweitlauf-Fingerprint (optional) und T2-Tests.
