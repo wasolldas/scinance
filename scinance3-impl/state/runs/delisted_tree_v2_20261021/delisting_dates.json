@@ -1,0 +1,2097 @@
+{
+ "n_symbols": 306,
+ "symbols": {
+  "10000000AIDOGEUSDT": {
+   "announcement_day": "2025-04-25",
+   "announcement_id": null,
+   "delist_date": "2025-04-28",
+   "launch_day": "2024-03-04",
+   "source": "data_harvest_register"
+  },
+  "1000000CHEEMSUSDT": {
+   "announcement_day": "2026-05-26",
+   "announcement_id": null,
+   "delist_date": "2026-05-28",
+   "launch_day": "2024-11-25",
+   "source": "data_harvest_register"
+  },
+  "1000000PEIPEIUSDT": {
+   "announcement_day": "2025-10-15",
+   "announcement_id": null,
+   "delist_date": "2025-10-17",
+   "launch_day": "2024-07-04",
+   "source": "data_harvest_register"
+  },
+  "1000000VINUUSDT": {
+   "announcement_day": "2024-02-01",
+   "announcement_id": null,
+   "delist_date": "2024-02-06",
+   "launch_day": "2023-11-28",
+   "source": "data_harvest_register"
+  },
+  "10000COQUSDT": {
+   "announcement_day": "2025-10-01",
+   "announcement_id": null,
+   "delist_date": "2025-10-06",
+   "launch_day": "2024-03-12",
+   "source": "data_harvest_register"
+  },
+  "10000ELONUSDT": {
+   "announcement_day": "2026-02-04",
+   "announcement_id": null,
+   "delist_date": "2026-02-06",
+   "launch_day": "2025-02-10",
+   "source": "data_harvest_register"
+  },
+  "10000LADYSUSDT": {
+   "announcement_day": "2025-10-01",
+   "announcement_id": null,
+   "delist_date": "2025-10-06",
+   "launch_day": "2023-05-11",
+   "source": "data_harvest_register"
+  },
+  "10000NFTUSDT": {
+   "announcement_day": "2024-09-13",
+   "announcement_id": null,
+   "delist_date": "2024-09-18",
+   "launch_day": "2022-01-24",
+   "source": "data_harvest_register"
+  },
+  "10000QUBICUSDT": {
+   "announcement_day": "2026-05-12",
+   "announcement_id": null,
+   "delist_date": "2026-05-14",
+   "launch_day": "2024-12-24",
+   "source": "data_harvest_register"
+  },
+  "10000STARLUSDT": {
+   "announcement_day": "2024-07-29",
+   "announcement_id": null,
+   "delist_date": "2024-08-01",
+   "launch_day": "2023-10-20",
+   "source": "data_harvest_register"
+  },
+  "10000WENUSDT": {
+   "announcement_day": "2025-10-15",
+   "announcement_id": null,
+   "delist_date": "2025-10-17",
+   "launch_day": "2024-01-31",
+   "source": "data_harvest_register"
+  },
+  "10000WHYUSDT": {
+   "announcement_day": "2025-08-29",
+   "announcement_id": null,
+   "delist_date": "2025-09-03",
+   "launch_day": "2024-10-04",
+   "source": "data_harvest_register"
+  },
+  "1000APUUSDT": {
+   "announcement_day": "2025-07-08",
+   "announcement_id": null,
+   "delist_date": "2025-07-11",
+   "launch_day": "2024-06-20",
+   "source": "data_harvest_register"
+  },
+  "1000BEERUSDT": {
+   "announcement_day": "2024-10-18",
+   "announcement_id": null,
+   "delist_date": "2024-10-22",
+   "launch_day": "2024-05-31",
+   "source": "data_harvest_register"
+  },
+  "1000CATSUSDT": {
+   "announcement_day": "2025-07-02",
+   "announcement_id": null,
+   "delist_date": "2025-07-05",
+   "launch_day": "2024-10-11",
+   "source": "data_harvest_register"
+  },
+  "1000IQ50USDT": {
+   "announcement_day": "2024-07-01",
+   "announcement_id": null,
+   "delist_date": "2024-07-08",
+   "launch_day": "2024-03-19",
+   "source": "data_harvest_register"
+  },
+  "1000MUMUUSDT": {
+   "announcement_day": "2025-06-09",
+   "announcement_id": null,
+   "delist_date": "2025-06-12",
+   "launch_day": "2024-09-23",
+   "source": "data_harvest_register"
+  },
+  "1000XUSDT": {
+   "announcement_day": "2026-02-09",
+   "announcement_id": null,
+   "delist_date": "2026-02-11",
+   "launch_day": "2024-10-25",
+   "source": "data_harvest_register"
+  },
+  "1CATUSDT": {
+   "announcement_day": "2025-01-17",
+   "announcement_id": null,
+   "delist_date": "2025-01-22",
+   "launch_day": "2023-12-27",
+   "source": "data_harvest_register"
+  },
+  "A2ZUSDT": {
+   "announcement_day": "2026-02-25",
+   "announcement_id": null,
+   "delist_date": "2026-02-27",
+   "launch_day": "2025-07-31",
+   "source": "data_harvest_register"
+  },
+  "A8USDT": {
+   "announcement_id": null,
+   "delist_date": "2025-11-21",
+   "launch_day": "2024-07-22",
+   "source": "data_harvest_register"
+  },
+  "ACXUSDT": {
+   "announcement_day": "2026-08-28",
+   "announcement_id": null,
+   "delist_date": "2026-08-30",
+   "launch_day": "2024-12-06",
+   "source": "data_harvest_register"
+  },
+  "AERGOUSDT": {
+   "announcement_day": "2026-07-24",
+   "announcement_id": null,
+   "delist_date": "2026-07-25",
+   "launch_day": "2023-11-16",
+   "source": "data_harvest_register"
+  },
+  "AGIXUSDT": {
+   "announcement_day": "2024-05-31",
+   "announcement_id": null,
+   "delist_date": "2024-06-07",
+   "launch_day": "2023-02-09",
+   "source": "data_harvest_register"
+  },
+  "AGTUSDT": {
+   "announcement_id": null,
+   "delist_date": "2025-10-21",
+   "launch_day": "2025-05-28",
+   "source": "data_harvest_register"
+  },
+  "AI16ZUSDT": {
+   "announcement_day": "2025-11-04",
+   "announcement_id": null,
+   "delist_date": "2025-11-06",
+   "launch_day": "2024-12-30",
+   "source": "data_harvest_register"
+  },
+  "AIAUSDT": {
+   "announcement_day": "2025-12-11",
+   "announcement_id": null,
+   "delist_date": "2025-12-13",
+   "launch_day": "2025-09-18",
+   "source": "data_harvest_register"
+  },
+  "AINUSDT": {
+   "announcement_day": "2026-03-04",
+   "announcement_id": null,
+   "delist_date": "2026-03-06",
+   "launch_day": "2025-07-10",
+   "source": "data_harvest_register"
+  },
+  "AIUSDT": {
+   "announcement_day": "2025-11-12",
+   "announcement_id": null,
+   "delist_date": "2025-11-14",
+   "launch_day": "2024-01-16",
+   "source": "data_harvest_register"
+  },
+  "AKROUSDT": {
+   "announcement_day": "2024-12-19",
+   "announcement_id": null,
+   "delist_date": "2024-12-24",
+   "launch_day": "2022-05-25",
+   "source": "data_harvest_register"
+  },
+  "ALEOUSDT": {
+   "announcement_day": "2026-01-21",
+   "announcement_id": null,
+   "delist_date": "2026-01-24",
+   "launch_day": "2024-09-19",
+   "source": "data_harvest_register"
+  },
+  "ALPACAUSDT": {
+   "announcement_day": "2025-04-24",
+   "announcement_id": null,
+   "delist_date": "2025-04-30",
+   "launch_day": "2023-08-02",
+   "source": "data_harvest_register"
+  },
+  "ALPHAUSDT": {
+   "announcement_day": "2025-10-13",
+   "announcement_id": null,
+   "delist_date": "2025-10-15",
+   "launch_day": "2022-03-30",
+   "source": "data_harvest_register"
+  },
+  "ALUUSDT": {
+   "announcement_day": "2026-03-04",
+   "announcement_id": null,
+   "delist_date": "2026-03-06",
+   "launch_day": "2025-01-14",
+   "source": "data_harvest_register"
+  },
+  "AMBUSDT": {
+   "announcement_day": "2025-02-19",
+   "announcement_id": null,
+   "delist_date": "2025-02-23",
+   "launch_day": "2023-06-05",
+   "source": "data_harvest_register"
+  },
+  "ANCUSDT": {
+   "announcement_id": null,
+   "delist_date": "2022-05-13",
+   "launch_day": "2022-03-15",
+   "source": "data_harvest_register"
+  },
+  "ANTUSDT": {
+   "announcement_day": "2024-07-23",
+   "announcement_id": null,
+   "delist_date": "2024-07-25",
+   "launch_day": "2021-12-16",
+   "source": "data_harvest_register"
+  },
+  "ASPUSDT": {
+   "announcement_day": "2026-09-03",
+   "announcement_id": null,
+   "delist_date": "2026-09-05",
+   "launch_day": "2025-07-24",
+   "source": "data_harvest_register"
+  },
+  "ATAUSDT": {
+   "announcement_day": "2025-10-01",
+   "announcement_id": null,
+   "delist_date": "2025-10-06",
+   "launch_day": "2023-08-08",
+   "source": "data_harvest_register"
+  },
+  "AUDIOUSDT": {
+   "announcement_day": "2025-11-12",
+   "announcement_id": null,
+   "delist_date": "2025-11-14",
+   "launch_day": "2021-11-26",
+   "source": "data_harvest_register"
+  },
+  "AVAILUSDT": {
+   "announcement_id": null,
+   "delist_date": "2025-10-26",
+   "launch_day": "2024-07-23",
+   "source": "data_harvest_register"
+  },
+  "AVLUSDT": {
+   "announcement_day": "2026-03-25",
+   "announcement_id": null,
+   "delist_date": "2026-03-27",
+   "launch_day": "2025-02-20",
+   "source": "data_harvest_register"
+  },
+  "BADGERUSDT": {
+   "announcement_day": "2025-10-23",
+   "announcement_id": null,
+   "delist_date": "2025-10-25",
+   "launch_day": "2023-08-16",
+   "source": "data_harvest_register"
+  },
+  "BAKEUSDT": {
+   "announcement_day": "2025-10-03",
+   "announcement_id": null,
+   "delist_date": "2025-10-06",
+   "launch_day": "2022-04-01",
+   "source": "data_harvest_register"
+  },
+  "BALUSDT": {
+   "announcement_day": "2025-07-29",
+   "announcement_id": null,
+   "delist_date": "2025-07-29",
+   "launch_day": "2022-04-08",
+   "source": "data_harvest_register"
+  },
+  "BDXNUSDT": {
+   "announcement_id": null,
+   "delist_date": "2025-10-21",
+   "launch_day": "2025-06-03",
+   "source": "data_harvest_register"
+  },
+  "BENDOGUSDT": {
+   "announcement_day": "2025-01-24",
+   "announcement_id": null,
+   "delist_date": "2025-01-30",
+   "launch_day": "2024-06-03",
+   "source": "data_harvest_register"
+  },
+  "BILLYUSDT": {
+   "announcement_day": "2025-02-12",
+   "announcement_id": null,
+   "delist_date": "2025-02-19",
+   "launch_day": "2024-11-27",
+   "source": "data_harvest_register"
+  },
+  "BITUSDT": {
+   "announcement_id": null,
+   "delist_date": "2023-07-04",
+   "launch_day": "2021-10-11",
+   "source": "data_harvest_register"
+  },
+  "BLUEUSDT": {
+   "announcement_day": "2025-04-02",
+   "announcement_id": null,
+   "delist_date": "2025-04-07",
+   "launch_day": "2024-12-18",
+   "source": "data_harvest_register"
+  },
+  "BLZUSDT": {
+   "announcement_day": "2024-12-19",
+   "announcement_id": null,
+   "delist_date": "2024-12-24",
+   "launch_day": "2022-06-06",
+   "source": "data_harvest_register"
+  },
+  "BNXUSDT": {
+   "announcement_day": "2025-02-27",
+   "announcement_id": null,
+   "delist_date": "2025-03-17",
+   "launch_day": "2023-02-28",
+   "source": "data_harvest_register"
+  },
+  "BOBBOBUSDT": {
+   "announcement_day": "2026-07-24",
+   "announcement_id": null,
+   "delist_date": "2026-07-27",
+   "launch_day": "2025-11-24",
+   "source": "data_harvest_register"
+  },
+  "BONDUSDT": {
+   "announcement_day": "2024-12-19",
+   "announcement_id": null,
+   "delist_date": "2024-12-24",
+   "launch_day": "2023-10-16",
+   "source": "data_harvest_register"
+  },
+  "BSUUSDT": {
+   "announcement_day": "2026-04-30",
+   "announcement_id": null,
+   "delist_date": "2026-04-30",
+   "launch_day": "2025-08-27",
+   "source": "data_harvest_register"
+  },
+  "BSWUSDT": {
+   "announcement_day": "2025-09-29",
+   "announcement_id": null,
+   "delist_date": "2025-10-01",
+   "launch_day": "2022-03-23",
+   "source": "data_harvest_register"
+  },
+  "BTTUSDT": {
+   "announcement_id": null,
+   "delist_date": "2022-02-14",
+   "launch_day": "2021-12-08",
+   "source": "data_harvest_register"
+  },
+  "BUSDUSDT": {
+   "announcement_day": "2023-12-04",
+   "announcement_id": null,
+   "delist_date": "2023-12-08",
+   "launch_day": "2023-02-14",
+   "source": "data_harvest_register"
+  },
+  "BUZZUSDT": {
+   "announcement_day": "2025-04-17",
+   "announcement_id": null,
+   "delist_date": "2025-04-19",
+   "launch_day": "2025-01-22",
+   "source": "data_harvest_register"
+  },
+  "CAMPUSDT": {
+   "announcement_day": "2026-04-14",
+   "announcement_id": null,
+   "delist_date": "2026-04-16",
+   "launch_day": "2025-08-28",
+   "source": "data_harvest_register"
+  },
+  "CANTOUSDT": {
+   "announcement_day": "2024-08-07",
+   "announcement_id": null,
+   "delist_date": "2024-08-12",
+   "launch_day": "2024-05-23",
+   "source": "data_harvest_register"
+  },
+  "CEEKUSDT": {
+   "announcement_day": "2024-10-04",
+   "announcement_id": null,
+   "delist_date": "2024-10-10",
+   "launch_day": "2022-07-18",
+   "source": "data_harvest_register"
+  },
+  "CELRUSDT": {
+   "announcement_id": null,
+   "delist_date": "2025-11-21",
+   "launch_day": "2021-10-25",
+   "source": "data_harvest_register"
+  },
+  "CHESSUSDT": {
+   "announcement_day": "2025-10-28",
+   "announcement_id": null,
+   "delist_date": "2025-10-30",
+   "launch_day": "2024-09-02",
+   "source": "data_harvest_register"
+  },
+  "CLOUDUSDT": {
+   "announcement_day": "2026-05-06",
+   "announcement_id": null,
+   "delist_date": "2026-05-08",
+   "launch_day": "2024-07-19",
+   "source": "data_harvest_register"
+  },
+  "COCOSUSDT": {
+   "announcement_day": "2023-05-25",
+   "announcement_id": null,
+   "delist_date": "2023-05-26",
+   "launch_day": "2023-02-20",
+   "source": "data_harvest_register"
+  },
+  "COMBOUSDT": {
+   "announcement_day": "2025-03-21",
+   "announcement_id": null,
+   "delist_date": "2025-03-27",
+   "launch_day": "2023-06-08",
+   "source": "data_harvest_register"
+  },
+  "COMMONUSDT": {
+   "announcement_day": "2026-01-31",
+   "announcement_id": null,
+   "delist_date": "2026-02-02",
+   "launch_day": "2025-10-27",
+   "source": "data_harvest_register"
+  },
+  "COOKUSDT": {
+   "announcement_day": "2026-03-25",
+   "announcement_id": null,
+   "delist_date": "2026-03-27",
+   "launch_day": "2024-12-02",
+   "source": "data_harvest_register"
+  },
+  "COSUSDT": {
+   "announcement_id": null,
+   "delist_date": "2025-10-26",
+   "launch_day": "2024-05-09",
+   "source": "data_harvest_register"
+  },
+  "COVALUSDT": {
+   "announcement_day": "2024-07-22",
+   "announcement_id": null,
+   "delist_date": "2024-07-24",
+   "launch_day": "2024-03-08",
+   "source": "data_harvest_register"
+  },
+  "CPOOLUSDT": {
+   "announcement_day": "2025-10-16",
+   "announcement_id": null,
+   "delist_date": "2025-10-18",
+   "launch_day": "2025-03-06",
+   "source": "data_harvest_register"
+  },
+  "CREAMUSDT": {
+   "announcement_day": "2023-06-27",
+   "announcement_id": null,
+   "delist_date": "2023-06-30",
+   "launch_day": "2022-01-17",
+   "source": "data_harvest_register"
+  },
+  "CTKUSDT": {
+   "announcement_day": "2026-04-20",
+   "announcement_id": null,
+   "delist_date": "2026-04-22",
+   "launch_day": "2021-12-02",
+   "source": "data_harvest_register"
+  },
+  "CTSIUSDT": {
+   "announcement_day": "2026-03-17",
+   "announcement_id": null,
+   "delist_date": "2026-03-19",
+   "launch_day": "2022-03-23",
+   "source": "data_harvest_register"
+  },
+  "CUDISUSDT": {
+   "announcement_day": "2026-02-09",
+   "announcement_id": null,
+   "delist_date": "2026-02-11",
+   "launch_day": "2025-06-12",
+   "source": "data_harvest_register"
+  },
+  "DAMUSDT": {
+   "announcement_day": "2026-01-07",
+   "announcement_id": null,
+   "delist_date": "2026-01-10",
+   "launch_day": "2025-08-18",
+   "source": "data_harvest_register"
+  },
+  "DAOUSDT": {
+   "announcement_day": "2024-09-19",
+   "announcement_id": null,
+   "delist_date": "2024-09-24",
+   "launch_day": "2024-03-27",
+   "source": "data_harvest_register"
+  },
+  "DARKUSDT": {
+   "announcement_day": "2025-06-27",
+   "announcement_id": null,
+   "delist_date": "2025-07-01",
+   "launch_day": "2025-04-25",
+   "source": "data_harvest_register"
+  },
+  "DARUSDT": {
+   "announcement_day": "2025-01-02",
+   "announcement_id": null,
+   "delist_date": "2025-01-06",
+   "launch_day": "2022-05-02",
+   "source": "data_harvest_register"
+  },
+  "DEGENUSDT": {
+   "announcement_day": "2026-05-12",
+   "announcement_id": null,
+   "delist_date": "2026-05-14",
+   "launch_day": "2024-04-01",
+   "source": "data_harvest_register"
+  },
+  "DENTUSDT": {
+   "announcement_day": "2026-02-04",
+   "announcement_id": null,
+   "delist_date": "2026-02-06",
+   "launch_day": "2022-01-13",
+   "source": "data_harvest_register"
+  },
+  "DGBUSDT": {
+   "announcement_day": "2026-02-25",
+   "announcement_id": null,
+   "delist_date": "2026-02-27",
+   "launch_day": "2022-03-28",
+   "source": "data_harvest_register"
+  },
+  "DMCUSDT": {
+   "announcement_id": null,
+   "delist_date": "2025-10-21",
+   "launch_day": "2025-07-03",
+   "source": "data_harvest_register"
+  },
+  "DODOUSDT": {
+   "announcement_day": "2026-03-04",
+   "announcement_id": null,
+   "delist_date": "2026-03-06",
+   "launch_day": "2022-04-20",
+   "source": "data_harvest_register"
+  },
+  "DOGSUSDT": {
+   "announcement_day": "2025-10-21",
+   "announcement_id": null,
+   "delist_date": "2025-10-24",
+   "launch_day": "2024-08-26",
+   "source": "data_harvest_register"
+  },
+  "DOGUSDT": {
+   "announcement_day": "2026-05-26",
+   "announcement_id": null,
+   "delist_date": "2026-05-28",
+   "launch_day": "2024-06-04",
+   "source": "data_harvest_register"
+  },
+  "DOP1USDT": {
+   "announcement_day": "2025-01-24",
+   "announcement_id": null,
+   "delist_date": "2025-01-30",
+   "launch_day": "2024-07-10",
+   "source": "data_harvest_register"
+  },
+  "DUCKUSDT": {
+   "announcement_day": "2025-10-12",
+   "announcement_id": null,
+   "delist_date": "2025-10-14",
+   "launch_day": "2025-01-16",
+   "source": "data_harvest_register"
+  },
+  "ELXUSDT": {
+   "announcement_day": "2025-12-02",
+   "announcement_id": null,
+   "delist_date": "2025-12-04",
+   "launch_day": "2025-03-12",
+   "source": "data_harvest_register"
+  },
+  "EOSUSDT": {
+   "announcement_id": null,
+   "delist_date": "2025-05-21",
+   "launch_day": "2021-06-29",
+   "source": "data_harvest_register"
+  },
+  "EPTUSDT": {
+   "announcement_day": "2026-01-28",
+   "announcement_id": null,
+   "delist_date": "2026-01-30",
+   "launch_day": "2025-04-21",
+   "source": "data_harvest_register"
+  },
+  "ESUSDT": {
+   "announcement_day": "2026-07-08",
+   "announcement_id": null,
+   "delist_date": "2026-07-10",
+   "launch_day": "2025-07-16",
+   "source": "data_harvest_register"
+  },
+  "ETHWUSDT": {
+   "announcement_id": null,
+   "delist_date": "2025-11-21",
+   "launch_day": "2022-09-16",
+   "source": "data_harvest_register"
+  },
+  "FBUSDT": {
+   "announcement_day": "2025-08-29",
+   "announcement_id": null,
+   "delist_date": "2025-09-03",
+   "launch_day": "2024-09-25",
+   "source": "data_harvest_register"
+  },
+  "FDUSDUSDT": {
+   "announcement_day": "2025-02-12",
+   "announcement_id": null,
+   "delist_date": "2025-02-19",
+   "launch_day": "2024-08-16",
+   "source": "data_harvest_register"
+  },
+  "FETUSDT": {
+   "announcement_day": "2024-05-31",
+   "announcement_id": null,
+   "delist_date": "2024-06-07",
+   "launch_day": "2023-02-07",
+   "source": "data_harvest_register"
+  },
+  "FIOUSDT": {
+   "announcement_day": "2026-04-28",
+   "announcement_id": null,
+   "delist_date": "2026-04-30",
+   "launch_day": "2024-09-26",
+   "source": "data_harvest_register"
+  },
+  "FIREUSDT": {
+   "announcement_day": "2025-03-12",
+   "announcement_id": null,
+   "delist_date": "2025-03-18",
+   "launch_day": "2024-05-09",
+   "source": "data_harvest_register"
+  },
+  "FISUSDT": {
+   "announcement_id": null,
+   "delist_date": "2025-10-21",
+   "launch_day": "2025-07-28",
+   "source": "data_harvest_register"
+  },
+  "FITFIUSDT": {
+   "announcement_day": "2024-10-29",
+   "announcement_id": null,
+   "delist_date": "2024-11-05",
+   "launch_day": "2022-05-10",
+   "source": "data_harvest_register"
+  },
+  "FLMUSDT": {
+   "announcement_day": "2025-10-30",
+   "announcement_id": null,
+   "delist_date": "2025-11-01",
+   "launch_day": "2022-05-02",
+   "source": "data_harvest_register"
+  },
+  "FORTHUSDT": {
+   "announcement_day": "2025-11-12",
+   "announcement_id": null,
+   "delist_date": "2025-11-14",
+   "launch_day": "2023-08-01",
+   "source": "data_harvest_register"
+  },
+  "FOXYUSDT": {
+   "announcement_day": "2025-05-20",
+   "announcement_id": null,
+   "delist_date": "2025-05-22",
+   "launch_day": "2024-04-12",
+   "source": "data_harvest_register"
+  },
+  "FRAGUSDT": {
+   "announcement_id": null,
+   "delist_date": "2025-10-21",
+   "launch_day": "2025-07-01",
+   "source": "data_harvest_register"
+  },
+  "FRONTUSDT": {
+   "announcement_day": "2024-08-22",
+   "announcement_id": null,
+   "delist_date": "2024-08-27",
+   "launch_day": "2023-09-18",
+   "source": "data_harvest_register"
+  },
+  "FTMUSDT": {
+   "announcement_day": "2024-12-26",
+   "announcement_id": null,
+   "delist_date": "2025-01-10",
+   "launch_day": "2021-09-23",
+   "source": "data_harvest_register"
+  },
+  "FTNUSDT": {
+   "announcement_day": "2025-06-20",
+   "announcement_id": null,
+   "delist_date": "2025-06-23",
+   "launch_day": "2024-05-16",
+   "source": "data_harvest_register"
+  },
+  "FTTUSDT": {
+   "announcement_id": null,
+   "delist_date": "2022-11-13",
+   "launch_day": "2021-10-12",
+   "source": "data_harvest_register"
+  },
+  "FUELUSDT": {
+   "announcement_id": null,
+   "delist_date": "2025-10-26",
+   "launch_day": "2024-12-31",
+   "source": "data_harvest_register"
+  },
+  "FUNUSDT": {
+   "announcement_day": "2024-11-11",
+   "announcement_id": null,
+   "delist_date": "2024-11-15",
+   "launch_day": "2023-12-14",
+   "source": "data_harvest_register"
+  },
+  "FWOGUSDT": {
+   "announcement_day": "2026-01-21",
+   "announcement_id": null,
+   "delist_date": "2026-01-24",
+   "launch_day": "2024-11-12",
+   "source": "data_harvest_register"
+  },
+  "FXSUSDT": {
+   "announcement_day": "2025-12-29",
+   "announcement_id": null,
+   "delist_date": "2026-01-02",
+   "launch_day": "2022-04-04",
+   "source": "data_harvest_register"
+  },
+  "GALUSDT": {
+   "announcement_day": "2024-07-16",
+   "announcement_id": null,
+   "delist_date": "2024-07-22",
+   "launch_day": "2022-05-05",
+   "source": "data_harvest_register"
+  },
+  "GEMSUSDT": {
+   "announcement_day": "2025-03-19",
+   "announcement_id": null,
+   "delist_date": "2025-03-25",
+   "launch_day": "2024-12-05",
+   "source": "data_harvest_register"
+  },
+  "GFTUSDT": {
+   "announcement_day": "2024-11-28",
+   "announcement_id": null,
+   "delist_date": "2024-12-02",
+   "launch_day": "2023-02-10",
+   "source": "data_harvest_register"
+  },
+  "GIGAUSDT": {
+   "announcement_day": "2026-07-24",
+   "announcement_id": null,
+   "delist_date": "2026-07-27",
+   "launch_day": "2024-12-12",
+   "source": "data_harvest_register"
+  },
+  "GLMRUSDT": {
+   "announcement_id": null,
+   "delist_date": "2025-11-26",
+   "launch_day": "2022-03-30",
+   "source": "data_harvest_register"
+  },
+  "GMEUSDT": {
+   "announcement_day": "2025-03-19",
+   "announcement_id": null,
+   "delist_date": "2025-03-25",
+   "launch_day": "2024-06-11",
+   "source": "data_harvest_register"
+  },
+  "GNOUSDT": {
+   "announcement_day": "2026-06-01",
+   "announcement_id": null,
+   "delist_date": "2026-06-03",
+   "launch_day": "2024-05-14",
+   "source": "data_harvest_register"
+  },
+  "GODSUSDT": {
+   "announcement_day": "2026-06-09",
+   "announcement_id": null,
+   "delist_date": "2026-06-11",
+   "launch_day": "2023-11-22",
+   "source": "data_harvest_register"
+  },
+  "GOMININGUSDT": {
+   "announcement_day": "2025-06-03",
+   "announcement_id": null,
+   "delist_date": "2025-06-06",
+   "launch_day": "2024-10-02",
+   "source": "data_harvest_register"
+  },
+  "GORKUSDT": {
+   "announcement_id": null,
+   "delist_date": "2025-10-21",
+   "launch_day": "2025-05-05",
+   "source": "data_harvest_register"
+  },
+  "GPTUSDT": {
+   "announcement_id": null,
+   "delist_date": "2024-04-24",
+   "launch_day": "2023-03-16",
+   "source": "data_harvest_register"
+  },
+  "GSTUSDT": {
+   "announcement_id": null,
+   "delist_date": "2022-07-21",
+   "launch_day": "2022-05-02",
+   "source": "data_harvest_register"
+  },
+  "GTCUSDT": {
+   "announcement_id": null,
+   "delist_date": "2025-11-26",
+   "launch_day": "2021-11-29",
+   "source": "data_harvest_register"
+  },
+  "GUSDT": {
+   "announcement_id": null,
+   "delist_date": "2025-10-26",
+   "launch_day": "2024-07-25",
+   "source": "data_harvest_register"
+  },
+  "HFTUSDT": {
+   "announcement_day": "2026-08-19",
+   "announcement_id": null,
+   "delist_date": "2026-08-21",
+   "launch_day": "2023-03-14",
+   "source": "data_harvest_register"
+  },
+  "HIFIUSDT": {
+   "announcement_day": "2025-10-28",
+   "announcement_id": null,
+   "delist_date": "2025-10-30",
+   "launch_day": "2023-08-28",
+   "source": "data_harvest_register"
+  },
+  "HIGHUSDT": {
+   "announcement_day": "2026-07-17",
+   "announcement_id": null,
+   "delist_date": "2026-07-20",
+   "launch_day": "2023-02-07",
+   "source": "data_harvest_register"
+  },
+  "HIPPOUSDT": {
+   "announcement_day": "2026-04-14",
+   "announcement_id": null,
+   "delist_date": "2026-04-16",
+   "launch_day": "2024-11-14",
+   "source": "data_harvest_register"
+  },
+  "HOOKUSDT": {
+   "announcement_day": "2026-04-01",
+   "announcement_id": null,
+   "delist_date": "2026-04-03",
+   "launch_day": "2023-02-07",
+   "source": "data_harvest_register"
+  },
+  "HOTUSDT": {
+   "announcement_day": "2025-10-13",
+   "announcement_id": null,
+   "delist_date": "2025-10-15",
+   "launch_day": "2022-03-28",
+   "source": "data_harvest_register"
+  },
+  "HPOS10IUSDT": {
+   "announcement_day": "2026-05-26",
+   "announcement_id": null,
+   "delist_date": "2026-05-28",
+   "launch_day": "2024-10-21",
+   "source": "data_harvest_register"
+  },
+  "ICXUSDT": {
+   "announcement_day": "2026-09-16",
+   "announcement_id": null,
+   "delist_date": "2026-09-18",
+   "launch_day": "2022-04-13",
+   "source": "data_harvest_register"
+  },
+  "IDEXUSDT": {
+   "announcement_day": "2026-02-25",
+   "announcement_id": null,
+   "delist_date": "2026-02-27",
+   "launch_day": "2023-05-23",
+   "source": "data_harvest_register"
+  },
+  "IGUUSDT": {
+   "announcement_id": null,
+   "delist_date": "2023-12-31",
+   "launch_day": "2023-12-06",
+   "source": "data_harvest_register"
+  },
+  "IPUSDT": {
+   "announcement_day": "2026-06-23",
+   "announcement_id": null,
+   "delist_date": "2026-06-26",
+   "launch_day": "2025-02-07",
+   "source": "data_harvest_register"
+  },
+  "JAILSTOOLUSDT": {
+   "announcement_day": "2025-04-11",
+   "announcement_id": null,
+   "delist_date": "2025-04-16",
+   "launch_day": "2025-02-14",
+   "source": "data_harvest_register"
+  },
+  "JOEUSDT": {
+   "announcement_day": "2025-11-12",
+   "announcement_id": null,
+   "delist_date": "2025-11-14",
+   "launch_day": "2023-03-29",
+   "source": "data_harvest_register"
+  },
+  "JUSDT": {
+   "announcement_id": null,
+   "delist_date": "2025-10-17",
+   "launch_day": "2025-01-22",
+   "source": "data_harvest_register"
+  },
+  "KDAUSDT": {
+   "announcement_day": "2025-10-22",
+   "announcement_id": null,
+   "delist_date": "2025-10-24",
+   "launch_day": "2022-03-15",
+   "source": "data_harvest_register"
+  },
+  "KEEPUSDT": {
+   "announcement_id": null,
+   "delist_date": "2022-02-18",
+   "launch_day": "2021-11-16",
+   "source": "data_harvest_register"
+  },
+  "KEYUSDT": {
+   "announcement_day": "2025-01-17",
+   "announcement_id": null,
+   "delist_date": "2025-01-22",
+   "launch_day": "2023-05-29",
+   "source": "data_harvest_register"
+  },
+  "KLAYUSDT": {
+   "announcement_day": "2024-10-23",
+   "announcement_id": null,
+   "delist_date": "2024-10-28",
+   "launch_day": "2021-12-10",
+   "source": "data_harvest_register"
+  },
+  "KOMAUSDT": {
+   "announcement_day": "2025-07-29",
+   "announcement_id": null,
+   "delist_date": "2025-08-01",
+   "launch_day": "2024-12-10",
+   "source": "data_harvest_register"
+  },
+  "KUSDT": {
+   "announcement_id": null,
+   "delist_date": "2025-10-19",
+   "launch_day": "2025-08-08",
+   "source": "data_harvest_register"
+  },
+  "L3USDT": {
+   "announcement_day": "2026-04-01",
+   "announcement_id": null,
+   "delist_date": "2026-04-03",
+   "launch_day": "2024-07-31",
+   "source": "data_harvest_register"
+  },
+  "LAIUSDT": {
+   "announcement_day": "2025-03-15",
+   "announcement_id": null,
+   "delist_date": "2025-03-17",
+   "launch_day": "2024-04-26",
+   "source": "data_harvest_register"
+  },
+  "LAUNCHCOINUSDT": {
+   "announcement_id": null,
+   "delist_date": "2025-10-26",
+   "launch_day": "2025-05-14",
+   "source": "data_harvest_register"
+  },
+  "LAYERUSDT": {
+   "announcement_id": null,
+   "delist_date": "2025-01-24",
+   "launch_day": "2025-01-24",
+   "source": "data_harvest_register"
+  },
+  "LEVERUSDT": {
+   "announcement_day": "2025-06-29",
+   "announcement_id": null,
+   "delist_date": "2025-07-01",
+   "launch_day": "2023-06-05",
+   "source": "data_harvest_register"
+  },
+  "LFTUSDT": {
+   "announcement_day": "2024-07-01",
+   "announcement_id": null,
+   "delist_date": "2024-07-08",
+   "launch_day": "2024-05-16",
+   "source": "data_harvest_register"
+  },
+  "LINAUSDT": {
+   "announcement_day": "2025-03-21",
+   "announcement_id": null,
+   "delist_date": "2025-03-27",
+   "launch_day": "2022-04-20",
+   "source": "data_harvest_register"
+  },
+  "LISTAUSDT": {
+   "announcement_day": "2026-04-14",
+   "announcement_id": null,
+   "delist_date": "2026-04-16",
+   "launch_day": "2024-06-21",
+   "source": "data_harvest_register"
+  },
+  "LOOKSUSDT": {
+   "announcement_id": null,
+   "delist_date": "2025-10-26",
+   "launch_day": "2022-01-24",
+   "source": "data_harvest_register"
+  },
+  "LOOMUSDT": {
+   "announcement_day": "2024-09-19",
+   "announcement_id": null,
+   "delist_date": "2024-09-24",
+   "launch_day": "2023-09-21",
+   "source": "data_harvest_register"
+  },
+  "LTOUSDT": {
+   "announcement_day": "2025-01-24",
+   "announcement_id": null,
+   "delist_date": "2025-01-30",
+   "launch_day": "2024-04-01",
+   "source": "data_harvest_register"
+  },
+  "LUCEUSDT": {
+   "announcement_day": "2025-04-25",
+   "announcement_id": null,
+   "delist_date": "2025-04-28",
+   "launch_day": "2024-11-19",
+   "source": "data_harvest_register"
+  },
+  "LUNAUSDT": {
+   "announcement_id": null,
+   "delist_date": "2022-05-12",
+   "launch_day": "2021-10-11",
+   "source": "data_harvest_register"
+  },
+  "MAJORUSDT": {
+   "announcement_id": null,
+   "delist_date": "2025-10-21",
+   "launch_day": "2024-11-18",
+   "source": "data_harvest_register"
+  },
+  "MANEKIUSDT": {
+   "announcement_day": "2025-04-25",
+   "announcement_id": null,
+   "delist_date": "2025-04-28",
+   "launch_day": "2024-06-26",
+   "source": "data_harvest_register"
+  },
+  "MAPOUSDT": {
+   "announcement_day": "2024-09-19",
+   "announcement_id": null,
+   "delist_date": "2024-09-24",
+   "launch_day": "2024-05-23",
+   "source": "data_harvest_register"
+  },
+  "MASAUSDT": {
+   "announcement_day": "2025-10-16",
+   "announcement_id": null,
+   "delist_date": "2025-10-18",
+   "launch_day": "2024-05-21",
+   "source": "data_harvest_register"
+  },
+  "MATICUSDT": {
+   "announcement_id": null,
+   "delist_date": "2024-09-06",
+   "launch_day": "2021-01-15",
+   "source": "data_harvest_register"
+  },
+  "MAXUSDT": {
+   "announcement_day": "2025-04-24",
+   "announcement_id": null,
+   "delist_date": "2025-04-28",
+   "launch_day": "2024-08-06",
+   "source": "data_harvest_register"
+  },
+  "MBLUSDT": {
+   "announcement_day": "2025-08-29",
+   "announcement_id": null,
+   "delist_date": "2025-09-03",
+   "launch_day": "2023-11-14",
+   "source": "data_harvest_register"
+  },
+  "MBOXUSDT": {
+   "announcement_day": "2026-06-24",
+   "announcement_id": null,
+   "delist_date": "2026-06-26",
+   "launch_day": "2024-01-18",
+   "source": "data_harvest_register"
+  },
+  "MCUSDT": {
+   "announcement_day": "2023-11-03",
+   "announcement_id": null,
+   "delist_date": "2023-11-07",
+   "launch_day": "2023-08-15",
+   "source": "data_harvest_register"
+  },
+  "MDTUSDT": {
+   "announcement_day": "2025-07-01",
+   "announcement_id": null,
+   "delist_date": "2025-07-04",
+   "launch_day": "2023-06-30",
+   "source": "data_harvest_register"
+  },
+  "MEMEFIUSDT": {
+   "announcement_day": "2025-05-09",
+   "announcement_id": null,
+   "delist_date": "2025-05-12",
+   "launch_day": "2024-11-12",
+   "source": "data_harvest_register"
+  },
+  "MICHIUSDT": {
+   "announcement_day": "2025-06-23",
+   "announcement_id": null,
+   "delist_date": "2025-06-27",
+   "launch_day": "2025-01-27",
+   "source": "data_harvest_register"
+  },
+  "MILKUSDT": {
+   "announcement_day": "2025-11-28",
+   "announcement_id": null,
+   "delist_date": "2025-12-01",
+   "launch_day": "2025-05-06",
+   "source": "data_harvest_register"
+  },
+  "MKRUSDT": {
+   "announcement_day": "2025-08-12",
+   "announcement_id": null,
+   "delist_date": "2025-08-18",
+   "launch_day": "2022-02-15",
+   "source": "data_harvest_register"
+  },
+  "MLNUSDT": {
+   "announcement_day": "2026-06-24",
+   "announcement_id": null,
+   "delist_date": "2026-06-26",
+   "launch_day": "2025-04-09",
+   "source": "data_harvest_register"
+  },
+  "MOBILEUSDT": {
+   "announcement_day": "2025-07-29",
+   "announcement_id": null,
+   "delist_date": "2025-08-01",
+   "launch_day": "2024-02-22",
+   "source": "data_harvest_register"
+  },
+  "MOTHERUSDT": {
+   "announcement_day": "2025-03-12",
+   "announcement_id": null,
+   "delist_date": "2025-03-18",
+   "launch_day": "2024-08-09",
+   "source": "data_harvest_register"
+  },
+  "MULTIUSDT": {
+   "announcement_day": "2024-02-27",
+   "announcement_id": null,
+   "delist_date": "2024-03-05",
+   "launch_day": "2023-09-20",
+   "source": "data_harvest_register"
+  },
+  "MVLUSDT": {
+   "announcement_day": "2025-10-16",
+   "announcement_id": null,
+   "delist_date": "2025-10-18",
+   "launch_day": "2024-11-29",
+   "source": "data_harvest_register"
+  },
+  "MYRIAUSDT": {
+   "announcement_day": "2025-10-01",
+   "announcement_id": null,
+   "delist_date": "2025-10-06",
+   "launch_day": "2023-12-15",
+   "source": "data_harvest_register"
+  },
+  "MYROUSDT": {
+   "announcement_day": "2025-11-28",
+   "announcement_id": null,
+   "delist_date": "2025-12-01",
+   "launch_day": "2024-01-18",
+   "source": "data_harvest_register"
+  },
+  "NCUSDT": {
+   "announcement_day": "2025-07-02",
+   "announcement_id": null,
+   "delist_date": "2025-07-05",
+   "launch_day": "2025-01-17",
+   "source": "data_harvest_register"
+  },
+  "NEIROETHUSDT": {
+   "announcement_day": "2025-09-04",
+   "announcement_id": null,
+   "delist_date": "2025-09-09",
+   "launch_day": "2024-08-15",
+   "source": "data_harvest_register"
+  },
+  "NFPUSDT": {
+   "announcement_day": "2026-04-07",
+   "announcement_id": null,
+   "delist_date": "2026-04-09",
+   "launch_day": "2023-12-27",
+   "source": "data_harvest_register"
+  },
+  "NKNUSDT": {
+   "announcement_day": "2026-01-26",
+   "announcement_id": null,
+   "delist_date": "2026-01-29",
+   "launch_day": "2023-02-21",
+   "source": "data_harvest_register"
+  },
+  "NODEUSDT": {
+   "announcement_id": null,
+   "delist_date": "2025-10-21",
+   "launch_day": "2025-09-04",
+   "source": "data_harvest_register"
+  },
+  "NSUSDT": {
+   "announcement_day": "2026-02-25",
+   "announcement_id": null,
+   "delist_date": "2026-02-27",
+   "launch_day": "2024-12-20",
+   "source": "data_harvest_register"
+  },
+  "NTRNUSDT": {
+   "announcement_day": "2026-04-01",
+   "announcement_id": null,
+   "delist_date": "2026-04-03",
+   "launch_day": "2023-10-10",
+   "source": "data_harvest_register"
+  },
+  "NULSUSDT": {
+   "announcement_day": "2025-04-09",
+   "announcement_id": null,
+   "delist_date": "2025-04-14",
+   "launch_day": "2024-08-27",
+   "source": "data_harvest_register"
+  },
+  "NYANUSDT": {
+   "announcement_day": "2025-02-12",
+   "announcement_id": null,
+   "delist_date": "2025-02-19",
+   "launch_day": "2024-05-29",
+   "source": "data_harvest_register"
+  },
+  "OBOLUSDT": {
+   "announcement_day": "2025-12-10",
+   "announcement_id": null,
+   "delist_date": "2025-12-12",
+   "launch_day": "2025-05-07",
+   "source": "data_harvest_register"
+  },
+  "OBTUSDT": {
+   "announcement_day": "2026-02-25",
+   "announcement_id": null,
+   "delist_date": "2026-02-27",
+   "launch_day": "2025-04-25",
+   "source": "data_harvest_register"
+  },
+  "OCEANUSDT": {
+   "announcement_day": "2024-05-31",
+   "announcement_id": null,
+   "delist_date": "2024-06-07",
+   "launch_day": "2022-02-23",
+   "source": "data_harvest_register"
+  },
+  "OLUSDT": {
+   "announcement_day": "2026-06-01",
+   "announcement_id": null,
+   "delist_date": "2026-06-03",
+   "launch_day": "2024-11-21",
+   "source": "data_harvest_register"
+  },
+  "OMGUSDT": {
+   "announcement_day": "2025-05-30",
+   "announcement_id": null,
+   "delist_date": "2025-06-03",
+   "launch_day": "2021-10-12",
+   "source": "data_harvest_register"
+  },
+  "OMNIUSDT": {
+   "announcement_day": "2025-09-22",
+   "announcement_id": null,
+   "delist_date": "2025-09-24",
+   "launch_day": "2024-04-17",
+   "source": "data_harvest_register"
+  },
+  "OMUSDT": {
+   "announcement_day": "2026-02-13",
+   "announcement_id": null,
+   "delist_date": "2026-02-20",
+   "launch_day": "2024-03-18",
+   "source": "data_harvest_register"
+  },
+  "ONEUSDT": {
+   "announcement_day": "2026-04-07",
+   "announcement_id": null,
+   "delist_date": "2026-04-09",
+   "launch_day": "2021-10-25",
+   "source": "data_harvest_register"
+  },
+  "ORBSUSDT": {
+   "announcement_day": "2026-06-09",
+   "announcement_id": null,
+   "delist_date": "2026-06-11",
+   "launch_day": "2023-10-09",
+   "source": "data_harvest_register"
+  },
+  "ORNUSDT": {
+   "announcement_day": "2024-10-15",
+   "announcement_id": null,
+   "delist_date": "2024-10-17",
+   "launch_day": "2024-03-11",
+   "source": "data_harvest_register"
+  },
+  "OSMOUSDT": {
+   "announcement_id": null,
+   "delist_date": "2025-10-21",
+   "launch_day": "2024-05-30",
+   "source": "data_harvest_register"
+  },
+  "OXTUSDT": {
+   "announcement_day": "2026-05-12",
+   "announcement_id": null,
+   "delist_date": "2026-05-14",
+   "launch_day": "2023-08-10",
+   "source": "data_harvest_register"
+  },
+  "PENGUSDT": {
+   "announcement_day": "2025-01-24",
+   "announcement_id": null,
+   "delist_date": "2025-01-30",
+   "launch_day": "2024-05-27",
+   "source": "data_harvest_register"
+  },
+  "PERPUSDT": {
+   "announcement_id": null,
+   "delist_date": "2025-11-26",
+   "launch_day": "2023-09-06",
+   "source": "data_harvest_register"
+  },
+  "PHBUSDT": {
+   "announcement_day": "2026-01-26",
+   "announcement_id": null,
+   "delist_date": "2026-01-29",
+   "launch_day": "2023-05-18",
+   "source": "data_harvest_register"
+  },
+  "PIGGYUSDT": {
+   "announcement_day": "2025-12-05",
+   "announcement_id": null,
+   "delist_date": "2025-12-07",
+   "launch_day": "2025-10-29",
+   "source": "data_harvest_register"
+  },
+  "PIRATEUSDT": {
+   "announcement_day": "2025-03-19",
+   "announcement_id": null,
+   "delist_date": "2025-03-25",
+   "launch_day": "2024-07-22",
+   "source": "data_harvest_register"
+  },
+  "PIXFIUSDT": {
+   "announcement_day": "2024-11-03",
+   "announcement_id": null,
+   "delist_date": "2024-11-05",
+   "launch_day": "2024-08-08",
+   "source": "data_harvest_register"
+  },
+  "PONKEUSDT": {
+   "announcement_day": "2026-04-07",
+   "announcement_id": null,
+   "delist_date": "2026-04-09",
+   "launch_day": "2024-06-07",
+   "source": "data_harvest_register"
+  },
+  "PRAIUSDT": {
+   "announcement_day": "2025-07-02",
+   "announcement_id": null,
+   "delist_date": "2025-07-05",
+   "launch_day": "2025-05-19",
+   "source": "data_harvest_register"
+  },
+  "PRCLUSDT": {
+   "announcement_day": "2025-12-24",
+   "announcement_id": null,
+   "delist_date": "2025-12-26",
+   "launch_day": "2024-07-17",
+   "source": "data_harvest_register"
+  },
+  "PRIMEUSDT": {
+   "announcement_day": "2025-10-01",
+   "announcement_id": null,
+   "delist_date": "2025-10-06",
+   "launch_day": "2024-09-30",
+   "source": "data_harvest_register"
+  },
+  "PROMUSDT": {
+   "announcement_day": "2026-04-20",
+   "announcement_id": null,
+   "delist_date": "2026-04-22",
+   "launch_day": "2023-09-05",
+   "source": "data_harvest_register"
+  },
+  "PROSUSDT": {
+   "announcement_day": "2025-04-13",
+   "announcement_id": null,
+   "delist_date": "2025-04-16",
+   "launch_day": "2024-11-15",
+   "source": "data_harvest_register"
+  },
+  "PUMPBTCUSDT": {
+   "announcement_day": "2026-07-17",
+   "announcement_id": null,
+   "delist_date": "2026-07-20",
+   "launch_day": "2025-04-11",
+   "source": "data_harvest_register"
+  },
+  "PUMPUSDT": {
+   "announcement_id": null,
+   "delist_date": "2025-06-03",
+   "launch_day": "2025-04-11",
+   "source": "data_harvest_register"
+  },
+  "PUNDUUSDT": {
+   "announcement_day": "2024-07-01",
+   "announcement_id": null,
+   "delist_date": "2024-07-08",
+   "launch_day": "2024-03-28",
+   "source": "data_harvest_register"
+  },
+  "PYRUSDT": {
+   "announcement_day": "2026-06-09",
+   "announcement_id": null,
+   "delist_date": "2026-06-11",
+   "launch_day": "2024-10-07",
+   "source": "data_harvest_register"
+  },
+  "QIUSDT": {
+   "announcement_day": "2025-10-01",
+   "announcement_id": null,
+   "delist_date": "2025-10-06",
+   "launch_day": "2023-12-12",
+   "source": "data_harvest_register"
+  },
+  "QUICKUSDT": {
+   "announcement_day": "2025-11-28",
+   "announcement_id": null,
+   "delist_date": "2025-12-01",
+   "launch_day": "2024-09-10",
+   "source": "data_harvest_register"
+  },
+  "RADUSDT": {
+   "announcement_id": null,
+   "delist_date": "2025-11-26",
+   "launch_day": "2023-06-08",
+   "source": "data_harvest_register"
+  },
+  "RAYUSDT": {
+   "announcement_id": null,
+   "delist_date": "2022-11-15",
+   "launch_day": "2022-02-15",
+   "source": "data_harvest_register"
+  },
+  "RDNTUSDT": {
+   "announcement_day": "2026-04-28",
+   "announcement_id": null,
+   "delist_date": "2026-04-30",
+   "launch_day": "2023-04-17",
+   "source": "data_harvest_register"
+  },
+  "REEFUSDT": {
+   "announcement_day": "2025-01-17",
+   "announcement_id": null,
+   "delist_date": "2025-01-22",
+   "launch_day": "2022-02-15",
+   "source": "data_harvest_register"
+  },
+  "RENUSDT": {
+   "announcement_day": "2025-02-27",
+   "announcement_id": null,
+   "delist_date": "2025-03-06",
+   "launch_day": "2021-12-24",
+   "source": "data_harvest_register"
+  },
+  "REQUSDT": {
+   "announcement_day": "2026-06-01",
+   "announcement_id": null,
+   "delist_date": "2026-06-03",
+   "launch_day": "2021-12-06",
+   "source": "data_harvest_register"
+  },
+  "REXUSDT": {
+   "announcement_day": "2025-10-11",
+   "announcement_id": null,
+   "delist_date": "2025-10-13",
+   "launch_day": "2025-01-09",
+   "source": "data_harvest_register"
+  },
+  "RFCUSDT": {
+   "announcement_day": "2025-10-16",
+   "announcement_id": null,
+   "delist_date": "2025-10-18",
+   "launch_day": "2025-04-14",
+   "source": "data_harvest_register"
+  },
+  "RHEAUSDT": {
+   "announcement_day": "2025-10-15",
+   "announcement_id": null,
+   "delist_date": "2025-10-17",
+   "launch_day": "2025-08-06",
+   "source": "data_harvest_register"
+  },
+  "RIFSOLUSDT": {
+   "announcement_day": "2025-04-01",
+   "announcement_id": null,
+   "delist_date": "2025-04-07",
+   "launch_day": "2024-11-18",
+   "source": "data_harvest_register"
+  },
+  "RIFUSDT": {
+   "announcement_day": "2025-11-28",
+   "announcement_id": null,
+   "delist_date": "2025-12-01",
+   "launch_day": "2023-10-23",
+   "source": "data_harvest_register"
+  },
+  "RLSUSDT": {
+   "announcement_day": "2026-04-14",
+   "announcement_id": null,
+   "delist_date": "2026-04-16",
+   "launch_day": "2025-12-02",
+   "source": "data_harvest_register"
+  },
+  "RNDRUSDT": {
+   "announcement_day": "2024-07-15",
+   "announcement_id": null,
+   "delist_date": "2024-07-22",
+   "launch_day": "2021-11-30",
+   "source": "data_harvest_register"
+  },
+  "ROAMUSDT": {
+   "announcement_day": "2026-07-24",
+   "announcement_id": null,
+   "delist_date": "2026-07-27",
+   "launch_day": "2025-03-07",
+   "source": "data_harvest_register"
+  },
+  "RONUSDT": {
+   "announcement_day": "2025-01-22",
+   "announcement_id": null,
+   "delist_date": "2025-01-26",
+   "launch_day": "2024-02-20",
+   "source": "data_harvest_register"
+  },
+  "RSS3USDT": {
+   "announcement_id": null,
+   "delist_date": "2025-11-26",
+   "launch_day": "2022-02-23",
+   "source": "data_harvest_register"
+  },
+  "SAROSUSDT": {
+   "announcement_day": "2026-02-09",
+   "announcement_id": null,
+   "delist_date": "2026-02-11",
+   "launch_day": "2025-05-20",
+   "source": "data_harvest_register"
+  },
+  "SCAUSDT": {
+   "announcement_id": null,
+   "delist_date": "2025-10-21",
+   "launch_day": "2024-03-13",
+   "source": "data_harvest_register"
+  },
+  "SCRTUSDT": {
+   "announcement_day": "2026-09-03",
+   "announcement_id": null,
+   "delist_date": "2026-09-05",
+   "launch_day": "2022-03-30",
+   "source": "data_harvest_register"
+  },
+  "SCRUSDT": {
+   "announcement_day": "2026-07-08",
+   "announcement_id": null,
+   "delist_date": "2026-07-10",
+   "launch_day": "2024-10-08",
+   "source": "data_harvest_register"
+  },
+  "SCUSDT": {
+   "announcement_day": "2026-06-09",
+   "announcement_id": null,
+   "delist_date": "2026-06-11",
+   "launch_day": "2021-11-30",
+   "source": "data_harvest_register"
+  },
+  "SDUSDT": {
+   "announcement_day": "2026-03-04",
+   "announcement_id": null,
+   "delist_date": "2026-03-06",
+   "launch_day": "2024-11-14",
+   "source": "data_harvest_register"
+  },
+  "SENDUSDT": {
+   "announcement_day": "2025-10-16",
+   "announcement_id": null,
+   "delist_date": "2025-10-18",
+   "launch_day": "2024-12-13",
+   "source": "data_harvest_register"
+  },
+  "SERAPHUSDT": {
+   "announcement_day": "2025-10-16",
+   "announcement_id": null,
+   "delist_date": "2025-10-18",
+   "launch_day": "2025-03-11",
+   "source": "data_harvest_register"
+  },
+  "SFPUSDT": {
+   "announcement_day": "2026-04-07",
+   "announcement_id": null,
+   "delist_date": "2026-04-09",
+   "launch_day": "2021-11-26",
+   "source": "data_harvest_register"
+  },
+  "SILLYUSDT": {
+   "announcement_day": "2025-01-24",
+   "announcement_id": null,
+   "delist_date": "2025-01-30",
+   "launch_day": "2023-12-27",
+   "source": "data_harvest_register"
+  },
+  "SKATEUSDT": {
+   "announcement_id": null,
+   "delist_date": "2025-10-21",
+   "launch_day": "2025-06-09",
+   "source": "data_harvest_register"
+  },
+  "SKYAIUSDT": {
+   "announcement_day": "2026-03-04",
+   "announcement_id": null,
+   "delist_date": "2026-03-06",
+   "launch_day": "2025-05-13",
+   "source": "data_harvest_register"
+  },
+  "SLERFUSDT": {
+   "announcement_day": "2025-09-30",
+   "announcement_id": null,
+   "delist_date": "2025-10-02",
+   "launch_day": "2024-03-18",
+   "source": "data_harvest_register"
+  },
+  "SLFUSDT": {
+   "announcement_day": "2025-09-17",
+   "announcement_id": null,
+   "delist_date": "2025-09-19",
+   "launch_day": "2024-09-03",
+   "source": "data_harvest_register"
+  },
+  "SOLOUSDT": {
+   "announcement_day": "2025-10-15",
+   "announcement_id": null,
+   "delist_date": "2025-10-17",
+   "launch_day": "2024-12-26",
+   "source": "data_harvest_register"
+  },
+  "SOLVUSDT": {
+   "announcement_day": "2026-06-24",
+   "announcement_id": null,
+   "delist_date": "2026-06-26",
+   "launch_day": "2025-01-17",
+   "source": "data_harvest_register"
+  },
+  "SPECUSDT": {
+   "announcement_day": "2025-10-01",
+   "announcement_id": null,
+   "delist_date": "2025-10-06",
+   "launch_day": "2024-05-27",
+   "source": "data_harvest_register"
+  },
+  "SPELLUSDT": {
+   "announcement_day": "2026-04-07",
+   "announcement_id": null,
+   "delist_date": "2026-04-09",
+   "launch_day": "2021-12-13",
+   "source": "data_harvest_register"
+  },
+  "SRMUSDT": {
+   "announcement_id": null,
+   "delist_date": "2022-11-15",
+   "launch_day": "2021-10-11",
+   "source": "data_harvest_register"
+  },
+  "STMXUSDT": {
+   "announcement_day": "2025-02-19",
+   "announcement_id": null,
+   "delist_date": "2025-02-23",
+   "launch_day": "2022-03-28",
+   "source": "data_harvest_register"
+  },
+  "STPTUSDT": {
+   "announcement_day": "2025-05-15",
+   "announcement_id": null,
+   "delist_date": "2025-05-17",
+   "launch_day": "2023-10-03",
+   "source": "data_harvest_register"
+  },
+  "STRAXUSDT": {
+   "announcement_day": "2024-03-19",
+   "announcement_id": null,
+   "delist_date": "2024-03-20",
+   "launch_day": "2023-10-09",
+   "source": "data_harvest_register"
+  },
+  "SUNDOGUSDT": {
+   "announcement_id": null,
+   "delist_date": "2025-11-26",
+   "launch_day": "2024-08-26",
+   "source": "data_harvest_register"
+  },
+  "SWARMSUSDT": {
+   "announcement_day": "2026-07-08",
+   "announcement_id": null,
+   "delist_date": "2026-07-10",
+   "launch_day": "2025-01-06",
+   "source": "data_harvest_register"
+  },
+  "SWEATUSDT": {
+   "announcement_id": null,
+   "delist_date": "2025-10-26",
+   "launch_day": "2022-11-03",
+   "source": "data_harvest_register"
+  },
+  "SWELLUSDT": {
+   "announcement_id": null,
+   "delist_date": "2025-10-21",
+   "launch_day": "2024-11-07",
+   "source": "data_harvest_register"
+  },
+  "SXPUSDT": {
+   "announcement_day": "2026-04-01",
+   "announcement_id": null,
+   "delist_date": "2026-04-03",
+   "launch_day": "2021-12-08",
+   "source": "data_harvest_register"
+  },
+  "SYNUSDT": {
+   "announcement_day": "2026-05-06",
+   "announcement_id": null,
+   "delist_date": "2026-05-08",
+   "launch_day": "2024-08-20",
+   "source": "data_harvest_register"
+  },
+  "SYSUSDT": {
+   "announcement_day": "2026-04-01",
+   "announcement_id": null,
+   "delist_date": "2026-04-03",
+   "launch_day": "2024-08-20",
+   "source": "data_harvest_register"
+  },
+  "TAIUSDT": {
+   "announcement_day": "2026-03-17",
+   "announcement_id": null,
+   "delist_date": "2026-03-19",
+   "launch_day": "2024-11-14",
+   "source": "data_harvest_register"
+  },
+  "TANSSIUSDT": {
+   "announcement_id": null,
+   "delist_date": "2025-10-21",
+   "launch_day": "2025-07-09",
+   "source": "data_harvest_register"
+  },
+  "TOKENUSDT": {
+   "announcement_id": null,
+   "delist_date": "2025-10-21",
+   "launch_day": "2023-11-03",
+   "source": "data_harvest_register"
+  },
+  "TOMIUSDT": {
+   "announcement_day": "2024-11-03",
+   "announcement_id": null,
+   "delist_date": "2024-11-05",
+   "launch_day": "2023-10-10",
+   "source": "data_harvest_register"
+  },
+  "TOMOUSDT": {
+   "announcement_day": "2023-11-10",
+   "announcement_id": null,
+   "delist_date": "2023-11-14",
+   "launch_day": "2022-04-27",
+   "source": "data_harvest_register"
+  },
+  "TONUSDT": {
+   "announcement_day": "2026-06-11",
+   "announcement_id": null,
+   "delist_date": "2026-06-15",
+   "launch_day": "2023-08-31",
+   "source": "data_harvest_register"
+  },
+  "TROYUSDT": {
+   "announcement_day": "2025-04-09",
+   "announcement_id": null,
+   "delist_date": "2025-04-14",
+   "launch_day": "2024-11-13",
+   "source": "data_harvest_register"
+  },
+  "TRUUSDT": {
+   "announcement_day": "2026-04-28",
+   "announcement_id": null,
+   "delist_date": "2026-04-30",
+   "launch_day": "2023-03-09",
+   "source": "data_harvest_register"
+  },
+  "TSTBSCUSDT": {
+   "announcement_day": "2026-07-24",
+   "announcement_id": null,
+   "delist_date": "2026-07-27",
+   "launch_day": "2025-02-09",
+   "source": "data_harvest_register"
+  },
+  "UNFIUSDT": {
+   "announcement_day": "2024-10-28",
+   "announcement_id": null,
+   "delist_date": "2024-11-04",
+   "launch_day": "2022-05-30",
+   "source": "data_harvest_register"
+  },
+  "UROUSDT": {
+   "announcement_day": "2025-02-27",
+   "announcement_id": null,
+   "delist_date": "2025-03-06",
+   "launch_day": "2024-12-13",
+   "source": "data_harvest_register"
+  },
+  "USTUSDT": {
+   "announcement_id": null,
+   "delist_date": "2022-05-13",
+   "launch_day": "2022-05-10",
+   "source": "data_harvest_register"
+  },
+  "UXLINKUSDT": {
+   "announcement_day": "2025-09-24",
+   "announcement_id": null,
+   "delist_date": "2025-09-26",
+   "launch_day": "2024-07-19",
+   "source": "data_harvest_register"
+  },
+  "VANRYUSDT": {
+   "announcement_day": "2026-08-10",
+   "announcement_id": null,
+   "delist_date": "2026-08-12",
+   "launch_day": "2024-03-14",
+   "source": "data_harvest_register"
+  },
+  "VFYUSDT": {
+   "announcement_day": "2026-03-25",
+   "announcement_id": null,
+   "delist_date": "2026-03-27",
+   "launch_day": "2025-09-30",
+   "source": "data_harvest_register"
+  },
+  "VGXUSDT": {
+   "announcement_day": "2024-09-19",
+   "announcement_id": null,
+   "delist_date": "2024-09-24",
+   "launch_day": "2023-08-01",
+   "source": "data_harvest_register"
+  },
+  "VICUSDT": {
+   "announcement_day": "2026-01-26",
+   "announcement_id": null,
+   "delist_date": "2026-01-29",
+   "launch_day": "2025-03-13",
+   "source": "data_harvest_register"
+  },
+  "VIDTUSDT": {
+   "announcement_day": "2025-04-13",
+   "announcement_id": null,
+   "delist_date": "2025-04-16",
+   "launch_day": "2024-08-26",
+   "source": "data_harvest_register"
+  },
+  "VINEUSDT": {
+   "announcement_day": "2026-08-19",
+   "announcement_id": null,
+   "delist_date": "2026-08-21",
+   "launch_day": "2025-01-23",
+   "source": "data_harvest_register"
+  },
+  "VOXELUSDT": {
+   "announcement_day": "2025-10-28",
+   "announcement_id": null,
+   "delist_date": "2025-10-30",
+   "launch_day": "2024-08-21",
+   "source": "data_harvest_register"
+  },
+  "VRAUSDT": {
+   "announcement_day": "2025-05-09",
+   "announcement_id": null,
+   "delist_date": "2025-05-12",
+   "launch_day": "2023-10-03",
+   "source": "data_harvest_register"
+  },
+  "VRUSDT": {
+   "announcement_day": "2025-10-15",
+   "announcement_id": null,
+   "delist_date": "2025-10-17",
+   "launch_day": "2025-01-16",
+   "source": "data_harvest_register"
+  },
+  "VTHOUSDT": {
+   "announcement_day": "2025-10-08",
+   "announcement_id": null,
+   "delist_date": "2025-10-10",
+   "launch_day": "2024-02-19",
+   "source": "data_harvest_register"
+  },
+  "WHITEWHALEUSDT": {
+   "announcement_day": "2026-07-17",
+   "announcement_id": null,
+   "delist_date": "2026-07-20",
+   "launch_day": "2026-01-06",
+   "source": "data_harvest_register"
+  },
+  "WSMUSDT": {
+   "announcement_day": "2024-02-01",
+   "announcement_id": null,
+   "delist_date": "2024-02-05",
+   "launch_day": "2023-10-12",
+   "source": "data_harvest_register"
+  },
+  "XCHUSDT": {
+   "announcement_day": "2026-03-17",
+   "announcement_id": null,
+   "delist_date": "2026-03-19",
+   "launch_day": "2024-05-27",
+   "source": "data_harvest_register"
+  },
+  "XEMUSDT": {
+   "announcement_day": "2025-10-01",
+   "announcement_id": null,
+   "delist_date": "2025-10-06",
+   "launch_day": "2021-11-30",
+   "source": "data_harvest_register"
+  },
+  "XIONUSDT": {
+   "announcement_day": "2026-06-16",
+   "announcement_id": null,
+   "delist_date": "2026-06-18",
+   "launch_day": "2024-12-05",
+   "source": "data_harvest_register"
+  },
+  "XNOUSDT": {
+   "announcement_day": "2026-01-21",
+   "announcement_id": null,
+   "delist_date": "2026-01-24",
+   "launch_day": "2022-09-02",
+   "source": "data_harvest_register"
+  },
+  "XRDUSDT": {
+   "announcement_day": "2025-07-08",
+   "announcement_id": null,
+   "delist_date": "2025-07-11",
+   "launch_day": "2023-12-12",
+   "source": "data_harvest_register"
+  },
+  "XTERUSDT": {
+   "announcement_day": "2025-10-16",
+   "announcement_id": null,
+   "delist_date": "2025-10-18",
+   "launch_day": "2025-03-06",
+   "source": "data_harvest_register"
+  },
+  "YALAUSDT": {
+   "announcement_day": "2026-02-05",
+   "announcement_id": null,
+   "delist_date": "2026-02-07",
+   "launch_day": "2025-08-08",
+   "source": "data_harvest_register"
+  },
+  "YFIIUSDT": {
+   "announcement_day": "2024-03-29",
+   "announcement_id": null,
+   "delist_date": "2024-04-03",
+   "launch_day": "2023-08-16",
+   "source": "data_harvest_register"
+  },
+  "YZYUSDT": {
+   "announcement_day": "2026-04-28",
+   "announcement_id": null,
+   "delist_date": "2026-04-30",
+   "launch_day": "2025-08-21",
+   "source": "data_harvest_register"
+  },
+  "ZBCUSDT": {
+   "announcement_id": null,
+   "delist_date": "2023-09-14",
+   "launch_day": "2023-08-22",
+   "source": "data_harvest_register"
+  },
+  "ZCXUSDT": {
+   "announcement_day": "2024-09-19",
+   "announcement_id": null,
+   "delist_date": "2024-09-24",
+   "launch_day": "2024-06-24",
+   "source": "data_harvest_register"
+  },
+  "ZENTUSDT": {
+   "announcement_day": "2025-12-24",
+   "announcement_id": null,
+   "delist_date": "2025-12-26",
+   "launch_day": "2024-12-23",
+   "source": "data_harvest_register"
+  },
+  "ZEUSUSDT": {
+   "announcement_day": "2026-02-04",
+   "announcement_id": null,
+   "delist_date": "2026-02-06",
+   "launch_day": "2024-04-08",
+   "source": "data_harvest_register"
+  },
+  "ZKFUSDT": {
+   "announcement_day": "2024-11-11",
+   "announcement_id": null,
+   "delist_date": "2024-11-15",
+   "launch_day": "2024-01-16",
+   "source": "data_harvest_register"
+  },
+  "ZKJUSDT": {
+   "announcement_day": "2025-06-16",
+   "announcement_id": null,
+   "delist_date": "2025-06-18",
+   "launch_day": "2024-06-17",
+   "source": "data_harvest_register"
+  },
+  "ZRCUSDT": {
+   "announcement_id": null,
+   "delist_date": "2025-11-21",
+   "launch_day": "2024-11-25",
+   "source": "data_harvest_register"
+  }
+ }
+}

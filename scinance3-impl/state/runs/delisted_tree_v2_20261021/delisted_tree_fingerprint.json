@@ -1,0 +1,2774 @@
+{
+ "code": {
+  "bit_generator": "PCG64",
+  "code_sha256": "3e249b01fa9b3d8217fea2d76f3648a03a08a3ce02aecd5c6b860944bb93245f",
+  "files": {
+   "h32_fm8/__init__.py": "3a73ed3b3a8b93c76a729d24f0d7efe42d1057dc6cec88a3387fa08fa932d424",
+   "h32_fm8/artifacts.py": "e8e247a7570253a7de95350ee3313eed86cb3aaeddd5fba2847427d90dfa8db6",
+   "h32_fm8/calibration.py": "9db992b57de1b9e8ae094682cfeac36548f2bf82a7b5d60b5eece55996df046a",
+   "h32_fm8/checks.py": "7b9ba1a018160cb9a0377ac11cb3acf58b86ab10cf5b583cf82b53ed94248222",
+   "h32_fm8/constants.py": "d3b49654fc7a8d3cc8591c45a8d04a1511aa56a0ba92918e9f1fcf96b9a81889",
+   "h32_fm8/delisted_tree.py": "136dfb34d4b5c9f527e9e9efb661173e72b7269b6346e6428f971328df1c4810",
+   "h32_fm8/errors.py": "de8ed078913d7cdbf6e40919a0797109ba5aeaf9045c771a3ff624cb3d294566",
+   "h32_fm8/estimators.py": "a8d0d75e613354326d531e7beec6dfee5eaa9e7d47e55fbb9da9c5a14c06a53a",
+   "h32_fm8/fm8.py": "6d73de5ccc971f52ba90c545884da0ae54786b3707b49859d23c42a93821c9c3",
+   "h32_fm8/fweek.py": "90cb8817ed15b87436f01250df9a779b5dcac3a2835c86061464f34695161f8d",
+   "h32_fm8/gate.py": "5335cbfa2e049ea98b7f21d08fcf0b41a7ba77cb1e2887c25e3a8bad6051de13",
+   "h32_fm8/handover.py": "a017d35fbbfb72921fe1ff224ef70558efc35a96decfa35ba278376f19ad7077",
+   "h32_fm8/labels.py": "fc2f3e2ccd701065f5265de66a69cb42f1cfe9bc29c3fc66d1fb01e1864e86dc",
+   "h32_fm8/nullsim.py": "a3d563ace238dbca2f4a13bf212fd4898c6539f74ae0c462dfea3383961b2257",
+   "h32_fm8/panel_cut.py": "57600d850d34df342f1859519eff448f021aaa9ea159d715686b19162dcd4a34",
+   "h32_fm8/permutation.py": "1d116fcfaa91977d624c212eb2f38daa857cd12838f8a7092bc148a1e7dc71d0",
+   "h32_fm8/pilot.py": "a2d2510cf28201068dda15e90a2ec820fa5916d4ec967b25a27832d912f5c81c",
+   "h32_fm8/pnull.py": "35e2b9e31a33bd667393f689a932b1d6f31d2875f9dfc8b49606b7707613e4da",
+   "h32_fm8/positive_control.py": "cc1bfe9dffc65fbf008916f92c95877f92d9d17803d8eb430ec352bc2cca67b3",
+   "h32_fm8/schema.py": "7c790459f8f6f118de2465ec8e525e79fd7a01ae70d66f2f3b5f68615fa96f49",
+   "h32_fm8/testrun.py": "71b9016ccd5123a9b201a46b487ddca356150860169ec52ea3c0dd7cce54524a",
+   "h32_fm8/vorlauf.py": "70e8fb128a3e2442db57bd8d59d9dfbaa38aec9e09276867cf73094e81c861a7",
+   "h32_fm8/weekly.py": "814c4b7761cc6e02b63b5efb6a2c7e3fbfafbdbd0bf76d8bf69d0e95c50fbc78",
+   "power_p1.py": "74a8dedec983a0342af8378533d0e01b907a5293746d6b839dfebf2bfe36d111",
+   "scripts/h32_fm8.py": "711a00a2f6430ceeb3dc731c297059063d82d804af588ad4d393f691e3ad31cd",
+   "wp13_xsec/__init__.py": "d798c195bcf8f3904b04735132e44ac3b1b0c93c42b4ecd81e89482cd3e6cef4",
+   "wp13_xsec/characteristics.py": "eeb18b7869e33aa9f430e88d06e46cc22dfb210cbe9b9ddb8172098e6bb3e80c",
+   "wp13_xsec/gates.py": "7ef101f04e7d50b8c503c19856adb0c19db57d3a7b7685096f661a363c45d573",
+   "wp13_xsec/ic.py": "57c2b763a11dad1769bf33a2f613bf6c57124eb2b886ed08d84cdfaf4f7cbcc4",
+   "wp13_xsec/nulls.py": "1d026e6532165e4a480ef8444e3b5f941617aa39095215fc98d9fa2c57639d0c",
+   "wp13_xsec/positive_control.py": "e58e65e10358ef8e0d8e910bb49a44d4222b927b2fc0fb6398b4cfc8a47dfaf3",
+   "wp13_xsec/prelaunch.py": "3a19a38ead49be3f0331eaa018ab5d2703c7d296ce8d3fef34db34a436878d60",
+   "wp13_xsec/run.py": "6ef3d34489860bc11e12cfe2cd00ecfeaff10c3da2167f60f736260117fcff9c",
+   "wp7_universe/__init__.py": "e99022e2a1c6894046d3794e4b6fddf4658d01fb56680658439437c995b72477",
+   "wp7_universe/bybit_rest.py": "ec42e2d2029d4e0caf11bb2055a416a2c35a69f9f34efcdeec9f41eed4ba7a3c",
+   "wp7_universe/null_ic.py": "af429b312fef956a28e4752f9992aafe390aab13b7cc9087219e6d92e7c587da",
+   "wp7_universe/pair_corr.py": "8eda9c44f2f92c561592acda46ff63f69de537b8dff5ac201aa663716347bba2",
+   "wp7_universe/panel_load.py": "9c115be5f23a7cae952d380e18dccd89c62ea4232d7bc4301ac008a0eb84e219",
+   "wp7_universe/panel_store.py": "fb96d43f6d8a6fcdebaba309396e5334c4d25c1509205d6d26f13e9c8e220c0e",
+   "wp7_universe/pit_universe.py": "ade4ef62f767a24dc87f34992373b2be59c8b7fcc36c8020201863eaedc9ffe3",
+   "wp7_universe/report.py": "e56cce1cb2fea91e0eb94bd87145858a626baca8c216aeef072a271f4cce2740",
+   "wp7_universe/spread_probe.py": "322507141708285442efe3d5e5b95876e4b361d23623b8c0af11509ac577be5a",
+   "wp7_universe/stats.py": "b366495b39c2f73c34aa92657b7b4910c495624baebccb3c54c6f61423843034"
+  },
+  "numpy": "2.5.3",
+  "python": "3.13.16"
+ },
+ "delisting_dates": {
+  "n_symbols": 306,
+  "path": "/tmp/claude-0/-home-user-scinance/632fbebe-92f6-553b-ba2e-14f1a2521e17/scratchpad/panel_delisted_v2/delisting_dates.json",
+  "sha256": "c1306c561246a684a29b166bc0a8663f2345a0a21e5798ea7e2a7a823bbaf1f3"
+ },
+ "dropped_after_last_trading_day": {},
+ "dropped_before_start_year": {},
+ "files": {
+  "frozen/source=bybit/category=linear/symbol=10000000AIDOGEUSDT/year=2024/part.parquet": "93d5fc333b783cc54c0be50175a8e4a522101e7679e3484e7f183f5c42f05714",
+  "frozen/source=bybit/category=linear/symbol=10000000AIDOGEUSDT/year=2025/part.parquet": "cd13963d260507611decbdc9967a4faa07c6e5ff20b66975f9cccf0c9dbb429a",
+  "frozen/source=bybit/category=linear/symbol=1000000CHEEMSUSDT/year=2024/part.parquet": "d6f1533e145be6f8bd948c19d6e1fc663bc32317fb8e836bbc80e78671a2ae44",
+  "frozen/source=bybit/category=linear/symbol=1000000CHEEMSUSDT/year=2025/part.parquet": "27a2c407b013f29b632d803ae4747fd7053b7730e67bf84fcd395b4d2ea849bf",
+  "frozen/source=bybit/category=linear/symbol=1000000CHEEMSUSDT/year=2026/part.parquet": "eaf3436b8c3bbe5ffd57a78c1dcae73558970cfc5d6d04d24994567cf2f54f31",
+  "frozen/source=bybit/category=linear/symbol=1000000PEIPEIUSDT/year=2024/part.parquet": "ead571f47cdb0c515f41d6fa58e907250ee0568551cab8e505f99a2cd7e8a1b9",
+  "frozen/source=bybit/category=linear/symbol=1000000PEIPEIUSDT/year=2025/part.parquet": "ee28e211c98f81d12b51d394f2471cd98816416bfe6ed40bd4f4433428fdd148",
+  "frozen/source=bybit/category=linear/symbol=1000000VINUUSDT/year=2023/part.parquet": "c379340cce2070cefe1a6dbdf826c9d18af986fd1fc067bd4cfe73d452bb9c88",
+  "frozen/source=bybit/category=linear/symbol=1000000VINUUSDT/year=2024/part.parquet": "243c2b9ca4ae9190e2c6f4cea1ee88cd9721e604f22c0d62d4f6a735f2128955",
+  "frozen/source=bybit/category=linear/symbol=10000COQUSDT/year=2024/part.parquet": "4e1e8bcae7ddca528a038d83d7f0b8aa6162c40edb401434a480bb5873941439",
+  "frozen/source=bybit/category=linear/symbol=10000COQUSDT/year=2025/part.parquet": "9123706948d2f01f7aabd78a7078cc7691668e03cd767c7f3dbc23c162af827b",
+  "frozen/source=bybit/category=linear/symbol=10000ELONUSDT/year=2025/part.parquet": "d3c9789dafb9bccab3216f322a7734772f94c43782a2e8c94a8c75f11725a776",
+  "frozen/source=bybit/category=linear/symbol=10000ELONUSDT/year=2026/part.parquet": "cd8fe0ce9beb734fa58be1e95282c9b7385eebe8ceb3b5cbed663cf195ce8608",
+  "frozen/source=bybit/category=linear/symbol=10000LADYSUSDT/year=2023/part.parquet": "54826fc267acd44101acede40a6172fe90784aa734a78d10a271ae9cc2ea8cfb",
+  "frozen/source=bybit/category=linear/symbol=10000LADYSUSDT/year=2024/part.parquet": "fe207721482d04b2acf0a64cf7f307b3e74c40d38a1d97ab9ca17fff75a7804c",
+  "frozen/source=bybit/category=linear/symbol=10000LADYSUSDT/year=2025/part.parquet": "4d6a03cbc6d64e872eb98132f11fd956ee6625c8c261031d7b9422ed65d7b0a4",
+  "frozen/source=bybit/category=linear/symbol=10000NFTUSDT/year=2022/part.parquet": "da79efd49dc2d80ef0ab99353fadb15fc91c2d4762cfaa5632020560eb87b4a0",
+  "frozen/source=bybit/category=linear/symbol=10000NFTUSDT/year=2023/part.parquet": "2491621c9853f0dada017428d91460f5625e0a3f27eb0b925b20050f8dca2687",
+  "frozen/source=bybit/category=linear/symbol=10000NFTUSDT/year=2024/part.parquet": "c3eeece8edccebc91c3444a50c4829a68f6161d63aa058251ba1c38c552d0aaf",
+  "frozen/source=bybit/category=linear/symbol=10000QUBICUSDT/year=2024/part.parquet": "08cadd63f2e2eebfd01dd7edb65a2707ceece68d99e761e05a3a12220065e029",
+  "frozen/source=bybit/category=linear/symbol=10000QUBICUSDT/year=2025/part.parquet": "492b097074b6d8d431a66619cbfc9ff2cf24126065e211e1541a8561b8e84a29",
+  "frozen/source=bybit/category=linear/symbol=10000QUBICUSDT/year=2026/part.parquet": "011712e53bffa006ba0da2eb1439d3eb535f8af8644ea48226b5cfa21167ba96",
+  "frozen/source=bybit/category=linear/symbol=10000STARLUSDT/year=2023/part.parquet": "c265a68fc1560ec1a564e74992c37b609722062222b56b8ce820dd1e360fe52d",
+  "frozen/source=bybit/category=linear/symbol=10000STARLUSDT/year=2024/part.parquet": "33cdef54d48d9d442ccf1585970f3345426a1109ae071a2cd071d296d326aff5",
+  "frozen/source=bybit/category=linear/symbol=10000WENUSDT/year=2024/part.parquet": "18b71a8445165e29c1c42d543f64ec962c674e032369bd20bc33d41015517887",
+  "frozen/source=bybit/category=linear/symbol=10000WENUSDT/year=2025/part.parquet": "4d4c5c5680c392462a292b5a25ae24aa066ade9bacf45602ffe3c9c37f7f513c",
+  "frozen/source=bybit/category=linear/symbol=10000WHYUSDT/year=2024/part.parquet": "ce7d7212aca7281377e11e9ee9a97faeff84017f495f5cd685acb916463e6dae",
+  "frozen/source=bybit/category=linear/symbol=10000WHYUSDT/year=2025/part.parquet": "fd31188301c0921bb23475cdf0669976f302de81b802af51e6513aa51a888d1d",
+  "frozen/source=bybit/category=linear/symbol=1000APUUSDT/year=2024/part.parquet": "1310adec878e4f378002aeb2ecd58ca6ada7c6043d7634e0bc2401d41ba9b218",
+  "frozen/source=bybit/category=linear/symbol=1000APUUSDT/year=2025/part.parquet": "c2a30a7ee670360d5634e1e71fbce085093c7c61323a5b7b150baca8c38c78a0",
+  "frozen/source=bybit/category=linear/symbol=1000BEERUSDT/year=2024/part.parquet": "fbc8bb361b51240e85dadefbfd6d02a02dd4c6a7045d2e85dde73c15fd61cbec",
+  "frozen/source=bybit/category=linear/symbol=1000CATSUSDT/year=2024/part.parquet": "cb171745450f13c93dcfe5b218eb53434372fe13212b5051b7b7ac1b5a7b9366",
+  "frozen/source=bybit/category=linear/symbol=1000CATSUSDT/year=2025/part.parquet": "f015f1edb4497206ed9bcf75c312c62e31c7d49435b2a1dc6cd1c785c7897f1c",
+  "frozen/source=bybit/category=linear/symbol=1000IQ50USDT/year=2024/part.parquet": "71b48c08cb6f18838dcb55b8b19f9597c43d192186a128450c97d1ab043950eb",
+  "frozen/source=bybit/category=linear/symbol=1000MUMUUSDT/year=2024/part.parquet": "e199cd8d6cc003f968ef4e678cbc4844bd789aba811e9e0533e92108ef95da52",
+  "frozen/source=bybit/category=linear/symbol=1000MUMUUSDT/year=2025/part.parquet": "6576158c08cd111d8febafcd674318f0d045c70e29f002e178fe33e1f11ebcce",
+  "frozen/source=bybit/category=linear/symbol=1000XUSDT/year=2024/part.parquet": "d670fc37d82edf915dcb4d085852d44728bd544770e833b44ba26bc44fecac17",
+  "frozen/source=bybit/category=linear/symbol=1000XUSDT/year=2025/part.parquet": "0ccbf673696c38f084c21384a397188648ac4c8c2cdd9de2d9250cc1b97d29aa",
+  "frozen/source=bybit/category=linear/symbol=1000XUSDT/year=2026/part.parquet": "6286405dafd52c4cddf5a11c889f39cecdcded2eaaa0e43ff5d5fd137b5ceaa4",
+  "frozen/source=bybit/category=linear/symbol=1CATUSDT/year=2023/part.parquet": "93c87d00ec40fb2622708a3c86ab95fb723c58bfcfe43691d0d7a443bdc18c11",
+  "frozen/source=bybit/category=linear/symbol=1CATUSDT/year=2024/part.parquet": "96c5cce921afb4306cbc4d01cce93de479427eb109f33f81d79cfe30ea1c1da1",
+  "frozen/source=bybit/category=linear/symbol=1CATUSDT/year=2025/part.parquet": "6796da7a1a3a1a4f7193c4cc8fb46293d225d927bb42c8e99ddebf512a48de1d",
+  "frozen/source=bybit/category=linear/symbol=A2ZUSDT/year=2025/part.parquet": "575c873263c044f431921410f99a8a5d16c013df00545a49ce76eeb2bf8aa6fb",
+  "frozen/source=bybit/category=linear/symbol=A2ZUSDT/year=2026/part.parquet": "45d78bd287436aa0edebf6296a160c26ec8a269332a27611354e3a311c11766a",
+  "frozen/source=bybit/category=linear/symbol=A8USDT/year=2024/part.parquet": "e3b4cc6ab0c583dd1db68a3aba845b8452c4046efb8d2450986bd633820d8ffb",
+  "frozen/source=bybit/category=linear/symbol=A8USDT/year=2025/part.parquet": "9e0bd7d2b2d90cf41ba58103d2af27c08e1c7d657fb8cabe94579c4dc78bf186",
+  "frozen/source=bybit/category=linear/symbol=ACXUSDT/year=2024/part.parquet": "80dff089d0d670de40260791865c34a30f9eb71cc546406ba314774361fdc33a",
+  "frozen/source=bybit/category=linear/symbol=ACXUSDT/year=2025/part.parquet": "8a4b3bfb634a87e143167bfe5e2fa2e8b1d1825fa860bf31cbbe4e6872af7993",
+  "frozen/source=bybit/category=linear/symbol=ACXUSDT/year=2026/part.parquet": "2637cfe4ea313e62f7da5d797a491ee69665c9b981b05247ba92a3426fae3a59",
+  "frozen/source=bybit/category=linear/symbol=AERGOUSDT/year=2023/part.parquet": "e8f287a91d63ee91478d644033749e934f9024660aa909d5fe7423e2ab15e62c",
+  "frozen/source=bybit/category=linear/symbol=AERGOUSDT/year=2024/part.parquet": "b30973385367878a2c97b68c316029eda6f2d8158983932d45d3e21ff51ec85e",
+  "frozen/source=bybit/category=linear/symbol=AERGOUSDT/year=2025/part.parquet": "c7399fc13a976c08332d212f1cf60dfc9031cece0dea8030894e82226851a17e",
+  "frozen/source=bybit/category=linear/symbol=AERGOUSDT/year=2026/part.parquet": "2d6da23099898731a2d08431a33a77149add19d3598f5b0327f7706678844091",
+  "frozen/source=bybit/category=linear/symbol=AGIXUSDT/year=2023/part.parquet": "6199f413bd4957d49986a7ff392dcad42f6ee24658ef988afd3f667c76873a20",
+  "frozen/source=bybit/category=linear/symbol=AGIXUSDT/year=2024/part.parquet": "99224ccfc69a4b5234558bf8f36ed0bc32ae4f600aa3f656fcd767afcf3d62f7",
+  "frozen/source=bybit/category=linear/symbol=AGTUSDT/year=2025/part.parquet": "7b6006405ec6e4912a98d384085f7720a34936ef8f219b09158cc44eb4a3202e",
+  "frozen/source=bybit/category=linear/symbol=AI16ZUSDT/year=2024/part.parquet": "e144d6cdeb8965bde295da50fcce929c6ad502120caa59391df3c7d7bf05fba5",
+  "frozen/source=bybit/category=linear/symbol=AI16ZUSDT/year=2025/part.parquet": "f2a7430abcc6ebd46b2689891eb5713d8e1fc867d6f46c91af7b08adc870fdc2",
+  "frozen/source=bybit/category=linear/symbol=AIAUSDT/year=2025/part.parquet": "1c8d1ec0f25727e008a14e4a85831a4000708a1c6f96684b2374685920279d32",
+  "frozen/source=bybit/category=linear/symbol=AINUSDT/year=2025/part.parquet": "3dd832f7658f3abe39294cb17c4c32d2ce2d52daccf7754e232ba00cca3454cc",
+  "frozen/source=bybit/category=linear/symbol=AINUSDT/year=2026/part.parquet": "cb6d0bf61443c7731315d47c64fc4c1ffada7b481be92a43a8f07e93949f218b",
+  "frozen/source=bybit/category=linear/symbol=AIUSDT/year=2024/part.parquet": "b0ab13623a728728c662c6c8c48213cac8add68162f5abe14c3ca0e652a14980",
+  "frozen/source=bybit/category=linear/symbol=AIUSDT/year=2025/part.parquet": "e0af67f2d13a6cdf8939ee89d3705e599867b116adbb0af2f4d769fe618f2377",
+  "frozen/source=bybit/category=linear/symbol=AKROUSDT/year=2022/part.parquet": "c824fbf95ff1fa12526c36410d44ff1f32a42fd5e16d9098e7a44e7f30d8a78a",
+  "frozen/source=bybit/category=linear/symbol=AKROUSDT/year=2023/part.parquet": "a86df114590b3258cc9a2da1708fe50b384559ae10c1c1ff1c60b0ddeb8f023d",
+  "frozen/source=bybit/category=linear/symbol=AKROUSDT/year=2024/part.parquet": "a167738fa6ea3e6b8c5b0290f7485b96c465600ff25b2176ec95b30f1d65a2d9",
+  "frozen/source=bybit/category=linear/symbol=ALEOUSDT/year=2024/part.parquet": "8328e4abcffab529ea2cb6d40721d1abba6831fd9cfa5c9c9049b524eb4ddde4",
+  "frozen/source=bybit/category=linear/symbol=ALEOUSDT/year=2025/part.parquet": "b39287f2d2f05537a4ba6c92f4d160c54ae26b995666179331915bec24cbb0be",
+  "frozen/source=bybit/category=linear/symbol=ALEOUSDT/year=2026/part.parquet": "abc425ec737212974fa45e26470b69308c11167ef3a472ccec7c43c6449707ea",
+  "frozen/source=bybit/category=linear/symbol=ALPACAUSDT/year=2023/part.parquet": "1f00b3bc09793aefd03a0003e0db5351a7489f2e74420543717793eefc9b1a19",
+  "frozen/source=bybit/category=linear/symbol=ALPACAUSDT/year=2024/part.parquet": "854fdd5831a4720982317fb6ee7f3ed1b41fb492c9e18dfe5082b50fc6e466bb",
+  "frozen/source=bybit/category=linear/symbol=ALPACAUSDT/year=2025/part.parquet": "43cf95d49ef70fe35b4fcde78c8140c1cad5e77269bca5951dbc1aff4e1404c5",
+  "frozen/source=bybit/category=linear/symbol=ALPHAUSDT/year=2022/part.parquet": "a80b94d81ff94c84555ce2884eac530a7bdcddbfb24fa6f4744cdc27dd360884",
+  "frozen/source=bybit/category=linear/symbol=ALPHAUSDT/year=2023/part.parquet": "e34a8498565e93ab28dad188881cc8f256066a26258f2d67007b92f59fb3e50b",
+  "frozen/source=bybit/category=linear/symbol=ALPHAUSDT/year=2024/part.parquet": "9750b0e43b8ea5f2a005222c939962829316c40fdce60b287339d61e83cb0119",
+  "frozen/source=bybit/category=linear/symbol=ALPHAUSDT/year=2025/part.parquet": "1e44a8ecb567e5649779280c1d0cb7317187a4f8c0908ab57a1b416801281392",
+  "frozen/source=bybit/category=linear/symbol=ALUUSDT/year=2025/part.parquet": "8a0eb923b18bb428175cb4122349021880f35aa8d4c36b35401e5cc464570d79",
+  "frozen/source=bybit/category=linear/symbol=ALUUSDT/year=2026/part.parquet": "94386e79a7894266cafca6802b11fb0354832604837b4e76802d3d5d0c4548e0",
+  "frozen/source=bybit/category=linear/symbol=AMBUSDT/year=2023/part.parquet": "7af6b39e6d2e92d7bdcdd6584ca6806f221568a18b1b5c1042dab95457c6382a",
+  "frozen/source=bybit/category=linear/symbol=AMBUSDT/year=2024/part.parquet": "f285308da673f46e8455260b7201b9488cfa2c12d7581b6bd302d58f23fdd791",
+  "frozen/source=bybit/category=linear/symbol=AMBUSDT/year=2025/part.parquet": "cb2a50c3ff3a17af69b46971aa379887d0ff2f5a4f55e49b1a9a7bb641456dcb",
+  "frozen/source=bybit/category=linear/symbol=ANCUSDT/year=2022/part.parquet": "b959eae7240aff5dba6ada32b794c8dd5168ee26b05fdad4b0de7ddbc2240744",
+  "frozen/source=bybit/category=linear/symbol=ANTUSDT/year=2021/part.parquet": "0346dcb86fca65974939823d60d056a953c8c09200caad040b315ab5f1772de3",
+  "frozen/source=bybit/category=linear/symbol=ANTUSDT/year=2022/part.parquet": "a6b44a082bf797d02103ea1f434aa825a1e04a0ea1b4fc40530142cd3307a1cb",
+  "frozen/source=bybit/category=linear/symbol=ANTUSDT/year=2023/part.parquet": "cbf09ceb4e9b1e6b19acf835b73e5d4d23c340f55821c84a75b78c74b5ad6adc",
+  "frozen/source=bybit/category=linear/symbol=ANTUSDT/year=2024/part.parquet": "5deab16ccae4592b5aa6727cedaae26f470995e3f470cb0bbf7c5a9335a9acd4",
+  "frozen/source=bybit/category=linear/symbol=ASPUSDT/year=2025/part.parquet": "fdb402516b101cf08fcde842f81a206b3d8b685de5a55f7263dceea5e1dd5576",
+  "frozen/source=bybit/category=linear/symbol=ASPUSDT/year=2026/part.parquet": "6d18d2aac3713996b875e53fd25769ca0145c3308a54ed66a7fe1bee4641a8f9",
+  "frozen/source=bybit/category=linear/symbol=ATAUSDT/year=2023/part.parquet": "8878bfa84b740a435c2e9730396229e2a8df6009305368c325e3480dc3cdcc78",
+  "frozen/source=bybit/category=linear/symbol=ATAUSDT/year=2024/part.parquet": "a85061d95ebecbe815a0b897115f495d6612015f91c5a93be9d6fa74d01917af",
+  "frozen/source=bybit/category=linear/symbol=ATAUSDT/year=2025/part.parquet": "63a2a3dec50088fffc5d8de1cbda987fa6b39b4d7bd457ec5bd60de09c2342ca",
+  "frozen/source=bybit/category=linear/symbol=AUDIOUSDT/year=2021/part.parquet": "8957009ba4878becc4abeeb1dbe6a1c57bff528fcde3e422b00eaf7f19c6abe1",
+  "frozen/source=bybit/category=linear/symbol=AUDIOUSDT/year=2022/part.parquet": "52335a674ac1dbc553694e23e2d73c2e771ea3aa99300f75c0be1d48b45ecf42",
+  "frozen/source=bybit/category=linear/symbol=AUDIOUSDT/year=2023/part.parquet": "75d7974049428163d43655929b9d6d46f3f1fbd637beabcf44813c317080a403",
+  "frozen/source=bybit/category=linear/symbol=AUDIOUSDT/year=2024/part.parquet": "5eed7fcaa084b45f2d932d2329a851c47bc4b1e85774ac4dd2ff0ea8068c1311",
+  "frozen/source=bybit/category=linear/symbol=AUDIOUSDT/year=2025/part.parquet": "177f981a3689b8fdafe367db3cf5772ffaa168339d6d6844a6b921cdd14f1c9c",
+  "frozen/source=bybit/category=linear/symbol=AVAILUSDT/year=2024/part.parquet": "4668d95c6846abc70edeaf1db03c979f0f872c8209fa80071f37fd6ec7fc6f49",
+  "frozen/source=bybit/category=linear/symbol=AVAILUSDT/year=2025/part.parquet": "d875add481e118b3dd60245ef95ff5e48a56ac23c698b83b0e06f5ea85e1a7ff",
+  "frozen/source=bybit/category=linear/symbol=AVLUSDT/year=2025/part.parquet": "9750b8a18e52b4fe7667452b0b805755f892cae9cb66686c98fa6d58c8daa298",
+  "frozen/source=bybit/category=linear/symbol=AVLUSDT/year=2026/part.parquet": "812b44c01a1079ae08eee57640281a1547828bfc544a2ffe9f9693d033b725bd",
+  "frozen/source=bybit/category=linear/symbol=BADGERUSDT/year=2023/part.parquet": "9d3d994c43c97e2f04962362899120fe8b35feb65607fa85fb489b5eb0abc18d",
+  "frozen/source=bybit/category=linear/symbol=BADGERUSDT/year=2024/part.parquet": "c23c0957fa70a0e2f39659d02d79007fa72fce58f8dc9a136ffe4cb36c68a422",
+  "frozen/source=bybit/category=linear/symbol=BADGERUSDT/year=2025/part.parquet": "bd710fe9c15f07c736230338e5c18da89f2523092aee206197c09caedcc82689",
+  "frozen/source=bybit/category=linear/symbol=BAKEUSDT/year=2022/part.parquet": "7aed704fdd465e74e6fb0e3c326093e7c9e5eb11368e9df01b6ad6cb022baa56",
+  "frozen/source=bybit/category=linear/symbol=BAKEUSDT/year=2023/part.parquet": "72bf957fb79342a65dabf4c3614c4b03ec4bd3675623ed24b77d3fbbc436ca3c",
+  "frozen/source=bybit/category=linear/symbol=BAKEUSDT/year=2024/part.parquet": "fb22b5b7c190d5d824e6f23fb1d3f2099aff5c9468ac11ee4f2f4b93fb21d821",
+  "frozen/source=bybit/category=linear/symbol=BAKEUSDT/year=2025/part.parquet": "926895917b90685a8975ae9ddecb2135ed22fcccba836f9c25bbe095cc2665c0",
+  "frozen/source=bybit/category=linear/symbol=BALUSDT/year=2022/part.parquet": "f9da32c93a774daf7fa0761c733d152dd186cc959ff86d9d4f93121ecea0cd20",
+  "frozen/source=bybit/category=linear/symbol=BALUSDT/year=2023/part.parquet": "e236735db5ee70a24de5541c58200e35abb9370da167f4bff8902a3c5099aa8e",
+  "frozen/source=bybit/category=linear/symbol=BALUSDT/year=2024/part.parquet": "6e41c7ce89deafa0780dd1dba3b61cb94f3b99e216ed935b501ea5bbad616e1a",
+  "frozen/source=bybit/category=linear/symbol=BALUSDT/year=2025/part.parquet": "2680da150761b491d93ac5b19e3206db8b3e4c0776c3b6791f823835a75de134",
+  "frozen/source=bybit/category=linear/symbol=BDXNUSDT/year=2025/part.parquet": "ed2209fe8b6da1d8640b5914cd4b96a2fe0a0d67fe8dc017fde4656ca0554ed0",
+  "frozen/source=bybit/category=linear/symbol=BENDOGUSDT/year=2024/part.parquet": "476785c64b8b5271bd355234cd333f889e8389dc7690b5da7f4eb9d08fb6d4ea",
+  "frozen/source=bybit/category=linear/symbol=BENDOGUSDT/year=2025/part.parquet": "387f1b40ee7038b7936f6460e9b1181fc3623e2fcf75d87e99e6e7dd392de315",
+  "frozen/source=bybit/category=linear/symbol=BILLYUSDT/year=2024/part.parquet": "4fbaded7074e022df6bf6a2b7040f5ae2f584c093865f4523ed1b1b5a03dd0ef",
+  "frozen/source=bybit/category=linear/symbol=BILLYUSDT/year=2025/part.parquet": "f60a81459c8f5ec310f2bf6d002e2f603020c94214cc780e3a29d0bcedcbe752",
+  "frozen/source=bybit/category=linear/symbol=BITUSDT/year=2021/part.parquet": "a783735d869e5a47383d35bf22114ca5c601d224c5c00ffef0e70519651d64dd",
+  "frozen/source=bybit/category=linear/symbol=BITUSDT/year=2022/part.parquet": "da492a5027290b71f83729b90116be8b60e06eff859182feb2f1d17c297374bb",
+  "frozen/source=bybit/category=linear/symbol=BITUSDT/year=2023/part.parquet": "e83868401061abae9b0f4b5679edf7909ed320d732b1deb019b2b519e10df6f8",
+  "frozen/source=bybit/category=linear/symbol=BLUEUSDT/year=2024/part.parquet": "51c6b53120f8975a1c72623ebdd3e68b5c6266156ee37ea1cfd93d7e4dff1e01",
+  "frozen/source=bybit/category=linear/symbol=BLUEUSDT/year=2025/part.parquet": "da3286ce4fc06d08353d23a21bc05970f5b430225a868874069629dac1a453e9",
+  "frozen/source=bybit/category=linear/symbol=BLZUSDT/year=2022/part.parquet": "4c6c598e72eb4e2e4eb5b316e72e1bad967be9f8d954149069ae15e7bdb3bdb7",
+  "frozen/source=bybit/category=linear/symbol=BLZUSDT/year=2023/part.parquet": "0ffd947c9107df984913a7bdc62f48f52739517a32be3199810e3d4d64fdd320",
+  "frozen/source=bybit/category=linear/symbol=BLZUSDT/year=2024/part.parquet": "d01b6389118fb67b2cce53fe6b06042673214304c74a6dacdb3972954998b9b2",
+  "frozen/source=bybit/category=linear/symbol=BNXUSDT/year=2023/part.parquet": "aa96429b2cdcf8f1afb77132cbe8a5528d07e4732f901f9b85419ac49292b894",
+  "frozen/source=bybit/category=linear/symbol=BNXUSDT/year=2024/part.parquet": "f1e611fe77bb5da45a1601e1cdd5988889a0ced878542bc875695f02044a4fd9",
+  "frozen/source=bybit/category=linear/symbol=BNXUSDT/year=2025/part.parquet": "bdfe09fc26f4334193b4de635de0c1ef299f96b7dd3b55730b6bd8e5a712d5c2",
+  "frozen/source=bybit/category=linear/symbol=BOBBOBUSDT/year=2025/part.parquet": "b827b02da22fda5d4b81f67b9b71c874dba25c38b5bed030caea17bc6e7d4b8f",
+  "frozen/source=bybit/category=linear/symbol=BOBBOBUSDT/year=2026/part.parquet": "a517370dc8b57d98059f35dde55c209576e9590b5a4b9be3f1b7e5837c36f98f",
+  "frozen/source=bybit/category=linear/symbol=BONDUSDT/year=2023/part.parquet": "bd20f8abdb22728ea581eb6ed894f28c8febe241847970757a9f114749145ce3",
+  "frozen/source=bybit/category=linear/symbol=BONDUSDT/year=2024/part.parquet": "739b7640d92c45721dac466fdde6855d0c0a63c08d404f3de6821d82be2183b7",
+  "frozen/source=bybit/category=linear/symbol=BSUUSDT/year=2025/part.parquet": "e3a2bb01f54792a776c779eda0f8b5ae5c7ec43e8ca0584f7934cbe4286be325",
+  "frozen/source=bybit/category=linear/symbol=BSUUSDT/year=2026/part.parquet": "c2212609c1eba67a160eb71a5a25ea112bf950db7efa8202e574cf0b52252fb5",
+  "frozen/source=bybit/category=linear/symbol=BSWUSDT/year=2022/part.parquet": "73e39e7257687645b7ae91e2cb761b9f8cfa876e26f42c0b517db841bdd508dd",
+  "frozen/source=bybit/category=linear/symbol=BSWUSDT/year=2023/part.parquet": "410fe4a6314958ff932b4be280f2be44bd382c852c8d9eb03d4b14dbee0febe2",
+  "frozen/source=bybit/category=linear/symbol=BSWUSDT/year=2024/part.parquet": "1999f484105613e7265127b457f8a02878f62e3ebff6b4ff6a21a90102bb07cc",
+  "frozen/source=bybit/category=linear/symbol=BSWUSDT/year=2025/part.parquet": "6a08469891b3a4347043672bd5e7dff3a4845d378b9ea0c79c9d519d13f29045",
+  "frozen/source=bybit/category=linear/symbol=BTTUSDT/year=2021/part.parquet": "6404306926107c5c4869d9159c7dbf827c0fda30b079d00c33a58061fdf7e92e",
+  "frozen/source=bybit/category=linear/symbol=BTTUSDT/year=2022/part.parquet": "4c17ad3fdae03a807c57e1a3c99783015bd1e236adb1ec513c2d59e93182952f",
+  "frozen/source=bybit/category=linear/symbol=BUSDUSDT/year=2023/part.parquet": "7240ef72c82720f8a38f85eb27e5f89e00bd097682b5f80f61548bb97cdeadfe",
+  "frozen/source=bybit/category=linear/symbol=BUZZUSDT/year=2025/part.parquet": "d71a1cf1db1e53b3dafcac015ed188c731435a8ed0ace0ba89790730e0b9eade",
+  "frozen/source=bybit/category=linear/symbol=CAMPUSDT/year=2025/part.parquet": "ea120a09b8c52279988aba396ce3fd35bee9c48de22e06289fafb6fac92b9805",
+  "frozen/source=bybit/category=linear/symbol=CAMPUSDT/year=2026/part.parquet": "198189d2c52a19dc47858eb94c700c426b626b300d0cc76b3adb2bf8d789d698",
+  "frozen/source=bybit/category=linear/symbol=CANTOUSDT/year=2024/part.parquet": "c396410ecd9e82dcf1411ff3b2a9fd8a8a4ce22a9300e9bd6e8970b9a961ab1a",
+  "frozen/source=bybit/category=linear/symbol=CEEKUSDT/year=2022/part.parquet": "32a6f0cdfef83203d1f252f6abb688858df174cbf40c252d3993b331197e1ea6",
+  "frozen/source=bybit/category=linear/symbol=CEEKUSDT/year=2023/part.parquet": "b400d000faf5ca55fa5c1474eb3aa9f694f4f9e521db41aabfd99012fbb3c639",
+  "frozen/source=bybit/category=linear/symbol=CEEKUSDT/year=2024/part.parquet": "864c062c8cc668ba5a38f42f9e2aa76c5540066f3f0f8ffcefbc7c9f8ad53f15",
+  "frozen/source=bybit/category=linear/symbol=CELRUSDT/year=2021/part.parquet": "287bbab4368fac00c3cfbf2345b2370f5be71b3e09dc7003bad390d83763678f",
+  "frozen/source=bybit/category=linear/symbol=CELRUSDT/year=2022/part.parquet": "4acaaab129353f8f2698f7ba8224145df5ed173e7d06aba8e8b2bea3031c6044",
+  "frozen/source=bybit/category=linear/symbol=CELRUSDT/year=2023/part.parquet": "7db133424d05122d8f0d8315cffb3badb3f706c978073fe95c6fc8443d22791d",
+  "frozen/source=bybit/category=linear/symbol=CELRUSDT/year=2024/part.parquet": "4a61b3dacf1271cf362c3fd007bf398c4843f824fc96701ca1361137b58fb66f",
+  "frozen/source=bybit/category=linear/symbol=CELRUSDT/year=2025/part.parquet": "3fe345387524560c83e355f6229f3bf06c20d47f6f37c9697e5ed47fd50a988c",
+  "frozen/source=bybit/category=linear/symbol=CHESSUSDT/year=2024/part.parquet": "83f6ea62db1764d9aba3e37a7ab997e7184822ae9a45a698ef7a6ef73ef46324",
+  "frozen/source=bybit/category=linear/symbol=CHESSUSDT/year=2025/part.parquet": "7839368e7ada949158f02c9293c4f62a8640ff1bf54876262e87aeaa839996d0",
+  "frozen/source=bybit/category=linear/symbol=CLOUDUSDT/year=2024/part.parquet": "668b54a46d505b53ed1a44a55a6706143d91a38bc8c860d07aabc8c71853d809",
+  "frozen/source=bybit/category=linear/symbol=CLOUDUSDT/year=2025/part.parquet": "a183e8b9c0ccb7e40999fc3f9978e3ccde4619230769e849850f109168942758",
+  "frozen/source=bybit/category=linear/symbol=CLOUDUSDT/year=2026/part.parquet": "b76cca11d252c0071c95b32b06f7d27020a903059c4f6335050d749037e0ffb7",
+  "frozen/source=bybit/category=linear/symbol=COCOSUSDT/year=2023/part.parquet": "f37d0f777b51149d6f8b57dbf31b71564e2ec35a62fb3406e593b74f8029141e",
+  "frozen/source=bybit/category=linear/symbol=COMBOUSDT/year=2023/part.parquet": "a43d22b080adf5e4a94d6268790f42a6426db5d680916f5aa1ccd849305acfac",
+  "frozen/source=bybit/category=linear/symbol=COMBOUSDT/year=2024/part.parquet": "b44707f074bc74ec4027e2f577b5fe29c56efdcf911dd84522a284d0daaa9a86",
+  "frozen/source=bybit/category=linear/symbol=COMBOUSDT/year=2025/part.parquet": "3b10556694f9d4415043e6030075cecec92f9c893d70f552a90efe839564cda7",
+  "frozen/source=bybit/category=linear/symbol=COMMONUSDT/year=2025/part.parquet": "5da34be4e923cd0ae2c8d3cc2f904f6be52dfca2da4eb2477502b08bd0d40294",
+  "frozen/source=bybit/category=linear/symbol=COMMONUSDT/year=2026/part.parquet": "af287ca4bac05b859115cc28c2da7f4dec05e2da4d670b75088fc658742c7578",
+  "frozen/source=bybit/category=linear/symbol=COOKUSDT/year=2024/part.parquet": "0d4d6ea66e0928f796e367f353c9dfb7ba0ecb58addbfcd1cfd129e7faa2f3ea",
+  "frozen/source=bybit/category=linear/symbol=COOKUSDT/year=2025/part.parquet": "59be78eb9636f82f4e6fff31d80dda7404414ddbd2a7df6878588ca311eb5c4b",
+  "frozen/source=bybit/category=linear/symbol=COOKUSDT/year=2026/part.parquet": "ecb30e35f87db96210c0d0b13aee0ade9423aa99a8fba5baa45224b690689774",
+  "frozen/source=bybit/category=linear/symbol=COSUSDT/year=2024/part.parquet": "baf2eb24b9b0afc24dfbcf19a25b66d5f03c467d87cdae19d17ba05f53591780",
+  "frozen/source=bybit/category=linear/symbol=COSUSDT/year=2025/part.parquet": "0276e50b26c04c4ab1071aebf6b29d53e8c56eca09b76e3a06f579078417c7cd",
+  "frozen/source=bybit/category=linear/symbol=COVALUSDT/year=2024/part.parquet": "4e49afabbd2e686e079edb943b6f8d7233790b883720a7dadcf0937ceee84398",
+  "frozen/source=bybit/category=linear/symbol=CPOOLUSDT/year=2025/part.parquet": "f5e2c361eb40d670279552d51e326e1e238e7e6aa9c80ab182a0a175063906cb",
+  "frozen/source=bybit/category=linear/symbol=CREAMUSDT/year=2022/part.parquet": "418e13cfac3692d016e82a287a60a31cf334234b0e44bb0f18f7976c778daade",
+  "frozen/source=bybit/category=linear/symbol=CREAMUSDT/year=2023/part.parquet": "c07e71b86500f53b19a768b702c048fce399cf22dd3915b62e3f644134370122",
+  "frozen/source=bybit/category=linear/symbol=CTKUSDT/year=2021/part.parquet": "b8d89fd832da9349b1c882ac9009361818f7df386f084b817ef706dfa7b44440",
+  "frozen/source=bybit/category=linear/symbol=CTKUSDT/year=2022/part.parquet": "f7c1bff97ef569532d061453898e44b5a1c73c9e8ce74f3b3d2156318ea2e1f2",
+  "frozen/source=bybit/category=linear/symbol=CTKUSDT/year=2023/part.parquet": "5b92f297b52006a3ac24149613ceaf239ecca5627815ca17a8ecc6a3fd1a9dbb",
+  "frozen/source=bybit/category=linear/symbol=CTKUSDT/year=2024/part.parquet": "eb5bb1cbf8b6293469aad39fa9b6410688c00f8e74504a950cb18693070be4d4",
+  "frozen/source=bybit/category=linear/symbol=CTKUSDT/year=2025/part.parquet": "1efc05900c5a2e00ff45e82d3a951554bbbcb40282f05345bdb5d17f4bd6d349",
+  "frozen/source=bybit/category=linear/symbol=CTKUSDT/year=2026/part.parquet": "d6ca7f88fdc2b5816d93c7136e9b53de1728f3aa4ebe80d1161cfa08e8669acf",
+  "frozen/source=bybit/category=linear/symbol=CTSIUSDT/year=2022/part.parquet": "cede96e5f5194d1adad7d408c767ad5fb4b86d6b3e0022d5ae898b9e07d6e460",
+  "frozen/source=bybit/category=linear/symbol=CTSIUSDT/year=2023/part.parquet": "4613d688a7fc61234f47cd9119bf0a1808d6c3515c58902429d3f83a49e661ff",
+  "frozen/source=bybit/category=linear/symbol=CTSIUSDT/year=2024/part.parquet": "b95f705c893966b927420ca04a4a54891f993bcfb8be4730c55e3079457818d2",
+  "frozen/source=bybit/category=linear/symbol=CTSIUSDT/year=2025/part.parquet": "3a8f28e27d76660e39b49fd6c0f99fe1c137e81f125d6e43f2d98e3baae451ca",
+  "frozen/source=bybit/category=linear/symbol=CTSIUSDT/year=2026/part.parquet": "1b113ad9a1f78fef82d219714db8e445f2520c2371c479c866a51ee07cf7d222",
+  "frozen/source=bybit/category=linear/symbol=CUDISUSDT/year=2025/part.parquet": "6e36e994441728e09ce90a29ca23d08038785b9be4818b0eb5c49547b2dbea06",
+  "frozen/source=bybit/category=linear/symbol=CUDISUSDT/year=2026/part.parquet": "e77555752ef0ff84099e33d5398c9341017d110727e2d5de6d250f4badda2995",
+  "frozen/source=bybit/category=linear/symbol=DAMUSDT/year=2025/part.parquet": "85b6b17f009a5ece1ca9149ac0c321cf73c9614cbd6ff34111aa4c36eb8188b3",
+  "frozen/source=bybit/category=linear/symbol=DAMUSDT/year=2026/part.parquet": "68e710b767bfc9400b4ad6b1eba9a153a8cec1df62ba790c6baa3753ed6d88fa",
+  "frozen/source=bybit/category=linear/symbol=DAOUSDT/year=2024/part.parquet": "edd933369349fa883fa6d50f485d75462ba6bdb7a1139ddbd11d884b29afc02d",
+  "frozen/source=bybit/category=linear/symbol=DARKUSDT/year=2025/part.parquet": "78aaf9172b746a84054b1a8c724402f77296e8edb6553bd83facbe02c26c1937",
+  "frozen/source=bybit/category=linear/symbol=DARUSDT/year=2022/part.parquet": "a2dca88ba593f934d0d7b32c3e7b53041f75cd38dfc9bec9a17c9991facb99b8",
+  "frozen/source=bybit/category=linear/symbol=DARUSDT/year=2023/part.parquet": "e3203b8cab2e81295e183bac3d27c1368de778e7ee222a0a36252f7647ecf543",
+  "frozen/source=bybit/category=linear/symbol=DARUSDT/year=2024/part.parquet": "57b4966aa8807cfa1e4d5fc8dc18b1ade178c882d341321af7d9256d753394c8",
+  "frozen/source=bybit/category=linear/symbol=DARUSDT/year=2025/part.parquet": "730f15d55c05535a547b5758ef1b86aa5581b765df91a2f80516ab7c1df9bac0",
+  "frozen/source=bybit/category=linear/symbol=DEGENUSDT/year=2024/part.parquet": "92eb21c97a9f70919687212db389eb30c6243f50586745a1e1145d4d57426380",
+  "frozen/source=bybit/category=linear/symbol=DEGENUSDT/year=2025/part.parquet": "a6e243e122023eba180a7190fd884132fd61d8c3dba9b87b9bbe519640b04efe",
+  "frozen/source=bybit/category=linear/symbol=DEGENUSDT/year=2026/part.parquet": "dd19f6ca2b461dd241b570a0e80a69a5778c22c99cdbda6060910db29f965e9e",
+  "frozen/source=bybit/category=linear/symbol=DENTUSDT/year=2022/part.parquet": "f738500055185cc6a4c599a21786650082c8d88c70c6dacfb3535ec18e288354",
+  "frozen/source=bybit/category=linear/symbol=DENTUSDT/year=2023/part.parquet": "7923384e3d1299e577482b7600284307cf4606b2a8ddd0d536a3e2f578455da5",
+  "frozen/source=bybit/category=linear/symbol=DENTUSDT/year=2024/part.parquet": "bf267ec786f90c76404d8a8ccc47907c7c2f8d31472389a5b0367b8f7e22cb22",
+  "frozen/source=bybit/category=linear/symbol=DENTUSDT/year=2025/part.parquet": "0db8a687919809eeb650dfedce937d58d331376882c328cff8d5aa82ec36a473",
+  "frozen/source=bybit/category=linear/symbol=DENTUSDT/year=2026/part.parquet": "9f27ac1a8585d3b3a9c8f368818e8086977dab74455891ffd2a29187632858d2",
+  "frozen/source=bybit/category=linear/symbol=DGBUSDT/year=2022/part.parquet": "85121e82b82a97781fc05507823429d796d7e4390e428f309efe03f4d0c6f695",
+  "frozen/source=bybit/category=linear/symbol=DGBUSDT/year=2023/part.parquet": "faa4dbac2b8a3f54f491fbd166334bf34ba67b7d1f69a3561370433a89c7c807",
+  "frozen/source=bybit/category=linear/symbol=DGBUSDT/year=2024/part.parquet": "2e7b352544ebbd400d16eedbd8bbba8aa458dd260a94c51787ea8d2bd17c8735",
+  "frozen/source=bybit/category=linear/symbol=DGBUSDT/year=2025/part.parquet": "a4e50753afc60c0f5fad4f59b30f51263fe8fac4cc84497bbc7a432ad56265a0",
+  "frozen/source=bybit/category=linear/symbol=DGBUSDT/year=2026/part.parquet": "a9a4666058fee5e1d0650ef93ffc26153a3c3413a69d75c966fca08c1f98a486",
+  "frozen/source=bybit/category=linear/symbol=DMCUSDT/year=2025/part.parquet": "4c63ae188287345feec429fecf6ee4bebce08c38a9230c4ecfb9df1bf2f3ce98",
+  "frozen/source=bybit/category=linear/symbol=DODOUSDT/year=2022/part.parquet": "86ae1df60e97875b32c0e9b7fd5dd03ab929f1efdf98e69869e7b0e1be99305b",
+  "frozen/source=bybit/category=linear/symbol=DODOUSDT/year=2023/part.parquet": "53624c4876cfda38bc864f13b0b25545066d9bd20cc888ae65920828303802b7",
+  "frozen/source=bybit/category=linear/symbol=DODOUSDT/year=2024/part.parquet": "aa39b7c7303758e13fd9fdab0140661a63fadd41ca29e9a9c5211887c03620fd",
+  "frozen/source=bybit/category=linear/symbol=DODOUSDT/year=2025/part.parquet": "079bd5703712b515b8b530a1605fe8cdf9e98d2e1515729d3c2227b8accffe6b",
+  "frozen/source=bybit/category=linear/symbol=DODOUSDT/year=2026/part.parquet": "b49155cc15acf3612c5251dea984c802addc5815e545ac617b572ef33fa8075e",
+  "frozen/source=bybit/category=linear/symbol=DOGSUSDT/year=2024/part.parquet": "7f38628dbd446aaa3cf086b0176041133419298283101c73574a4f7331622e00",
+  "frozen/source=bybit/category=linear/symbol=DOGSUSDT/year=2025/part.parquet": "a6eb8e1b70dbab974543a8eaeeed21d1128800207426892194a1b75b48c82bb2",
+  "frozen/source=bybit/category=linear/symbol=DOGUSDT/year=2024/part.parquet": "69d79f69f6f92601949658d39df650d2d490af78517a3e2519883372f257fd32",
+  "frozen/source=bybit/category=linear/symbol=DOGUSDT/year=2025/part.parquet": "83798cbfde84e72bcb699aa486f8470079b035838582139c52675324ac3db332",
+  "frozen/source=bybit/category=linear/symbol=DOGUSDT/year=2026/part.parquet": "261f060c9a5a861f7ea3e5190c17af4d1ec9badf2a59fd7ddedb0c278abcd3f5",
+  "frozen/source=bybit/category=linear/symbol=DOP1USDT/year=2024/part.parquet": "ff146dc79b1b74138b283f50e1b0c22f6e463729e6d4c098d1e2af84003200d6",
+  "frozen/source=bybit/category=linear/symbol=DOP1USDT/year=2025/part.parquet": "8c7d5b63f1b961a9f7fc2ac62bc1e3cfcd560b1c976517b2aafc5ba0b534993e",
+  "frozen/source=bybit/category=linear/symbol=DUCKUSDT/year=2025/part.parquet": "786751a5f1dc974fb16b9d3e539d02bf5810f7b7ec5b09f2dd7344a7f77ac092",
+  "frozen/source=bybit/category=linear/symbol=ELXUSDT/year=2025/part.parquet": "bcad900712ddd43ad748b6fe93da13380aa234d8400dc3e35cf60660c7f93fd3",
+  "frozen/source=bybit/category=linear/symbol=EOSUSDT/year=2021/part.parquet": "3cf397210a20a97877c2ba20d1c49234e597e6c804542b1e6dbd98b42058c9d4",
+  "frozen/source=bybit/category=linear/symbol=EOSUSDT/year=2022/part.parquet": "2550955b482baf712c745e508d24791192394fc0dc7d54ffa16a4ea4fee88305",
+  "frozen/source=bybit/category=linear/symbol=EOSUSDT/year=2023/part.parquet": "d2a75af60018af210f939a786b5760f07896a0ebbda82804a78f5dafa746665d",
+  "frozen/source=bybit/category=linear/symbol=EOSUSDT/year=2024/part.parquet": "2045b2b96b606111c49842a38cd7eba8295c57193a5d5fc06bc1dbf6719122cb",
+  "frozen/source=bybit/category=linear/symbol=EOSUSDT/year=2025/part.parquet": "447d68e27aac0ed5c0d0ec41ecb220e32f5bd2a071a7591069370c4cfbbd9152",
+  "frozen/source=bybit/category=linear/symbol=EPTUSDT/year=2025/part.parquet": "89dc3089229033c2ef45a982c51f3f3c6d54e37d24c075d46cb6f4beb8f41feb",
+  "frozen/source=bybit/category=linear/symbol=EPTUSDT/year=2026/part.parquet": "c7be80a8ed46f2ba936b8cbe9a90298662a69172d8c28d714a4782855e5cdb45",
+  "frozen/source=bybit/category=linear/symbol=ESUSDT/year=2025/part.parquet": "85e428d911f0eb42e5d8d2c7a7a6ca3ce48335b4236f6122044d583c83f52875",
+  "frozen/source=bybit/category=linear/symbol=ESUSDT/year=2026/part.parquet": "21d3fa19a553f974f6825e88798a487c81a0cde9513d9a3186bb4966a9393df2",
+  "frozen/source=bybit/category=linear/symbol=ETHWUSDT/year=2022/part.parquet": "b10173f1e8d0697a355b2b8ae196a18cd3be1da7ebfe77ddae5b6fd6b794c143",
+  "frozen/source=bybit/category=linear/symbol=ETHWUSDT/year=2023/part.parquet": "3c5ae8892ebc035f98dc2b39d8aca0852adfb83d5ffe1057fc5d09156f167a80",
+  "frozen/source=bybit/category=linear/symbol=ETHWUSDT/year=2024/part.parquet": "3786c5bf1228acd6973f75816e5e75eef736f859d6ced6db3e6527c4590cf75d",
+  "frozen/source=bybit/category=linear/symbol=ETHWUSDT/year=2025/part.parquet": "0e96f011da2cab1142c04eb6ac37c3aa16538ade4eb33936f3df21cab35cc096",
+  "frozen/source=bybit/category=linear/symbol=FBUSDT/year=2024/part.parquet": "7fc4e9de7b07b43997fd413281ab7c374a37c54fc2787eea072f9c9176de3473",
+  "frozen/source=bybit/category=linear/symbol=FBUSDT/year=2025/part.parquet": "2e439f538a507665523e1f509e59c9c0498cf478da11c26a90f628b2e02efe64",
+  "frozen/source=bybit/category=linear/symbol=FDUSDUSDT/year=2024/part.parquet": "a7b8e463fa16a7bb3342bfef938dcc8ae3a4eca0ed8771c04b52c3e46cf2abc9",
+  "frozen/source=bybit/category=linear/symbol=FDUSDUSDT/year=2025/part.parquet": "f02dd3489bf517a1c3878f382b1e5ce8ed36c0e4daab4f1e86d35f11117b97aa",
+  "frozen/source=bybit/category=linear/symbol=FETUSDT/year=2023/part.parquet": "e8f428ca709791e06b161d7a85c46749a127f81c80baa654420540f8a3e94dd6",
+  "frozen/source=bybit/category=linear/symbol=FETUSDT/year=2024/part.parquet": "fcfee17a83e8b6bf45b855863e1cc5312b69ca0fb34980177620a25dd3a24ad2",
+  "frozen/source=bybit/category=linear/symbol=FIOUSDT/year=2024/part.parquet": "43ecfab040e023e6d11dd7e906ecc2bd9f5683f18197ded8913ed0b4f8548896",
+  "frozen/source=bybit/category=linear/symbol=FIOUSDT/year=2025/part.parquet": "7dcc5562dc5cc64ceaea5dd4876208cec4926eadb14ac9848f682224c5a033ee",
+  "frozen/source=bybit/category=linear/symbol=FIOUSDT/year=2026/part.parquet": "07cb9a51eb93d4507e081091cae9a995f764b5be5a27f74104121ae04150a1e1",
+  "frozen/source=bybit/category=linear/symbol=FIREUSDT/year=2024/part.parquet": "399eb0bb04ec5071454cfdc37210010324c4d796e4edaba17a57499cc6f68eb2",
+  "frozen/source=bybit/category=linear/symbol=FIREUSDT/year=2025/part.parquet": "16881fb68ae6ef94e2e164fc44d1b8acdbd8475382b70c74032ad2f109d6d102",
+  "frozen/source=bybit/category=linear/symbol=FISUSDT/year=2025/part.parquet": "e897fde8a99c1ae561f53299c49eff0f411ab14ad22caeb137c902c503aa3a50",
+  "frozen/source=bybit/category=linear/symbol=FITFIUSDT/year=2022/part.parquet": "2faf0039d4ec7f8e4e915fa8879542a56945be383babe2e7c4fff80b33346dd6",
+  "frozen/source=bybit/category=linear/symbol=FITFIUSDT/year=2023/part.parquet": "027c0d0ed6cf7be0a2579ac2b2bf7505b5ab4186ebacccbbbfbfcd25ab976eed",
+  "frozen/source=bybit/category=linear/symbol=FITFIUSDT/year=2024/part.parquet": "786d6762c78e59c815fbfaf50a72545e649feabd07512b93f1c4d856c9198f7c",
+  "frozen/source=bybit/category=linear/symbol=FLMUSDT/year=2022/part.parquet": "dc366efdde6b94408a78e4b78845e24882df481f90c60027a1079d8bec0e7bf4",
+  "frozen/source=bybit/category=linear/symbol=FLMUSDT/year=2023/part.parquet": "144914d7cfac7dcf76e2b9e2ce1bee649bc09aee4e75146db1a6bdcf8eb34aa2",
+  "frozen/source=bybit/category=linear/symbol=FLMUSDT/year=2024/part.parquet": "dd019592f1b41dfc0ded078d7bd04bd611900f8338138198d67b33b479326623",
+  "frozen/source=bybit/category=linear/symbol=FLMUSDT/year=2025/part.parquet": "ef469c21afbcb431b5047d19caf1ce7bba3ebf9d1644f98972feae49dbbcac55",
+  "frozen/source=bybit/category=linear/symbol=FORTHUSDT/year=2023/part.parquet": "de23a240a5680c424a7a66001dbc67f2e138bfcc2f8cf11bdce942eb0a713868",
+  "frozen/source=bybit/category=linear/symbol=FORTHUSDT/year=2024/part.parquet": "b3642b66ac7f048da5ffb4a3e5caa9c48648ccb6e68bb974c9b4261c9f3946d1",
+  "frozen/source=bybit/category=linear/symbol=FORTHUSDT/year=2025/part.parquet": "3a0c86215790cac1cd33324ff497a6af9f6bd57e400b18ff2f49176d58965ba3",
+  "frozen/source=bybit/category=linear/symbol=FOXYUSDT/year=2024/part.parquet": "9adccbd9cd79b85ce4d12bf562a368c749ca28d4fe59077a6acc1d5f6e788c04",
+  "frozen/source=bybit/category=linear/symbol=FOXYUSDT/year=2025/part.parquet": "6d198db2b29c9ac2ca3eed5ec9215f6aedc98651e7f533a836aa72dddd8acf35",
+  "frozen/source=bybit/category=linear/symbol=FRAGUSDT/year=2025/part.parquet": "0a785d7de2aa5a4318dc01fb2c0712e12e4c7ac64277f11b07f69b5679a9114f",
+  "frozen/source=bybit/category=linear/symbol=FRONTUSDT/year=2023/part.parquet": "2e0a26ae0e2c760c2116a83088787f83c1aed8e54f6e72cc020a516988323252",
+  "frozen/source=bybit/category=linear/symbol=FRONTUSDT/year=2024/part.parquet": "c41f3e57275fc6e95928e8fc46cd7836b0d86075a73ad72fe617593f757541eb",
+  "frozen/source=bybit/category=linear/symbol=FTMUSDT/year=2021/part.parquet": "89cf729df1be55fdc5655479bdf12c124391ece688d3b100a1c829dc6d94317e",
+  "frozen/source=bybit/category=linear/symbol=FTMUSDT/year=2022/part.parquet": "6e0eefde3b1258ce2fa7849ae17bb5568daa6c9e98ac2bb42c32c4a69fe6f82b",
+  "frozen/source=bybit/category=linear/symbol=FTMUSDT/year=2023/part.parquet": "75baae9117fbab5c7d116ef3c683a90a5c6d962736fd4b46af578618253fa568",
+  "frozen/source=bybit/category=linear/symbol=FTMUSDT/year=2024/part.parquet": "4477919ac6d8b67b2b495856678541b410b77305721a8b89e4d4714f25f205e4",
+  "frozen/source=bybit/category=linear/symbol=FTMUSDT/year=2025/part.parquet": "ab182037cd68222adc1ada96b302abbda419f56d6e51a5872b18641f06d742c5",
+  "frozen/source=bybit/category=linear/symbol=FTNUSDT/year=2024/part.parquet": "6d7c6125b2df03762a802cd9ac38a229bb14ca24477c0c6384e6f6b7f93e7a37",
+  "frozen/source=bybit/category=linear/symbol=FTNUSDT/year=2025/part.parquet": "96c1767326c2d8632c211bbb59ba83af0b22987f7f3833e52a5fa7637b785da2",
+  "frozen/source=bybit/category=linear/symbol=FTTUSDT/year=2021/part.parquet": "bb4321ff7e21e7d4d55118eb12ad79b89e3a37e401b2ce43d70ad15b1e1ce80c",
+  "frozen/source=bybit/category=linear/symbol=FTTUSDT/year=2022/part.parquet": "2274ed994fa389518e90ddc6cff9c9c9e81dc64dce1c0d3cc4f03b2be1e7f0f5",
+  "frozen/source=bybit/category=linear/symbol=FUELUSDT/year=2024/part.parquet": "732c64eae445b24d60f105298857835f1ba7447b6f396c90dfaf9f7d79e8a2ea",
+  "frozen/source=bybit/category=linear/symbol=FUELUSDT/year=2025/part.parquet": "43e2c390c3e61eee09c3fecf44397a51762197307bdaa0d83bdb570720929acf",
+  "frozen/source=bybit/category=linear/symbol=FUNUSDT/year=2023/part.parquet": "5dfb700446c3f55ede8ff103cc8ed7195f3cabff5d56c5e91bfcf0a892a61c6a",
+  "frozen/source=bybit/category=linear/symbol=FUNUSDT/year=2024/part.parquet": "a3b113ec537bbaaf46f4482e9d0428655f168f9d4e3eb968c489ed6e3b230548",
+  "frozen/source=bybit/category=linear/symbol=FWOGUSDT/year=2024/part.parquet": "0c7ecebbbe704ed43b73bad54bfc04ee3581b0b38a6ce633a0e5c8ca19bd8e40",
+  "frozen/source=bybit/category=linear/symbol=FWOGUSDT/year=2025/part.parquet": "5e7b00c88e570c51a8f49d22558fc6b0a73967c603a791cbfc5c5f3aabb17e35",
+  "frozen/source=bybit/category=linear/symbol=FWOGUSDT/year=2026/part.parquet": "d19c66b7ff2dcb51c7426c1cfd97422e294666079e5baa0ed95e9aea1fe5c5cb",
+  "frozen/source=bybit/category=linear/symbol=FXSUSDT/year=2022/part.parquet": "cf6af072e7cb9615cb422474e75b1cd8402ea7e834adce6a133cf61132c9720d",
+  "frozen/source=bybit/category=linear/symbol=FXSUSDT/year=2023/part.parquet": "25188815b049567ac6b654b6259db584510143972c0a5ec60ba104a6c2da214c",
+  "frozen/source=bybit/category=linear/symbol=FXSUSDT/year=2024/part.parquet": "39e501ceb3f63a04b1b8f584d0b4576d6fede4a8ad02e55923c6d3a07b0838a6",
+  "frozen/source=bybit/category=linear/symbol=FXSUSDT/year=2025/part.parquet": "8ee6a6c9c3a959dc960beb334f05f32ba76c456f89da67e91648b5e4f5616961",
+  "frozen/source=bybit/category=linear/symbol=FXSUSDT/year=2026/part.parquet": "bc2468c687bc2ee0c5222ca902954db54a760ee132cff99335973656dc52d36f",
+  "frozen/source=bybit/category=linear/symbol=GALUSDT/year=2022/part.parquet": "ef9326c2107367bbfe35e2222beec4733f4f07d6c96a24b2daa73061300d20e8",
+  "frozen/source=bybit/category=linear/symbol=GALUSDT/year=2023/part.parquet": "b00c0a60b4eb5b7a40b346bbc270d0739cbc680b3d2d21465774ef0f5a42e16a",
+  "frozen/source=bybit/category=linear/symbol=GALUSDT/year=2024/part.parquet": "f3712e7653c12dd6172542d08918af3e383e9df9f46f73fb2e6241e7beafb8c7",
+  "frozen/source=bybit/category=linear/symbol=GEMSUSDT/year=2024/part.parquet": "049e8f8983a257fd9d9a964d596d64a588117dced79291972a48a971abac9d65",
+  "frozen/source=bybit/category=linear/symbol=GEMSUSDT/year=2025/part.parquet": "5cf7188e20ca414e25c2dc8f1804d8cfd5bada2ab863dc93c25e96815e4477fa",
+  "frozen/source=bybit/category=linear/symbol=GFTUSDT/year=2023/part.parquet": "e92657e8bfc8c67d2e210f475267799f4c67ae1a4bbb6138474d3e5e68807fe4",
+  "frozen/source=bybit/category=linear/symbol=GFTUSDT/year=2024/part.parquet": "30b111c0fa17ddd9ed3e4de7b4ca2f431ace5232be0410b600a2e28738371669",
+  "frozen/source=bybit/category=linear/symbol=GIGAUSDT/year=2024/part.parquet": "6383ab2ad88b297cd785a2cec53dc3e1eaddc4403651dd589ca7d31cf993a066",
+  "frozen/source=bybit/category=linear/symbol=GIGAUSDT/year=2025/part.parquet": "bebb25e982b3aee47b95d02194fa09b828e861279b7547ea259011deeb8c65db",
+  "frozen/source=bybit/category=linear/symbol=GIGAUSDT/year=2026/part.parquet": "6b9f99c1f847d2053a7ad78e0c69ec7cf3569bcc51007974748d87f93feefec5",
+  "frozen/source=bybit/category=linear/symbol=GLMRUSDT/year=2022/part.parquet": "e5411200c2ba6976e13264cf8fc1f230d71610a68e5aa50ae8c25193d7259430",
+  "frozen/source=bybit/category=linear/symbol=GLMRUSDT/year=2023/part.parquet": "55ea26b37621f4fe3802e848ad9b90180fa774f9a7d24a03e3f78938a1c61bf1",
+  "frozen/source=bybit/category=linear/symbol=GLMRUSDT/year=2024/part.parquet": "41de86fd935eb6aeaa12f27970697385176e058e8b615dadc96e2a4b16130a6e",
+  "frozen/source=bybit/category=linear/symbol=GLMRUSDT/year=2025/part.parquet": "2bf30b0d9c6a7ca7d336bb8370c73addecac862eefe4a44fb5f87f3708028dd6",
+  "frozen/source=bybit/category=linear/symbol=GMEUSDT/year=2024/part.parquet": "90282ca84f37945fc1abbe4d3ce27f6680ba1c8b1fdf00db490586eb410a3d2a",
+  "frozen/source=bybit/category=linear/symbol=GMEUSDT/year=2025/part.parquet": "84f3c043744cc15b00bac3b9d33b567690b211739690504ade3b617d9c0ea9d4",
+  "frozen/source=bybit/category=linear/symbol=GNOUSDT/year=2024/part.parquet": "52398154c78c4f9915e31927b387673220c6f7f4103332e83536610e1ce134b5",
+  "frozen/source=bybit/category=linear/symbol=GNOUSDT/year=2025/part.parquet": "5d2004f4f7262c3a65e2a46ac4d4e6f86b8c0ccc96ee9ab88a0d93edb12db03d",
+  "frozen/source=bybit/category=linear/symbol=GNOUSDT/year=2026/part.parquet": "a249df06dff9c34d2cc52c875e03d8e7a75b266a87598098c4427aa666ab5e5d",
+  "frozen/source=bybit/category=linear/symbol=GODSUSDT/year=2023/part.parquet": "804754d78a1d80a290c4d3e2232a708e2d6f099c41ceb8ba055f9b6ef821b445",
+  "frozen/source=bybit/category=linear/symbol=GODSUSDT/year=2024/part.parquet": "036a60742ad0e0792067017aff0e6691d7f441ccbaef370e6b6ec6afd88095d4",
+  "frozen/source=bybit/category=linear/symbol=GODSUSDT/year=2025/part.parquet": "56475feca53ca92046d39afc155a584d7db9e38b78551b8f245db76a8202e444",
+  "frozen/source=bybit/category=linear/symbol=GODSUSDT/year=2026/part.parquet": "f42801f2467eb3d8c758393c36c8c84945206b4e9cca23a57ba5b9b09b6da78e",
+  "frozen/source=bybit/category=linear/symbol=GOMININGUSDT/year=2024/part.parquet": "8c5bf9f8ad5e3cb006e88306addaa78aca006466e43a6ecfd7cbfa49353212b7",
+  "frozen/source=bybit/category=linear/symbol=GOMININGUSDT/year=2025/part.parquet": "9b57fae90c98eedf7bbc42d2c487bda88bf1c536a4e0cb9e348c974ffe92c9f6",
+  "frozen/source=bybit/category=linear/symbol=GORKUSDT/year=2025/part.parquet": "637a905aebb791d6406eda51e7e7462c3153ec961d1d4b3eab96535039e0c5e3",
+  "frozen/source=bybit/category=linear/symbol=GPTUSDT/year=2023/part.parquet": "79e13ff73edcc9849e15f3e2c980f8171be3d1cd8c54c65ff40507b47e82254d",
+  "frozen/source=bybit/category=linear/symbol=GPTUSDT/year=2024/part.parquet": "c3183d79b03592ac8d13b04442a14212a3c27665ddfdfb0244e21f75d628ba0a",
+  "frozen/source=bybit/category=linear/symbol=GSTUSDT/year=2022/part.parquet": "868d4530cbf9d461a0b0c20413fd0a67fe77462ff6ee1db8e6c43f2a6b345bee",
+  "frozen/source=bybit/category=linear/symbol=GTCUSDT/year=2021/part.parquet": "140b3a788fb6c90113f587e7c82bb2df79da725d6fc379d1a0eb5a5727276210",
+  "frozen/source=bybit/category=linear/symbol=GTCUSDT/year=2022/part.parquet": "0e960a67c34f425dc3671ef267fec97daebbe2108c902995c2dc584ac9a8c501",
+  "frozen/source=bybit/category=linear/symbol=GTCUSDT/year=2023/part.parquet": "7bfd7aa99313dc2f1c8dbf92a7efa9edbf0d9e9842576b075810b2f27f51101f",
+  "frozen/source=bybit/category=linear/symbol=GTCUSDT/year=2024/part.parquet": "d7591f258d965045904d17cc2fe2a01425a04f34fe50471bae433d64a231cc92",
+  "frozen/source=bybit/category=linear/symbol=GTCUSDT/year=2025/part.parquet": "3086d9b113beac90c8727bcca7cf3b1ef969273d3d9113af8cfb2b7615c57466",
+  "frozen/source=bybit/category=linear/symbol=GUSDT/year=2024/part.parquet": "ab35b9b27d790e5e3dd2042095e2d64bd79a27c90bdf0decabb55eb1bb26decb",
+  "frozen/source=bybit/category=linear/symbol=GUSDT/year=2025/part.parquet": "54a8fa5d4db12fcef1182dcd0ff1d12c773baa66eb6ef02c448d0048c5c96377",
+  "frozen/source=bybit/category=linear/symbol=HFTUSDT/year=2023/part.parquet": "0424b9b83c2d9329f4cc3d2e94a8e9f8bf1824f25e19492bd55b2946ab2d6442",
+  "frozen/source=bybit/category=linear/symbol=HFTUSDT/year=2024/part.parquet": "36800ca089474fc1e2d69b8d238bbf5f2c0ba4f54f2de554f9a6f03e5e286160",
+  "frozen/source=bybit/category=linear/symbol=HFTUSDT/year=2025/part.parquet": "24d266371476e041bc424ef8f96e6be71b7ef56c1bc4512a40f795606a8319d9",
+  "frozen/source=bybit/category=linear/symbol=HFTUSDT/year=2026/part.parquet": "fcc70f498cc8414d5edcfa92cb66fc2f80db0ffe81ad85b284767a2488430e38",
+  "frozen/source=bybit/category=linear/symbol=HIFIUSDT/year=2023/part.parquet": "2fb6c76f0455367908331586d5a479056bda60a8cbee2a5a0972e0da7801031a",
+  "frozen/source=bybit/category=linear/symbol=HIFIUSDT/year=2024/part.parquet": "cbccb351f3808558435f1e532a18b422d3becfd93545f1aa2f8e36c27f7f8486",
+  "frozen/source=bybit/category=linear/symbol=HIFIUSDT/year=2025/part.parquet": "b2fa3a864d85c78543fe5c40432799bb7ba5144e10a993087dd0bcd44126743a",
+  "frozen/source=bybit/category=linear/symbol=HIGHUSDT/year=2023/part.parquet": "05c549607e857ba3ecf232c65e1b1ea171f70fa44f4a60da80554fb60a638d30",
+  "frozen/source=bybit/category=linear/symbol=HIGHUSDT/year=2024/part.parquet": "90b9f5ee03e4ebe238f936ffd119ae5a6bc24e255211195afa0f16d2f6beef5b",
+  "frozen/source=bybit/category=linear/symbol=HIGHUSDT/year=2025/part.parquet": "abcc509bb34d8034b6a78609427f9b40a2747889871b1606d3a31ec8544dfa55",
+  "frozen/source=bybit/category=linear/symbol=HIGHUSDT/year=2026/part.parquet": "cf347d14ab9d816a85c95c7700f7322ea341e63e44027bda99c51ce972d89a48",
+  "frozen/source=bybit/category=linear/symbol=HIPPOUSDT/year=2024/part.parquet": "62d67582b6cbbbc152a1d92c0e84be57d72f20caba91c423bd8f1cb9b196de6f",
+  "frozen/source=bybit/category=linear/symbol=HIPPOUSDT/year=2025/part.parquet": "cc45e8535503d4dac0a0fa76cae55337850e40b2e9ec7ec70f80342926ab5144",
+  "frozen/source=bybit/category=linear/symbol=HIPPOUSDT/year=2026/part.parquet": "a1f1c961682c0333a9d5521a5aebeb4b12b6379533918f5fbe0375e3b73fb6ef",
+  "frozen/source=bybit/category=linear/symbol=HOOKUSDT/year=2023/part.parquet": "5df887efb2e223f1348ff001aac113786d09bceb5c10e2391ed8dd051700fd1e",
+  "frozen/source=bybit/category=linear/symbol=HOOKUSDT/year=2024/part.parquet": "da82e5b2b852fe0aa45c1b54b5e8859078964f617153f0dd72aff460c2e5c186",
+  "frozen/source=bybit/category=linear/symbol=HOOKUSDT/year=2025/part.parquet": "2bf188dc9b05565db6e9f46b0a5ca6cedae0fe412e3b9ab030dbff6bca69be28",
+  "frozen/source=bybit/category=linear/symbol=HOOKUSDT/year=2026/part.parquet": "7c1b688d8d18652d2ec44f4762e118fe4b7b7eb981cb22066c3033459b043e08",
+  "frozen/source=bybit/category=linear/symbol=HOTUSDT/year=2022/part.parquet": "74dcc363d01a2682c3ccda4798ec8e31f84ddd0c0535fbfb35079a0ed125d6cd",
+  "frozen/source=bybit/category=linear/symbol=HOTUSDT/year=2023/part.parquet": "110fc5c5808b8d42b360cedb42b312eb2d66d508d08aff7a891a6ab452387518",
+  "frozen/source=bybit/category=linear/symbol=HOTUSDT/year=2024/part.parquet": "0d37a4811a47655c263b156baa8b4de987ddee4ac08e1fd425ebe4e3fae0359a",
+  "frozen/source=bybit/category=linear/symbol=HOTUSDT/year=2025/part.parquet": "af04320c65091faa1325ab0c98a8d6d3401cef5f45bc0cb0ebfb911383e5d022",
+  "frozen/source=bybit/category=linear/symbol=HPOS10IUSDT/year=2024/part.parquet": "f941137ccf35b007d5091e0d701d40fd537706114fe2b892e546eef749f542fe",
+  "frozen/source=bybit/category=linear/symbol=HPOS10IUSDT/year=2025/part.parquet": "ba105018f92d79eb49b2462572060e26504b5547f1a2f6dc1f99e4eaa467a21c",
+  "frozen/source=bybit/category=linear/symbol=HPOS10IUSDT/year=2026/part.parquet": "e5a58620aec5c73296692c90492c30f6d35d349df2c4b17c1a02a3e21bb6503f",
+  "frozen/source=bybit/category=linear/symbol=ICXUSDT/year=2022/part.parquet": "58cbfaad72c44074a89ca32604c81e6ece3fbeec8de8893b89a2bf87e395a514",
+  "frozen/source=bybit/category=linear/symbol=ICXUSDT/year=2023/part.parquet": "589ad12ec9d51802695fe94b04944c2a6479d9db1feaabd8d60a113afe059c37",
+  "frozen/source=bybit/category=linear/symbol=ICXUSDT/year=2024/part.parquet": "b544aad644bec8a5a7a8bf5be49286e018abe683c11d06213446f383876790cc",
+  "frozen/source=bybit/category=linear/symbol=ICXUSDT/year=2025/part.parquet": "4b2d25932a195d205ed4492b0fa5be7ec4ca224b0d252e392649f9186a1f1255",
+  "frozen/source=bybit/category=linear/symbol=ICXUSDT/year=2026/part.parquet": "47ddcafe33a1f62dfaf9a95009b63a9bd80b0c8cbe3c0c78fdd4a1eb5e8369c7",
+  "frozen/source=bybit/category=linear/symbol=IDEXUSDT/year=2023/part.parquet": "f4756d5625ebad6afa4c4c32be686572efed428658d24d76e26b77b5ad1617a6",
+  "frozen/source=bybit/category=linear/symbol=IDEXUSDT/year=2024/part.parquet": "4626f048342b617a7d1744fd3d0107c6eaf277ceab053ea72a86f1d74b90ef6e",
+  "frozen/source=bybit/category=linear/symbol=IDEXUSDT/year=2025/part.parquet": "9b435f3aea9cbf06761922ecb9db0de539dd5266d2539cb6f74cf854aa130f3c",
+  "frozen/source=bybit/category=linear/symbol=IDEXUSDT/year=2026/part.parquet": "539d7dc57cb0f1d3d53ed663140bec1978a9a48baee3c3f620d8fd0a31ccfad8",
+  "frozen/source=bybit/category=linear/symbol=IGUUSDT/year=2023/part.parquet": "90f4ffc67ff674a1e7936317446f913607f4a4e918e205bda751ac22ed37314d",
+  "frozen/source=bybit/category=linear/symbol=IPUSDT/year=2025/part.parquet": "bd4318c0dc2cf2d83b7fa2d115535f5fba4445e0b0cfdb0c5e02b0e383848a64",
+  "frozen/source=bybit/category=linear/symbol=IPUSDT/year=2026/part.parquet": "9144b394984d5d540ab5375f22b3374de96f3280764afe3698c29a3bfe4b3755",
+  "frozen/source=bybit/category=linear/symbol=JAILSTOOLUSDT/year=2025/part.parquet": "443abbee5ec7aef22f45cfb69637511a08ff55cfa1725ae207af21fd2f82abe6",
+  "frozen/source=bybit/category=linear/symbol=JOEUSDT/year=2023/part.parquet": "56fe7c83758d80f62a4203574e834778869640f1830ced2aa74c7aa83d3bc2ca",
+  "frozen/source=bybit/category=linear/symbol=JOEUSDT/year=2024/part.parquet": "514252583147a5de289f03103e429b3fa1612ccd1cc4b6ed8afa9240df8a2d03",
+  "frozen/source=bybit/category=linear/symbol=JOEUSDT/year=2025/part.parquet": "f65b731dc33c9ea4d3b90fc8f16f692e21bbb8238442b9d61732c636d828bb41",
+  "frozen/source=bybit/category=linear/symbol=JUSDT/year=2025/part.parquet": "198ae6a8c80053a7e3852650a0ec35890586beba0ca8afcd68e7758e4f1e8db5",
+  "frozen/source=bybit/category=linear/symbol=KDAUSDT/year=2022/part.parquet": "73ed0819557dc134bf9e9bb8ac3edb48dc0fa747a1b0a3e7510ad634559351f6",
+  "frozen/source=bybit/category=linear/symbol=KDAUSDT/year=2023/part.parquet": "3f6015eaacf2f5deda9847b47382f5448e3b4f8ff99f94d5a7858fcf62e267aa",
+  "frozen/source=bybit/category=linear/symbol=KDAUSDT/year=2024/part.parquet": "22952dc3f510fce075f0b12f65b5d2bd93508f4426a1b1482254362632915929",
+  "frozen/source=bybit/category=linear/symbol=KDAUSDT/year=2025/part.parquet": "6d0932fb0ed94fb52d9e5ba8255a21a6cd4bae696cd598655d74e3fa5b3e0fb9",
+  "frozen/source=bybit/category=linear/symbol=KEEPUSDT/year=2021/part.parquet": "2987a8450dbe8ac819022ce5a6ebfd81af0771a68dcb162ee1fcc353cf587b30",
+  "frozen/source=bybit/category=linear/symbol=KEEPUSDT/year=2022/part.parquet": "cc61a1f9562ffe30baaff42f3efda86fccace56cf0029b23ad4ade7b7306ea36",
+  "frozen/source=bybit/category=linear/symbol=KEYUSDT/year=2023/part.parquet": "075b2739405658ff5423379a92989c25e6ba65ad6df609e8ddae7a025d28afb0",
+  "frozen/source=bybit/category=linear/symbol=KEYUSDT/year=2024/part.parquet": "365fc4c15c090e44c3d59daa8c2dcf381e35529b54690c589f1158f354694ab0",
+  "frozen/source=bybit/category=linear/symbol=KEYUSDT/year=2025/part.parquet": "76ff58d36e1761747204c8667b00b5caef5055495971451b3abb7460f35d7ca7",
+  "frozen/source=bybit/category=linear/symbol=KLAYUSDT/year=2021/part.parquet": "403f86d02e56b1d6f7f9ccf8bba0054bc84e4d6486f163d155c4efb8f5a27141",
+  "frozen/source=bybit/category=linear/symbol=KLAYUSDT/year=2022/part.parquet": "e049484220796f160319d5b5377559445659dd3990b0440aed6947da1cdad2a8",
+  "frozen/source=bybit/category=linear/symbol=KLAYUSDT/year=2023/part.parquet": "39ea10dba48cb8425ec3403367662cca7cb2aaafabfc87cd01fb531fc719545b",
+  "frozen/source=bybit/category=linear/symbol=KLAYUSDT/year=2024/part.parquet": "c2c229bbf2392092bb60bb0c2720785a96cde4d324c9d18849b2d8b81bb72d73",
+  "frozen/source=bybit/category=linear/symbol=KOMAUSDT/year=2024/part.parquet": "1462de904ef8165d6c8db9ce2eabb2cac18763e5fa11eb10743d83e21b689f76",
+  "frozen/source=bybit/category=linear/symbol=KOMAUSDT/year=2025/part.parquet": "814d751db79d4123769f36158835605a710b91ec411502508088e8cf030749dd",
+  "frozen/source=bybit/category=linear/symbol=KUSDT/year=2025/part.parquet": "fd4fae62e15a0d943b735aa035d8367760053302a71c3122590c17a73b31842d",
+  "frozen/source=bybit/category=linear/symbol=L3USDT/year=2024/part.parquet": "78bf4582cca67ea5098596ddd260f426a7c26116353f773f7bf41205b57e4531",
+  "frozen/source=bybit/category=linear/symbol=L3USDT/year=2025/part.parquet": "acdb1428391a02c27e7523a002feb2d9f920db659a0e057662dcbe0686a64be4",
+  "frozen/source=bybit/category=linear/symbol=L3USDT/year=2026/part.parquet": "77537bbc0aa66d11e8e88e008b1085b1b1d48499ffc3396c8a4b791f48b02eb7",
+  "frozen/source=bybit/category=linear/symbol=LAIUSDT/year=2024/part.parquet": "89fa4d93cd53e58ee059ac177b144116e94ff93b19bb82e9c4c9c9a2735e2264",
+  "frozen/source=bybit/category=linear/symbol=LAIUSDT/year=2025/part.parquet": "c9a7eca88cd584e1e06633318f3e8419f017e8b49d1ba2284c691e7fc79b4752",
+  "frozen/source=bybit/category=linear/symbol=LAUNCHCOINUSDT/year=2025/part.parquet": "486c5323b2f5595ac914e286586f84ee36b2f9b039e08f61a81c1827dfa8715f",
+  "frozen/source=bybit/category=linear/symbol=LEVERUSDT/year=2023/part.parquet": "bfa9c5233142eb35eb2bf7a2507e28dc29e00eae08d6172a441e0b43e0b66d1c",
+  "frozen/source=bybit/category=linear/symbol=LEVERUSDT/year=2024/part.parquet": "be0dffcd227db65230f5251af171f01ec6ca6cca53a2ab040720e8068a2a05db",
+  "frozen/source=bybit/category=linear/symbol=LEVERUSDT/year=2025/part.parquet": "42191ad729a831661ce9cec2c5e2f8fab6e7bd0e9e8b941643baed89bbdf6aec",
+  "frozen/source=bybit/category=linear/symbol=LFTUSDT/year=2024/part.parquet": "082cc05ed3b73ea259c6ea65f72265ac0f260700fcd47ae66869f56cd37596af",
+  "frozen/source=bybit/category=linear/symbol=LINAUSDT/year=2022/part.parquet": "7f2a6c794a9581c59ea112b3e67e1a843f59dbd2327ddd710920dab2d4c40d96",
+  "frozen/source=bybit/category=linear/symbol=LINAUSDT/year=2023/part.parquet": "1d7caee9a3b8d983da32b63bb982ad42f760f97e89762f8e092123447ff30e91",
+  "frozen/source=bybit/category=linear/symbol=LINAUSDT/year=2024/part.parquet": "948aca26e345f99fd15cded6b005700c449559713b8e7ec537acf7cf9087d1f9",
+  "frozen/source=bybit/category=linear/symbol=LINAUSDT/year=2025/part.parquet": "5de5b241b987a686cce5628fb90d3ec6f50502108cdf7c5066371b592fb3eb33",
+  "frozen/source=bybit/category=linear/symbol=LISTAUSDT/year=2024/part.parquet": "8096b826d87b2b170327bb089236a501e6f90366cf3144a49dce1089ba295303",
+  "frozen/source=bybit/category=linear/symbol=LISTAUSDT/year=2025/part.parquet": "c9de7febbf3cce61284a5f0e01febcaedd4f1e78bb675b051fe8e6dea79f43ad",
+  "frozen/source=bybit/category=linear/symbol=LISTAUSDT/year=2026/part.parquet": "768942559e698cafda79fdb4faa5644ed3da6ff2b3d345a2c533be5cc0b09d5c",
+  "frozen/source=bybit/category=linear/symbol=LOOKSUSDT/year=2022/part.parquet": "c7723197a718fa3345dcf417a6f6ab99367e0612ba34598ab222c5be483daf4e",
+  "frozen/source=bybit/category=linear/symbol=LOOKSUSDT/year=2023/part.parquet": "047243b15d1fd5892a0229c1bb10b5b53a0e67686bef5bceaa37efa0a625bf6e",
+  "frozen/source=bybit/category=linear/symbol=LOOKSUSDT/year=2024/part.parquet": "4bfb88a118dd70d0cd60ff62ff2f154ac5f411fb90ef39aad3436bd6a43d8d2b",
+  "frozen/source=bybit/category=linear/symbol=LOOKSUSDT/year=2025/part.parquet": "b38e2a6617cdebf95b685b44896dcebd906beb5728829bac54b8cb1f030827d9",
+  "frozen/source=bybit/category=linear/symbol=LOOMUSDT/year=2023/part.parquet": "8f6ce94e4247e34b0019e9d5558ef1c0ed9e9729290185d4d19620d8cac2e60a",
+  "frozen/source=bybit/category=linear/symbol=LOOMUSDT/year=2024/part.parquet": "dc12a8a5cb860b565ba99423056a94a349396744d0d27738daa70d7d57cf45ae",
+  "frozen/source=bybit/category=linear/symbol=LTOUSDT/year=2024/part.parquet": "09325587d8da8844a04977e5ba14cfaada9059738c378df32f823d49c666dfa2",
+  "frozen/source=bybit/category=linear/symbol=LTOUSDT/year=2025/part.parquet": "1dcdc997a06d9eae36686646e89cb63a2112bf2f48a44b4f24b38d7bb3857930",
+  "frozen/source=bybit/category=linear/symbol=LUCEUSDT/year=2024/part.parquet": "eaa702e82127f7bfacda6495bcb78e6736f3f9b1234581c647ab71c48c529015",
+  "frozen/source=bybit/category=linear/symbol=LUCEUSDT/year=2025/part.parquet": "1c58b46095df19faf628f420e5c71b8725b1200bb73e9be94dc18544bf194887",
+  "frozen/source=bybit/category=linear/symbol=LUNAUSDT/year=2021/part.parquet": "2edc42dc2fa667377685d87acf5dc9260687bb4abd9c6293a37f5629ea147555",
+  "frozen/source=bybit/category=linear/symbol=LUNAUSDT/year=2022/part.parquet": "554f951397f96441b174339b65a71b8c8c8bec95cb6f025bd920fd2d711312e2",
+  "frozen/source=bybit/category=linear/symbol=MAJORUSDT/year=2024/part.parquet": "f51869e655fdc1932961179f44256ddf0337f2aa3fd17a4bd36df5e18f82a546",
+  "frozen/source=bybit/category=linear/symbol=MAJORUSDT/year=2025/part.parquet": "558609823b00656885a08cad8e52e1ca9adb0855239a8af761e04831478f8d0d",
+  "frozen/source=bybit/category=linear/symbol=MANEKIUSDT/year=2024/part.parquet": "b3d75e9fcb168bdba4d00476ba08a8f27d7e1b108a6785579d615a442897b8bd",
+  "frozen/source=bybit/category=linear/symbol=MANEKIUSDT/year=2025/part.parquet": "71247598e57902fa63b4b189aeaa912538e80b381e15cd2623be142d99e516e6",
+  "frozen/source=bybit/category=linear/symbol=MAPOUSDT/year=2024/part.parquet": "664f370afbea661641cf37aae71c9544406a39e659c7886224e08014936f58cf",
+  "frozen/source=bybit/category=linear/symbol=MASAUSDT/year=2024/part.parquet": "423fefa6f377210f576fa0ba0d521ac4515853dcbf5941f7db3c5ed09823ad2b",
+  "frozen/source=bybit/category=linear/symbol=MASAUSDT/year=2025/part.parquet": "b4f84de6415aff2974a39436fab913d9c587be6d162303bcff988a560847bb46",
+  "frozen/source=bybit/category=linear/symbol=MATICUSDT/year=2021/part.parquet": "480deb5aced9c24e967e09cac56a49a26fd4ece5b2dc4b9a41650d1415b76b93",
+  "frozen/source=bybit/category=linear/symbol=MATICUSDT/year=2022/part.parquet": "9c5f115e31313fbfcb92483cc4ed4b4dd42861a6110fdc85d3c5c34ceb7ebcea",
+  "frozen/source=bybit/category=linear/symbol=MATICUSDT/year=2023/part.parquet": "300d73e9b3140975d057a97386974a1da7021ddff1fdd9da2644d19ff4ee2a2a",
+  "frozen/source=bybit/category=linear/symbol=MATICUSDT/year=2024/part.parquet": "fc225efd582d20b2597a7a2eb107bb53bd37582f87f0bdacfca75f2d3bd2b392",
+  "frozen/source=bybit/category=linear/symbol=MAXUSDT/year=2024/part.parquet": "9fae27a8d621ed56a2ce6e1a1d17e03a6c918eb36db8f4bf0cc591587fe7cf71",
+  "frozen/source=bybit/category=linear/symbol=MAXUSDT/year=2025/part.parquet": "818e7cbcb1a06c6b7288396d25591542f508ce146977f43f86f471cade9531d4",
+  "frozen/source=bybit/category=linear/symbol=MBLUSDT/year=2023/part.parquet": "e1411a427800d89cd7249b82908fbc347f54dbb8ff1e6c3b59efcb70a161820c",
+  "frozen/source=bybit/category=linear/symbol=MBLUSDT/year=2024/part.parquet": "dc7f125b42944cdea67cfab0afe8cb7e1778aa6c6f9b588bd2976940f577678b",
+  "frozen/source=bybit/category=linear/symbol=MBLUSDT/year=2025/part.parquet": "90640e21f3ae95eb61a6c6da63b5f9df40e603c4b61fd74cd7bd3505d853773c",
+  "frozen/source=bybit/category=linear/symbol=MBOXUSDT/year=2024/part.parquet": "4f43d0b0feb274823cc4830a64d9ff7ce4573073947c1af9e23868f034631929",
+  "frozen/source=bybit/category=linear/symbol=MBOXUSDT/year=2025/part.parquet": "0dd09d0a3d8140825c045b834b6ac60b42447619560b5a913af973011cd3f964",
+  "frozen/source=bybit/category=linear/symbol=MBOXUSDT/year=2026/part.parquet": "270528ce1abe27248fc301381fb2d8fd7af2c7afa2fe830813f0a96f388aa4dd",
+  "frozen/source=bybit/category=linear/symbol=MCUSDT/year=2023/part.parquet": "c823bc17a80e0144c4067577250ab01746a8ddf373e6359682224eb3aa26d64e",
+  "frozen/source=bybit/category=linear/symbol=MDTUSDT/year=2023/part.parquet": "76c40df60d8994c5b8f21da09231a67d245f39ab6401434c9fc113022c07b280",
+  "frozen/source=bybit/category=linear/symbol=MDTUSDT/year=2024/part.parquet": "156fdd8335579a06ba3561f6351d52b8626ae3f8cc190ba41721e79825fe8100",
+  "frozen/source=bybit/category=linear/symbol=MDTUSDT/year=2025/part.parquet": "49f65205c9bfa3b9d591bf3e73f476bd87665b4ad8201940adbc1ca8611da2dc",
+  "frozen/source=bybit/category=linear/symbol=MEMEFIUSDT/year=2024/part.parquet": "85e2fda1f16c8f8d816a603a3243ff116cb9a1d2575cbcfb4608dffe77891e6e",
+  "frozen/source=bybit/category=linear/symbol=MEMEFIUSDT/year=2025/part.parquet": "efaf70ea6c4bb368382cdceb33808366b6049fdc6d5a7ef74f76086216159e29",
+  "frozen/source=bybit/category=linear/symbol=MICHIUSDT/year=2025/part.parquet": "54ad59b8cdfc45a17e9831f50501a7ef53723783db0a977721766f13291c58e1",
+  "frozen/source=bybit/category=linear/symbol=MILKUSDT/year=2025/part.parquet": "81399aed5b41e098fe60c34d8b417cf5e80fcd46bc48ca19c3ffee35c0eeeace",
+  "frozen/source=bybit/category=linear/symbol=MKRUSDT/year=2022/part.parquet": "539ba2bd2b38a3e44d2b165cf212c4dafea521a45dccef39c277aaf1d991f04e",
+  "frozen/source=bybit/category=linear/symbol=MKRUSDT/year=2023/part.parquet": "8dbcfd20249a169b065f5cc72ff3119e840939cb8a420a713e48d24d42472adc",
+  "frozen/source=bybit/category=linear/symbol=MKRUSDT/year=2024/part.parquet": "fe4aafaef0b41cf011471a62faa7dacb74e2439c265df32f4c4e8f240568c33c",
+  "frozen/source=bybit/category=linear/symbol=MKRUSDT/year=2025/part.parquet": "15bb60076b66d76871ca19e63e88d92a0dd1d07fac9ec6bd6a257e868de44aba",
+  "frozen/source=bybit/category=linear/symbol=MLNUSDT/year=2025/part.parquet": "5b11f9efe65f0a897b06de79bfabcb9e5fdb822b1218e490c2d392f263d03485",
+  "frozen/source=bybit/category=linear/symbol=MLNUSDT/year=2026/part.parquet": "413e5c155728ebed3bb6d739575b33400f5fa1d0e9bb650703687abc2f7622c7",
+  "frozen/source=bybit/category=linear/symbol=MOBILEUSDT/year=2024/part.parquet": "fd3fe1432ed69620bdad8f384da5fc43c7f7a9b3c82e364fe822b3db8d0a1cc7",
+  "frozen/source=bybit/category=linear/symbol=MOBILEUSDT/year=2025/part.parquet": "502a5aab1d48b75f6a7ca87a2f77c429b526afa48c1f45e03cf0461d533661e0",
+  "frozen/source=bybit/category=linear/symbol=MOTHERUSDT/year=2024/part.parquet": "65c7feed1f81f5dd4ab7476aa49f7c87326f2e50e5f402321cc89a5ff9b0b96c",
+  "frozen/source=bybit/category=linear/symbol=MOTHERUSDT/year=2025/part.parquet": "da898bf664f7f5a3b241732d7e6798959934e3deab9dfc8fa178bee86090d0bc",
+  "frozen/source=bybit/category=linear/symbol=MULTIUSDT/year=2023/part.parquet": "2011eef529dab69f3b57b4c945e4b040ef9733799e630dc0b9005df25c6308df",
+  "frozen/source=bybit/category=linear/symbol=MULTIUSDT/year=2024/part.parquet": "c7be6aaa5a53f13e38223627a6158d79fe5ab828f14c7032aba08a1e8c23a004",
+  "frozen/source=bybit/category=linear/symbol=MVLUSDT/year=2024/part.parquet": "3612efde83b3400b40e980442aec569a1ac26862f88f11c0da26872dfd1005be",
+  "frozen/source=bybit/category=linear/symbol=MVLUSDT/year=2025/part.parquet": "b0c2391fba2483f84f1d117901976c1ceb1670d779a92a7d8ecde908931f0418",
+  "frozen/source=bybit/category=linear/symbol=MYRIAUSDT/year=2023/part.parquet": "9f06db3bdd024406c27502334fdda5e4e26c29d01e6ff3fef2441e35cffe73c6",
+  "frozen/source=bybit/category=linear/symbol=MYRIAUSDT/year=2024/part.parquet": "b126ba7d6cc250b8366481163411a87f7d71639f42d68d4cddeb6792f330113a",
+  "frozen/source=bybit/category=linear/symbol=MYRIAUSDT/year=2025/part.parquet": "ccfbe05466a8a13aa2e02569cd0a96b155ff4e1f4a229ae5bbd335316f0e1e9a",
+  "frozen/source=bybit/category=linear/symbol=MYROUSDT/year=2024/part.parquet": "e177e061e3f5146f2cf22560e6e9dd5c35e83f6b7e649b7574e89837040e5eac",
+  "frozen/source=bybit/category=linear/symbol=MYROUSDT/year=2025/part.parquet": "045fdd28942599b7819ab79bae5ea41f88bafdda54cf827a065a160325718e91",
+  "frozen/source=bybit/category=linear/symbol=NCUSDT/year=2025/part.parquet": "57373d41dd39d4455a44f8495843496229e806605fd82ca21e5f4744cf06265b",
+  "frozen/source=bybit/category=linear/symbol=NEIROETHUSDT/year=2024/part.parquet": "eb5cd56dccda6a2ec7aec3c16203d37d3d9c55a57277731819132cf228bdad1e",
+  "frozen/source=bybit/category=linear/symbol=NEIROETHUSDT/year=2025/part.parquet": "ab770f47a6cfbc8c4e3f15adf7f9bf0c041ea2f5b30efbf13c72cf6c8ab41fd8",
+  "frozen/source=bybit/category=linear/symbol=NFPUSDT/year=2023/part.parquet": "ffca65d780e36121a7e4fb48ab0f6a2e5513b3836157e5cc13c569c23f79349b",
+  "frozen/source=bybit/category=linear/symbol=NFPUSDT/year=2024/part.parquet": "b2050f0ce86f96c712cfa8e11d67a718f3e020eed6bfa1d8f76ded9d82d7fbf6",
+  "frozen/source=bybit/category=linear/symbol=NFPUSDT/year=2025/part.parquet": "576220cf7d395165a07da020b72f7e3f245a4f7025f813584b665050db17ccf5",
+  "frozen/source=bybit/category=linear/symbol=NFPUSDT/year=2026/part.parquet": "037fc723d81980d97cf0b50168171753ef3f574c51c10b35bb1db1275ff073c7",
+  "frozen/source=bybit/category=linear/symbol=NKNUSDT/year=2023/part.parquet": "68c139d2fb982e0f681135f132ca38682cd39468fe0b04e2be18435857b8ade5",
+  "frozen/source=bybit/category=linear/symbol=NKNUSDT/year=2024/part.parquet": "b7333bf2dfd60cc8712158becd65d2098e662cddccb591373557fdef30ca020c",
+  "frozen/source=bybit/category=linear/symbol=NKNUSDT/year=2025/part.parquet": "8cf1fd2012e99cf00569c1f8db548072296b6b148fabc3263a0c7768a4b465bf",
+  "frozen/source=bybit/category=linear/symbol=NKNUSDT/year=2026/part.parquet": "afa90fdb4d434d58edc359daa73d67ec974708328fb0f9b0eb52c5ade7a385b8",
+  "frozen/source=bybit/category=linear/symbol=NODEUSDT/year=2025/part.parquet": "65909450e9e15c0ab5101821838339c5ea666f7557f2b6985a26993513176d85",
+  "frozen/source=bybit/category=linear/symbol=NSUSDT/year=2024/part.parquet": "3ab7cedda79a69bfd373fb662aa82b09383031931319086f45b3adac5de58c04",
+  "frozen/source=bybit/category=linear/symbol=NSUSDT/year=2025/part.parquet": "bacdbeb010ded67aeca42258cf4132fa285eb9bdda6ada23391da63f8631a409",
+  "frozen/source=bybit/category=linear/symbol=NSUSDT/year=2026/part.parquet": "69c736bc1c21fec4d460475305a7578b2b9838f290e7e991b993b8328c2ac508",
+  "frozen/source=bybit/category=linear/symbol=NTRNUSDT/year=2023/part.parquet": "a8bf043cce550c42f88e89746acbbc59c63eab2993ed885e17dba2bf4c01abd2",
+  "frozen/source=bybit/category=linear/symbol=NTRNUSDT/year=2024/part.parquet": "4c09a3338edfd2a38034b7b45899df14323fbc3da731d595b53dd29921cd1fe7",
+  "frozen/source=bybit/category=linear/symbol=NTRNUSDT/year=2025/part.parquet": "0b8e8ec7feca13ee5f92e342f688cde005221774e17d67d6def76553ef733324",
+  "frozen/source=bybit/category=linear/symbol=NTRNUSDT/year=2026/part.parquet": "ff65899195b99fd10b1f58f9d785eb677fd4cb8d69c81841e319a84da866401b",
+  "frozen/source=bybit/category=linear/symbol=NULSUSDT/year=2024/part.parquet": "31021906ca128f4a76c1687270e2ac44045f7ce5270fd76312375e8434c2171e",
+  "frozen/source=bybit/category=linear/symbol=NULSUSDT/year=2025/part.parquet": "77c2182fe46301d78f8d64b87deed50ae049da8dce0ad1c85a983885ffdd9feb",
+  "frozen/source=bybit/category=linear/symbol=NYANUSDT/year=2024/part.parquet": "9435e66f94d2b0b8fa1ccb1938570db10acf160caadae20b60e080bc189cf91d",
+  "frozen/source=bybit/category=linear/symbol=NYANUSDT/year=2025/part.parquet": "4999d7a55f0146e9c419a42fcb2e83a777fe4b1e3166cf8bc579c6602d595f83",
+  "frozen/source=bybit/category=linear/symbol=OBOLUSDT/year=2025/part.parquet": "569b37cb11cfc0d9e1effa754d8fd2012efe157696e381af4a65c9519da1ba61",
+  "frozen/source=bybit/category=linear/symbol=OBTUSDT/year=2025/part.parquet": "d785b45fbc98ecdbbe5f1ad154c6abaa572a16210059aa1d77528867326d976c",
+  "frozen/source=bybit/category=linear/symbol=OBTUSDT/year=2026/part.parquet": "569bd7fa52e15fd0c5fb62a2034380003b7364a2713ce43dafc249bb8ed1c79e",
+  "frozen/source=bybit/category=linear/symbol=OCEANUSDT/year=2022/part.parquet": "3a0027e7ea24e932eda5cb94c562d5f9c63af5fd9b31700e25d2d390f80cdb89",
+  "frozen/source=bybit/category=linear/symbol=OCEANUSDT/year=2023/part.parquet": "114a1ae50eacd12758b7e188a270dace249687494f13a2e858db73929b7258e3",
+  "frozen/source=bybit/category=linear/symbol=OCEANUSDT/year=2024/part.parquet": "450adc1b6653c65fc8475b2445e3292f28ea0e7bc634f65220ca8aa647deb3e7",
+  "frozen/source=bybit/category=linear/symbol=OLUSDT/year=2024/part.parquet": "fc4967a42bf6abf4bfe9b57434bb8061c6775accfe99ecd7a79e1d09b093e5b6",
+  "frozen/source=bybit/category=linear/symbol=OLUSDT/year=2025/part.parquet": "c96d0047fa723c72cee6f819f8e2ae2e269ae8ccb533a6e7bbf989d0704ff20f",
+  "frozen/source=bybit/category=linear/symbol=OLUSDT/year=2026/part.parquet": "eb2a7a0e66faa25775eb7e5484364bf1ed8d7feff639175051d3a94e81cd9919",
+  "frozen/source=bybit/category=linear/symbol=OMGUSDT/year=2021/part.parquet": "d8d67e519e13e643e0b9ee22c5488a64c778552f084bd0c4e2a50c36c420d948",
+  "frozen/source=bybit/category=linear/symbol=OMGUSDT/year=2022/part.parquet": "a00bdfdb02953a36310317ba1811cbd0935005fcbd9e6866e25a113200ab48ad",
+  "frozen/source=bybit/category=linear/symbol=OMGUSDT/year=2023/part.parquet": "3acf2d81468fcf27b69f35cf899f418ba8668955ea5be03e8bd45d1aaefefdce",
+  "frozen/source=bybit/category=linear/symbol=OMGUSDT/year=2024/part.parquet": "8d4fc07646ade841ed74272d00f2af50fdbd1c6fc99b2e37e3af7248a4ed4112",
+  "frozen/source=bybit/category=linear/symbol=OMGUSDT/year=2025/part.parquet": "df83b9f810521e997442d990c50157ef235a48814e2453814ac029f399d6f7ba",
+  "frozen/source=bybit/category=linear/symbol=OMNIUSDT/year=2024/part.parquet": "cd26ed9d1e312674098fb68fbd3bec4d078bf276af5429c0e9b1270c0070e6b0",
+  "frozen/source=bybit/category=linear/symbol=OMNIUSDT/year=2025/part.parquet": "12d254ec5af224f0780fc74ceb8007e093bca36edab8e4e98e8fd21898a3b705",
+  "frozen/source=bybit/category=linear/symbol=OMUSDT/year=2024/part.parquet": "3cc76fe2069204a26152e7b428d5b124b0c37184fda709ffbc14cff30a199492",
+  "frozen/source=bybit/category=linear/symbol=OMUSDT/year=2025/part.parquet": "f2b98fd2b034bc95b40aefc883030c3b21d7a1c8ffe2fd03d1e8acf62999ec81",
+  "frozen/source=bybit/category=linear/symbol=OMUSDT/year=2026/part.parquet": "bf6b48b7a9102d85c43c683aba345992db2fe925768ea3225e66e7d5bc2f2e91",
+  "frozen/source=bybit/category=linear/symbol=ONEUSDT/year=2021/part.parquet": "69d95a6bd4b3531ac9074fae37aa765e3d19583ee15a428d8be2a0d70d9f68d5",
+  "frozen/source=bybit/category=linear/symbol=ONEUSDT/year=2022/part.parquet": "94af04f914538bb6cff27f9ef6d6ffe37b7aba68f9c6213b42827f0057b053b0",
+  "frozen/source=bybit/category=linear/symbol=ONEUSDT/year=2023/part.parquet": "2f018e79478e7cf6ec460977cfe1a779a12cb34838639af95d638c7461642b2c",
+  "frozen/source=bybit/category=linear/symbol=ONEUSDT/year=2024/part.parquet": "9c60f3a1c7b2a832ac2511901da3793eee56d1f144bc8584f357eb23ef989daa",
+  "frozen/source=bybit/category=linear/symbol=ONEUSDT/year=2025/part.parquet": "db2d7f0067c9452ec09958ff2a864651734b64424087782206ee79a5c5b8aca7",
+  "frozen/source=bybit/category=linear/symbol=ONEUSDT/year=2026/part.parquet": "0822038f19579de768bce9c5bdacbf7ddecb38c44ce9d3b41320685382bf0dbf",
+  "frozen/source=bybit/category=linear/symbol=ORBSUSDT/year=2023/part.parquet": "e8bdc84991d4191bca36c2fe473e02c2600dddd62c196fa6ff4b45fbae65f1c1",
+  "frozen/source=bybit/category=linear/symbol=ORBSUSDT/year=2024/part.parquet": "17c4f9f37a35b6b960db5450cfee1ae4944692de1ab1c4c3d3d74c5fda86af9b",
+  "frozen/source=bybit/category=linear/symbol=ORBSUSDT/year=2025/part.parquet": "de37e8b52726264f385f12a2fdfea35b0a2760846f35905ab528b715fd53bb13",
+  "frozen/source=bybit/category=linear/symbol=ORBSUSDT/year=2026/part.parquet": "8ca5603fbf9eddf1932bc339f319283ebb79775cf6b54eac28238a81ec8a5577",
+  "frozen/source=bybit/category=linear/symbol=ORNUSDT/year=2024/part.parquet": "c29f3ec1efc33785a1d4e33f66ff127be4fc1da27b7f3f88e745c703b72c1489",
+  "frozen/source=bybit/category=linear/symbol=OSMOUSDT/year=2024/part.parquet": "2220f212440c21c82c686e55496ba9fcc202b68106ff2c19da37732c02952f42",
+  "frozen/source=bybit/category=linear/symbol=OSMOUSDT/year=2025/part.parquet": "af81cc60b9ec39f8f0a6b200643b0ac4042c8bf38a98f8920c8716e8704f07ac",
+  "frozen/source=bybit/category=linear/symbol=OXTUSDT/year=2023/part.parquet": "93fd4ccf55a360ed588c0cb78e3379594b42b679148df0dad06822bc309724b2",
+  "frozen/source=bybit/category=linear/symbol=OXTUSDT/year=2024/part.parquet": "0ebe0b385e96a6ba24f708ecd78ef22c6b637e953513e0fcc8c404884ef2b8e2",
+  "frozen/source=bybit/category=linear/symbol=OXTUSDT/year=2025/part.parquet": "f4dc46efbf3b6ad92b454ebb6903b56b783c7cc94dab3fd4ed51547119b73a08",
+  "frozen/source=bybit/category=linear/symbol=OXTUSDT/year=2026/part.parquet": "dd322206dd6c5912f8b8e20eeaf81ad406adb2c2326a978806b0a5fbafd954b4",
+  "frozen/source=bybit/category=linear/symbol=PENGUSDT/year=2024/part.parquet": "3dd0856917c5bd6713655ea479e733df10827982d7b97664434bb5f05c15bbf0",
+  "frozen/source=bybit/category=linear/symbol=PENGUSDT/year=2025/part.parquet": "c44cac30fa5796fa14fd14c9b3a49ee4f9f5d178114d021b21ef20da06fb62ed",
+  "frozen/source=bybit/category=linear/symbol=PERPUSDT/year=2023/part.parquet": "43c569f7346c86a21c33532fe2973e7fd31e1ca1feabc360806038986e48ae40",
+  "frozen/source=bybit/category=linear/symbol=PERPUSDT/year=2024/part.parquet": "787d77bbe876cd9036b1d11541e5fbe21973b6ab6cba838b093a31ba53da372b",
+  "frozen/source=bybit/category=linear/symbol=PERPUSDT/year=2025/part.parquet": "597c4ca64ab9bb61536da4fefba35dfbd559b5682ab426ca88d7a70a417a4eb1",
+  "frozen/source=bybit/category=linear/symbol=PHBUSDT/year=2023/part.parquet": "76bc9b12c646aea4e5aeff5b23f3aa6957c470415b4d56fcdd3c054acd7965d5",
+  "frozen/source=bybit/category=linear/symbol=PHBUSDT/year=2024/part.parquet": "dd6a47b923f507bae4f25534c25a640a44bfe8a54044ffa6a8d0ae92fb2260d0",
+  "frozen/source=bybit/category=linear/symbol=PHBUSDT/year=2025/part.parquet": "72d120171cbba60dc556e27b9b6a2bea8ba6a7a595e860e62c0296d30435cd84",
+  "frozen/source=bybit/category=linear/symbol=PHBUSDT/year=2026/part.parquet": "e03b3a9b57820aa46806713130a82a68c18bd42e0849b5fe41ac7740e0c64593",
+  "frozen/source=bybit/category=linear/symbol=PIGGYUSDT/year=2025/part.parquet": "8a0f1954f47ed79bf7817f758e9f11c993e937e6f299120aab5a8f695c7c297b",
+  "frozen/source=bybit/category=linear/symbol=PIRATEUSDT/year=2024/part.parquet": "fb1d1aa1f734749ce90093f424b7c55fc7e7c3e56ee9c1a129bdfcf247421fc8",
+  "frozen/source=bybit/category=linear/symbol=PIRATEUSDT/year=2025/part.parquet": "114bff8ee3be6f6712a4577b685db4e87530e98e7b63c0864f2585855606ec18",
+  "frozen/source=bybit/category=linear/symbol=PIXFIUSDT/year=2024/part.parquet": "a052e7194e1d4a0924876444bdd36103db27316fe699e92d673a4e2d7822fae9",
+  "frozen/source=bybit/category=linear/symbol=PONKEUSDT/year=2024/part.parquet": "4863896a9e5f772fe1a6bab12d0dcc25f2ab0efd85d4169d22c421ec351f7176",
+  "frozen/source=bybit/category=linear/symbol=PONKEUSDT/year=2025/part.parquet": "ba212222505642c8f493396b34db967a9681af600aa3985092a8e35038195523",
+  "frozen/source=bybit/category=linear/symbol=PONKEUSDT/year=2026/part.parquet": "a941d783eae597a85f7a8f2d3afb005f486e99bfa239c733d177ecd1033c2f63",
+  "frozen/source=bybit/category=linear/symbol=PRAIUSDT/year=2025/part.parquet": "987ec9df5879a065b2b33880c3cb278abba68dd250976aba99b6126244d839e8",
+  "frozen/source=bybit/category=linear/symbol=PRCLUSDT/year=2024/part.parquet": "19d53a620d044e4ccb04cad48a6b55cd4a8ac68404c0a60a060df226adad7c8a",
+  "frozen/source=bybit/category=linear/symbol=PRCLUSDT/year=2025/part.parquet": "188826889e5066cf737149878a974b13fe9e3655ed6e42df4075ba3c578bcb1e",
+  "frozen/source=bybit/category=linear/symbol=PRIMEUSDT/year=2024/part.parquet": "3855bac2f4f2177a9181406f1c447c068dd73aeaf1c992392a1f765efadf423a",
+  "frozen/source=bybit/category=linear/symbol=PRIMEUSDT/year=2025/part.parquet": "a1e61bce86beb3f361e5d5451f015bcf0f8c5f5d68206797e7178354b63f78be",
+  "frozen/source=bybit/category=linear/symbol=PROMUSDT/year=2023/part.parquet": "000b88185d8e25a1207bf3711b38dafa53c38b3228f533e1e9369f4c460e224d",
+  "frozen/source=bybit/category=linear/symbol=PROMUSDT/year=2024/part.parquet": "0fe26b5722c413d7ce332159a51e430ba71a146104f4aae8f57c04e2e3af7a24",
+  "frozen/source=bybit/category=linear/symbol=PROMUSDT/year=2025/part.parquet": "d2b29a3d7a6f9bfdf35178dea11edb5f1c09bbcdf41b593d06acf00e1e934dc2",
+  "frozen/source=bybit/category=linear/symbol=PROMUSDT/year=2026/part.parquet": "ac73c8595da44a747211cba1dec3cd0d6d1f44e0fe0d3d2b68ec2873b0fed713",
+  "frozen/source=bybit/category=linear/symbol=PROSUSDT/year=2024/part.parquet": "86e173d9f754bdc7272e036d4272b20f08e31d572a5bcf8fe7853b92143ed65f",
+  "frozen/source=bybit/category=linear/symbol=PROSUSDT/year=2025/part.parquet": "1bda7c8ccfa4b09f1fac0e6629e5737f3d8a2b5b38d3cc3637b5bcc3ebfc4222",
+  "frozen/source=bybit/category=linear/symbol=PUMPBTCUSDT/year=2025/part.parquet": "4ba3f0bf6e8e6cd4e67501dd5fbb7cae6b0e1a5068e63404ff17dd326e92a946",
+  "frozen/source=bybit/category=linear/symbol=PUMPBTCUSDT/year=2026/part.parquet": "7735a1731d773eecac55bfc99c3d5c2c01eb13ed1d4495dd905c8d9352abcab9",
+  "frozen/source=bybit/category=linear/symbol=PUMPUSDT/year=2025/part.parquet": "d29cd85281632763b6e6f307cf51db23e58eb3ecc41b510da71fc99308d5bdbc",
+  "frozen/source=bybit/category=linear/symbol=PUNDUUSDT/year=2024/part.parquet": "4c13b2ba8b9c9a322a31f0eed6745688ff8d9e5812bfc4a6c4e63dc1dc55c1f1",
+  "frozen/source=bybit/category=linear/symbol=PYRUSDT/year=2024/part.parquet": "1e205cf0bd84630ed9abc773cac0c1f47b99900dc75d1978629e0dfdd9ac8503",
+  "frozen/source=bybit/category=linear/symbol=PYRUSDT/year=2025/part.parquet": "114fe82ad41ee0aba9dd2f7480fc3d6a0c25bafc0a0520f1823c19da5332e9fe",
+  "frozen/source=bybit/category=linear/symbol=PYRUSDT/year=2026/part.parquet": "ac2e258db369b18f895ed0500c13a2290127ac6e21b6dc7e844a522436d2ed19",
+  "frozen/source=bybit/category=linear/symbol=QIUSDT/year=2023/part.parquet": "e9935ab00b34c348c64930d28bc9bbf31a80852f2f2074979cb5e3a93d56d185",
+  "frozen/source=bybit/category=linear/symbol=QIUSDT/year=2024/part.parquet": "4b31f854ae87e5fd0782385ec84a5ebf730cd6729682d1472e6793ba035f09c8",
+  "frozen/source=bybit/category=linear/symbol=QIUSDT/year=2025/part.parquet": "6c5201e56e3072f553fb77332543c9e8aaddf490e9f1a8a302c35d8aa1a22f20",
+  "frozen/source=bybit/category=linear/symbol=QUICKUSDT/year=2024/part.parquet": "f0a937dfc304a113c6782de7ba2bbad2ce5f33afaa572a309a2b6530e6a2331c",
+  "frozen/source=bybit/category=linear/symbol=QUICKUSDT/year=2025/part.parquet": "758d13b90abb2c88efbafc2471dc105801aedc15ba2aca660c9643bbb61f9704",
+  "frozen/source=bybit/category=linear/symbol=RADUSDT/year=2023/part.parquet": "35129c874a34401390236afbd85843c89af6646b507300ed91e09f5a894c2a4b",
+  "frozen/source=bybit/category=linear/symbol=RADUSDT/year=2024/part.parquet": "cc35d160252898deac4ff03a8dfa911de7ebf5da3294ca18700d97495be86817",
+  "frozen/source=bybit/category=linear/symbol=RADUSDT/year=2025/part.parquet": "4ba3563f896be4ad77a9fdee7eec3843b3dc2ed39273a5d04ff6f1061a199a97",
+  "frozen/source=bybit/category=linear/symbol=RAYUSDT/year=2022/part.parquet": "e5edc512206293b2014eaf7f88279e61f3d30a7a5abe2b4bacd1769d24bafe21",
+  "frozen/source=bybit/category=linear/symbol=RDNTUSDT/year=2023/part.parquet": "c59fe13881aec84de409431d8a3cd8607fa29c53ecc87910a01d7de30cb620cb",
+  "frozen/source=bybit/category=linear/symbol=RDNTUSDT/year=2024/part.parquet": "6eb05bf0474c50767876291e2e7f54b4ae0339ab1ff60dd77991d800fa97e306",
+  "frozen/source=bybit/category=linear/symbol=RDNTUSDT/year=2025/part.parquet": "81a41b8f99f625e526f898ccef6552c63940b614f993ba2adb4a69fd779dcf2c",
+  "frozen/source=bybit/category=linear/symbol=RDNTUSDT/year=2026/part.parquet": "db1bcfcffc2a784484e9131d9aa902500d225efebd8986fe9664aaecf3072e4d",
+  "frozen/source=bybit/category=linear/symbol=REEFUSDT/year=2022/part.parquet": "d48bc9ebf9c74985c4c587705580cfd99ddd46b9880ea4f0f43f66e4a182ac7c",
+  "frozen/source=bybit/category=linear/symbol=REEFUSDT/year=2023/part.parquet": "efdc5dcfd747f79ca7f361c1981a4cef0f4dc9f408c158fa23b19203d8554a7c",
+  "frozen/source=bybit/category=linear/symbol=REEFUSDT/year=2024/part.parquet": "b5526c6d6e11caae7a890e1ba2b71ad5bfe83f50673474ff2b23730c65fe64c6",
+  "frozen/source=bybit/category=linear/symbol=REEFUSDT/year=2025/part.parquet": "bd7715179c621f6c1d7910711c8558b35d45c06058b71048f9e660a64da72289",
+  "frozen/source=bybit/category=linear/symbol=RENUSDT/year=2021/part.parquet": "28bf809e387bf8b03d8d2a71006f97af801f23804b745ce74d81ae3255284879",
+  "frozen/source=bybit/category=linear/symbol=RENUSDT/year=2022/part.parquet": "b1931bbf0d31e55a458c8a8dd164e0696d1f3bb132039b6cea12927f4121e1ba",
+  "frozen/source=bybit/category=linear/symbol=RENUSDT/year=2023/part.parquet": "793792c38a5986330984420f338100bfadb9a2e7c2bc62968a9448ec71628637",
+  "frozen/source=bybit/category=linear/symbol=RENUSDT/year=2024/part.parquet": "4ad667f64c3dda8e4003b1615cf9ddb6780a84391475487b24d57a860e53c983",
+  "frozen/source=bybit/category=linear/symbol=RENUSDT/year=2025/part.parquet": "72646de6b5f5cb57566ec3e176ae2e1f2742bd40c9227dae71f4ecadbc37990f",
+  "frozen/source=bybit/category=linear/symbol=REQUSDT/year=2021/part.parquet": "80622e85a357041acda381a6869f1e675ff872ee7a617e85af4f7d4222c03f9b",
+  "frozen/source=bybit/category=linear/symbol=REQUSDT/year=2022/part.parquet": "25198823ff08780f1c96a70d016200a17f0584a460928fabd0a24fdfd71892af",
+  "frozen/source=bybit/category=linear/symbol=REQUSDT/year=2023/part.parquet": "e93c1e86bfaccda44dd10af5f4b9130b12186a2816f35011a49b7abc15a980c9",
+  "frozen/source=bybit/category=linear/symbol=REQUSDT/year=2024/part.parquet": "c87dbf4214a74342d499d70ea82e64dbe27021b62949a567a500c882b1c88778",
+  "frozen/source=bybit/category=linear/symbol=REQUSDT/year=2025/part.parquet": "f8c4807b3ccc0c4607dc1618ab3dfc18382198eb9a0bd1572168a7ce3c122330",
+  "frozen/source=bybit/category=linear/symbol=REQUSDT/year=2026/part.parquet": "330f286410517678608d80190ef1c8348507fa6e931f7d8374ce9a0c366eb890",
+  "frozen/source=bybit/category=linear/symbol=REXUSDT/year=2025/part.parquet": "fd24aef6f9486148f34a8b2c9f940187c8782578a4c6dde90c08129556076864",
+  "frozen/source=bybit/category=linear/symbol=RFCUSDT/year=2025/part.parquet": "afe611d2b5ce132525376dcf592b12e085e04ca3885471c83bc435b36ae8f287",
+  "frozen/source=bybit/category=linear/symbol=RHEAUSDT/year=2025/part.parquet": "b7ababa44f1bc3abf6fcfc9ef55d5cfbc4bb9666c8bc27913a3a3e19fdc7f5f9",
+  "frozen/source=bybit/category=linear/symbol=RIFSOLUSDT/year=2024/part.parquet": "f7af6ba82e56887412194142b1732a2c471f6c922389f4df0287111890d7939e",
+  "frozen/source=bybit/category=linear/symbol=RIFSOLUSDT/year=2025/part.parquet": "bc401e9041d66fa5c22860f9c2c42a219f798003fdbc8e8eac6913f81cf594cf",
+  "frozen/source=bybit/category=linear/symbol=RIFUSDT/year=2023/part.parquet": "bc8d9a532801b011637234ac24b4e9594dc0f9cbccc30600606f395937631972",
+  "frozen/source=bybit/category=linear/symbol=RIFUSDT/year=2024/part.parquet": "686f71ee4e1f2c0fd251f2bcb7b8380cafcfbc0b5d8f80ea277ce14c621f4821",
+  "frozen/source=bybit/category=linear/symbol=RIFUSDT/year=2025/part.parquet": "ba7d017c7b4467c2f738202f16ce3963c8a2bfba8d683d7e1c7343586a1d92d3",
+  "frozen/source=bybit/category=linear/symbol=RLSUSDT/year=2025/part.parquet": "1fb51af374e47eef56654cdb322a87c7e8a3913f2c8250dd898ccbc6b6c339a9",
+  "frozen/source=bybit/category=linear/symbol=RLSUSDT/year=2026/part.parquet": "51184ec09c4faa5758d1bc6ce21993d61fd11bbab0e8963b377e378bfd7909cb",
+  "frozen/source=bybit/category=linear/symbol=RNDRUSDT/year=2021/part.parquet": "3823d0f62d8d47e3eacb85b6690a277994499b8698c3c5930de4672aaf918d26",
+  "frozen/source=bybit/category=linear/symbol=RNDRUSDT/year=2022/part.parquet": "b68b78cd6801f42a0e825595261fe1a8e7807061c67408853c5656153a7fc947",
+  "frozen/source=bybit/category=linear/symbol=RNDRUSDT/year=2023/part.parquet": "40162f904e4bffe4562b536d681306d61e5b697daec201683e49d633d8ef1ac7",
+  "frozen/source=bybit/category=linear/symbol=RNDRUSDT/year=2024/part.parquet": "f58cb97a08cf56131e580918e934f321210614eecd2a1cca9a17340f143f5180",
+  "frozen/source=bybit/category=linear/symbol=ROAMUSDT/year=2025/part.parquet": "b0eb0fa6dd7943f540087e5a2c677b9dc3eaae1bc3ea04d5273b86db6f93af7a",
+  "frozen/source=bybit/category=linear/symbol=ROAMUSDT/year=2026/part.parquet": "11f6f029decec089e43df40486b59c1f260bce94dbbd1aa6efe3e93a066c914f",
+  "frozen/source=bybit/category=linear/symbol=RONUSDT/year=2024/part.parquet": "ac34a6a30e9effc31ed020f0b5ba877be6d2394c1566829e81fdd4a89430d7ee",
+  "frozen/source=bybit/category=linear/symbol=RONUSDT/year=2025/part.parquet": "75789b7df69c4c895f1dcf7a5802d91a5d385a9fde46bd292ee674e5a6be528b",
+  "frozen/source=bybit/category=linear/symbol=RSS3USDT/year=2022/part.parquet": "e20aec054417bd3ab50b43999ccd4a67ae2c01975425ef24b2ab12e11e2d0660",
+  "frozen/source=bybit/category=linear/symbol=RSS3USDT/year=2023/part.parquet": "10cf41dd0afa6688e4c74711827f52c72c6cbb25e7343921bd7eec376c790381",
+  "frozen/source=bybit/category=linear/symbol=RSS3USDT/year=2024/part.parquet": "0390d6d012799105968eb602dcda492f6efa9a69beca0470a46524a48d311481",
+  "frozen/source=bybit/category=linear/symbol=RSS3USDT/year=2025/part.parquet": "1930bd6f0f8f666674c4dcc4386f21fea9e47a73bd4819c88e34ae82c40d69b1",
+  "frozen/source=bybit/category=linear/symbol=SAROSUSDT/year=2025/part.parquet": "62dda5f84da222a405b9e5774f25520bc8685e82e8af70d84755864a2eba6802",
+  "frozen/source=bybit/category=linear/symbol=SAROSUSDT/year=2026/part.parquet": "290e9e32e142434994575bacf2cfc59ff51fbe955e6735ea6aab86fb1b868fd8",
+  "frozen/source=bybit/category=linear/symbol=SCAUSDT/year=2024/part.parquet": "76d6e963b6251592f0c28850c26c7113f29554105c1fc7b48cbf8629643703f7",
+  "frozen/source=bybit/category=linear/symbol=SCAUSDT/year=2025/part.parquet": "6eba88db3ea6da9dde2acae330491d01cbdff10d74e4e07bc6de51b9035b851f",
+  "frozen/source=bybit/category=linear/symbol=SCRTUSDT/year=2022/part.parquet": "19326668f14eab126b23961eb009682c440c9b5538b99a97239ea14ba186e2a7",
+  "frozen/source=bybit/category=linear/symbol=SCRTUSDT/year=2023/part.parquet": "1b1f5f0b3c8b1f921097b01afc5a7ebff35a8857888c2d99c218fe5e18f9dcf1",
+  "frozen/source=bybit/category=linear/symbol=SCRTUSDT/year=2024/part.parquet": "6f966f520069a8614a5a500634923a3ef7df75aa835567d631d3bc3e7b913b93",
+  "frozen/source=bybit/category=linear/symbol=SCRTUSDT/year=2025/part.parquet": "9930edfe73d1cd6e6e97e0702edd7922d9029bb22e1d52eedbdb0695480e0c17",
+  "frozen/source=bybit/category=linear/symbol=SCRTUSDT/year=2026/part.parquet": "78b5593ff66a33bf15a0e4fdefac18efcb0ac27515cc0ccbe2696e846901435f",
+  "frozen/source=bybit/category=linear/symbol=SCRUSDT/year=2024/part.parquet": "5a22644c42a4ec4c40327c7a709a26de1a52325920630a7e8eb87d8b1ab874ba",
+  "frozen/source=bybit/category=linear/symbol=SCRUSDT/year=2025/part.parquet": "eee3f63b30fcb1c4768628a935382bc21bdffd0ac8d87b0015006e7b05bdd873",
+  "frozen/source=bybit/category=linear/symbol=SCRUSDT/year=2026/part.parquet": "863ffd972a3b002ee85adff2d3e689b63ea445a573659cb613e3df1373ba5110",
+  "frozen/source=bybit/category=linear/symbol=SCUSDT/year=2021/part.parquet": "c30d6d82d88e6abbe9cef683a405ceca930e2ac0401dd4d88d7a086734ac526b",
+  "frozen/source=bybit/category=linear/symbol=SCUSDT/year=2022/part.parquet": "91d46014fa43c942f24a7cb03cd9bc19552a28676e9b51a30e0e0e3f877dc2ee",
+  "frozen/source=bybit/category=linear/symbol=SCUSDT/year=2023/part.parquet": "04afb0f13a0e91fce4e10af43392c2fb67814dc46ea14ea9ef4f4fc142e88dd1",
+  "frozen/source=bybit/category=linear/symbol=SCUSDT/year=2024/part.parquet": "9f5bed25b429f81f9ec1dd48861d05e7ce97be3897b1f5d921aa3cd39d0fa816",
+  "frozen/source=bybit/category=linear/symbol=SCUSDT/year=2025/part.parquet": "2799880d1a7f577fdd116a08b253335c67c2e996d6a8c9c48119bd46ac1e9064",
+  "frozen/source=bybit/category=linear/symbol=SCUSDT/year=2026/part.parquet": "7ffcc647d49f544f3ddf014913906d62187609ca34bad8fb045ee3ed83d5ddb8",
+  "frozen/source=bybit/category=linear/symbol=SDUSDT/year=2024/part.parquet": "fe315ffe5fcb6a6b315650fc7402b6c0113a86f2f48811fa46d2929ba82f336a",
+  "frozen/source=bybit/category=linear/symbol=SDUSDT/year=2025/part.parquet": "f989429dadc59348c6a78b6440c57cf047db4bb14070626b28b4c147a5053667",
+  "frozen/source=bybit/category=linear/symbol=SDUSDT/year=2026/part.parquet": "e04784cbc13753399841d93be4c293f20903021c20b4c394438aad41207b5e70",
+  "frozen/source=bybit/category=linear/symbol=SENDUSDT/year=2024/part.parquet": "c0cd98bf7f3ce945cf7c5e2a24fed8f8f65778f28729de51216f49fb41dc86e1",
+  "frozen/source=bybit/category=linear/symbol=SENDUSDT/year=2025/part.parquet": "efab92bdb773b16e08617758e3239568836fa7069c9c1e9275cb4ffa1a4cedc7",
+  "frozen/source=bybit/category=linear/symbol=SERAPHUSDT/year=2025/part.parquet": "2f1e3b30070f86c6c35e5db21e2dc0274986f316f90b6e47b3fe624c4414b8d7",
+  "frozen/source=bybit/category=linear/symbol=SFPUSDT/year=2021/part.parquet": "13d5297ba29c1e7b15eecbb4de724e81adc471f77a85ba7e42da1cf330a3cd6e",
+  "frozen/source=bybit/category=linear/symbol=SFPUSDT/year=2022/part.parquet": "e6de6a15010233143ee9142d0f763621c86fb1fe7dc213e0fe9fc847cc8c88ad",
+  "frozen/source=bybit/category=linear/symbol=SFPUSDT/year=2023/part.parquet": "6907bb9f139fb28bf8551a55b98b4675cdb5099adf132015cd45cfd4a8d82e42",
+  "frozen/source=bybit/category=linear/symbol=SFPUSDT/year=2024/part.parquet": "ac6c6210eb3c56d9f797e497b1c312bbbba58c04598a09aebedc2b818e51947d",
+  "frozen/source=bybit/category=linear/symbol=SFPUSDT/year=2025/part.parquet": "9c2507b1ab6d697d46ebfeb47758d2f39a652e5f4fa388b9aa14c2cd223db998",
+  "frozen/source=bybit/category=linear/symbol=SFPUSDT/year=2026/part.parquet": "6020389b061a6fe3f721a3f541a66961088ded92fe53ebe121e9133237c6fba4",
+  "frozen/source=bybit/category=linear/symbol=SILLYUSDT/year=2023/part.parquet": "8c49c96dfcba5046cff4e5b0f71ce55544b4fbd3a0310e721f55826e37d1d056",
+  "frozen/source=bybit/category=linear/symbol=SILLYUSDT/year=2024/part.parquet": "399def3cb7e2f5f83a3b1b0b1c577200a69ef512f4cc6d027229156a0ddb64c9",
+  "frozen/source=bybit/category=linear/symbol=SILLYUSDT/year=2025/part.parquet": "6d8da80748fcba253b2b644e369c45737616137471c71e2e7be3a472fd0b10f3",
+  "frozen/source=bybit/category=linear/symbol=SKATEUSDT/year=2025/part.parquet": "8cf7de910b301594d9024f5c86e70ff6b663093d00613ebcead950d9388fcefc",
+  "frozen/source=bybit/category=linear/symbol=SKYAIUSDT/year=2025/part.parquet": "f2202cfbefb9f6424e29d8a0fe0b8627aee523b5036d0de4c659ae91f9f4b8ca",
+  "frozen/source=bybit/category=linear/symbol=SKYAIUSDT/year=2026/part.parquet": "e94b0dc4df33c04ef5baa12183c1f02666eb1be2375cca6d1e8d8bb8a92df7f3",
+  "frozen/source=bybit/category=linear/symbol=SLERFUSDT/year=2024/part.parquet": "3a2b097faa34d3519c7f25d9fb04d6a6a542dd6210dda683688f7ff38f3961e5",
+  "frozen/source=bybit/category=linear/symbol=SLERFUSDT/year=2025/part.parquet": "a6ac8a0cad42f6a00befd1ca8d1a5cc0cf655e1fd2a4dc93fab0176363b28cd0",
+  "frozen/source=bybit/category=linear/symbol=SLFUSDT/year=2024/part.parquet": "f1d893051a157f40fbdcf45ea790d12c1e3beff2d4f2ed036b980a04b485a039",
+  "frozen/source=bybit/category=linear/symbol=SLFUSDT/year=2025/part.parquet": "f7023cfb4a0a7b9ce47c01a80dc6a21c969165ccfed52eff21aff6c8c3f5c41e",
+  "frozen/source=bybit/category=linear/symbol=SOLOUSDT/year=2024/part.parquet": "2bb2ceff6b8252d83b554a295751b24a2eb6e9a9391279667d76698d9e6ac80a",
+  "frozen/source=bybit/category=linear/symbol=SOLOUSDT/year=2025/part.parquet": "f567d218fdd641bdedc05f31beb03836c8a49e8492c0fa64a507ee1764928d0c",
+  "frozen/source=bybit/category=linear/symbol=SOLVUSDT/year=2025/part.parquet": "0de056988be3d2f74d9d6af8cd9c28f4551cfb8df648b0d5298b64725cd77b74",
+  "frozen/source=bybit/category=linear/symbol=SOLVUSDT/year=2026/part.parquet": "582da607176f9429678829a5f56706c7cbf8e8e1817414fb83ad1c2543604d55",
+  "frozen/source=bybit/category=linear/symbol=SPECUSDT/year=2024/part.parquet": "cf184c00e86f6f164b847791a93a792535303aefa71481149811ef7671f8955b",
+  "frozen/source=bybit/category=linear/symbol=SPECUSDT/year=2025/part.parquet": "1f7f53128d945401bccda5c332b075d4781cbebf62883effb1cb0a74fb549f3d",
+  "frozen/source=bybit/category=linear/symbol=SPELLUSDT/year=2021/part.parquet": "c8f08438202732dec9164a748065d5008c34934933f4123f1512602a1f820073",
+  "frozen/source=bybit/category=linear/symbol=SPELLUSDT/year=2022/part.parquet": "13ff9d3c6617e98b75c86a90bb54a69e603ba9d5e039301c4edff506e73cfd15",
+  "frozen/source=bybit/category=linear/symbol=SPELLUSDT/year=2023/part.parquet": "a72c15e6a40aea2a55e86c5874b3aa5b0e1c460b86220295f87051752bf5c934",
+  "frozen/source=bybit/category=linear/symbol=SPELLUSDT/year=2024/part.parquet": "27cf104de91ec344137468eb5c78d6e7f5d2e889f5325877f8d9e3c916eddfb5",
+  "frozen/source=bybit/category=linear/symbol=SPELLUSDT/year=2025/part.parquet": "44fb027b1a0302adda4052675506a0d4cfbe64247cf828e65eb3edb79d3d57db",
+  "frozen/source=bybit/category=linear/symbol=SPELLUSDT/year=2026/part.parquet": "2f1f54aac838c55b966e26178f394137a7dda2137c449302beb409fc00cbbe12",
+  "frozen/source=bybit/category=linear/symbol=SRMUSDT/year=2021/part.parquet": "300f15724ecc2ec8b2147645f05631929c9bcdaa3d5a225e8bec76866c9f52f8",
+  "frozen/source=bybit/category=linear/symbol=SRMUSDT/year=2022/part.parquet": "27ebea765381664721157b1303cfc7cc23f25205641b12f1259b9a212f74a205",
+  "frozen/source=bybit/category=linear/symbol=STMXUSDT/year=2022/part.parquet": "6e1b57de674fb08fa913712028d697031be05e300d4926af474926256efb1a8a",
+  "frozen/source=bybit/category=linear/symbol=STMXUSDT/year=2023/part.parquet": "0735ba5a827daae814d54fa1fbfe77818003a4f68524014fdf621c53f91b48b3",
+  "frozen/source=bybit/category=linear/symbol=STMXUSDT/year=2024/part.parquet": "71801757f2c9b20e803b65e18e4e6c8ac52ec950fd8647536ef76557f6e8d9ba",
+  "frozen/source=bybit/category=linear/symbol=STMXUSDT/year=2025/part.parquet": "f5255860a556c6f9643657707f69afbdedc1e0e4659df486741683be6e2ce3a3",
+  "frozen/source=bybit/category=linear/symbol=STPTUSDT/year=2023/part.parquet": "08cd5908b93fd6bb186c647bbd2394948976ec964d1b67178b439f143120296a",
+  "frozen/source=bybit/category=linear/symbol=STPTUSDT/year=2024/part.parquet": "9183bf7c28df938fa5566849a67409002e985f7690f4af1cda2beffc4df042c7",
+  "frozen/source=bybit/category=linear/symbol=STPTUSDT/year=2025/part.parquet": "d3a0e53e2b56df9b5109ee40941f1e58a10b2439e0ebda0bb247046fe8400706",
+  "frozen/source=bybit/category=linear/symbol=STRAXUSDT/year=2023/part.parquet": "2304601e4be091c8320ea5ea897540275f2637b8c7aa39fe34cf73138987f074",
+  "frozen/source=bybit/category=linear/symbol=STRAXUSDT/year=2024/part.parquet": "54c178a9e018026e2b4f8987bd929c51c7e358689a67dc45cfc8915500c7f78f",
+  "frozen/source=bybit/category=linear/symbol=SUNDOGUSDT/year=2024/part.parquet": "573467add4a5844fc65bd29b7a174d52068354217c2425bc269cf576802bfa8a",
+  "frozen/source=bybit/category=linear/symbol=SUNDOGUSDT/year=2025/part.parquet": "6f432345034ea8fa89ae35b2fbe0dadd733acf05a7f6faffc821814ce5e57f1e",
+  "frozen/source=bybit/category=linear/symbol=SWARMSUSDT/year=2025/part.parquet": "f3b3fbc5473942db8e8ed465f28ce59e39ac2cb7ee7836ddef18da13062c5a67",
+  "frozen/source=bybit/category=linear/symbol=SWARMSUSDT/year=2026/part.parquet": "33397c2578e54a4fac77a4c8c985ebaf33d57e98c67752358a792d3b53764021",
+  "frozen/source=bybit/category=linear/symbol=SWEATUSDT/year=2022/part.parquet": "5f54042fd99dcf81e8f9f75f91240ae54e141a8d325d844392b74432eeac3fdd",
+  "frozen/source=bybit/category=linear/symbol=SWEATUSDT/year=2023/part.parquet": "01f1b8a7a85003000460530aebef7829d90a61d7fa9ee00e316b9f799989ee99",
+  "frozen/source=bybit/category=linear/symbol=SWEATUSDT/year=2024/part.parquet": "aa14d8e7cba5bb360017ddbd1e5b0bfdca51836d57f406c9ca7c6ceb4001bc0f",
+  "frozen/source=bybit/category=linear/symbol=SWEATUSDT/year=2025/part.parquet": "1de790d7d7f126e32c005c721981f71ecd7328ebaeb9dac6d0e1d251c457c740",
+  "frozen/source=bybit/category=linear/symbol=SWELLUSDT/year=2024/part.parquet": "5fff045cefec5692079523a9447ba9e99855346a98d47b520f8bb066a398ebf0",
+  "frozen/source=bybit/category=linear/symbol=SWELLUSDT/year=2025/part.parquet": "3e0cc648d9186a4e34eb48d6e966925426db8292ff1a65ecae98e3b02b7c10cf",
+  "frozen/source=bybit/category=linear/symbol=SXPUSDT/year=2021/part.parquet": "4f9d31369a0f976ba102922ce00625b11686328e5950e043b5bd2fd557e521cd",
+  "frozen/source=bybit/category=linear/symbol=SXPUSDT/year=2022/part.parquet": "c775aca1bf3e433d01e77bf1a873713d43c6618a2121f8510f6d40937c661ab6",
+  "frozen/source=bybit/category=linear/symbol=SXPUSDT/year=2023/part.parquet": "e71b187d13396e705a17db61682a7c633e80db37e2212ebf73e88698aaead016",
+  "frozen/source=bybit/category=linear/symbol=SXPUSDT/year=2024/part.parquet": "8c5d305f16c4b5c0e3203bf53ed07297113986173ab1dd75bdce5e17391feae2",
+  "frozen/source=bybit/category=linear/symbol=SXPUSDT/year=2025/part.parquet": "cf30b5f7bdf2a44bf1b968a05aac106090acdf3dbf5a7d5bb838bac6c12eb182",
+  "frozen/source=bybit/category=linear/symbol=SXPUSDT/year=2026/part.parquet": "bbdaf1b37594a97eb8ca75f453bde2e3c6443704a2bed65b021af341e3f45d57",
+  "frozen/source=bybit/category=linear/symbol=SYNUSDT/year=2024/part.parquet": "b212ee9ab7dd97abb3bd04b12cdfe761d7861a3ce0f5c28676c27b9e2665efcd",
+  "frozen/source=bybit/category=linear/symbol=SYNUSDT/year=2025/part.parquet": "f404c25f50ddd4bf8fed77fbfd67cbd6bd67481699cd47853c07f27c96aa66fe",
+  "frozen/source=bybit/category=linear/symbol=SYNUSDT/year=2026/part.parquet": "dad81ec066bc0dd007b2bf08dc692f77aaefaee8b25721ec545c049c7f8e54a4",
+  "frozen/source=bybit/category=linear/symbol=SYSUSDT/year=2024/part.parquet": "c3bdb5b983c1aba480bb4c9ece3fab9d9c806091831d5ef3e98b6615b4baf33b",
+  "frozen/source=bybit/category=linear/symbol=SYSUSDT/year=2025/part.parquet": "66a4bd5b5cced637104a46921bd65a96f649c81580d02cc7e2d57c5d3c38b08e",
+  "frozen/source=bybit/category=linear/symbol=SYSUSDT/year=2026/part.parquet": "187c5db0453aae0fbf96675aa926b6f5135f9ae5a6081cebbbf53ead9612f98c",
+  "frozen/source=bybit/category=linear/symbol=TAIUSDT/year=2024/part.parquet": "de290464ca95fa909420e20cbb57cda91fbd1459808c73480dec21d032f023a4",
+  "frozen/source=bybit/category=linear/symbol=TAIUSDT/year=2025/part.parquet": "1018e67f2babbc37a6154d91d9d3d4747f6b6a34c3bf97b1d55a215007ce226f",
+  "frozen/source=bybit/category=linear/symbol=TAIUSDT/year=2026/part.parquet": "b09344804f864b588ce0fe0bcdac6a36258984160ee2026a461af7452998c881",
+  "frozen/source=bybit/category=linear/symbol=TANSSIUSDT/year=2025/part.parquet": "7e838d336ba669077a54c27fa0724a006747545cf0960a8c00dd1eb5d46405a7",
+  "frozen/source=bybit/category=linear/symbol=TOKENUSDT/year=2023/part.parquet": "0600c23b63c263198c6c35ed6004d6919e44fd67fa1a3eb21e588f1a914d4fd9",
+  "frozen/source=bybit/category=linear/symbol=TOKENUSDT/year=2024/part.parquet": "2a40b7b402f7c5b9704789b071b8d10314fb87839ad1359aab23ffed4008bfb1",
+  "frozen/source=bybit/category=linear/symbol=TOKENUSDT/year=2025/part.parquet": "b46eebf66a37b93ca45b1d6a5e798f2d05521c9656b4a0a976c70e96c54b84a5",
+  "frozen/source=bybit/category=linear/symbol=TOMIUSDT/year=2023/part.parquet": "6567f9ae2da709eca1a5c778cc43ef97e4fbd559d8e9463978929b3a03f6f70f",
+  "frozen/source=bybit/category=linear/symbol=TOMIUSDT/year=2024/part.parquet": "8d22dabb3f304b0ec194ee4483fab03eb728bb44530a9ca8ddd9e75c7bf75012",
+  "frozen/source=bybit/category=linear/symbol=TOMOUSDT/year=2022/part.parquet": "34e635a04e119ccbcff010c4a50f3c9f0fb683685ef82c274a73cc34c2099abc",
+  "frozen/source=bybit/category=linear/symbol=TOMOUSDT/year=2023/part.parquet": "a1226cb6b52e88f14f5dc2d01563854db5ecbde48dc80efc25f184e7e1ec7252",
+  "frozen/source=bybit/category=linear/symbol=TONUSDT/year=2023/part.parquet": "c22a0be2ae37741c40512e22082a6de05d72e33041afca38ea93a6b751c7812a",
+  "frozen/source=bybit/category=linear/symbol=TONUSDT/year=2024/part.parquet": "7ed37e8beae1266f5901e802d20660618be466aaabd8762831646a6e1c8641ce",
+  "frozen/source=bybit/category=linear/symbol=TONUSDT/year=2025/part.parquet": "e637ed8e3e9a37481a38cf573739484680b581e15a2e0a6829b34fb5b265bf4a",
+  "frozen/source=bybit/category=linear/symbol=TONUSDT/year=2026/part.parquet": "c522213b81256260b3d32fc385e2b14b7b2666e139a0f0d8f33d4801c4c74b4f",
+  "frozen/source=bybit/category=linear/symbol=TROYUSDT/year=2024/part.parquet": "f50eae1a52cdfcbe116ac3eeac24dd48a5ee161fd4e2af9d2014d58bdc60c2e9",
+  "frozen/source=bybit/category=linear/symbol=TROYUSDT/year=2025/part.parquet": "7c4cb9d2fad43e682d6de79bf14f311efab4eef02927ba78ad25de9c9cdff678",
+  "frozen/source=bybit/category=linear/symbol=TRUUSDT/year=2023/part.parquet": "464c80b6df03ea6c9b7d257267906baabb1fe376ca66b82cef59da0cbf38f97c",
+  "frozen/source=bybit/category=linear/symbol=TRUUSDT/year=2024/part.parquet": "06b03fcfdd78c515856ccbbfe258ed56d02bed839f5c83ba74723f7f571615c6",
+  "frozen/source=bybit/category=linear/symbol=TRUUSDT/year=2025/part.parquet": "0ff2594c04686727cf454f0504f03e3f3e8895bc55e08db49093231ef65e2c4f",
+  "frozen/source=bybit/category=linear/symbol=TRUUSDT/year=2026/part.parquet": "6e7e3554acdaa7ff85ac9ff01195874a2f783113243c9f006ed013f76cf20662",
+  "frozen/source=bybit/category=linear/symbol=TSTBSCUSDT/year=2025/part.parquet": "52487b613a507e8f5b493fdf81826f0253ba1ffd32465b7a691a357694e972ea",
+  "frozen/source=bybit/category=linear/symbol=TSTBSCUSDT/year=2026/part.parquet": "3ce377fb60590710c5d13772d3c15f5917bcbcde01ce9902b6bd6ab6ce55ece4",
+  "frozen/source=bybit/category=linear/symbol=UNFIUSDT/year=2022/part.parquet": "65833f6b14a24b2825261c673c7dd551e981c94668fef67e65ad2a330c0324b3",
+  "frozen/source=bybit/category=linear/symbol=UNFIUSDT/year=2023/part.parquet": "64ad0157f5ae75dc0042dcc6b26a0574208752aef6a4a0cbe0bccfb609a3486e",
+  "frozen/source=bybit/category=linear/symbol=UNFIUSDT/year=2024/part.parquet": "d74f8f8ad167c3203fd1393580c8b1742a132345142f696ba5b6ed69fc178bc3",
+  "frozen/source=bybit/category=linear/symbol=UROUSDT/year=2024/part.parquet": "fe79f4ac3606aa5a48f14c24c840d68cba0d901b85854f396b8076e8682e7db3",
+  "frozen/source=bybit/category=linear/symbol=UROUSDT/year=2025/part.parquet": "ceccf7014d1ad0b2e55a452e4299d6c465cbb42f8d045c2cd623a4d587bff15d",
+  "frozen/source=bybit/category=linear/symbol=USTUSDT/year=2022/part.parquet": "f13c1df84ab0b60c312238a5707828c3dc5e3fc2617ae69bf9205ad2961cfffb",
+  "frozen/source=bybit/category=linear/symbol=UXLINKUSDT/year=2024/part.parquet": "69cff3cbb55493cfdc07da25048f231b504f50997a02a28d935e0d5eecbdf980",
+  "frozen/source=bybit/category=linear/symbol=UXLINKUSDT/year=2025/part.parquet": "c9271d85cf316c7169d1b40614b36668f19100fa38f883effb6b744a894e0ec2",
+  "frozen/source=bybit/category=linear/symbol=VANRYUSDT/year=2024/part.parquet": "40ce5c56ef958d0d5353e769238f5947bbabbe60431c9de77ba72c63fd7a99dc",
+  "frozen/source=bybit/category=linear/symbol=VANRYUSDT/year=2025/part.parquet": "01763d7c40fecfb3fb3ef66d2cd55a68db0da3c1845cf4d4bcc4b41d8c5ecb6c",
+  "frozen/source=bybit/category=linear/symbol=VANRYUSDT/year=2026/part.parquet": "98cc4858ff243e2ec969a7b969391842c0674e3a687b5b37f8b69af74d024b92",
+  "frozen/source=bybit/category=linear/symbol=VFYUSDT/year=2025/part.parquet": "72d8074cd0bb350dca9f36264ae467a3804b79ff644194777ffbd45f3ab6bc09",
+  "frozen/source=bybit/category=linear/symbol=VFYUSDT/year=2026/part.parquet": "74fc02fc5bbd1b42402d8ec88934a45e6eb9adccaa9e2f2d29185226051db1bb",
+  "frozen/source=bybit/category=linear/symbol=VGXUSDT/year=2023/part.parquet": "fdde639978c826fe809b8a981b7adf7fb6cac54e4c51b987b345b61ea510ea7b",
+  "frozen/source=bybit/category=linear/symbol=VGXUSDT/year=2024/part.parquet": "bcc2e4e31796ac43f7e255c8917121c51195ff3340decbae13f476af4bf52549",
+  "frozen/source=bybit/category=linear/symbol=VICUSDT/year=2025/part.parquet": "d07034fd2afda6801fb697e80ce986e1aa5811d216722b709acc283a6b1e8ae0",
+  "frozen/source=bybit/category=linear/symbol=VICUSDT/year=2026/part.parquet": "bb9c186f3821a38f0fb000bb286e1b3489132e612b1403c92348761484098163",
+  "frozen/source=bybit/category=linear/symbol=VIDTUSDT/year=2024/part.parquet": "308acc6f00dcdf03c2d164e63dbb07124276fcdb0dbe39e9bb559b9e786cb49c",
+  "frozen/source=bybit/category=linear/symbol=VIDTUSDT/year=2025/part.parquet": "de18425e5b45f91e96bb7ba23964975a60d9a33d322e646b6eac1bc88ae42486",
+  "frozen/source=bybit/category=linear/symbol=VINEUSDT/year=2025/part.parquet": "ac5ce093da27cd47a7c4e6d7706df0a4e9585d60bf3cd5706779f975fd0ebafa",
+  "frozen/source=bybit/category=linear/symbol=VINEUSDT/year=2026/part.parquet": "3243968c2c0a1121383317602c423181588fe89140661c4818bb73fbc03b4d80",
+  "frozen/source=bybit/category=linear/symbol=VOXELUSDT/year=2024/part.parquet": "87acf5552bcff237ed498ffbc3fa6c2430c5f551f07f9be987673d19794a4c11",
+  "frozen/source=bybit/category=linear/symbol=VOXELUSDT/year=2025/part.parquet": "1b745a6b12aaf5bc776b10b09b64fa9d5f472a000fbfab824890127cae78f512",
+  "frozen/source=bybit/category=linear/symbol=VRAUSDT/year=2023/part.parquet": "1cbc8715191d136915d88f17dea65c9ad8fd9ec7b9bbfa59d6f7519813cabd66",
+  "frozen/source=bybit/category=linear/symbol=VRAUSDT/year=2024/part.parquet": "aa8d6818504f1a74c0af01f7c20f0b93f2eea363937fa18ee433109b27c39b1d",
+  "frozen/source=bybit/category=linear/symbol=VRAUSDT/year=2025/part.parquet": "b5a92c4909c5fa0a6bf32ed04f85b2484eada782810b6b5d5e68a5d52d59de80",
+  "frozen/source=bybit/category=linear/symbol=VRUSDT/year=2025/part.parquet": "40d7331d250f0868d0e1124eec5ba5e47c134b04f62262e048b203b38b20db70",
+  "frozen/source=bybit/category=linear/symbol=VTHOUSDT/year=2024/part.parquet": "de021a51e3bad8393c43123a53776799c9cdc5969e5d291fd381927bac73f3a0",
+  "frozen/source=bybit/category=linear/symbol=VTHOUSDT/year=2025/part.parquet": "996fdf364ae4b32ccdc5f3c41c4cf499c6667e9d783930580510b6397a39d22f",
+  "frozen/source=bybit/category=linear/symbol=WHITEWHALEUSDT/year=2026/part.parquet": "41b3ddbf6d739b720805b5c1f57af50e46b34496f9eae8325812771a321c6be1",
+  "frozen/source=bybit/category=linear/symbol=WSMUSDT/year=2023/part.parquet": "e40737669721e2f858e1bec8ebb1d32cf3f61481d804a0d336cb7199f782879b",
+  "frozen/source=bybit/category=linear/symbol=WSMUSDT/year=2024/part.parquet": "74f7eea28be8adfd769230813db01399b0f51057c3b8b20aaf3f280bcb886473",
+  "frozen/source=bybit/category=linear/symbol=XCHUSDT/year=2024/part.parquet": "a9b2a980d534b025fc80e21af0fd3e13ac34659252f41c1f043eb47f9f4c4b07",
+  "frozen/source=bybit/category=linear/symbol=XCHUSDT/year=2025/part.parquet": "52a1ea3945c4b7cbe6847d24dfe366ee4d03c0762d94fb0c1c862aecf4b41e57",
+  "frozen/source=bybit/category=linear/symbol=XCHUSDT/year=2026/part.parquet": "f289220a54d25bd135f4ee2bef71ca949021a53ef8a5b84fc88c31f8a06f9bbe",
+  "frozen/source=bybit/category=linear/symbol=XEMUSDT/year=2021/part.parquet": "ded08d4c5505d2d75d572bea3b329cdb11d166f1889f01cd49485904df45e945",
+  "frozen/source=bybit/category=linear/symbol=XEMUSDT/year=2022/part.parquet": "4001052bfb4c26abdfc7bc1c9f092465eac0bddc7102d1a5318b6562cce54ba1",
+  "frozen/source=bybit/category=linear/symbol=XEMUSDT/year=2023/part.parquet": "ddf05961f4c6a39393a89e7a23d110b5363093ff491914787749f2b192ca813c",
+  "frozen/source=bybit/category=linear/symbol=XEMUSDT/year=2024/part.parquet": "a3d645b1c9424f7bc7faa2bab37d90df677c3700f195e6416710805422594fd1",
+  "frozen/source=bybit/category=linear/symbol=XEMUSDT/year=2025/part.parquet": "a63672d980393037cc2e42922376a6b8b6ec363c13963de2c6c021409e2ae953",
+  "frozen/source=bybit/category=linear/symbol=XIONUSDT/year=2024/part.parquet": "836e252aee90561461c8334e32107e669a9bbb50a99471b1fa9b7c1e332b4ace",
+  "frozen/source=bybit/category=linear/symbol=XIONUSDT/year=2025/part.parquet": "e1c48eb44f4ed817e3394527e6558408add5b84fd896b4f5c07c318613109f76",
+  "frozen/source=bybit/category=linear/symbol=XIONUSDT/year=2026/part.parquet": "1ee107c4f85822ff7f879f067edee6d0af2fd811f5b6bdbe596c6579365aa4b4",
+  "frozen/source=bybit/category=linear/symbol=XNOUSDT/year=2022/part.parquet": "72f8f19634320437cb272237fcead0df3dfb5ea69bed5fc01d50dde1aeaf8846",
+  "frozen/source=bybit/category=linear/symbol=XNOUSDT/year=2023/part.parquet": "cb8aba4340880cc4ff744133e5b914f22e108a9b17d659e86e77c745eb402a16",
+  "frozen/source=bybit/category=linear/symbol=XNOUSDT/year=2024/part.parquet": "730f8ae1839b6c3dbdff1ae2819384d8e30e1843f348b9bc379671079f957700",
+  "frozen/source=bybit/category=linear/symbol=XNOUSDT/year=2025/part.parquet": "86992635cb77c2cc89afd811c50781d36c8416f1eaef9d0d636c306614454039",
+  "frozen/source=bybit/category=linear/symbol=XNOUSDT/year=2026/part.parquet": "7245fac5417be928d7981076326c0b037ba4bf62154b831c66a10a67fc6a7765",
+  "frozen/source=bybit/category=linear/symbol=XRDUSDT/year=2023/part.parquet": "1d4fd588474c0439b6ae381237b3893940834e609339bcee8dd9755ae25f3794",
+  "frozen/source=bybit/category=linear/symbol=XRDUSDT/year=2024/part.parquet": "95d6dc7fce9125be7f1423ff764b6706783d14c57f5876e5b5608178708f00b7",
+  "frozen/source=bybit/category=linear/symbol=XRDUSDT/year=2025/part.parquet": "91995e0546d213f95aee41b80f9e7030d8e6c458fc2c5f05644f116ac6198be4",
+  "frozen/source=bybit/category=linear/symbol=XTERUSDT/year=2025/part.parquet": "d17cac563612f5dcc3a35ca7f6483fa0792988cf65a711f4d78c9db80646a7c6",
+  "frozen/source=bybit/category=linear/symbol=YALAUSDT/year=2025/part.parquet": "d0101b66ce752bd23ef39f8a79f93746920c16f90d8cb80add13364aa338db62",
+  "frozen/source=bybit/category=linear/symbol=YALAUSDT/year=2026/part.parquet": "f3162b813d440ef3a689b97e7ff7a5dc58d54bb145a180cff6a805f1759baa3e",
+  "frozen/source=bybit/category=linear/symbol=YFIIUSDT/year=2023/part.parquet": "064e5603960213143026dab4a1b2516d7c0979252bf6d3ec959caefaa94a1df3",
+  "frozen/source=bybit/category=linear/symbol=YFIIUSDT/year=2024/part.parquet": "8b5039f6b37ed413a9bee66488fc67a8a632a3916124cf1eec23eeb7d7783f53",
+  "frozen/source=bybit/category=linear/symbol=YZYUSDT/year=2025/part.parquet": "2bc2e7a036e0c8d0c2a6270cab46a3451e0c41df4f8ac3475e5cd7503696a196",
+  "frozen/source=bybit/category=linear/symbol=YZYUSDT/year=2026/part.parquet": "6dc59a7a8ba82ac9919151698aa1cf26a4e31d04d04626486730b5443f026cf2",
+  "frozen/source=bybit/category=linear/symbol=ZBCUSDT/year=2023/part.parquet": "6493513da3351bc4cd5b1fe783ef4795900b3cb2cd760785ae655b8199c612f1",
+  "frozen/source=bybit/category=linear/symbol=ZCXUSDT/year=2024/part.parquet": "5d6e1415e11acdf2aea9ff6c9015c7b238810495750023a03a3471f45c1929a3",
+  "frozen/source=bybit/category=linear/symbol=ZENTUSDT/year=2024/part.parquet": "f29a1b52bbcf209658e4e439f3bb556157da1fdebee734920c91cbb65b099ca0",
+  "frozen/source=bybit/category=linear/symbol=ZENTUSDT/year=2025/part.parquet": "a9f3cfe869c7ee98a5514bf7545b2ffe1c84ed1273472b58390c4ff9cb748c5b",
+  "frozen/source=bybit/category=linear/symbol=ZEUSUSDT/year=2024/part.parquet": "5a2bd7aea85aa4d364a1cb146c6fa31f98a6d2121c6e712b631d2975292f96dc",
+  "frozen/source=bybit/category=linear/symbol=ZEUSUSDT/year=2025/part.parquet": "93ebf04ea4c91dc326daf347bca04f147948312117ff814cb4e13384194c1dd8",
+  "frozen/source=bybit/category=linear/symbol=ZEUSUSDT/year=2026/part.parquet": "b7a1618380648701c02853ee22635f83445be559bc1d88c26b401ffe20b64750",
+  "frozen/source=bybit/category=linear/symbol=ZKFUSDT/year=2024/part.parquet": "910a8a560a2dcc0b9bfd719f28992df1921d2915a55be63c6f831fbb53fa313b",
+  "frozen/source=bybit/category=linear/symbol=ZKJUSDT/year=2024/part.parquet": "075c9a5177e364fe3b17bc90a558dcb170cb0f72e87e27893e14a427a8067e4e",
+  "frozen/source=bybit/category=linear/symbol=ZKJUSDT/year=2025/part.parquet": "41182c001c32e3913fa50e06b2d3410443323795239a59d3d3637167b22c9266",
+  "frozen/source=bybit/category=linear/symbol=ZRCUSDT/year=2024/part.parquet": "178c4021af11e2396bc8aa995992438ae0725c652a8e8d6f2da764555084ce17",
+  "frozen/source=bybit/category=linear/symbol=ZRCUSDT/year=2025/part.parquet": "f50a7ba4ed43860685d7a2e6d67168ff0758ec5b2283d4cebf065491c03414b4"
+ },
+ "first_last_candle": {
+  "10000000AIDOGEUSDT": {
+   "first_candle": "2024-03-05",
+   "last_candle": "2025-04-28"
+  },
+  "1000000CHEEMSUSDT": {
+   "first_candle": "2024-11-25",
+   "last_candle": "2026-05-28"
+  },
+  "1000000PEIPEIUSDT": {
+   "first_candle": "2024-07-04",
+   "last_candle": "2025-10-17"
+  },
+  "1000000VINUUSDT": {
+   "first_candle": "2023-11-28",
+   "last_candle": "2024-02-06"
+  },
+  "10000COQUSDT": {
+   "first_candle": "2024-03-12",
+   "last_candle": "2025-10-06"
+  },
+  "10000ELONUSDT": {
+   "first_candle": "2025-02-10",
+   "last_candle": "2026-02-06"
+  },
+  "10000LADYSUSDT": {
+   "first_candle": "2023-05-11",
+   "last_candle": "2025-10-06"
+  },
+  "10000NFTUSDT": {
+   "first_candle": "2022-01-24",
+   "last_candle": "2024-09-18"
+  },
+  "10000QUBICUSDT": {
+   "first_candle": "2024-12-24",
+   "last_candle": "2026-05-14"
+  },
+  "10000STARLUSDT": {
+   "first_candle": "2023-10-20",
+   "last_candle": "2024-08-01"
+  },
+  "10000WENUSDT": {
+   "first_candle": "2024-01-31",
+   "last_candle": "2025-10-17"
+  },
+  "10000WHYUSDT": {
+   "first_candle": "2024-10-04",
+   "last_candle": "2025-09-03"
+  },
+  "1000APUUSDT": {
+   "first_candle": "2024-06-20",
+   "last_candle": "2025-07-11"
+  },
+  "1000BEERUSDT": {
+   "first_candle": "2024-05-31",
+   "last_candle": "2024-10-22"
+  },
+  "1000CATSUSDT": {
+   "first_candle": "2024-10-11",
+   "last_candle": "2025-07-05"
+  },
+  "1000IQ50USDT": {
+   "first_candle": "2024-03-19",
+   "last_candle": "2024-07-08"
+  },
+  "1000MUMUUSDT": {
+   "first_candle": "2024-09-23",
+   "last_candle": "2025-06-12"
+  },
+  "1000XUSDT": {
+   "first_candle": "2024-10-25",
+   "last_candle": "2026-02-11"
+  },
+  "1CATUSDT": {
+   "first_candle": "2023-12-27",
+   "last_candle": "2025-01-22"
+  },
+  "A2ZUSDT": {
+   "first_candle": "2025-07-31",
+   "last_candle": "2026-02-27"
+  },
+  "A8USDT": {
+   "first_candle": "2024-07-22",
+   "last_candle": "2025-11-21"
+  },
+  "ACXUSDT": {
+   "first_candle": "2024-12-06",
+   "last_candle": "2026-08-30"
+  },
+  "AERGOUSDT": {
+   "first_candle": "2023-11-16",
+   "last_candle": "2026-07-25"
+  },
+  "AGIXUSDT": {
+   "first_candle": "2023-02-09",
+   "last_candle": "2024-06-07"
+  },
+  "AGTUSDT": {
+   "first_candle": "2025-05-28",
+   "last_candle": "2025-10-21"
+  },
+  "AI16ZUSDT": {
+   "first_candle": "2024-12-30",
+   "last_candle": "2025-11-06"
+  },
+  "AIAUSDT": {
+   "first_candle": "2025-09-18",
+   "last_candle": "2025-12-13"
+  },
+  "AINUSDT": {
+   "first_candle": "2025-07-10",
+   "last_candle": "2026-03-06"
+  },
+  "AIUSDT": {
+   "first_candle": "2024-01-17",
+   "last_candle": "2025-11-14"
+  },
+  "AKROUSDT": {
+   "first_candle": "2022-05-25",
+   "last_candle": "2024-12-24"
+  },
+  "ALEOUSDT": {
+   "first_candle": "2024-09-19",
+   "last_candle": "2026-01-24"
+  },
+  "ALPACAUSDT": {
+   "first_candle": "2023-08-02",
+   "last_candle": "2025-04-30"
+  },
+  "ALPHAUSDT": {
+   "first_candle": "2022-03-30",
+   "last_candle": "2025-10-15"
+  },
+  "ALUUSDT": {
+   "first_candle": "2025-01-14",
+   "last_candle": "2026-03-06"
+  },
+  "AMBUSDT": {
+   "first_candle": "2023-06-05",
+   "last_candle": "2025-02-23"
+  },
+  "ANCUSDT": {
+   "first_candle": "2022-03-15",
+   "last_candle": "2022-05-13"
+  },
+  "ANTUSDT": {
+   "first_candle": "2021-12-17",
+   "last_candle": "2024-07-25"
+  },
+  "ASPUSDT": {
+   "first_candle": "2025-07-24",
+   "last_candle": "2026-09-05"
+  },
+  "ATAUSDT": {
+   "first_candle": "2023-08-08",
+   "last_candle": "2025-10-06"
+  },
+  "AUDIOUSDT": {
+   "first_candle": "2021-11-26",
+   "last_candle": "2025-11-14"
+  },
+  "AVAILUSDT": {
+   "first_candle": "2024-07-23",
+   "last_candle": "2025-10-26"
+  },
+  "AVLUSDT": {
+   "first_candle": "2025-02-20",
+   "last_candle": "2026-03-27"
+  },
+  "BADGERUSDT": {
+   "first_candle": "2023-08-16",
+   "last_candle": "2025-10-25"
+  },
+  "BAKEUSDT": {
+   "first_candle": "2022-04-01",
+   "last_candle": "2025-10-06"
+  },
+  "BALUSDT": {
+   "first_candle": "2022-04-08",
+   "last_candle": "2025-07-29"
+  },
+  "BDXNUSDT": {
+   "first_candle": "2025-06-03",
+   "last_candle": "2025-10-21"
+  },
+  "BENDOGUSDT": {
+   "first_candle": "2024-06-03",
+   "last_candle": "2025-01-30"
+  },
+  "BILLYUSDT": {
+   "first_candle": "2024-11-27",
+   "last_candle": "2025-02-19"
+  },
+  "BITUSDT": {
+   "first_candle": "2021-10-11",
+   "last_candle": "2023-07-04"
+  },
+  "BLUEUSDT": {
+   "first_candle": "2024-12-18",
+   "last_candle": "2025-04-07"
+  },
+  "BLZUSDT": {
+   "first_candle": "2022-06-06",
+   "last_candle": "2024-12-24"
+  },
+  "BNXUSDT": {
+   "first_candle": "2023-02-28",
+   "last_candle": "2025-03-17"
+  },
+  "BOBBOBUSDT": {
+   "first_candle": "2025-11-24",
+   "last_candle": "2026-07-27"
+  },
+  "BONDUSDT": {
+   "first_candle": "2023-10-16",
+   "last_candle": "2024-12-24"
+  },
+  "BSUUSDT": {
+   "first_candle": "2025-08-27",
+   "last_candle": "2026-04-30"
+  },
+  "BSWUSDT": {
+   "first_candle": "2022-03-23",
+   "last_candle": "2025-10-01"
+  },
+  "BTTUSDT": {
+   "first_candle": "2021-12-08",
+   "last_candle": "2022-02-14"
+  },
+  "BUSDUSDT": {
+   "first_candle": "2023-02-14",
+   "last_candle": "2023-12-08"
+  },
+  "BUZZUSDT": {
+   "first_candle": "2025-01-22",
+   "last_candle": "2025-04-19"
+  },
+  "CAMPUSDT": {
+   "first_candle": "2025-08-28",
+   "last_candle": "2026-04-16"
+  },
+  "CANTOUSDT": {
+   "first_candle": "2024-05-23",
+   "last_candle": "2024-08-12"
+  },
+  "CEEKUSDT": {
+   "first_candle": "2022-07-18",
+   "last_candle": "2024-10-10"
+  },
+  "CELRUSDT": {
+   "first_candle": "2021-10-25",
+   "last_candle": "2025-11-21"
+  },
+  "CHESSUSDT": {
+   "first_candle": "2024-09-02",
+   "last_candle": "2025-10-30"
+  },
+  "CLOUDUSDT": {
+   "first_candle": "2024-07-19",
+   "last_candle": "2026-05-08"
+  },
+  "COCOSUSDT": {
+   "first_candle": "2023-02-20",
+   "last_candle": "2023-05-26"
+  },
+  "COMBOUSDT": {
+   "first_candle": "2023-06-08",
+   "last_candle": "2025-03-27"
+  },
+  "COMMONUSDT": {
+   "first_candle": "2025-10-27",
+   "last_candle": "2026-02-02"
+  },
+  "COOKUSDT": {
+   "first_candle": "2024-12-02",
+   "last_candle": "2026-03-27"
+  },
+  "COSUSDT": {
+   "first_candle": "2024-05-09",
+   "last_candle": "2025-10-26"
+  },
+  "COVALUSDT": {
+   "first_candle": "2024-03-08",
+   "last_candle": "2024-07-24"
+  },
+  "CPOOLUSDT": {
+   "first_candle": "2025-03-06",
+   "last_candle": "2025-10-18"
+  },
+  "CREAMUSDT": {
+   "first_candle": "2022-01-17",
+   "last_candle": "2023-06-30"
+  },
+  "CTKUSDT": {
+   "first_candle": "2021-12-03",
+   "last_candle": "2026-04-22"
+  },
+  "CTSIUSDT": {
+   "first_candle": "2022-03-23",
+   "last_candle": "2026-03-19"
+  },
+  "CUDISUSDT": {
+   "first_candle": "2025-06-12",
+   "last_candle": "2026-02-11"
+  },
+  "DAMUSDT": {
+   "first_candle": "2025-08-18",
+   "last_candle": "2026-01-10"
+  },
+  "DAOUSDT": {
+   "first_candle": "2024-03-27",
+   "last_candle": "2024-09-24"
+  },
+  "DARKUSDT": {
+   "first_candle": "2025-04-27",
+   "last_candle": "2025-07-01"
+  },
+  "DARUSDT": {
+   "first_candle": "2022-05-02",
+   "last_candle": "2025-01-06"
+  },
+  "DEGENUSDT": {
+   "first_candle": "2024-04-01",
+   "last_candle": "2026-05-14"
+  },
+  "DENTUSDT": {
+   "first_candle": "2022-01-14",
+   "last_candle": "2026-02-06"
+  },
+  "DGBUSDT": {
+   "first_candle": "2022-03-28",
+   "last_candle": "2026-02-27"
+  },
+  "DMCUSDT": {
+   "first_candle": "2025-07-03",
+   "last_candle": "2025-10-21"
+  },
+  "DODOUSDT": {
+   "first_candle": "2022-04-22",
+   "last_candle": "2026-03-06"
+  },
+  "DOGSUSDT": {
+   "first_candle": "2024-08-26",
+   "last_candle": "2025-10-24"
+  },
+  "DOGUSDT": {
+   "first_candle": "2024-06-04",
+   "last_candle": "2026-05-28"
+  },
+  "DOP1USDT": {
+   "first_candle": "2024-07-10",
+   "last_candle": "2025-01-30"
+  },
+  "DUCKUSDT": {
+   "first_candle": "2025-01-16",
+   "last_candle": "2025-10-14"
+  },
+  "ELXUSDT": {
+   "first_candle": "2025-03-12",
+   "last_candle": "2025-12-04"
+  },
+  "EOSUSDT": {
+   "first_candle": "2021-06-29",
+   "last_candle": "2025-05-21"
+  },
+  "EPTUSDT": {
+   "first_candle": "2025-04-21",
+   "last_candle": "2026-01-30"
+  },
+  "ESUSDT": {
+   "first_candle": "2025-07-16",
+   "last_candle": "2026-07-10"
+  },
+  "ETHWUSDT": {
+   "first_candle": "2022-09-16",
+   "last_candle": "2025-11-21"
+  },
+  "FBUSDT": {
+   "first_candle": "2024-09-25",
+   "last_candle": "2025-09-03"
+  },
+  "FDUSDUSDT": {
+   "first_candle": "2024-08-16",
+   "last_candle": "2025-02-19"
+  },
+  "FETUSDT": {
+   "first_candle": "2023-02-09",
+   "last_candle": "2024-06-07"
+  },
+  "FIOUSDT": {
+   "first_candle": "2024-09-26",
+   "last_candle": "2026-04-30"
+  },
+  "FIREUSDT": {
+   "first_candle": "2024-05-09",
+   "last_candle": "2025-03-18"
+  },
+  "FISUSDT": {
+   "first_candle": "2025-07-28",
+   "last_candle": "2025-10-21"
+  },
+  "FITFIUSDT": {
+   "first_candle": "2022-05-10",
+   "last_candle": "2024-11-05"
+  },
+  "FLMUSDT": {
+   "first_candle": "2022-05-02",
+   "last_candle": "2025-11-01"
+  },
+  "FORTHUSDT": {
+   "first_candle": "2023-08-01",
+   "last_candle": "2025-11-14"
+  },
+  "FOXYUSDT": {
+   "first_candle": "2024-04-12",
+   "last_candle": "2025-05-22"
+  },
+  "FRAGUSDT": {
+   "first_candle": "2025-07-01",
+   "last_candle": "2025-10-21"
+  },
+  "FRONTUSDT": {
+   "first_candle": "2023-09-18",
+   "last_candle": "2024-08-27"
+  },
+  "FTMUSDT": {
+   "first_candle": "2021-09-23",
+   "last_candle": "2025-01-10"
+  },
+  "FTNUSDT": {
+   "first_candle": "2024-05-16",
+   "last_candle": "2025-06-23"
+  },
+  "FTTUSDT": {
+   "first_candle": "2021-10-12",
+   "last_candle": "2022-11-13"
+  },
+  "FUELUSDT": {
+   "first_candle": "2024-12-31",
+   "last_candle": "2025-10-26"
+  },
+  "FUNUSDT": {
+   "first_candle": "2023-12-14",
+   "last_candle": "2024-11-15"
+  },
+  "FWOGUSDT": {
+   "first_candle": "2024-11-12",
+   "last_candle": "2026-01-24"
+  },
+  "FXSUSDT": {
+   "first_candle": "2022-04-04",
+   "last_candle": "2026-01-02"
+  },
+  "GALUSDT": {
+   "first_candle": "2022-05-05",
+   "last_candle": "2024-07-22"
+  },
+  "GEMSUSDT": {
+   "first_candle": "2024-12-05",
+   "last_candle": "2025-03-25"
+  },
+  "GFTUSDT": {
+   "first_candle": "2023-02-10",
+   "last_candle": "2024-12-02"
+  },
+  "GIGAUSDT": {
+   "first_candle": "2024-12-12",
+   "last_candle": "2026-07-27"
+  },
+  "GLMRUSDT": {
+   "first_candle": "2022-03-30",
+   "last_candle": "2025-11-26"
+  },
+  "GMEUSDT": {
+   "first_candle": "2024-06-11",
+   "last_candle": "2025-03-25"
+  },
+  "GNOUSDT": {
+   "first_candle": "2024-05-14",
+   "last_candle": "2026-06-03"
+  },
+  "GODSUSDT": {
+   "first_candle": "2023-11-22",
+   "last_candle": "2026-06-11"
+  },
+  "GOMININGUSDT": {
+   "first_candle": "2024-10-02",
+   "last_candle": "2025-06-06"
+  },
+  "GORKUSDT": {
+   "first_candle": "2025-05-05",
+   "last_candle": "2025-10-21"
+  },
+  "GPTUSDT": {
+   "first_candle": "2023-03-17",
+   "last_candle": "2024-04-24"
+  },
+  "GSTUSDT": {
+   "first_candle": "2022-05-02",
+   "last_candle": "2022-07-21"
+  },
+  "GTCUSDT": {
+   "first_candle": "2021-11-29",
+   "last_candle": "2025-11-26"
+  },
+  "GUSDT": {
+   "first_candle": "2024-07-25",
+   "last_candle": "2025-10-26"
+  },
+  "HFTUSDT": {
+   "first_candle": "2023-03-14",
+   "last_candle": "2026-08-21"
+  },
+  "HIFIUSDT": {
+   "first_candle": "2023-08-28",
+   "last_candle": "2025-10-30"
+  },
+  "HIGHUSDT": {
+   "first_candle": "2023-02-17",
+   "last_candle": "2026-07-20"
+  },
+  "HIPPOUSDT": {
+   "first_candle": "2024-11-14",
+   "last_candle": "2026-04-16"
+  },
+  "HOOKUSDT": {
+   "first_candle": "2023-02-13",
+   "last_candle": "2026-04-03"
+  },
+  "HOTUSDT": {
+   "first_candle": "2022-03-28",
+   "last_candle": "2025-10-15"
+  },
+  "HPOS10IUSDT": {
+   "first_candle": "2024-10-21",
+   "last_candle": "2026-05-28"
+  },
+  "ICXUSDT": {
+   "first_candle": "2022-04-13",
+   "last_candle": "2026-09-18"
+  },
+  "IDEXUSDT": {
+   "first_candle": "2023-05-23",
+   "last_candle": "2026-02-27"
+  },
+  "IGUUSDT": {
+   "first_candle": "2023-12-06",
+   "last_candle": "2023-12-31"
+  },
+  "IPUSDT": {
+   "first_candle": "2025-02-07",
+   "last_candle": "2026-06-26"
+  },
+  "JAILSTOOLUSDT": {
+   "first_candle": "2025-02-14",
+   "last_candle": "2025-04-16"
+  },
+  "JOEUSDT": {
+   "first_candle": "2023-03-29",
+   "last_candle": "2025-11-14"
+  },
+  "JUSDT": {
+   "first_candle": "2025-01-22",
+   "last_candle": "2025-10-17"
+  },
+  "KDAUSDT": {
+   "first_candle": "2022-03-15",
+   "last_candle": "2025-10-24"
+  },
+  "KEEPUSDT": {
+   "first_candle": "2021-11-16",
+   "last_candle": "2022-02-18"
+  },
+  "KEYUSDT": {
+   "first_candle": "2023-05-29",
+   "last_candle": "2025-01-22"
+  },
+  "KLAYUSDT": {
+   "first_candle": "2021-12-10",
+   "last_candle": "2024-10-28"
+  },
+  "KOMAUSDT": {
+   "first_candle": "2024-12-10",
+   "last_candle": "2025-08-01"
+  },
+  "KUSDT": {
+   "first_candle": "2025-08-08",
+   "last_candle": "2025-10-19"
+  },
+  "L3USDT": {
+   "first_candle": "2024-07-31",
+   "last_candle": "2026-04-03"
+  },
+  "LAIUSDT": {
+   "first_candle": "2024-04-26",
+   "last_candle": "2025-03-17"
+  },
+  "LAUNCHCOINUSDT": {
+   "first_candle": "2025-05-14",
+   "last_candle": "2025-10-26"
+  },
+  "LEVERUSDT": {
+   "first_candle": "2023-06-05",
+   "last_candle": "2025-07-01"
+  },
+  "LFTUSDT": {
+   "first_candle": "2024-05-16",
+   "last_candle": "2024-07-08"
+  },
+  "LINAUSDT": {
+   "first_candle": "2022-04-20",
+   "last_candle": "2025-03-27"
+  },
+  "LISTAUSDT": {
+   "first_candle": "2024-06-21",
+   "last_candle": "2026-04-16"
+  },
+  "LOOKSUSDT": {
+   "first_candle": "2022-01-24",
+   "last_candle": "2025-10-26"
+  },
+  "LOOMUSDT": {
+   "first_candle": "2023-09-21",
+   "last_candle": "2024-09-24"
+  },
+  "LTOUSDT": {
+   "first_candle": "2024-04-01",
+   "last_candle": "2025-01-30"
+  },
+  "LUCEUSDT": {
+   "first_candle": "2024-11-19",
+   "last_candle": "2025-04-28"
+  },
+  "LUNAUSDT": {
+   "first_candle": "2021-10-11",
+   "last_candle": "2022-05-12"
+  },
+  "MAJORUSDT": {
+   "first_candle": "2024-11-19",
+   "last_candle": "2025-10-21"
+  },
+  "MANEKIUSDT": {
+   "first_candle": "2024-06-26",
+   "last_candle": "2025-04-28"
+  },
+  "MAPOUSDT": {
+   "first_candle": "2024-05-23",
+   "last_candle": "2024-09-24"
+  },
+  "MASAUSDT": {
+   "first_candle": "2024-05-21",
+   "last_candle": "2025-10-18"
+  },
+  "MATICUSDT": {
+   "first_candle": "2021-06-29",
+   "last_candle": "2024-09-06"
+  },
+  "MAXUSDT": {
+   "first_candle": "2024-08-06",
+   "last_candle": "2025-04-28"
+  },
+  "MBLUSDT": {
+   "first_candle": "2023-11-14",
+   "last_candle": "2025-09-03"
+  },
+  "MBOXUSDT": {
+   "first_candle": "2024-01-19",
+   "last_candle": "2026-06-26"
+  },
+  "MCUSDT": {
+   "first_candle": "2023-08-15",
+   "last_candle": "2023-11-07"
+  },
+  "MDTUSDT": {
+   "first_candle": "2023-06-30",
+   "last_candle": "2025-07-04"
+  },
+  "MEMEFIUSDT": {
+   "first_candle": "2024-11-13",
+   "last_candle": "2025-05-12"
+  },
+  "MICHIUSDT": {
+   "first_candle": "2025-01-27",
+   "last_candle": "2025-06-27"
+  },
+  "MILKUSDT": {
+   "first_candle": "2025-05-06",
+   "last_candle": "2025-12-01"
+  },
+  "MKRUSDT": {
+   "first_candle": "2022-02-15",
+   "last_candle": "2025-08-18"
+  },
+  "MLNUSDT": {
+   "first_candle": "2025-04-09",
+   "last_candle": "2026-06-26"
+  },
+  "MOBILEUSDT": {
+   "first_candle": "2024-02-22",
+   "last_candle": "2025-08-01"
+  },
+  "MOTHERUSDT": {
+   "first_candle": "2024-08-09",
+   "last_candle": "2025-03-18"
+  },
+  "MULTIUSDT": {
+   "first_candle": "2023-09-20",
+   "last_candle": "2024-03-05"
+  },
+  "MVLUSDT": {
+   "first_candle": "2024-11-29",
+   "last_candle": "2025-10-18"
+  },
+  "MYRIAUSDT": {
+   "first_candle": "2023-12-15",
+   "last_candle": "2025-10-06"
+  },
+  "MYROUSDT": {
+   "first_candle": "2024-01-19",
+   "last_candle": "2025-12-01"
+  },
+  "NCUSDT": {
+   "first_candle": "2025-01-17",
+   "last_candle": "2025-07-05"
+  },
+  "NEIROETHUSDT": {
+   "first_candle": "2024-08-15",
+   "last_candle": "2025-09-09"
+  },
+  "NFPUSDT": {
+   "first_candle": "2023-12-27",
+   "last_candle": "2026-04-09"
+  },
+  "NKNUSDT": {
+   "first_candle": "2023-02-21",
+   "last_candle": "2026-01-29"
+  },
+  "NODEUSDT": {
+   "first_candle": "2025-09-04",
+   "last_candle": "2025-10-21"
+  },
+  "NSUSDT": {
+   "first_candle": "2024-12-20",
+   "last_candle": "2026-02-27"
+  },
+  "NTRNUSDT": {
+   "first_candle": "2023-10-10",
+   "last_candle": "2026-04-03"
+  },
+  "NULSUSDT": {
+   "first_candle": "2024-08-27",
+   "last_candle": "2025-04-14"
+  },
+  "NYANUSDT": {
+   "first_candle": "2024-05-29",
+   "last_candle": "2025-02-19"
+  },
+  "OBOLUSDT": {
+   "first_candle": "2025-05-07",
+   "last_candle": "2025-12-12"
+  },
+  "OBTUSDT": {
+   "first_candle": "2025-04-25",
+   "last_candle": "2026-02-27"
+  },
+  "OCEANUSDT": {
+   "first_candle": "2022-02-23",
+   "last_candle": "2024-06-07"
+  },
+  "OLUSDT": {
+   "first_candle": "2024-11-21",
+   "last_candle": "2026-06-03"
+  },
+  "OMGUSDT": {
+   "first_candle": "2021-10-12",
+   "last_candle": "2025-06-03"
+  },
+  "OMNIUSDT": {
+   "first_candle": "2024-04-17",
+   "last_candle": "2025-09-24"
+  },
+  "OMUSDT": {
+   "first_candle": "2024-03-18",
+   "last_candle": "2026-02-20"
+  },
+  "ONEUSDT": {
+   "first_candle": "2021-10-25",
+   "last_candle": "2026-04-09"
+  },
+  "ORBSUSDT": {
+   "first_candle": "2023-10-13",
+   "last_candle": "2026-06-11"
+  },
+  "ORNUSDT": {
+   "first_candle": "2024-03-11",
+   "last_candle": "2024-10-17"
+  },
+  "OSMOUSDT": {
+   "first_candle": "2024-05-30",
+   "last_candle": "2025-10-21"
+  },
+  "OXTUSDT": {
+   "first_candle": "2023-08-10",
+   "last_candle": "2026-05-14"
+  },
+  "PENGUSDT": {
+   "first_candle": "2024-05-27",
+   "last_candle": "2025-01-30"
+  },
+  "PERPUSDT": {
+   "first_candle": "2023-09-06",
+   "last_candle": "2025-11-26"
+  },
+  "PHBUSDT": {
+   "first_candle": "2023-05-18",
+   "last_candle": "2026-01-29"
+  },
+  "PIGGYUSDT": {
+   "first_candle": "2025-10-29",
+   "last_candle": "2025-12-07"
+  },
+  "PIRATEUSDT": {
+   "first_candle": "2024-07-22",
+   "last_candle": "2025-03-25"
+  },
+  "PIXFIUSDT": {
+   "first_candle": "2024-08-08",
+   "last_candle": "2024-11-05"
+  },
+  "PONKEUSDT": {
+   "first_candle": "2024-06-07",
+   "last_candle": "2026-04-09"
+  },
+  "PRAIUSDT": {
+   "first_candle": "2025-05-19",
+   "last_candle": "2025-07-05"
+  },
+  "PRCLUSDT": {
+   "first_candle": "2024-07-17",
+   "last_candle": "2025-12-26"
+  },
+  "PRIMEUSDT": {
+   "first_candle": "2024-09-30",
+   "last_candle": "2025-10-06"
+  },
+  "PROMUSDT": {
+   "first_candle": "2023-09-05",
+   "last_candle": "2026-04-22"
+  },
+  "PROSUSDT": {
+   "first_candle": "2024-11-15",
+   "last_candle": "2025-04-16"
+  },
+  "PUMPBTCUSDT": {
+   "first_candle": "2025-04-11",
+   "last_candle": "2026-07-20"
+  },
+  "PUMPUSDT": {
+   "first_candle": "2025-04-11",
+   "last_candle": "2025-06-03"
+  },
+  "PUNDUUSDT": {
+   "first_candle": "2024-03-28",
+   "last_candle": "2024-07-08"
+  },
+  "PYRUSDT": {
+   "first_candle": "2024-10-07",
+   "last_candle": "2026-06-11"
+  },
+  "QIUSDT": {
+   "first_candle": "2023-12-12",
+   "last_candle": "2025-10-06"
+  },
+  "QUICKUSDT": {
+   "first_candle": "2024-09-10",
+   "last_candle": "2025-12-01"
+  },
+  "RADUSDT": {
+   "first_candle": "2023-06-08",
+   "last_candle": "2025-11-26"
+  },
+  "RAYUSDT": {
+   "first_candle": "2022-02-15",
+   "last_candle": "2022-11-15"
+  },
+  "RDNTUSDT": {
+   "first_candle": "2023-04-17",
+   "last_candle": "2026-04-30"
+  },
+  "REEFUSDT": {
+   "first_candle": "2022-02-15",
+   "last_candle": "2025-01-22"
+  },
+  "RENUSDT": {
+   "first_candle": "2021-12-24",
+   "last_candle": "2025-03-06"
+  },
+  "REQUSDT": {
+   "first_candle": "2021-12-06",
+   "last_candle": "2026-06-03"
+  },
+  "REXUSDT": {
+   "first_candle": "2025-01-09",
+   "last_candle": "2025-10-13"
+  },
+  "RFCUSDT": {
+   "first_candle": "2025-04-14",
+   "last_candle": "2025-10-18"
+  },
+  "RHEAUSDT": {
+   "first_candle": "2025-08-06",
+   "last_candle": "2025-10-17"
+  },
+  "RIFSOLUSDT": {
+   "first_candle": "2024-11-18",
+   "last_candle": "2025-04-07"
+  },
+  "RIFUSDT": {
+   "first_candle": "2023-10-23",
+   "last_candle": "2025-12-01"
+  },
+  "RLSUSDT": {
+   "first_candle": "2025-12-02",
+   "last_candle": "2026-04-16"
+  },
+  "RNDRUSDT": {
+   "first_candle": "2021-12-01",
+   "last_candle": "2024-07-22"
+  },
+  "ROAMUSDT": {
+   "first_candle": "2025-03-07",
+   "last_candle": "2026-07-27"
+  },
+  "RONUSDT": {
+   "first_candle": "2024-02-20",
+   "last_candle": "2025-01-26"
+  },
+  "RSS3USDT": {
+   "first_candle": "2022-02-23",
+   "last_candle": "2025-11-26"
+  },
+  "SAROSUSDT": {
+   "first_candle": "2025-05-20",
+   "last_candle": "2026-02-11"
+  },
+  "SCAUSDT": {
+   "first_candle": "2024-03-13",
+   "last_candle": "2025-10-21"
+  },
+  "SCRTUSDT": {
+   "first_candle": "2022-03-30",
+   "last_candle": "2026-09-05"
+  },
+  "SCRUSDT": {
+   "first_candle": "2024-10-10",
+   "last_candle": "2026-07-10"
+  },
+  "SCUSDT": {
+   "first_candle": "2021-12-01",
+   "last_candle": "2026-06-11"
+  },
+  "SDUSDT": {
+   "first_candle": "2024-11-14",
+   "last_candle": "2026-03-06"
+  },
+  "SENDUSDT": {
+   "first_candle": "2024-12-13",
+   "last_candle": "2025-10-18"
+  },
+  "SERAPHUSDT": {
+   "first_candle": "2025-03-11",
+   "last_candle": "2025-10-18"
+  },
+  "SFPUSDT": {
+   "first_candle": "2021-11-26",
+   "last_candle": "2026-04-09"
+  },
+  "SILLYUSDT": {
+   "first_candle": "2023-12-27",
+   "last_candle": "2025-01-30"
+  },
+  "SKATEUSDT": {
+   "first_candle": "2025-06-09",
+   "last_candle": "2025-10-21"
+  },
+  "SKYAIUSDT": {
+   "first_candle": "2025-05-13",
+   "last_candle": "2026-03-06"
+  },
+  "SLERFUSDT": {
+   "first_candle": "2024-03-18",
+   "last_candle": "2025-10-02"
+  },
+  "SLFUSDT": {
+   "first_candle": "2024-09-03",
+   "last_candle": "2025-09-19"
+  },
+  "SOLOUSDT": {
+   "first_candle": "2024-12-26",
+   "last_candle": "2025-10-17"
+  },
+  "SOLVUSDT": {
+   "first_candle": "2025-01-17",
+   "last_candle": "2026-06-26"
+  },
+  "SPECUSDT": {
+   "first_candle": "2024-05-27",
+   "last_candle": "2025-10-06"
+  },
+  "SPELLUSDT": {
+   "first_candle": "2021-12-13",
+   "last_candle": "2026-04-09"
+  },
+  "SRMUSDT": {
+   "first_candle": "2021-10-11",
+   "last_candle": "2022-11-15"
+  },
+  "STMXUSDT": {
+   "first_candle": "2022-03-28",
+   "last_candle": "2025-02-23"
+  },
+  "STPTUSDT": {
+   "first_candle": "2023-10-04",
+   "last_candle": "2025-05-17"
+  },
+  "STRAXUSDT": {
+   "first_candle": "2023-10-09",
+   "last_candle": "2024-03-20"
+  },
+  "SUNDOGUSDT": {
+   "first_candle": "2024-08-26",
+   "last_candle": "2025-11-26"
+  },
+  "SWARMSUSDT": {
+   "first_candle": "2025-01-06",
+   "last_candle": "2026-07-10"
+  },
+  "SWEATUSDT": {
+   "first_candle": "2022-11-04",
+   "last_candle": "2025-10-26"
+  },
+  "SWELLUSDT": {
+   "first_candle": "2024-11-07",
+   "last_candle": "2025-10-21"
+  },
+  "SXPUSDT": {
+   "first_candle": "2021-12-08",
+   "last_candle": "2026-04-03"
+  },
+  "SYNUSDT": {
+   "first_candle": "2024-08-20",
+   "last_candle": "2026-05-08"
+  },
+  "SYSUSDT": {
+   "first_candle": "2024-08-20",
+   "last_candle": "2026-04-03"
+  },
+  "TAIUSDT": {
+   "first_candle": "2024-11-14",
+   "last_candle": "2026-03-19"
+  },
+  "TANSSIUSDT": {
+   "first_candle": "2025-07-09",
+   "last_candle": "2025-10-21"
+  },
+  "TOKENUSDT": {
+   "first_candle": "2023-11-03",
+   "last_candle": "2025-10-21"
+  },
+  "TOMIUSDT": {
+   "first_candle": "2023-10-10",
+   "last_candle": "2024-11-05"
+  },
+  "TOMOUSDT": {
+   "first_candle": "2022-04-28",
+   "last_candle": "2023-11-14"
+  },
+  "TONUSDT": {
+   "first_candle": "2023-08-31",
+   "last_candle": "2026-06-15"
+  },
+  "TROYUSDT": {
+   "first_candle": "2024-11-13",
+   "last_candle": "2025-04-14"
+  },
+  "TRUUSDT": {
+   "first_candle": "2023-03-09",
+   "last_candle": "2026-04-30"
+  },
+  "TSTBSCUSDT": {
+   "first_candle": "2025-02-09",
+   "last_candle": "2026-07-27"
+  },
+  "UNFIUSDT": {
+   "first_candle": "2022-05-30",
+   "last_candle": "2024-11-04"
+  },
+  "UROUSDT": {
+   "first_candle": "2024-12-13",
+   "last_candle": "2025-03-06"
+  },
+  "USTUSDT": {
+   "first_candle": "2022-05-10",
+   "last_candle": "2022-05-13"
+  },
+  "UXLINKUSDT": {
+   "first_candle": "2024-07-19",
+   "last_candle": "2025-09-26"
+  },
+  "VANRYUSDT": {
+   "first_candle": "2024-03-14",
+   "last_candle": "2026-08-12"
+  },
+  "VFYUSDT": {
+   "first_candle": "2025-09-30",
+   "last_candle": "2026-03-27"
+  },
+  "VGXUSDT": {
+   "first_candle": "2023-08-01",
+   "last_candle": "2024-09-24"
+  },
+  "VICUSDT": {
+   "first_candle": "2025-03-13",
+   "last_candle": "2026-01-29"
+  },
+  "VIDTUSDT": {
+   "first_candle": "2024-08-26",
+   "last_candle": "2025-04-16"
+  },
+  "VINEUSDT": {
+   "first_candle": "2025-01-23",
+   "last_candle": "2026-08-21"
+  },
+  "VOXELUSDT": {
+   "first_candle": "2024-08-21",
+   "last_candle": "2025-10-30"
+  },
+  "VRAUSDT": {
+   "first_candle": "2023-10-03",
+   "last_candle": "2025-05-12"
+  },
+  "VRUSDT": {
+   "first_candle": "2025-01-16",
+   "last_candle": "2025-10-17"
+  },
+  "VTHOUSDT": {
+   "first_candle": "2024-02-19",
+   "last_candle": "2025-10-10"
+  },
+  "WHITEWHALEUSDT": {
+   "first_candle": "2026-01-06",
+   "last_candle": "2026-07-20"
+  },
+  "WSMUSDT": {
+   "first_candle": "2023-10-12",
+   "last_candle": "2024-02-05"
+  },
+  "XCHUSDT": {
+   "first_candle": "2024-05-27",
+   "last_candle": "2026-03-19"
+  },
+  "XEMUSDT": {
+   "first_candle": "2021-11-30",
+   "last_candle": "2025-10-06"
+  },
+  "XIONUSDT": {
+   "first_candle": "2024-12-05",
+   "last_candle": "2026-06-18"
+  },
+  "XNOUSDT": {
+   "first_candle": "2022-09-02",
+   "last_candle": "2026-01-24"
+  },
+  "XRDUSDT": {
+   "first_candle": "2023-12-12",
+   "last_candle": "2025-07-11"
+  },
+  "XTERUSDT": {
+   "first_candle": "2025-03-06",
+   "last_candle": "2025-10-18"
+  },
+  "YALAUSDT": {
+   "first_candle": "2025-08-08",
+   "last_candle": "2026-02-07"
+  },
+  "YFIIUSDT": {
+   "first_candle": "2023-08-16",
+   "last_candle": "2024-04-03"
+  },
+  "YZYUSDT": {
+   "first_candle": "2025-08-21",
+   "last_candle": "2026-04-30"
+  },
+  "ZBCUSDT": {
+   "first_candle": "2023-08-22",
+   "last_candle": "2023-09-14"
+  },
+  "ZCXUSDT": {
+   "first_candle": "2024-06-24",
+   "last_candle": "2024-09-24"
+  },
+  "ZENTUSDT": {
+   "first_candle": "2024-12-23",
+   "last_candle": "2025-12-26"
+  },
+  "ZEUSUSDT": {
+   "first_candle": "2024-04-09",
+   "last_candle": "2026-02-06"
+  },
+  "ZKFUSDT": {
+   "first_candle": "2024-01-17",
+   "last_candle": "2024-11-15"
+  },
+  "ZKJUSDT": {
+   "first_candle": "2024-06-17",
+   "last_candle": "2025-06-18"
+  },
+  "ZRCUSDT": {
+   "first_candle": "2024-11-25",
+   "last_candle": "2025-11-21"
+  }
+ },
+ "funding_missing_symbols": [],
+ "inputs": {
+  "rest.fundingRateAll": {
+   "files_sha256": "cd26b4521b8c14d48e453891d2669a4060afb199213cbe35bfb29aaf70ad775d",
+   "n_files": 2097,
+   "n_identical_duplicates": 0,
+   "n_rows": 3119696
+  },
+  "rest.kline1d": {
+   "files_sha256": "76cf682861a4fd73797aaa9a1cac9af961de8344bca09e89b1e2046f538f3484",
+   "n_files": 2097,
+   "n_identical_duplicates": 0,
+   "n_rows": 692628
+  }
+ },
+ "n_partitions": 772,
+ "n_symbols": 306,
+ "n_symbols_with_history": 305,
+ "no_history_symbols": {
+  "LAYERUSDT": "no_api_rows"
+ },
+ "not_done_partitions": [
+  {
+   "expected_days": 303,
+   "extra_rows": 0,
+   "missing_days": 1,
+   "missing_head": [
+    "2024-03-04"
+   ],
+   "n_rows": 302,
+   "status": "PARTIAL",
+   "symbol": "10000000AIDOGEUSDT",
+   "year": 2024
+  },
+  {
+   "expected_days": 351,
+   "extra_rows": 0,
+   "missing_days": 1,
+   "missing_head": [
+    "2024-01-16"
+   ],
+   "n_rows": 350,
+   "status": "PARTIAL",
+   "symbol": "AIUSDT",
+   "year": 2024
+  },
+  {
+   "expected_days": 16,
+   "extra_rows": 0,
+   "missing_days": 1,
+   "missing_head": [
+    "2021-12-16"
+   ],
+   "n_rows": 15,
+   "status": "PARTIAL",
+   "symbol": "ANTUSDT",
+   "year": 2021
+  },
+  {
+   "expected_days": 30,
+   "extra_rows": 0,
+   "missing_days": 1,
+   "missing_head": [
+    "2021-12-02"
+   ],
+   "n_rows": 29,
+   "status": "PARTIAL",
+   "symbol": "CTKUSDT",
+   "year": 2021
+  },
+  {
+   "expected_days": 68,
+   "extra_rows": 0,
+   "missing_days": 2,
+   "missing_head": [
+    "2025-04-25",
+    "2025-04-26"
+   ],
+   "n_rows": 66,
+   "status": "PARTIAL",
+   "symbol": "DARKUSDT",
+   "year": 2025
+  },
+  {
+   "expected_days": 353,
+   "extra_rows": 0,
+   "missing_days": 1,
+   "missing_head": [
+    "2022-01-13"
+   ],
+   "n_rows": 352,
+   "status": "PARTIAL",
+   "symbol": "DENTUSDT",
+   "year": 2022
+  },
+  {
+   "expected_days": 256,
+   "extra_rows": 0,
+   "missing_days": 2,
+   "missing_head": [
+    "2022-04-20",
+    "2022-04-21"
+   ],
+   "n_rows": 254,
+   "status": "PARTIAL",
+   "symbol": "DODOUSDT",
+   "year": 2022
+  },
+  {
+   "expected_days": 328,
+   "extra_rows": 0,
+   "missing_days": 2,
+   "missing_head": [
+    "2023-02-07",
+    "2023-02-08"
+   ],
+   "n_rows": 326,
+   "status": "PARTIAL",
+   "symbol": "FETUSDT",
+   "year": 2023
+  },
+  {
+   "expected_days": 291,
+   "extra_rows": 0,
+   "missing_days": 1,
+   "missing_head": [
+    "2023-03-16"
+   ],
+   "n_rows": 290,
+   "status": "PARTIAL",
+   "symbol": "GPTUSDT",
+   "year": 2023
+  },
+  {
+   "expected_days": 328,
+   "extra_rows": 0,
+   "missing_days": 10,
+   "missing_head": [
+    "2023-02-07",
+    "2023-02-08",
+    "2023-02-09",
+    "2023-02-10",
+    "2023-02-11",
+    "2023-02-12",
+    "2023-02-13",
+    "2023-02-14",
+    "2023-02-15",
+    "2023-02-16"
+   ],
+   "n_rows": 318,
+   "status": "PARTIAL",
+   "symbol": "HIGHUSDT",
+   "year": 2023
+  },
+  {
+   "expected_days": 328,
+   "extra_rows": 0,
+   "missing_days": 6,
+   "missing_head": [
+    "2023-02-07",
+    "2023-02-08",
+    "2023-02-09",
+    "2023-02-10",
+    "2023-02-11",
+    "2023-02-12"
+   ],
+   "n_rows": 322,
+   "status": "PARTIAL",
+   "symbol": "HOOKUSDT",
+   "year": 2023
+  },
+  {
+   "expected_days": 44,
+   "extra_rows": 0,
+   "missing_days": 1,
+   "missing_head": [
+    "2024-11-18"
+   ],
+   "n_rows": 43,
+   "status": "PARTIAL",
+   "symbol": "MAJORUSDT",
+   "year": 2024
+  },
+  {
+   "expected_days": 351,
+   "extra_rows": 0,
+   "missing_days": 165,
+   "missing_head": [
+    "2021-01-15",
+    "2021-01-16",
+    "2021-01-17",
+    "2021-01-18",
+    "2021-01-19",
+    "2021-01-20",
+    "2021-01-21",
+    "2021-01-22",
+    "2021-01-23",
+    "2021-01-24"
+   ],
+   "n_rows": 186,
+   "status": "PARTIAL",
+   "symbol": "MATICUSDT",
+   "year": 2021
+  },
+  {
+   "expected_days": 349,
+   "extra_rows": 0,
+   "missing_days": 1,
+   "missing_head": [
+    "2024-01-18"
+   ],
+   "n_rows": 348,
+   "status": "PARTIAL",
+   "symbol": "MBOXUSDT",
+   "year": 2024
+  },
+  {
+   "expected_days": 50,
+   "extra_rows": 0,
+   "missing_days": 1,
+   "missing_head": [
+    "2024-11-12"
+   ],
+   "n_rows": 49,
+   "status": "PARTIAL",
+   "symbol": "MEMEFIUSDT",
+   "year": 2024
+  },
+  {
+   "expected_days": 349,
+   "extra_rows": 0,
+   "missing_days": 1,
+   "missing_head": [
+    "2024-01-18"
+   ],
+   "n_rows": 348,
+   "status": "PARTIAL",
+   "symbol": "MYROUSDT",
+   "year": 2024
+  },
+  {
+   "expected_days": 84,
+   "extra_rows": 0,
+   "missing_days": 4,
+   "missing_head": [
+    "2023-10-09",
+    "2023-10-10",
+    "2023-10-11",
+    "2023-10-12"
+   ],
+   "n_rows": 80,
+   "status": "PARTIAL",
+   "symbol": "ORBSUSDT",
+   "year": 2023
+  },
+  {
+   "expected_days": 32,
+   "extra_rows": 0,
+   "missing_days": 1,
+   "missing_head": [
+    "2021-11-30"
+   ],
+   "n_rows": 31,
+   "status": "PARTIAL",
+   "symbol": "RNDRUSDT",
+   "year": 2021
+  },
+  {
+   "expected_days": 85,
+   "extra_rows": 0,
+   "missing_days": 2,
+   "missing_head": [
+    "2024-10-08",
+    "2024-10-09"
+   ],
+   "n_rows": 83,
+   "status": "PARTIAL",
+   "symbol": "SCRUSDT",
+   "year": 2024
+  },
+  {
+   "expected_days": 32,
+   "extra_rows": 0,
+   "missing_days": 1,
+   "missing_head": [
+    "2021-11-30"
+   ],
+   "n_rows": 31,
+   "status": "PARTIAL",
+   "symbol": "SCUSDT",
+   "year": 2021
+  },
+  {
+   "expected_days": 90,
+   "extra_rows": 0,
+   "missing_days": 1,
+   "missing_head": [
+    "2023-10-03"
+   ],
+   "n_rows": 89,
+   "status": "PARTIAL",
+   "symbol": "STPTUSDT",
+   "year": 2023
+  },
+  {
+   "expected_days": 59,
+   "extra_rows": 0,
+   "missing_days": 1,
+   "missing_head": [
+    "2022-11-03"
+   ],
+   "n_rows": 58,
+   "status": "PARTIAL",
+   "symbol": "SWEATUSDT",
+   "year": 2022
+  },
+  {
+   "expected_days": 249,
+   "extra_rows": 0,
+   "missing_days": 1,
+   "missing_head": [
+    "2022-04-27"
+   ],
+   "n_rows": 248,
+   "status": "PARTIAL",
+   "symbol": "TOMOUSDT",
+   "year": 2022
+  },
+  {
+   "expected_days": 268,
+   "extra_rows": 0,
+   "missing_days": 1,
+   "missing_head": [
+    "2024-04-08"
+   ],
+   "n_rows": 267,
+   "status": "PARTIAL",
+   "symbol": "ZEUSUSDT",
+   "year": 2024
+  },
+  {
+   "expected_days": 305,
+   "extra_rows": 0,
+   "missing_days": 1,
+   "missing_head": [
+    "2024-01-16"
+   ],
+   "n_rows": 304,
+   "status": "PARTIAL",
+   "symbol": "ZKFUSDT",
+   "year": 2024
+  }
+ ],
+ "register": {
+  "file": "delisting_register.csv",
+  "n_rows": 339,
+  "n_selected": 306,
+  "sha256": "a28c7eb73c586895f710511a73ca58d33570c283397ff356a5dff46c4d639b22"
+ },
+ "rows_of_symbols_not_in_the_selection": {
+  "rest.fundingRateAll": 2444459,
+  "rest.kline1d": 521558
+ },
+ "schema": "H-32 delisted tree fingerprint (DEC-100)",
+ "selection": {
+  "category": "linear",
+  "last_trading_day_max": "2026-09-28",
+  "listing_anchor": "register",
+  "quoteCoin": "USDT",
+  "start_year": 2021,
+  "status": "Closed"
+ },
+ "skipped_by_status": {
+  "DATAUSDT": {
+   "last_trading_day": "2025-05-29",
+   "relisted_launch_day": "2026-06-30",
+   "status": "Relisted"
+  },
+  "KORUUSDT": {
+   "last_trading_day": "2026-07-13",
+   "relisted_launch_day": "2026-07-15",
+   "status": "Relisted"
+  },
+  "LITUSDT": {
+   "last_trading_day": "2025-02-07",
+   "relisted_launch_day": "2025-12-30",
+   "status": "Relisted"
+  },
+  "MONUSDT": {
+   "last_trading_day": "2025-03-06",
+   "relisted_launch_day": "2025-11-24",
+   "status": "Relisted"
+  },
+  "SPCXUSDT": {
+   "last_trading_day": "2026-06-09",
+   "relisted_launch_day": "2026-06-15",
+   "status": "Relisted"
+  },
+  "ZKUSDT": {
+   "last_trading_day": "2024-06-06",
+   "relisted_launch_day": "2024-06-20",
+   "status": "Relisted"
+  }
+ },
+ "status_counts": {
+  "DONE": 747,
+  "FAILED": 1,
+  "PARTIAL": 25
+ },
+ "symbols": [
+  "10000000AIDOGEUSDT",
+  "1000000CHEEMSUSDT",
+  "1000000PEIPEIUSDT",
+  "1000000VINUUSDT",
+  "10000COQUSDT",
+  "10000ELONUSDT",
+  "10000LADYSUSDT",
+  "10000NFTUSDT",
+  "10000QUBICUSDT",
+  "10000STARLUSDT",
+  "10000WENUSDT",
+  "10000WHYUSDT",
+  "1000APUUSDT",
+  "1000BEERUSDT",
+  "1000CATSUSDT",
+  "1000IQ50USDT",
+  "1000MUMUUSDT",
+  "1000XUSDT",
+  "1CATUSDT",
+  "A2ZUSDT",
+  "A8USDT",
+  "ACXUSDT",
+  "AERGOUSDT",
+  "AGIXUSDT",
+  "AGTUSDT",
+  "AI16ZUSDT",
+  "AIAUSDT",
+  "AINUSDT",
+  "AIUSDT",
+  "AKROUSDT",
+  "ALEOUSDT",
+  "ALPACAUSDT",
+  "ALPHAUSDT",
+  "ALUUSDT",
+  "AMBUSDT",
+  "ANCUSDT",
+  "ANTUSDT",
+  "ASPUSDT",
+  "ATAUSDT",
+  "AUDIOUSDT",
+  "AVAILUSDT",
+  "AVLUSDT",
+  "BADGERUSDT",
+  "BAKEUSDT",
+  "BALUSDT",
+  "BDXNUSDT",
+  "BENDOGUSDT",
+  "BILLYUSDT",
+  "BITUSDT",
+  "BLUEUSDT",
+  "BLZUSDT",
+  "BNXUSDT",
+  "BOBBOBUSDT",
+  "BONDUSDT",
+  "BSUUSDT",
+  "BSWUSDT",
+  "BTTUSDT",
+  "BUSDUSDT",
+  "BUZZUSDT",
+  "CAMPUSDT",
+  "CANTOUSDT",
+  "CEEKUSDT",
+  "CELRUSDT",
+  "CHESSUSDT",
+  "CLOUDUSDT",
+  "COCOSUSDT",
+  "COMBOUSDT",
+  "COMMONUSDT",
+  "COOKUSDT",
+  "COSUSDT",
+  "COVALUSDT",
+  "CPOOLUSDT",
+  "CREAMUSDT",
+  "CTKUSDT",
+  "CTSIUSDT",
+  "CUDISUSDT",
+  "DAMUSDT",
+  "DAOUSDT",
+  "DARKUSDT",
+  "DARUSDT",
+  "DEGENUSDT",
+  "DENTUSDT",
+  "DGBUSDT",
+  "DMCUSDT",
+  "DODOUSDT",
+  "DOGSUSDT",
+  "DOGUSDT",
+  "DOP1USDT",
+  "DUCKUSDT",
+  "ELXUSDT",
+  "EOSUSDT",
+  "EPTUSDT",
+  "ESUSDT",
+  "ETHWUSDT",
+  "FBUSDT",
+  "FDUSDUSDT",
+  "FETUSDT",
+  "FIOUSDT",
+  "FIREUSDT",
+  "FISUSDT",
+  "FITFIUSDT",
+  "FLMUSDT",
+  "FORTHUSDT",
+  "FOXYUSDT",
+  "FRAGUSDT",
+  "FRONTUSDT",
+  "FTMUSDT",
+  "FTNUSDT",
+  "FTTUSDT",
+  "FUELUSDT",
+  "FUNUSDT",
+  "FWOGUSDT",
+  "FXSUSDT",
+  "GALUSDT",
+  "GEMSUSDT",
+  "GFTUSDT",
+  "GIGAUSDT",
+  "GLMRUSDT",
+  "GMEUSDT",
+  "GNOUSDT",
+  "GODSUSDT",
+  "GOMININGUSDT",
+  "GORKUSDT",
+  "GPTUSDT",
+  "GSTUSDT",
+  "GTCUSDT",
+  "GUSDT",
+  "HFTUSDT",
+  "HIFIUSDT",
+  "HIGHUSDT",
+  "HIPPOUSDT",
+  "HOOKUSDT",
+  "HOTUSDT",
+  "HPOS10IUSDT",
+  "ICXUSDT",
+  "IDEXUSDT",
+  "IGUUSDT",
+  "IPUSDT",
+  "JAILSTOOLUSDT",
+  "JOEUSDT",
+  "JUSDT",
+  "KDAUSDT",
+  "KEEPUSDT",
+  "KEYUSDT",
+  "KLAYUSDT",
+  "KOMAUSDT",
+  "KUSDT",
+  "L3USDT",
+  "LAIUSDT",
+  "LAUNCHCOINUSDT",
+  "LAYERUSDT",
+  "LEVERUSDT",
+  "LFTUSDT",
+  "LINAUSDT",
+  "LISTAUSDT",
+  "LOOKSUSDT",
+  "LOOMUSDT",
+  "LTOUSDT",
+  "LUCEUSDT",
+  "LUNAUSDT",
+  "MAJORUSDT",
+  "MANEKIUSDT",
+  "MAPOUSDT",
+  "MASAUSDT",
+  "MATICUSDT",
+  "MAXUSDT",
+  "MBLUSDT",
+  "MBOXUSDT",
+  "MCUSDT",
+  "MDTUSDT",
+  "MEMEFIUSDT",
+  "MICHIUSDT",
+  "MILKUSDT",
+  "MKRUSDT",
+  "MLNUSDT",
+  "MOBILEUSDT",
+  "MOTHERUSDT",
+  "MULTIUSDT",
+  "MVLUSDT",
+  "MYRIAUSDT",
+  "MYROUSDT",
+  "NCUSDT",
+  "NEIROETHUSDT",
+  "NFPUSDT",
+  "NKNUSDT",
+  "NODEUSDT",
+  "NSUSDT",
+  "NTRNUSDT",
+  "NULSUSDT",
+  "NYANUSDT",
+  "OBOLUSDT",
+  "OBTUSDT",
+  "OCEANUSDT",
+  "OLUSDT",
+  "OMGUSDT",
+  "OMNIUSDT",
+  "OMUSDT",
+  "ONEUSDT",
+  "ORBSUSDT",
+  "ORNUSDT",
+  "OSMOUSDT",
+  "OXTUSDT",
+  "PENGUSDT",
+  "PERPUSDT",
+  "PHBUSDT",
+  "PIGGYUSDT",
+  "PIRATEUSDT",
+  "PIXFIUSDT",
+  "PONKEUSDT",
+  "PRAIUSDT",
+  "PRCLUSDT",
+  "PRIMEUSDT",
+  "PROMUSDT",
+  "PROSUSDT",
+  "PUMPBTCUSDT",
+  "PUMPUSDT",
+  "PUNDUUSDT",
+  "PYRUSDT",
+  "QIUSDT",
+  "QUICKUSDT",
+  "RADUSDT",
+  "RAYUSDT",
+  "RDNTUSDT",
+  "REEFUSDT",
+  "RENUSDT",
+  "REQUSDT",
+  "REXUSDT",
+  "RFCUSDT",
+  "RHEAUSDT",
+  "RIFSOLUSDT",
+  "RIFUSDT",
+  "RLSUSDT",
+  "RNDRUSDT",
+  "ROAMUSDT",
+  "RONUSDT",
+  "RSS3USDT",
+  "SAROSUSDT",
+  "SCAUSDT",
+  "SCRTUSDT",
+  "SCRUSDT",
+  "SCUSDT",
+  "SDUSDT",
+  "SENDUSDT",
+  "SERAPHUSDT",
+  "SFPUSDT",
+  "SILLYUSDT",
+  "SKATEUSDT",
+  "SKYAIUSDT",
+  "SLERFUSDT",
+  "SLFUSDT",
+  "SOLOUSDT",
+  "SOLVUSDT",
+  "SPECUSDT",
+  "SPELLUSDT",
+  "SRMUSDT",
+  "STMXUSDT",
+  "STPTUSDT",
+  "STRAXUSDT",
+  "SUNDOGUSDT",
+  "SWARMSUSDT",
+  "SWEATUSDT",
+  "SWELLUSDT",
+  "SXPUSDT",
+  "SYNUSDT",
+  "SYSUSDT",
+  "TAIUSDT",
+  "TANSSIUSDT",
+  "TOKENUSDT",
+  "TOMIUSDT",
+  "TOMOUSDT",
+  "TONUSDT",
+  "TROYUSDT",
+  "TRUUSDT",
+  "TSTBSCUSDT",
+  "UNFIUSDT",
+  "UROUSDT",
+  "USTUSDT",
+  "UXLINKUSDT",
+  "VANRYUSDT",
+  "VFYUSDT",
+  "VGXUSDT",
+  "VICUSDT",
+  "VIDTUSDT",
+  "VINEUSDT",
+  "VOXELUSDT",
+  "VRAUSDT",
+  "VRUSDT",
+  "VTHOUSDT",
+  "WHITEWHALEUSDT",
+  "WSMUSDT",
+  "XCHUSDT",
+  "XEMUSDT",
+  "XIONUSDT",
+  "XNOUSDT",
+  "XRDUSDT",
+  "XTERUSDT",
+  "YALAUSDT",
+  "YFIIUSDT",
+  "YZYUSDT",
+  "ZBCUSDT",
+  "ZCXUSDT",
+  "ZENTUSDT",
+  "ZEUSUSDT",
+  "ZKFUSDT",
+  "ZKJUSDT",
+  "ZRCUSDT"
+ ],
+ "tree_sha256": "250a923b5c04f18025f9a7ffc72dbbd3b08b75e44bbcd38876b8effa6427e401"
+}
