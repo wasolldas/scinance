@@ -170,3 +170,11 @@ Tests: 1.992 passed / 3 failed (Legacy `test_execution_live.py`, Sandbox-bedingt
 - **Naechste Schritte:** v6 auswerten (Kernzahlen nachrechnen) -> `--emit-template` -> `state/registered/h32_v1.yaml`
   fuellen (Erstfassung Abschnitt 11) -> adversarischer Review -> Registrierung (Registry-Eintrag, sha256) ->
   Positivkontrolle -> Pilot -> Uebergabe -> Test. Dann HF-RV-Review -> DEC-Nachtrag (Option 3 tragfaehig?) -> Nutzer.
+- **Nachtrag 10a (16:30 UTC): Gate-Review VETO (aufloesbar) und DEC-101 Teil 1.** `state/herleitung_h32/
+  REVIEW_REGISTRIERUNG_H32.md`: v6-Arithmetik bestaetigt, aber das Universum enthaelt 68 USDC-Perps (`*PERP`, Zwillinge
+  der USDT-Perps) und datierte Futures (`*-DDMMMYY`); Delisted-Seite nur USDT; Null zu eng (W2 ~x1,13). DEC-101 Teil 1:
+  Universum = lineare USDT-Perps (Filter vor jeder Rechnung), skalierte Null im Testlauf (k = max(1, SD_real/sd_week),
+  keine negative Gutschrift), Pilot-Ausgabepfad gepinnt + Suche nach Pilot-JSONs, Pins (delisted_tree_sha256, runner),
+  q95 = max(1.000er, 10.000er Quantil), Endpower aus Replikat-Quantilen, `--pp3-dry-run`. Der Vorlauf 13:28 ist **v6a,
+  verworfen** (Akte). Builder-Auftrag `scratchpad/SPEC_DEC101_builder.md` laeuft (Sonnet, Worktree). Danach: Abnahme,
+  v6b zweimal bitgleich (je ~2 h), Template, Entwurf, Nachpruefung Pruefpunkte 1-5, PP3, Registrierung (DEC-101 Teil 2).
