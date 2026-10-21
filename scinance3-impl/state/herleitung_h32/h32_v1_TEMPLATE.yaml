@@ -1,0 +1,316 @@
+# H-32 (A3-fm8): automatisch aus einem Vorlauf-v6-Artefakt (--prelaunch) erzeugtes Skelett von state/registered/h32_v1.yaml.
+# NICHT registriert: der Orchestrator prueft (Zuordnung nach Regel U ist mechanisch im Pilot, nicht hier), setzt die
+# Registrierung und zitiert den sha256 dieser Datei als --registered-sha256.
+# Stichtag des Panels im Vorlauf: 2026-06-28; result_sha256 des Vorlaufs: 2ae9bad63a69580d551183764579318f7e5f82f1bc050a30c9bd470c09dd6fa0
+# Quelle (Vorlauf-JSON) sha256: 96edd5ea896834253e376407ea6efc53cc83a5bb158429e7690d42761ddb831a
+# W1-Determinismus-Kontrolle gegen v5e: nicht angefordert
+hypotheses:
+  H-32_mom1:
+    hypothesis: H-32
+    variant: mom1
+    direction: positive
+  H-32_mom2:
+    hypothesis: H-32
+    variant: mom2
+    direction: positive
+  H-32_mom4:
+    hypothesis: H-32
+    variant: mom4
+    direction: positive
+  H-32_rev_gap:
+    hypothesis: H-32
+    variant: rev_gap
+    direction: negative
+primary_statistic: fm_neutral_8w
+alpha: 0.05
+z_krit: 1.6448536
+mde_faktor: 2.4865
+seal:
+  panel_cut_test: '2026-06-28'
+  panel_cut_pilot: '2024-06-30'
+  stress_list_date_filter: true
+fdr:
+  p_source: factor_preserving_null_replicates
+  p_statistic: null_replicate_exceedance_fm8_window_mean
+  sided: one
+  combine: max_p
+  p_formula: 'p = (1 + #{null replicate window means >= observed window mean, registered
+    direction}) / (1 + R)'
+  n_reps: 10000
+  replicates_sha256: f10250dda8e842c7e748e758cad97926361edc30011c43b18c84a70e02847a62
+  replicates_cell: per window and variant the drift cell (driftfree / 0.002) with
+    the larger null mean
+  report_only:
+  - block_permutation_fm8_window_mean
+  - normal_approximation
+  block_len: 4
+  n_perm: 10000
+  seed: 53
+  family:
+    name: F-H32
+    method: BH
+    alpha: 0.1
+    denominator: 4
+    report_only: true
+  over_family:
+    name: F-WEEK
+    method: BY
+    alpha: 0.1
+    binding: true
+    m_rule: 'DEC-99 (7): nur getestete Eintraege'
+    double_statement_m: 11
+selection:
+  K: 4
+  ceiling: ceiling_k4
+fweek_counting:
+  rule: 'DEC-99 (7): nur Eintraege mit tatsaechlich berechnetem p-Wert zaehlen in
+    m; GL-012 (Pilot) / nicht uebergeben (p = 1) zaehlen nicht'
+  in_m: tested_only
+  method: BY
+  alpha: 0.1
+  double_statement_m: 11
+  double_statement_rule: 'alte Zaehlung: m inkl. p = 1-Eintraege (report-only)'
+pilot_window:
+  start: '2022-04-18'
+  end: '2024-06-30'
+  first_formation_week: '2022-04-18'
+  last_formation_week: '2024-06-17'
+  last_outcome_day: '2024-06-30'
+  w_pilot: 114
+  k_min_rule: 117
+  role: pilot_nicht_urteilstragend
+  single_run:
+    required: true
+    rerun_requires_dec: true
+  pilot_result_sha256: null
+  se_rule:
+    floor: true
+    sd: true
+    stationary_bootstrap:
+      mean_block: 4
+      n_rep: 1000
+      seed: 53
+  band:
+    level: 0.8
+    form: normal_zweiseitig
+    z: 1.2816
+  frozen_v6:
+    m_P:
+      mom1: 0.002176417764961407
+      mom2: 0.003274034863657733
+      mom4: 0.0042963304579969105
+      rev_gap: -0.0025396762293200367
+    calibration:
+      stress:
+        rho_f: 0.23520674556849896
+        beta_sd_calibrated: 0.5276833273137225
+        target_factor_share: 0.03520397436951935
+      sigma_f: 0.07143857241301174
+      sigma_e_used: 0.11739798512635136
+      rho_f_measured: 0.11760337278424948
+      factor_share_median: 0.017601987184759676
+      note: nur Streuung/Autokorrelation/Faktoranteil, kein Mittel (DEC-94 (5) (i))
+    k_fm8_series_sha256: b2584131bbe216a293b154c6adfffa9f7665f487d42fa382b944f25aed317a1b
+  report_only:
+  - bootstrap_percentile_band
+  - liquidity_buckets_3_10
+  - ic_without_bucket_1
+  - mu_sel
+  - power_at_mu_sel
+  not_computed:
+  - raw_ic
+  - lag_profile
+  - beta_calibration_ic
+handover_rule:
+  version: U-2
+  conditions:
+  - id: i
+    text: x_P > 0 in registrierter Richtung
+  - id: ii
+    text: x_P - m* >= max_W (z_krit * SE_T,W + 0.8416 * SD_T,W)
+  - id: iii
+    text: t_P >= t_min
+  t_min: 2.0
+  prior_reading: point
+  se_T: max(e_se_rule_W (v6), SE_W,Pilot)
+  sd_T: max(se_mean_W (v6), SE_W,Pilot)
+  pilot_k_adjusted: SE_W,Pilot = sqrt(max(1, c_real)) * sqrt(v_fm8_W + F2_real) /
+    sqrt(w_judged_W)
+  null_mean_credit: m* = max(0, m_P, m_W1, m_W2) in Richtung
+  regime_function: power_p1.assign_regime
+  double_statement:
+  - power_p1.assign_regime_a3_practice
+  - mu_sel
+  mu_sel: Loesung von P_mu(X >= x_P | X >= c_v) = 0.5, X ~ N(mu, SE_P^2), c_v = MDE80*_v
+    + m*
+  on_fail:
+    status: gl012_pilot
+    p_value: 1.0
+    in_f_week_m: false
+  result_lock: --pilot-result + --pilot-result-sha256 im Testlauf; Uebergabe bitgleich
+    nachgerechnet
+windows:
+  W1:
+    start: '2024-07-01'
+    end: '2025-06-30'
+    w_judged: 52
+    calibration:
+      measured:
+        rho_f: 0.0462406062845375
+        beta_sd_calibrated: 0.5365751598212628
+        target_factor_share: 0.026613298046759347
+      stress:
+        rho_f: 0.092481212569075
+        beta_sd_calibrated: 0.7128576483800596
+        target_factor_share: 0.053226596093518694
+      zero:
+        rho_f: 0.0
+        beta_sd_calibrated: 0.5395722765290544
+        target_factor_share: 0.026613298046759347
+    null_scales:
+      sigma_e_used: 0.12159707206761418
+      sigma_f: 0.06685192489159383
+    frozen_v6:
+      se_mean:
+        mom1: 0.00698156256641312
+        mom2: 0.007723024717643827
+        mom4: 0.009397335192545504
+        rev_gap: 0.007097950586160744
+      e_se_rule:
+        mom1: 0.007249834169989867
+        mom2: 0.007968168497417862
+        mom4: 0.009313101568783169
+        rev_gap: 0.007234749533603939
+      sd_week:
+        mom1: 0.050019329427165665
+        mom2: 0.055792720394213166
+        mom4: 0.06554672192646017
+        rev_gap: 0.04980168568887097
+      null_mean:
+        mom1: 0.001101028145112659
+        mom2: 0.0013444156476556993
+        mom4: 0.00183454770838687
+        rev_gap: -0.0008002123771225791
+      q95:
+        mom1: 0.012655110128980959
+        mom2: 0.014785747132329418
+        mom4: 0.017766047438509482
+        rev_gap: 0.01014897217362274
+      q95_driftfree:
+        mom1: 0.012263156383362867
+        mom2: 0.014785747132329418
+        mom4: 0.017750756067334877
+        rev_gap: 0.010131959227995231
+      q95_drifting:
+        mom1: 0.012655110128980959
+        mom2: 0.014604851654177468
+        mom4: 0.017766047438509482
+        rev_gap: 0.01014897217362274
+      ceiling_k4: 0.007601576548610902
+      floor_fm8: 0.04744079152167603
+      v_fm8: 0.0022579885360357317
+      k_fm8_series_sha256: 8b7eb6ff2f3d61a31d0b4a79cffc01371b311f30898585e02ecd4660bbda926c
+    bounce_sigma_true: 0.17236408998176572
+    survivorship:
+      mom1_diff_in_ic_min_units: -0.6958949582813337
+      rev_gap_diff_in_ic_min_units: -0.506811671999734
+      unit: Schwelle T_W,v = z_krit * e_se_rule + max(0, null_mean) (frozen_v6)
+  W2:
+    start: '2025-07-01'
+    end: '2026-06-28'
+    w_judged: 50
+    calibration:
+      measured:
+        rho_f: 0.0702025354761522
+        beta_sd_calibrated: 0.4415331678412226
+        target_factor_share: 0.013306470393853062
+      stress:
+        rho_f: 0.1404050709523044
+        beta_sd_calibrated: 0.5704797913207805
+        target_factor_share: 0.026612940787706124
+      zero:
+        rho_f: 0.0
+        beta_sd_calibrated: 0.4415331678412226
+        target_factor_share: 0.013306470393853062
+    null_scales:
+      sigma_e_used: 0.10612991014979394
+      sigma_f: 0.054611863018019804
+    frozen_v6:
+      se_mean:
+        mom1: 0.00638872673559674
+        mom2: 0.00735662450772661
+        mom4: 0.008621488749697785
+        rev_gap: 0.006443893176112732
+      e_se_rule:
+        mom1: 0.006405839850730278
+        mom2: 0.006901963174140049
+        mom4: 0.007900192276831754
+        rev_gap: 0.006373582459140744
+      sd_week:
+        mom1: 0.0431399385569362
+        mom2: 0.04732279291350554
+        mom4: 0.054705692782655906
+        rev_gap: 0.043002044098689914
+      null_mean:
+        mom1: 0.001237625702428581
+        mom2: 0.0016255137914811843
+        mom4: 0.0021718707758592764
+        rev_gap: -0.0011074110191079214
+      q95:
+        mom1: 0.011792300472724677
+        mom2: 0.01418177986471412
+        mom4: 0.017003756792670112
+        rev_gap: 0.008571338553315272
+      q95_driftfree:
+        mom1: 0.011263642700480175
+        mom2: 0.01392554633120499
+        mom4: 0.017003756792670112
+        rev_gap: 0.008571338553315272
+      q95_drifting:
+        mom1: 0.011792300472724677
+        mom2: 0.01418177986471412
+        mom4: 0.016875138363611222
+        rev_gap: 0.00841209116618443
+      ceiling_k4: 0.006975473699357643
+      floor_fm8: 0.041551891334484434
+      v_fm8: 0.001726999486962073
+      k_fm8_series_sha256: 4ea9739edcad49897a00b571e0b01a57ab47c87caac1366cc11811758accdc86
+    bounce_sigma_true: 0.13202006816347162
+    survivorship:
+      mom1_diff_in_ic_min_units: -0.8225573792239215
+      rev_gap_diff_in_ic_min_units: -0.5181536245034822
+      unit: Schwelle T_W,v = z_krit * e_se_rule + max(0, null_mean) (frozen_v6)
+beta_control:
+  method: fm_neutral_8w
+  beta_window_weeks: 8
+rules:
+  seed: 53
+  n_reps: 1000
+  mean_block: 4
+  n_boot: 1000
+  null_level: 0.95
+  bounce_spread: 0.003621
+positive_control:
+  seeds:
+  - 53
+  - 252
+  calibration_seeds_injection:
+  - 1000
+  - 1049
+  calibration_seeds_world:
+  - 2000
+  - 2049
+  world_sd_target: sqrt(v_fm8_W + max(F2_null_W, F2_real))
+  inject_target: 'realisiert: z_krit * SE_T,W + 0.8416 * SD_T,W im bindenden Fenster'
+  criteria:
+    sd_ratio_max: 1.1
+    pass_share_min: 0.734
+    neg_pass_max: 0.086
+    injection_tolerance: 0.1
+  report_only:
+  - prd_sector_world_0375
+  - joint_c10_share
+data_fingerprints:
+  union_range_fingerprint: e503bedb388cf8aaa9f3f28735cc4d83a659528447d95d027476027a4cb0c589
+  delisting_dates_sha256: c1306c561246a684a29b166bc0a8663f2345a0a21e5798ea7e2a7a823bbaf1f3
+  delisting_register_sha256: a28c7eb73c586895f710511a73ca58d33570c283397ff356a5dff46c4d639b22
