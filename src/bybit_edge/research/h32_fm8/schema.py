@@ -9,6 +9,12 @@ DEC-101 adds mandatory blocks: ``universe`` (E1: rule ``linear_usdt_perpetual`` 
 ``null_scaling`` (E2: enabled, the rule text, direction strictness), ``pilot_window.out_dir`` (E3: the one pilot directory),
 ``runner`` (E4: the CLI arguments that determine the union-range fingerprint), ``data_fingerprints.delisted_tree_sha256``
 (E4) and ``q95_1000`` / ``q95_10000`` next to the frozen ``q95`` (E5).
+
+DEC-101 Teil 2 (Nachpruefung N-1..N-5) adds mandatory pins: ``positive_control.null_scaling`` (N-1: enabled, rule and ref texts),
+``positive_control.inject_target`` / ``inject_target_label`` / ``inject_target_ref`` (N-2: the injection target F), the frozen
+``null_mean_driftfree`` per window and variant (N-2: ``m_df``), the texts of rule U-4 (``handover_rule.version`` ``U-4``, the
+condition (ii) text and ``k_pred``, N-3), ``fdr.p_formula`` (N-5: names the scaling) and the documentation fields
+``code_commit_prelaunch`` / ``code_commit_registration`` (N-5).  No frozen v6 NUMBER changes.
 """
 from __future__ import annotations
 
@@ -26,12 +32,15 @@ from .errors import PinError, SchemaError
 __all__ = ["load_registered_yaml", "validate_registered", "frozen_pin_table", "FROZEN_VARIANT_KEYS",
            "FROZEN_SCALAR_KEYS", "is_hex64", "threshold_frozen", "window_constants"]
 
-#: per-variant frozen constants of a judged window (ERSTFASSUNG 1.6).
+#: per-variant frozen constants of a judged window (ERSTFASSUNG 1.6).  DEC-101 Teil 2 (N-2): ``null_mean_driftfree`` (the null mean of
+#: the DRIFTFREE cell, ``m_df`` of the positive control's injection target F) is a mandatory pin; the Vorlauf artifact carries it in
+#: ``frozen_v6`` already (the re-emit of the template takes it from there, no new calculation).
 FROZEN_VARIANT_KEYS: tuple[str, ...] = ("se_mean", "e_se_rule", "sd_week", "null_mean", "q95", "q95_driftfree",
-                                        "q95_drifting", "q95_1000", "q95_10000")
+                                        "q95_drifting", "q95_1000", "q95_10000", "null_mean_driftfree")
 #: scalar frozen constants of a judged window.
 FROZEN_SCALAR_KEYS: tuple[str, ...] = ("ceiling_k4", "floor_fm8", "v_fm8")
 _HEX64 = re.compile(r"^[0-9a-f]{64}$")
+_COMMIT = re.compile(r"^[0-9a-f]{7,40}$")
 
 
 def is_hex64(x: Any) -> bool:
@@ -149,6 +158,8 @@ def validate_registered(reg: dict[str, Any]) -> None:
           f"fdr: p_statistic must be {C.P_STATISTIC!r}, sided one, combine max_p")
     _pin(list(fdr.get("report_only") or []) == list(C.P_REPORT_ONLY),
          f"fdr.report_only must be {list(C.P_REPORT_ONLY)} (block permutation and normal approximation are report-only)")
+    _pin(fdr.get("p_formula") == C.P_FORMULA,
+         f"fdr.p_formula must be the code text naming the scaling of the replicates (DEC-101 E2, Teil 2 (N-5)): {C.P_FORMULA!r}")
     _pin(isinstance(fdr.get("n_reps"), int) and not isinstance(fdr.get("n_reps"), bool) and fdr["n_reps"] >= C.N_REPS_MIN
          and isinstance(reg.get("rules"), dict) and isinstance(reg["rules"].get("n_reps"), int) and fdr["n_reps"] >= reg["rules"]["n_reps"],
          f"fdr.n_reps must be an integer >= max({C.N_REPS_MIN}, rules.n_reps) (number of p replicates)")
@@ -212,6 +223,10 @@ def validate_registered(reg: dict[str, Any]) -> None:
     # --- hand-over rule
     hr = _get(reg, "handover_rule")
     _pin(hr.get("version") == C.HANDOVER_VERSION, f"handover_rule.version must be {C.HANDOVER_VERSION}")
+    cond_ii = next((c for c in (hr.get("conditions") or []) if isinstance(c, dict) and c.get("id") == "ii"), None)
+    _pin(isinstance(cond_ii, dict) and cond_ii.get("text") == C.HANDOVER_COND_II,                     # DEC-101 Teil 2 (N-3): YAML text = code constant
+         f"handover_rule.conditions[ii].text must be the code text of rule {C.HANDOVER_VERSION}: {C.HANDOVER_COND_II!r}")
+    _pin(hr.get("k_pred") == C.HANDOVER_K_PRED, f"handover_rule.k_pred must be the code text {C.HANDOVER_K_PRED!r} (DEC-101 Teil 2 (N-3))")
     _pin(_num(hr.get("t_min")) and float(hr["t_min"]) == C.T_MIN, f"handover_rule.t_min must be {C.T_MIN}")
     _pin(hr.get("prior_reading") == "point", "handover_rule.prior_reading must be 'point' (reading A)")
     _pin((hr.get("on_fail") or {}).get("p_value") == 1.0 and (hr.get("on_fail") or {}).get("in_f_week_m") is False,
@@ -250,6 +265,9 @@ def validate_registered(reg: dict[str, Any]) -> None:
         for v in C.VARIANTS:                                                                               # DEC-101 E5: the q95 rule
             _pin(float(fz["q95"][v]) == max(float(fz["q95_1000"][v]), float(fz["q95_10000"][v])),
                  f"windows.{wn}.frozen_v6.q95[{v}] must equal max(q95_1000, q95_10000) (DEC-101 E5)")
+            # DEC-101 Teil 2 (N-2): null_mean is the larger of the two drift cells, so it is never below the driftfree cell's mean
+            _pin(float(fz["null_mean"][v]) >= float(fz["null_mean_driftfree"][v]),
+                 f"windows.{wn}.frozen_v6.null_mean[{v}] must be >= null_mean_driftfree (the frozen null mean is the larger cell, N-2)")
     # --- positive control (criteria are pinned to the code constants)
     pc = _get(reg, "positive_control")
     crit = pc.get("criteria") or {}
@@ -260,6 +278,22 @@ def validate_registered(reg: dict[str, Any]) -> None:
          and list(pc.get("calibration_seeds_injection") or []) == [min(C.PC_SEEDS_INJECT), max(C.PC_SEEDS_INJECT)]
          and list(pc.get("calibration_seeds_world") or []) == [min(C.PC_SEEDS_SIGMA_G), max(C.PC_SEEDS_SIGMA_G)],
          "positive_control seed ranges must be 53..252 / 1000..1049 / 2000..2049")
+    # DEC-101 Teil 2 (N-1): the control's gate chain uses the scaled null (mandatory, enabled); (N-2): the injection target F and its label
+    pcn = _get(pc, "null_scaling")
+    _need(isinstance(pcn, dict), "positive_control.null_scaling must be a mapping (DEC-101 Teil 2 (N-1))")
+    _pin(pcn.get("enabled") is True, "positive_control.null_scaling.enabled must be true (DEC-101 Teil 2 (N-1))")
+    _pin(pcn.get("rule") == C.PC_NULL_SCALING_RULE and pcn.get("ref") == C.PC_NULL_SCALING_REF,
+         f"positive_control.null_scaling must carry rule {C.PC_NULL_SCALING_RULE!r} and ref {C.PC_NULL_SCALING_REF!r}")
+    _pin(pc.get("inject_target") == C.PC_INJECT_TARGET,
+         f"positive_control.inject_target must be the code text of the injection target F (DEC-101 Teil 2 (N-2)): {C.PC_INJECT_TARGET!r}")
+    _pin(pc.get("inject_target_label") == C.PC_INJECT_LABEL and pc.get("inject_target_ref") == C.PC_INJECT_REF,
+         f"positive_control.inject_target_label / _ref must be {C.PC_INJECT_LABEL!r} / {C.PC_INJECT_REF!r} (DEC-101 Teil 2 (N-2))")
+    # DEC-101 Teil 2 (N-5): the code commit of the Vorlauf and the registration commit are documented SEPARATELY
+    for key, unset in (("code_commit_prelaunch", C.CODE_COMMIT_PRELAUNCH_UNSET),
+                       ("code_commit_registration", C.CODE_COMMIT_REGISTRATION_PLACEHOLDER)):
+        val = _get(reg, key)
+        _need(isinstance(val, str) and (bool(_COMMIT.match(val)) or val == unset),
+              f"{key} must be a git commit hash (7..40 hex characters, quoted in YAML) or {unset!r} (DEC-101 Teil 2 (N-5)), got {val!r}")
     # --- data fingerprints
     fp = _get(reg, "data_fingerprints")
     _need(is_hex64(fp.get("union_range_fingerprint")) and is_hex64(fp.get("delisting_dates_sha256"))
@@ -298,6 +332,9 @@ def frozen_pin_table(reg: dict[str, Any]) -> dict[str, Any]:
         "runner": {"as_of": _iso_date(reg["runner"]["as_of"]), "start_year": reg["runner"]["start_year"],
                    "end_year": reg["runner"]["end_year"], "allow_partial": reg["runner"]["allow_partial"]},
         "out_dir": reg["pilot_window"]["out_dir"], "delisted_tree_sha256": reg["data_fingerprints"]["delisted_tree_sha256"],
+        "pc_null_scaling_enabled": reg["positive_control"]["null_scaling"]["enabled"],        # DEC-101 Teil 2 (N-1)
+        "pc_inject_target": reg["positive_control"]["inject_target"],                          # DEC-101 Teil 2 (N-2)
+        "handover_version": reg["handover_rule"]["version"],                                   # DEC-101 Teil 2 (N-3)
     }
     for wn in ("W1", "W2"):
         w = reg["windows"][wn]

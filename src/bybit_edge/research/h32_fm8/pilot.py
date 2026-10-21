@@ -4,6 +4,10 @@ Gates in this order, each a loud fail before the next step (rc 1, NO HAND-OVER f
 
   PP0  start lock: sha256 of the registered YAML (CLI, before the panel is touched);
   PP0' exactly-one-pilot lock (``checks.check_rerun_lock``, CLI, before the panel is touched);
+  PP0'' attempt marker (DEC-101 Teil 2 (N-4), ``checks.write_attempt_marker``, CLI, directly BEFORE the panel is loaded): the file
+       ``h32_pilot_attempt.json`` (``registered_sha256``, UTC time stamp, mode, prefix) in the pinned pilot directory counts as a pilot
+       attempt for the lock whether or not a result follows -- an attempt that dies after the first variant (the pilot values are
+       logged before any result file exists) blocks a second run without ``--pilot-rerun-dec``;
   PP1  schema (``schema.validate_registered``);
   PP2  data fingerprints of the loaded panel == YAML (DEC-101 E4: including the delisted-tree pin);
   PP2u universe (DEC-101 E1): the panel is restricted to the linear USDT perpetuals BEFORE any cut or calculation and the
@@ -193,6 +197,12 @@ def render_pilot_markdown(report: dict[str, Any]) -> str:
         lines += ["", f"- Universum {uni.get('rule')} (DEC-101 E1; {C.UNIVERSE_LABEL}): {uni.get('n_before')} -> {uni.get('n_after')} Symbole, "
                       f"ausgeschlossen usdc_perp {ex.get('usdc_perp')}, dated_future {ex.get('dated_future')}, other {ex.get('other')}; "
                       f"excluded_sha256 `{uni.get('excluded_sha256')}`"]
+    lines += ["", f"## Uebergaberegel {C.HANDOVER_VERSION} (DEC-101 Teil 2 (N-3)): k_pred und (1c)-Term", "", C.HANDOVER_COND_II, "",
+              "| Variante | k_pred W1 / W2 | Schwelle U (m* + MDE80*_U) | Schwelle (1c) | bindend | Schwelle auf x_P |", "|---|---|---|---|---|---|"]
+    for v in C.VARIANTS:
+        h = report["variants"][v]["handover"]
+        lines.append(f"| {v} | {f(h['k_pred']['W1'], 3)} / {f(h['k_pred']['W2'], 3)} | {f(h['threshold_u'])} | {f(h['threshold_1c'])} | "
+                     f"{h['threshold_binding']} | {f(h['threshold_on_point'])} |")
     lines += ["", "## Pflicht-Doppelausweis (DEC-99 (3)) und Zuordnung (nur uebergebene Varianten)", "",
               "| Variante | Regime P-1 | Regime A3-Praxis | mu_sel | gemeinsame Power am Punkt | gemeinsame Power an mu_sel |",
               "|---|---|---|---|---|---|"]
@@ -226,7 +236,8 @@ def write_pilot_artifacts(out_dir: Path | str, report: dict[str, Any], registere
     artifacts.refuse_unsafe_path(out / "x", writing=True)
     sc = lock.get("scope") or {}                                                    # DEC-101 E3: the technical lock is re-checked
     checks.check_rerun_lock(out, registered, lock.get("rerun_dec"), registered_sha256=sc.get("registered_sha256"),
-                            runs_root=sc.get("runs_root"), repo_root=sc.get("repo_root"))             # belt and braces
+                            runs_root=sc.get("runs_root"), repo_root=sc.get("repo_root"),
+                            own_attempt_prefix=lock.get("prefix"))                                    # belt and braces; N-4: own marker excluded
     prefix = lock["prefix"]
     out.mkdir(parents=True, exist_ok=True)
     arts: dict[str, Any] = {}

@@ -297,7 +297,10 @@ def test_t1_adversarial_dominant_drifting_market_fires_the_raw_ic_but_not_the_fm
     0.002, betas U(0.5, 2.0), no cross-sectional predictability -- mom1 is only mechanically tied to beta.  The null (v6
     configuration, the adversary's own stress world, driftfree and drifting) is frozen once and applied to independent draws.
     Teeth: the RAW mean IC is the market-timing artifact; the fm8 statistic does not clear the frozen threshold in (almost) any
-    draw and certainly not in both windows' worth of draws."""
+    draw and certainly not in both windows' worth of draws.
+
+    DEC-101 Teil 2 (N-1 / N-5): the gate chain of this test is the production one -- the payload carries the ``null_scaling`` block (k from
+    the real weekly SD against the frozen one), because the gate no longer accepts a payload without it."""
     from bybit_edge.research.h32_fm8 import gate
     win = _synthetic_window()
     floor, _v = wkl.floor_and_v(np.full(52, 150))
@@ -315,8 +318,13 @@ def test_t1_adversarial_dominant_drifting_market_fires_the_raw_ic_but_not_the_fm
                                   convention="close_at_last")["mean_ic"]
         series = pc.eval_world({"returns": r, "returns_est": r}, win.alive_ext, win.symbols, "mom1")
         y = float(np.nanmean(series))
-        se = est.se_rule(series, floor, 52, n_boot=40, seed=53)["se"]
-        cond = gate.window_conditions({"y": y, "se_w": se, "q95": frozen["q95"]["mom1"]}, C.Z_KRIT)
+        se_r = est.se_rule(series, floor, 52, n_boot=40, seed=53)
+        se = se_r["se"]
+        # DEC-101 Teil 2 (N-1/N-5): the gate chain is the production one -- the null_scaling block as in the test run (k from the real
+        # weekly SD against the frozen one); the payload without the block is no longer accepted
+        cond = gate.window_conditions({"y": y, "se_w": se, "q95": frozen["q95"]["mom1"],
+                                       "null_scaling": {"sd_real": se_r["sd_ic"], "sd_week": frozen["sd_week"]["mom1"],
+                                                        "m": frozen["null_mean"]["mom1"], "q95_frozen": frozen["q95"]["mom1"]}}, C.Z_KRIT)
         n_pass += int(cond["window_pass"])
         raw_means.append(raw)
         y_means.append(y)
@@ -748,12 +756,27 @@ def pc_report(sig):
 
 
 def test_t1_pc_positive_control_realised_effect_world_and_criteria(pc_report, sig, shrunk):
+    """DEC-101 Teil 2 (N-2) changed the behaviour this test pins: the injection target is F, ``Ziel_W = max(z SE_T + z_80 SD_T - min(0, m_df),
+    q95_eff(k_pred) - m_df + z_80 SD_T)`` with the binding window ``argmax_W`` -- no longer the literal ERSTFASSUNG 4 target
+    ``z SE_T + z_80 SD_T`` (which is the (1b) term of F for ``m_df >= 0``).  The rest of the test (realised effect, world SD, criteria)
+    is unchanged; the full N-1 / N-2 tests are in ``test_h32_dec101_part2.py``."""
     r = pc_report
     assert r["bestanden"] is True and r["line"] == "Positivkontrolle BESTANDEN" and r["handed"] == ["mom1", "rev_gap"]
     for v, x in r["variants"].items():
         ho = sig["pilot"]["variants"][v]["handover"]
-        tw = {wn: C.Z_KRIT * ho["per_window"][wn]["se_t"] + C.Z_POWER * ho["per_window"][wn]["sd_t"] for wn in ("W1", "W2")}
+        # DEC-101 Teil 2 (N-2): the target is now F (the literal ERSTFASSUNG 4 target z SE_T + z_80 SD_T is its (1b) term for m_df >= 0):
+        # Ziel_W = max(z SE_T + z_80 SD_T - min(0, m_df), q95_eff(k_pred) - m_df + z_80 SD_T), binding window = argmax_W
+        tw = {}
+        for wn in ("W1", "W2"):
+            fz = sig["registered"]["windows"][wn]["frozen_v6"]
+            kp = max(1.0, math.sqrt(fz["v_fm8"] + ho["f2_real"]) / fz["sd_week"][v])
+            m, mdf, q = fz["null_mean"][v], fz["null_mean_driftfree"][v], fz["q95"][v]
+            t1b = C.Z_KRIT * ho["per_window"][wn]["se_t"] + C.Z_POWER * ho["per_window"][wn]["sd_t"] - min(0.0, mdf)
+            t1c = max(0.0, m) + kp * (q - m) - mdf + C.Z_POWER * ho["per_window"][wn]["sd_t"]
+            tw[wn] = max(t1b, t1c)
+            assert x["target_components"][wn]["k_pred"] == pytest.approx(kp) and x["target_components"][wn]["target"] == pytest.approx(tw[wn])
         assert x["binding_window"] == max(tw, key=tw.get) and x["target_effect"] == pytest.approx(tw[x["binding_window"]])
+        assert x["target_by_window"] == pytest.approx(tw)
         inj = x["injection"]
         assert abs(inj["rel_error"]) <= C.PC_INJECT_TOL and inj["realized_effect"] == pytest.approx(x["target_effect"], rel=C.PC_INJECT_TOL)
         assert inj["signal_ic"] > x["target_effect"]                                         # calibrated on the REALISED effect, not the nominal one (fm8 damping)

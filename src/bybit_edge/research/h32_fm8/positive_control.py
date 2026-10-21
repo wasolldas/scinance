@@ -15,18 +15,31 @@ sector world, labelled so).
 **Injection** (Review B-4): the PRD positive fixture generalised to the variant -- the next-week return carries
 ``s * c * z(characteristic_t)`` (z-score over the members of the week) -- with ``c`` scaled so that the REALISED effect
 (mean of positive minus negative control of the fm8 statistic, common random numbers, seeds 1000..1049) in the binding
-window equals ``z_krit * SE_T,W + 0.8416 * SD_T,W`` within +-5 % (MDE80 without credit; the credit is carried by the null).
+window equals the **target F** within +-5 % (DEC-101 Teil 2 (N-2), replaces only the target of ERSTFASSUNG 4; label
+"Injektionsziel F: Korrektur nach DEC-94 (3) (Review B-4/A-4, Nachpruefung N-2), vor jeder Pilot-Zahl")::
 
-**Judgement** seeds 53..252, positive and negative, gate chain = conditions (1a)-(1c) and (4b) of the test with the frozen
-constants.  BESTANDEN iff for every handed variant (a) the weekly SD of the control world <= 1.10 x the weekly SD of the
-power line in each window, (b) the PASS share in the binding window >= 0.734, (c) the false PASS rate of the negative
-control <= 0.086 in each window, (d) the realised injection effect on the judgement seeds within +-10 % of the target.
-Report-only: the same control in the literal PRD sector world (shock 0.375 sigma_e) and the joint C10 share.
+    Ziel_W = max( z_krit SE_T,W + z_80 SD_T,W - min(0, m_df,W),  q95_eff,W(k_pred,W) - m_df,W + z_80 SD_T,W )
+
+``m_df,W`` the frozen null mean of the DRIFTFREE cell (the control world has drift 0), ``q95_eff,W(k) = max(0, m_W) + k (q95_W - m_W)``
+with ``m_W`` the frozen ``null_mean`` (binding cell), ``k_pred,W = max(1, sqrt(v_fm8_W + F2_real) / sd_week_W,v)`` (the quantity the
+world SD is calibrated on) and ``SE_T,W`` / ``SD_T,W`` as in rule U.  The binding window is ``argmax_W Ziel_W``.  The first term is
+the (1b) requirement of the world (the null mean itself carries the credit; a negative null mean costs ``|m_df|``), the second the
+(1c) requirement under the scaled null -- the effect at which the expected PASS share in the binding window is ``Phi(z_80) = 0.80``.
+
+**Judgement** seeds 53..252, positive and negative, gate chain = conditions (1a)-(1c) and (4b) of the test **in production
+configuration** (DEC-101 Teil 2 (N-1)): per seed, window and variant the synthetic fm8 week series is judged exactly as the test
+run judges the real one -- ``k = est.scale_factor(SD(IC_t, ddof 1), sd_week_W,v)`` (frozen ``sd_week``), ``q95_eff = est.q95_effective(m, k,
+q95)`` with ``m`` the frozen ``null_mean`` of the binding cell, gate payload with the ``null_scaling`` block through
+``gate.window_conditions`` -- in the negative AND the positive control.  The artifact reports ``k`` per seed (median and quantiles) per
+window and variant, and -- report-only -- the PASS share the old unscaled chain (frozen ``q95``) would have given.  BESTANDEN iff for
+every handed variant (a) the weekly SD of the control world <= 1.10 x the weekly SD of the power line in each window, (b) the PASS
+share in the binding window >= 0.734, (c) the false PASS rate of the negative control <= 0.086 in each window, (d) the realised
+injection effect on the judgement seeds within +-10 % of the target.  Report-only: the same control in the literal PRD sector
+world (shock 0.375 sigma_e) and the joint C10 share.
 
 DEC-101: the control runs on the week shape of the panel restricted to the linear USDT perpetuals (E1; the report travels in
-the artifact under ``universe`` and the registered ``universe`` pin is checked) and the gate chain keeps the frozen
-``q95`` (which is max(q95_1000, q95_10000), E5).  The scaled null of the test run (E2) is NOT part of the control's gate chain
-(ERSTFASSUNG 4 is quoted literally; DEC-101 E2 names the test run only) -- a point reported to the orchestrator.
+the artifact under ``universe`` and the registered ``universe`` pin is checked) and the gate chain uses the frozen ``q95`` (which is
+max(q95_1000, q95_10000), E5) scaled as in the test run (E2, via DEC-101 Teil 2 (N-1)).
 """
 from __future__ import annotations
 
@@ -43,7 +56,7 @@ from . import estimators as est
 from .errors import PositiveControlAbort
 
 __all__ = ["synthesize_world", "eval_world", "run_positive_control", "render_pc_markdown", "write_pc_artifacts",
-           "build_shape", "PASS_LINE", "FAIL_LINE", "world_params"]
+           "build_shape", "PASS_LINE", "FAIL_LINE", "world_params", "injection_target_components", "k_summary"]
 
 PASS_LINE = "Positivkontrolle BESTANDEN"
 FAIL_LINE = "Positivkontrolle NICHT BESTANDEN"
@@ -171,6 +184,29 @@ def _mean_y(ics: list[float], sign: int) -> float:
 # calibrations
 # ----------------------------------------------------------------------------
 
+def injection_target_components(*, se_t: float, sd_t: float, m_df: float, m: float, q95: float, k_pred: float) -> dict[str, Any]:
+    """DEC-101 Teil 2 (N-2): the injection target F of ONE window (pure, T4), in registered-direction ``y`` units::
+
+        term_1b = z_krit SE_T + z_80 SD_T - min(0, m_df)
+        term_1c = q95_eff(k_pred) - m_df + z_80 SD_T,   q95_eff(k) = max(0, m) + k (q95 - m)
+        Ziel_W  = max(term_1b, term_1c)
+
+    ``m_df`` the frozen null mean of the driftfree cell (the control world has drift 0), ``m`` the frozen ``null_mean`` (binding cell),
+    ``q95`` the frozen quantile, ``k_pred`` the pilot's prediction of the scale factor, ``SE_T`` / ``SD_T`` as in rule U.  A non-finite
+    input is a loud fail (no target, no control)."""
+    vals = {"se_t": se_t, "sd_t": sd_t, "m_df": m_df, "m": m, "q95": q95, "k_pred": k_pred}
+    bad = [k for k, v in vals.items() if not (isinstance(v, (int, float, np.floating)) and math.isfinite(float(v)))]
+    if bad:
+        raise PositiveControlAbort(f"injection target F: non-finite input(s) {bad} -- no target")
+    z, zp = float(C.Z_KRIT), float(C.Z_POWER)
+    q95_eff = est.q95_effective(float(m), float(k_pred), float(q95))
+    term_1b = z * float(se_t) + zp * float(sd_t) - min(0.0, float(m_df))
+    term_1c = q95_eff - float(m_df) + zp * float(sd_t)
+    return {"se_t": float(se_t), "sd_t": float(sd_t), "m_df": float(m_df), "m": float(m), "q95": float(q95), "k_pred": float(k_pred),
+            "q95_eff_pred": q95_eff, "term_1b": term_1b, "term_1c": term_1c, "target": max(term_1b, term_1c),
+            "binding_condition": "1c" if term_1c > term_1b else "1b"}
+
+
 def _calibrate_sigma_g(geom: dict[str, Any], symbols: list[str], world: dict[str, float], variant: str, widx: int, target_sd: float,
                        *, f2_real: float, f2_null: float, seeds: tuple[int, ...]) -> dict[str, Any]:
     """sigma_g so that the weekly SD of the fm8 IC of the negative control hits ``target_sd`` within +-5 %.  0 if
@@ -254,6 +290,9 @@ def _calibrate_injection(geom: dict[str, Any], symbols: list[str], world: dict[s
 # ----------------------------------------------------------------------------
 
 def _window_pass(ics: list[float], wn: str, variant: str, sign: int, consts: dict[str, Any], bounce: float | None) -> dict[str, Any]:
+    """One synthetic week series judged exactly as the test run judges the real one (DEC-101 Teil 2 (N-1)): SE_W by rule P-1 (4),
+    ``k = max(1, SD(IC_t, ddof 1) / sd_week_W,v)`` against the FROZEN weekly SD, ``q95_eff = max(0, m) + k (q95 - m)`` with ``m`` the
+    frozen null mean of the binding cell, and the gate payload with the ``null_scaling`` block through ``gate.window_conditions``."""
     fz = consts["frozen"][wn]
     se = est.se_rule(ics, fz["floor_fm8"], consts["w_judged"][wn], mean_block=consts["mean_block"], n_boot=consts["n_boot"],
                      seed=consts["seed"])
@@ -261,10 +300,19 @@ def _window_pass(ics: list[float], wn: str, variant: str, sign: int, consts: dic
     a = a[np.isfinite(a)]
     mean_ic = float(a.mean()) if a.size else float("nan")
     y = sign * mean_ic if math.isfinite(mean_ic) else float("nan")
-    cond = gate.window_conditions({"y": y, "se_w": se["se"], "q95": fz["q95"][variant]}, float(C.Z_KRIT))
+    q95_frozen = float(fz["q95"][variant])
+    sd_real = float(se["sd_ic"])
+    payload = {"y": y, "se_w": se["se"], "q95": q95_frozen,
+               "null_scaling": {"sd_real": sd_real, "sd_week": float(fz["sd_week"][variant]), "m": float(fz["null_mean"][variant]),
+                                "q95_frozen": q95_frozen}}
+    cond = gate.window_conditions(payload, float(C.Z_KRIT))
     bounce_kill = bool(bounce is not None and math.isfinite(mean_ic) and abs(bounce) >= abs(mean_ic))
+    # report-only: the verdict of the OLD unscaled chain (frozen q95, k = 1) on the same series -- for the comparison only
+    unscaled_c = bool(math.isfinite(y) and y >= q95_frozen)
+    unscaled_pass = bool(cond["a_sign"] and cond["b_magnitude"] and unscaled_c and not bounce_kill)
     return {"y": y, "mean_ic": mean_ic, "se_w": se["se"], "window_pass": bool(cond["window_pass"] and not bounce_kill),
-            "conditions_pass": bool(cond["window_pass"]), "bounce_kill": bounce_kill}
+            "conditions_pass": bool(cond["window_pass"]), "bounce_kill": bounce_kill, "k": cond["k"], "q95_eff": cond["q95_effective"],
+            "sd_real": sd_real, "window_pass_unscaled_report_only": unscaled_pass, "payload": payload, "conditions": cond}
 
 
 def _judge_world(geoms: dict[str, dict[str, Any]], symbols: list[str], worlds: dict[str, dict[str, float]], variant: str,
@@ -283,17 +331,37 @@ def _judge_world(geoms: dict[str, dict[str, Any]], symbols: list[str], worlds: d
     return out
 
 
+def k_summary(ks: list[float]) -> dict[str, Any]:
+    """DEC-101 Teil 2 (N-1): the scale factors ``k`` of the judgement seeds of one window and condition -- count, finite count, share
+    above 1, minimum, quantiles (5 / 25 / 50 / 75 / 95 %) and maximum (``numpy.quantile``, linear interpolation)."""
+    a = np.asarray(ks, dtype=np.float64)
+    f = a[np.isfinite(a)]
+    q = [float(x) for x in np.quantile(f, [0.05, 0.25, 0.5, 0.75, 0.95])] if f.size else [float("nan")] * 5
+    return {"n": int(a.size), "n_finite": int(f.size), "share_gt_1": float((f > 1.0).mean()) if f.size else float("nan"),
+            "min": float(f.min()) if f.size else float("nan"), "q05": q[0], "q25": q[1], "median": q[2], "q75": q[3], "q95": q[4],
+            "max": float(f.max()) if f.size else float("nan")}
+
+
 def _summarize_world(judged: dict[str, Any], binding: str, target: float, sd_power_line: dict[str, float]) -> dict[str, Any]:
     wns = list(judged["pos"])
     n = len(judged["pos"][wns[0]])
     pass_share = {wn: sum(r["window_pass"] for r in judged["pos"][wn]) / n for wn in wns}
     neg_rate = {wn: sum(r["window_pass"] for r in judged["neg"][wn]) / n for wn in wns}
+    pass_unscaled = {wn: sum(r["window_pass_unscaled_report_only"] for r in judged["pos"][wn]) / n for wn in wns}
+    neg_unscaled = {wn: sum(r["window_pass_unscaled_report_only"] for r in judged["neg"][wn]) / n for wn in wns}
+    k_scaling = {cond: {wn: k_summary([r["k"] for r in judged[cond][wn]]) for wn in wns} for cond in ("neg", "pos")}
+    payload_example = {cond: {wn: {"seed_index": 0, "payload": judged[cond][wn][0]["payload"],
+                                   "conditions": {k: judged[cond][wn][0]["conditions"][k] for k in
+                                                  ("a_sign", "b_magnitude", "c_null_quantile", "window_pass", "threshold_t", "k", "q95_effective")}}
+                           for wn in wns} for cond in ("neg", "pos")}
     joint_pos = sum(all(judged["pos"][wn][i]["window_pass"] for wn in wns) for i in range(n)) / n
     joint_neg = sum(all(judged["neg"][wn][i]["window_pass"] for wn in wns) for i in range(n)) / n
     sd_world = {wn: _pooled_sd(judged["neg_ics"][wn]) for wn in wns}
     effect = float(np.mean([judged["pos"][binding][i]["y"] - judged["neg"][binding][i]["y"] for i in range(n)]))
     return {"n_seeds": n, "pass_share_by_window": pass_share, "pass_share_binding": pass_share[binding],
             "false_pass_rate_by_window": neg_rate, "joint_c10_share_positive": joint_pos, "joint_c10_false_pass_rate": joint_neg,
+            "k_scaling": k_scaling, "pass_share_by_window_unscaled_report_only": pass_unscaled,
+            "false_pass_rate_by_window_unscaled_report_only": neg_unscaled, "payload_example": payload_example,
             "weekly_sd_world": sd_world, "weekly_sd_power_line": dict(sd_power_line),
             "sd_ratio": {wn: sd_world[wn] / sd_power_line[wn] for wn in wns},
             "realized_effect_binding": effect, "target_effect": target, "effect_rel_error": effect / target - 1.0}
@@ -336,8 +404,10 @@ def run_positive_control(
     base_consts = {"mean_block": float(rules["mean_block"]), "n_boot": int(rules["n_boot"]), "seed": int(rules["seed"]),
                    "w_judged": {wn: int(registered["windows"][wn]["w_judged"]) for wn in ("W1", "W2")},
                    "frozen": {wn: {"floor_fm8": float(registered["windows"][wn]["frozen_v6"]["floor_fm8"]),
-                                   "q95": {v: float(registered["windows"][wn]["frozen_v6"]["q95"][v]) for v in C.VARIANTS}}
-                              for wn in ("W1", "W2")}}
+                                   "q95": {v: float(registered["windows"][wn]["frozen_v6"]["q95"][v]) for v in C.VARIANTS},
+                                   "sd_week": {v: float(registered["windows"][wn]["frozen_v6"]["sd_week"][v]) for v in C.VARIANTS},
+                                   "null_mean": {v: float(registered["windows"][wn]["frozen_v6"]["null_mean"][v]) for v in C.VARIANTS}}
+                              for wn in ("W1", "W2")}}               # DEC-101 Teil 2 (N-1): sd_week and null_mean feed the scaled null
     geoms: dict[str, dict[str, Any]] = {}
     worlds: dict[str, dict[str, float]] = {}
     lead = C.LEAD_WEEKS
@@ -362,8 +432,15 @@ def run_positive_control(
         sign = C.SIGN[C.DIRECTION[v]]
         ho = pilot["variants"][v]["handover"]
         f2_real = float(ho["f2_real"])
-        target_by_w = {wn: C.Z_KRIT * ho["per_window"][wn]["se_t"] + C.Z_POWER * ho["per_window"][wn]["sd_t"] for wn in geoms}
-        binding = max(target_by_w, key=lambda w_: target_by_w[w_])
+        target_comp: dict[str, dict[str, Any]] = {}
+        for wn in geoms:                                                  # DEC-101 Teil 2 (N-2): the injection target F per window
+            fz = registered["windows"][wn]["frozen_v6"]
+            kp = est.k_pred(float(fz["v_fm8"]), f2_real, float(fz["sd_week"][v]))
+            target_comp[wn] = injection_target_components(
+                se_t=float(ho["per_window"][wn]["se_t"]), sd_t=float(ho["per_window"][wn]["sd_t"]), m_df=float(fz["null_mean_driftfree"][v]),
+                m=float(fz["null_mean"][v]), q95=float(fz["q95"][v]), k_pred=kp)
+        target_by_w = {wn: target_comp[wn]["target"] for wn in geoms}
+        binding = max(target_by_w, key=lambda w_: target_by_w[w_])      # argmax_W Ziel_W
         target = target_by_w[binding]
         sd_line: dict[str, float] = {}
         f2_null: dict[str, float] = {}
@@ -377,7 +454,8 @@ def run_positive_control(
             say(f"  {v} {wn}: sigma_g {sig_g[wn]['sigma_g']:.5f} ({sig_g[wn]['reason']})")
         bidx = list(geoms).index(binding)
         inj = _calibrate_injection(geoms[binding], symbols, worlds[binding], v, bidx, sig_g[binding]["sigma_g"], target, sign, C.PC_SEEDS_INJECT)
-        say(f"  {v}: injection {inj['signal_ic']:.5f} -> realised effect {inj['realized_effect']:.5f} (target {target:.5f}, binding {binding})")
+        say(f"  {v}: injection {inj['signal_ic']:.5f} -> realised effect {inj['realized_effect']:.5f} (target F {target:.5f}, binding {binding}/{target_comp[binding]['binding_condition']}, "
+            f"k_pred {target_comp[binding]['k_pred']:.3f})")
         consts = dict(base_consts)
         judged = _judge_world(geoms, symbols, worlds, v, {wn: sig_g[wn]["sigma_g"] for wn in geoms}, inj["signal_ic"], C.PC_SEEDS_JUDGE,
                               consts, bounce if v == "rev_gap" else {}, sign)
@@ -387,8 +465,10 @@ def run_positive_control(
         judged_prd = _judge_world(geoms, symbols, worlds, v, prd_g, inj["signal_ic"], C.PC_SEEDS_JUDGE, consts,
                                   bounce if v == "rev_gap" else {}, sign)
         summ_prd = _summarize_world(judged_prd, binding, target, sd_line)
-        say(f"  {v}: PASS share {summ['pass_share_binding']:.3f}, false PASS {summ['false_pass_rate_by_window']}, criteria passed {crit['passed']}")
-        out_variants[v] = {"entry": C.ENTRY[v], "binding_window": binding, "target_effect": target, "target_by_window": target_by_w,
+        say(f"  {v}: PASS share {summ['pass_share_binding']:.3f} (unscaled, report-only {summ['pass_share_by_window_unscaled_report_only'][binding]:.3f}), "
+            f"k median {summ['k_scaling']['pos'][binding]['median']:.3f}, false PASS {summ['false_pass_rate_by_window']}, criteria passed {crit['passed']}")
+        out_variants[v] = {"entry": C.ENTRY[v], "binding_window": binding, "binding_condition": target_comp[binding]["binding_condition"],
+                           "target_effect": target, "target_by_window": target_by_w, "target_components": target_comp,
                            "f2_real": f2_real, "f2_null": f2_null, "weekly_sd_power_line": sd_line, "sigma_g": sig_g,
                            "injection": {k: inj[k] for k in ("signal_ic", "realized_effect", "target_effect", "rel_error", "n_iter")},
                            "judgement": summ, "criteria": crit, "prd_sector_world_report_only": {"sigma_g_rel_sigma_e": C.PC_PRD_SECTOR_REL,
@@ -402,6 +482,8 @@ def run_positive_control(
                   "injection": [min(C.PC_SEEDS_INJECT), max(C.PC_SEEDS_INJECT)], "world": [min(C.PC_SEEDS_SIGMA_G), max(C.PC_SEEDS_SIGMA_G)]},
         "criteria_constants": {"sd_ratio_max": C.PC_SD_RATIO_MAX, "pass_share_min": C.PC_PASS_SHARE_MIN, "neg_pass_max": C.PC_NEG_PASS_MAX,
                                "injection_tolerance": C.PC_INJECT_JUDGE_TOL},
+        "null_scaling": {"enabled": True, "rule": C.PC_NULL_SCALING_RULE, "ref": C.PC_NULL_SCALING_REF},       # DEC-101 Teil 2 (N-1)
+        "inject_target": C.PC_INJECT_TARGET, "inject_target_label": C.PC_INJECT_LABEL, "inject_target_ref": C.PC_INJECT_REF,   # (N-2)
         "worlds": worlds, "bounce_ic": bounce if "rev_gap" in handed else None, "variants": out_variants,
         "bestanden": bool(passed), "line": PASS_LINE if passed else FAIL_LINE, "label": FORK_LABEL,
         "not_computed": ["real returns (none passed)", "raw_ic", "lag_profile", "beta_calibration_ic"],
@@ -416,7 +498,10 @@ def render_pc_markdown(report: dict[str, Any]) -> str:
     lines = [report["line"], "", "# H-32 Positivkontrolle (PRD 3.3.8, DEC-94 (5))", "", f"- result_sha256: `{report['result_sha256']}`",
              f"- registrierte Datei sha256: `{report.get('registered_sha256')}`; Pilot-Ergebnis sha256: `{report.get('pilot_sha256')}`",
              f"- Seeds: Urteil {report['seeds']['judgement']}, Injektion {report['seeds']['injection']}, Welt {report['seeds']['world']}",
-             f"- {report['label']}", "", "## Kriterien je Variante (vorab fixiert)", "",
+             f"- {report['label']}", f"- {report['inject_target_label']} ({report['inject_target_ref']})",
+             f"- Injektionsziel F: {report['inject_target']}",
+             f"- Skalierte Null in der Gate-Kette ({report['null_scaling']['ref']}): {report['null_scaling']['rule']}", "",
+             "## Kriterien je Variante (vorab fixiert)", "",
              "(a) Wochen-SD der Kontrollwelt <= 1,10 x Wochen-SD der Power-Zeile je Fenster; (b) PASS-Anteil im bindenden Fenster >= "
              f"{report['criteria_constants']['pass_share_min']}; (c) falsche PASS-Quote je Fenster <= {report['criteria_constants']['neg_pass_max']}; "
              f"(d) realisierter Injektionseffekt innerhalb +-{report['criteria_constants']['injection_tolerance']:.0%} des Ziels.", "",
@@ -429,6 +514,25 @@ def render_pc_markdown(report: dict[str, Any]) -> str:
         lines.append(f"| {v} | {x['binding_window']} | {f(x['target_effect'])} | {f(x['injection']['signal_ic'])} | {f(j['realized_effect_binding'])} | "
                      f"{f(j['pass_share_binding'], 3)} | {f(fp.get('W1'), 3)} / {f(fp.get('W2'), 3)} | {f(sr.get('W1'), 3)} / {f(sr.get('W2'), 3)} | "
                      f"{all(c['a_sd_ratio'].values())} | {c['b_pass_share']} | {all(c['c_false_pass'].values())} | {c['d_injection']} | {c['passed']} |")
+    lines += ["", "## Injektionsziel F je Fenster (DEC-101 Teil 2 (N-2))", "",
+              "| Variante | Fenster | SE_T | SD_T | m_df | m | q95 | k_pred | q95_eff(k_pred) | Term (1b) | Term (1c) | Ziel_W | bindend |",
+              "|---|---|---|---|---|---|---|---|---|---|---|---|---|"]
+    for v, x in report["variants"].items():
+        for wn, t in x["target_components"].items():
+            lines.append(f"| {v} | {wn} | {f(t['se_t'])} | {f(t['sd_t'])} | {f(t['m_df'])} | {f(t['m'])} | {f(t['q95'])} | {f(t['k_pred'], 3)} | "
+                         f"{f(t['q95_eff_pred'])} | {f(t['term_1b'])} | {f(t['term_1c'])} | {f(t['target'])} | "
+                         f"{t['binding_condition']}{' (Fenster bindend)' if wn == x['binding_window'] else ''} |")
+    lines += ["", "## Skalierte Null je Seed (DEC-101 Teil 2 (N-1)): k = max(1, SD(IC_t) / sd_week), Median [5 %, 95 %]; PASS-Anteil skaliert / "
+              "unskaliert (report-only)", "",
+              "| Variante | Fenster | k negativ | k positiv | PASS-Anteil positiv skaliert | PASS-Anteil positiv unskaliert (report-only) | "
+              "falsche PASS skaliert | falsche PASS unskaliert (report-only) |", "|---|---|---|---|---|---|---|---|"]
+    for v, x in report["variants"].items():
+        j = x["judgement"]
+        for wn in j["pass_share_by_window"]:
+            kn, kp = j["k_scaling"]["neg"][wn], j["k_scaling"]["pos"][wn]
+            lines.append(f"| {v} | {wn} | {f(kn['median'], 3)} [{f(kn['q05'], 3)}, {f(kn['q95'], 3)}] | {f(kp['median'], 3)} [{f(kp['q05'], 3)}, "
+                         f"{f(kp['q95'], 3)}] | {f(j['pass_share_by_window'][wn], 3)} | {f(j['pass_share_by_window_unscaled_report_only'][wn], 3)} | "
+                         f"{f(j['false_pass_rate_by_window'][wn], 3)} | {f(j['false_pass_rate_by_window_unscaled_report_only'][wn], 3)} |")
     lines += ["", "## Report-only: woertliche PRD-Sektorwelt (Schock 0,375 sigma_e) und gemeinsame C10-Quote", "",
               "| Variante | PASS-Anteil bindend | falsche PASS W1/W2 | SD-Verhaeltnis W1/W2 | C10-Quote positiv (Welt F2_real / PRD) |", "|---|---|---|---|---|"]
     for v, x in report["variants"].items():

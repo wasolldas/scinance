@@ -5,7 +5,12 @@ q95 rule and the power line (E5) and the PP3 dry run / mu_sel placeholder (E6).
 Pure parts are tested with hand calculations and Monte Carlo (with a tolerance); the mode-level parts run on the fixture
 panels of ``tests/unit/h32_fixtures.py`` (nothing real is read).  The existing tests were adapted where DEC-101 changes the
 behaviour (``universe``, ``null_scaling``, ``runner``, ``pilot_window.out_dir`` and the delisted-tree pin are mandatory
-registration fields; the frozen ``q95`` is ``max(q95_1000, q95_10000)``; ``Spy`` replaces ``read_union_panel``)."""
+registration fields; the frozen ``q95`` is ``max(q95_1000, q95_10000)``; ``Spy`` replaces ``read_union_panel``).
+
+DEC-101 Teil 2 (N-3, N-5) adapted three tests of this file: the power-line hand calculations use the rule U-4 (1c) term at ``k_pred = 1``
+(``q95 + |m|`` for a negative null mean, identical to U-3 otherwise), and the gate no longer accepts a payload without the
+``null_scaling`` block (``test_dec101_e2_the_gate_derives_k_and_q95_eff_from_the_payload_alone``).  The tests of Teil 2 itself are in
+``test_h32_dec101_part2.py``."""
 from __future__ import annotations
 
 import ast
@@ -23,8 +28,8 @@ from bybit_edge.research import power_p1 as pp
 from bybit_edge.research.h32_fm8 import (checks, estimators as est, gate, handover, panel_cut, pilot as pilot_mod, pnull, pp3,
                                          powerline, schema, testrun, universe, vorlauf, weekly as wkl)
 from bybit_edge.research.h32_fm8 import constants as C
-from bybit_edge.research.h32_fm8.errors import (ArtifactError, DataFingerprintError, PilotLockError, PinError, RunnerPinError,
-                                                SchemaError, UniverseError)
+from bybit_edge.research.h32_fm8.errors import (ArtifactError, DataFingerprintError, GateError, PilotLockError, PinError,
+                                                RunnerPinError, SchemaError, UniverseError)
 from bybit_edge.research.wp13_xsec import ic
 
 from tests.unit import h32_fixtures as F
@@ -357,9 +362,14 @@ def test_dec101_e2_the_gate_derives_k_and_q95_eff_from_the_payload_alone():
     assert any("(1c) y >= q95_eff" in lab and "k=1.2" in lab for lab in inflated["labels"])
     assert gate.evaluate(pay(0.019, 0.05))["verdict"] == "PASS"                   # the frozen q95 alone would have passed it
     assert gate.evaluate(copy.deepcopy(pay(0.019, 0.06))) == inflated             # pure
-    # without a null_scaling block the gate uses the frozen q95 as before (k = 1)
+    # DEC-101 Teil 2 (N-5): without a null_scaling block the gate no longer falls back to the frozen q95 (k = 1) -- it is a loud fail
+    # (the earlier assertion of this test was the fallback; see ``test_h32_dec101_part2.py`` for the full N-5 tests).  An explicit
+    # k = 1 block (sd_real = sd_week, m = 0) is the way to state "no scaling" and reproduces the old arithmetic exactly.
     old = {"entry": "e", "variant": "mom1", "direction": "positive", "z_krit": C.Z_KRIT,
            "windows": {"W1": {"y": 0.02, "se_w": 0.01, "q95": 0.017, "ceiling_k4": 0.005, "threshold_frozen": 0.0175}}}
+    with pytest.raises(GateError, match="null_scaling"):
+        gate.evaluate(old)
+    old["windows"]["W1"]["null_scaling"] = {"sd_real": 0.05, "sd_week": 0.05, "m": 0.0, "q95_frozen": 0.017}
     assert gate.evaluate(old)["per_window"]["W1"]["k"] == 1.0 and gate.evaluate(old)["per_window"]["W1"]["q95_effective"] == 0.017
     nan_sd = pay(0.05, float("nan"))
     assert gate.evaluate(nan_sd)["verdict"] == "DROP"                              # fails closed
@@ -643,7 +653,8 @@ def test_dec101_e5_power_line_matches_the_hand_calculation():
         per = {}
         for wn in ("W1", "W2"):
             se, sd, nm, q = (frozen[wn][k][v] for k in ("e_se_rule", "se_mean", "null_mean", "q95"))
-            b, c = z * se + zp * sd + max(0.0, nm), q + zp * sd
+            # DEC-101 Teil 2 (N-3): the (1c) term is q95_eff(k_pred = 1) + z_80 SD: q95 for m >= 0 (as before), q95 + |m| for m < 0 (rev_gap)
+            b, c = z * se + zp * sd + max(0.0, nm), (q if nm >= 0.0 else q + abs(nm)) + zp * sd
             assert x["windows"][wn]["mde80_1b"] == pytest.approx(b, abs=1e-15) and x["windows"][wn]["mde80_1c"] == pytest.approx(c, abs=1e-15)
             assert x["windows"][wn]["mde80_w"] == max(b, c)
             per[wn] = (b, c, z * se + zp * sd, nm, se, sd, q)
@@ -652,7 +663,7 @@ def test_dec101_e5_power_line_matches_the_hand_calculation():
         u = max(p[2] for p in per.values())
         assert x["m_star"] == m_star and x["mde80_star_u"] == pytest.approx(u)
         assert x["handover_threshold_u"] == pytest.approx(u + m_star)
-        assert x["handover_threshold_on_point"] == pytest.approx(max(u + m_star, max(p[1] for p in per.values())))   # U-3
+        assert x["handover_threshold_on_point"] == pytest.approx(max(u + m_star, max(p[1] for p in per.values())))   # U-3 / U-4 at k_pred = 1
         margin = (u + m_star) - max(p[1] for p in per.values())
         assert x["rule_u_covers_1c"]["margin"] == pytest.approx(margin) and x["rule_u_covers_1c"]["covers"] is (margin >= 0.0)
         assert x["margin_against_gate_mde80_star"] == pytest.approx(x["handover_threshold_on_point"] - x["mde80_star"])
@@ -723,7 +734,9 @@ def test_dec101_e5_vorlauf_report_carries_the_power_line(sig, shrunk):
         x = pl["variants"][v]
         for wn in ("W1", "W2"):
             fz = reg["windows"][wn]["frozen_v6"]
-            assert x["windows"][wn]["mde80_1c"] == pytest.approx(fz["q95"][v] + C.Z_POWER * fz["se_mean"][v], abs=1e-15)
+            nm_v = fz["null_mean"][v]            # DEC-101 Teil 2 (N-3): U-4 at k_pred = 1 -- q95 + |m| for a negative null mean, else q95 (as in U-3)
+            q_eff = fz["q95"][v] if nm_v >= 0.0 else fz["q95"][v] - nm_v
+            assert x["windows"][wn]["mde80_1c"] == pytest.approx(q_eff + C.Z_POWER * fz["se_mean"][v], abs=1e-15)
             assert x["windows"][wn]["mde80_1b"] == pytest.approx(C.Z_KRIT * fz["e_se_rule"][v] + C.Z_POWER * fz["se_mean"][v] + max(0.0, fz["null_mean"][v]), abs=1e-15)
         assert x["m_star"] == max(0.0, reg["pilot_window"]["frozen_v6"]["m_P"][v], reg["windows"]["W1"]["frozen_v6"]["null_mean"][v],
                                   reg["windows"]["W2"]["frozen_v6"]["null_mean"][v])

@@ -94,11 +94,37 @@ PC_N_SECTORS = 8
 #: PRD/DEC-89 sector shock relative to sigma_e (report-only world).
 PC_PRD_SECTOR_REL = 0.375
 
+# ----------------------------------------------------------------------------
+# DEC-101 Teil 2 (Nachpruefung N-1, N-2): positive control in production configuration, injection target F
+# ----------------------------------------------------------------------------
+
+#: DEC-101 Teil 2 (N-1): the gate chain of the control uses the scaled null exactly as the test run does (DEC-101 E2); the YAML
+#: block ``positive_control.null_scaling`` repeats exactly these texts.
+PC_NULL_SCALING_RULE = ("wie Testlauf (DEC-101 E2); k je Seed aus der Wochen-SD der synthetischen Serie gegen sd_week")
+PC_NULL_SCALING_REF = "DEC-101 Teil 2 (N-1)"
+#: DEC-101 Teil 2 (N-2): the injection target F of the control (replaces only the target of ERSTFASSUNG 4; criteria (a)-(d), seeds and
+#: world stay).  ``m_df`` = frozen null mean of the DRIFTFREE cell (the control world has drift 0), ``m`` = frozen ``null_mean`` (binding
+#: cell), ``q95_eff(k_pred) = max(0, m) + k_pred (q95 - m)``; the injection aims at the REALISED fm8 effect of the binding window
+#: (argmax over W of the target).
+PC_INJECT_TARGET = ("realisierter fm8-Effekt im bindenden Fenster (argmax_W): Ziel_W = max(z_krit * SE_T,W + z_80 * SD_T,W - min(0, m_df,W), "
+                    "q95_eff,W(k_pred,W) - m_df,W + z_80 * SD_T,W); m_df,W = eingefrorenes Null-Mittel der driftfreien Zelle (stress), "
+                    "q95_eff,W(k_pred,W) = max(0, m_W) + k_pred,W * (q95_W,v - m_W), m_W = eingefrorenes null_mean (bindende Zelle), "
+                    "k_pred,W = max(1, sqrt(v_fm8_W + F2_real) / sd_week_W,v), SE_T,W / SD_T,W wie Regel U")
+PC_INJECT_LABEL = ("Injektionsziel F: Korrektur nach DEC-94 (3) (Review B-4/A-4, Nachpruefung N-2), vor jeder Pilot-Zahl")
+PC_INJECT_REF = "DEC-101 Teil 2 (N-2)"
+
 #: schema markers
-HANDOVER_VERSION = "U-3"
-#: DEC-101 Teil 2 (Review A-4): condition (ii) of rule U covers BOTH gate conditions -- (1b) with the null-mean credit and (1c)
-#: (frozen q95 + z_80 * SD_T); the threshold on the pilot point can only rise (direction: strictness, fixed before any pilot number).
-HANDOVER_COND_II = "x_P >= max(m* + max_W(z_krit * SE_T,W + z_80 * SD_T,W), max_W(q95_W,v + z_80 * SD_T,W))"
+#: DEC-101 Teil 2 (N-3, Review Nachpruefung N-3): rule U-4.  U-3 (Review A-4) made condition (ii) cover BOTH gate conditions --
+#: (1b) with the null-mean credit and (1c); U-4 puts the scaled null of the test run (DEC-101 E2) into the (1c) term:
+#: ``max(0, m_W) + k_pred,W (q95_W,v - m_W) + z_80 SD_T,W`` with ``k_pred,W`` from the pilot's F2_real.  The threshold on the pilot
+#: point can only rise (direction: strictness, fixed before any pilot number); at ``k_pred = 1`` and ``m >= 0`` no number changes.
+HANDOVER_VERSION = "U-4"
+HANDOVER_COND_II = ("x_P >= max(m* + max_W(z_krit * SE_T,W + z_80 * SD_T,W), "
+                    "max_W(max(0, m_W) + k_pred,W * (q95_W,v - m_W) + z_80 * SD_T,W))")
+#: DEC-101 Teil 2 (N-3): ``k_pred`` is the prediction of the test run's scale factor from the pilot's F2_real -- the same quantity the
+#: positive control calibrates its world SD on (N-2).  Before the pilot (power line of the Vorlauf) ``k_pred = 1``.
+HANDOVER_K_PRED = "k_pred,W = max(1, sqrt(v_fm8_W + F2_real) / sd_week_W,v); before the pilot (power line of the Vorlauf) k_pred = 1"
+HANDOVER_C_V = "c_v = max(MDE80*_U + m*, max_W(max(0, m_W) + k_pred,W * (q95_W,v - m_W) + z_80 * SD_T,W)) (U-4)"
 PILOT_SCHEMA = "H-32 pilot result (DEC-99)"
 RUN_SCHEMA = "H-32 test run (DEC-99, DEC-94)"
 PC_SCHEMA = "H-32 positive control (PRD 3.3.8, DEC-94 (5))"
@@ -106,6 +132,11 @@ PRELAUNCH_SCHEMA = "H-32 Vorlauf v6 (outcome-free)"
 
 PILOT_GL012 = "GL-012 (Pilot)"
 PILOT_HANDED = "UEBERGEBEN"
+#: DEC-101 Teil 2 (N-4): the attempt marker written BEFORE the panel is loaded (``<prefix>_attempt.json`` in the pinned pilot directory;
+#: it matches ``PILOT_FILE_GLOB`` and carries the ``registered_sha256``, so the exactly-one-pilot lock sees an aborted attempt).
+PILOT_ATTEMPT_SUFFIX = "_attempt"
+PILOT_ATTEMPT_SCHEMA = "H-32 pilot attempt marker (DEC-101 Teil 2, N-4)"
+PILOT_ATTEMPT_REF = "DEC-101 Teil 2 (N-4)"
 
 #: DEC-99 amendment (p convention, binding): p_W,v is the exceedance share of the replicate window means of the v6
 #: factor-preserving null (stress; the cell with the larger null mean of driftfree / drift).  The block permutation of the
@@ -115,6 +146,10 @@ P_STATISTIC = "null_replicate_exceedance_fm8_window_mean"
 P_REPORT_ONLY = ("block_permutation_fm8_window_mean", "normal_approximation")
 P_REPLICATES_SCHEMA = "H-32 null replicate window means for p (DEC-99, factor-preserving null)"
 P_REPLICATES_FILE = "h32_prelaunch_p_replicates.json"
+#: DEC-101 Teil 2 (N-5): the registered ``fdr.p_formula`` names the scaling of the replicates (DEC-101 E2, block ``null_scaling``).
+P_FORMULA = ("p = (1 + #{scaled null replicate window means d' >= observed window mean y, registered direction}) / (1 + R), "
+             "d' = max(0, m) + k * (d - m), k = max(1, SD(IC_t,W) / sd_week_W,v), m = frozen null_mean of the binding cell "
+             "(DEC-101 E2, block null_scaling)")
 
 #: the sealed file name patterns of the programme: no code path here opens a path matching one of them.
 SEALED_PATTERNS: tuple[str, ...] = ("*_L_window_sealed.json", "weekly_ic_series.csv", "ic_series_*_UNION_REAL.csv")
@@ -153,4 +188,16 @@ PP3_SCHEMA = "H-32 PP3 dry run (DEC-101 E6)"
 PP3_FILE = "h32_pp3_dry_run.json"
 W1_CONTROL_NOTE = ("W1-Determinismus-Kontrolle gegen v5e: entfaellt (DEC-100 N1); Ersatz: Fixture-T2, Zweitlauf bitgleich, "
                    "PP3-Trockenprobe")
+
+# ----------------------------------------------------------------------------
+# DEC-101 Teil 2 (Nachpruefung N-5): documentation fields of the registration
+# ----------------------------------------------------------------------------
+
+#: The template names the code commit of the Vorlauf (v6b: 6e4b447) and the registration commit SEPARATELY (the changes since the
+#: Vorlauf touch no frozen constant); the registration commit is set by the orchestrator.
+CODE_COMMIT_PRELAUNCH_UNSET = "<nicht angegeben: --code-commit-prelaunch>"
+CODE_COMMIT_REGISTRATION_PLACEHOLDER = "<wird vom Orchestrator gesetzt>"
+CODE_COMMIT_NOTE = ("code_commit_prelaunch = Code-Stand, mit dem der Vorlauf gerechnet wurde (nur damit bitgleich reproduzierbar); "
+                    "code_commit_registration = Code-Stand der Registrierung; die seitherigen Aenderungen beruehren keine eingefrorene "
+                    "Konstante (nur Regeltexte, Gate-Kette der Positivkontrolle, Injektionsziel, Uebergaberegel, Pilot-Sperre)")
 

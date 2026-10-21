@@ -20,6 +20,7 @@ import yaml
 from bybit_edge.research.h32_fm8 import artifacts, panel_cut, pnull, schema
 from bybit_edge.research.h32_fm8 import constants as C
 from bybit_edge.research.h32_fm8 import estimators as est
+from bybit_edge.research.h32_fm8.errors import H32Abort
 
 from tests.unit import h32_fixtures as F
 from tests.unit.h32_fixtures import REGISTERED_SHA, shrunk  # noqa: F401  (pytest fixture)
@@ -500,3 +501,117 @@ def test_cli_dec101_a_pp3_dry_run_never_counts_as_a_pilot_result(e2e, shrunk, mo
     assert [p.name for p in _pinned(repo).iterdir()] == [C.PP3_FILE]
     assert H32.main(["--pilot", *e2e["reg_args"], *RUNNER_ARGS, "--out", str(_pinned(repo))]) == 0         # the one pilot is still free
     assert spy.calls == 2 and (_pinned(repo) / "h32_pilot.json").is_file() and (_pinned(repo) / C.PP3_FILE).is_file()
+
+
+# ============================================================================
+# DEC-101 Teil 2 (Nachpruefung N-1..N-5): attempt marker, control report, template fields (B-7: the CLI end-to-end)
+# ============================================================================
+
+def test_cli_dec101t2_e2e_the_marker_the_control_report_and_the_template_carry_the_new_fields(e2e, shrunk):
+    # N-4: the first pilot of the end-to-end run left its marker next to the result (the marker is written before the panel is loaded)
+    marker = json.loads((e2e["pilot_dir"] / "h32_pilot_attempt.json").read_text(encoding="utf-8"))
+    assert marker["registered_sha256"] == e2e["sha"] and marker["mode"] == "pilot" and marker["prefix"] == "h32_pilot"
+    assert marker["attempt_utc"].endswith("Z") and len(marker["attempt_utc"]) == 20 and marker["schema"] == C.PILOT_ATTEMPT_SCHEMA
+    # N-1 / N-2: the control report of the end-to-end run
+    pc = json.loads((e2e["tmp"] / "pc" / "h32_positive_control.json").read_text(encoding="utf-8"))
+    assert pc["null_scaling"]["enabled"] is True and pc["null_scaling"]["ref"] == "DEC-101 Teil 2 (N-1)"
+    assert pc["inject_target"] == C.PC_INJECT_TARGET and pc["inject_target_label"].startswith("Injektionsziel F: Korrektur nach DEC-94 (3)")
+    for v, x in pc["variants"].items():
+        assert x["target_effect"] == x["target_by_window"][x["binding_window"]] == max(x["target_by_window"].values())
+        assert all(set(t) >= {"k_pred", "m_df", "q95_eff_pred", "term_1b", "term_1c", "target"} for t in x["target_components"].values())
+        assert x["judgement"]["k_scaling"]["neg"]["W1"]["n"] == len(C.PC_SEEDS_JUDGE)
+    md = (e2e["tmp"] / "pc" / "h32_positive_control.md").read_text(encoding="utf-8")
+    assert "Injektionsziel F" in md and "Skalierte Null je Seed" in md and md.isascii()
+    # N-3 / N-5: the pilot result and the template
+    pilot = json.loads(e2e["pilot_json"].read_text(encoding="utf-8"))
+    assert pilot["parameters"]["handover_version"] == "U-4" and set(pilot["variants"]["mom1"]["handover"]["k_pred"]) == {"W1", "W2"}
+    reg = schema.load_registered_yaml(e2e["yaml"])
+    assert reg["handover_rule"]["version"] == "U-4" and reg["positive_control"]["null_scaling"]["ref"] == "DEC-101 Teil 2 (N-1)"
+    assert reg["positive_control"]["inject_target"] == C.PC_INJECT_TARGET and reg["fdr"]["p_formula"] == C.P_FORMULA
+    assert reg["code_commit_registration"] == C.CODE_COMMIT_REGISTRATION_PLACEHOLDER and reg["code_commit_prelaunch"] == C.CODE_COMMIT_PRELAUNCH_UNSET
+    assert all("null_mean_driftfree" in reg["windows"][wn]["frozen_v6"] for wn in ("W1", "W2"))
+
+
+def test_cli_dec101t2_emit_template_takes_the_vorlauf_commit_and_refuses_a_non_hash(e2e, shrunk, tmp_path, capsys):
+    census = _write_census(tmp_path)
+    out = tmp_path / "t_commit.yaml"
+    assert H32.main(["--emit-template", str(e2e["pre_json"]), str(out), "--spread-census", str(census), "--code-commit-prelaunch", "6e4b447"]) == 0
+    text = out.read_text(encoding="utf-8")
+    reg = yaml.safe_load(text)
+    assert reg["code_commit_prelaunch"] == "6e4b447" and reg["code_commit_registration"] == "<wird vom Orchestrator gesetzt>"
+    assert "(code_commit_prelaunch): 6e4b447" in text.split("hypotheses:")[0] and "Quelle (Vorlauf-JSON) sha256: " + artifacts.sha256_file(e2e["pre_json"]) in text
+    schema.validate_registered(reg)
+    bad = tmp_path / "t_bad.yaml"
+    assert H32.main(["--emit-template", str(e2e["pre_json"]), str(bad), "--spread-census", str(census), "--code-commit-prelaunch", "not-a-hash"]) == 1
+    assert not bad.exists()
+    capsys.readouterr()
+    assert H32.main(["--emit-template", str(e2e["pre_json"]), str(tmp_path / "t_none.yaml"), "--spread-census", str(census)]) == 0
+    assert "code_commit_prelaunch" in capsys.readouterr().err                                         # the missing option is named, not silent
+    # the emitted template of the end-to-end run equals a re-emit (deterministic, the new blocks included)
+    again = tmp_path / "t_again.yaml"
+    assert H32.main(["--emit-template", str(e2e["pre_json"]), str(again), "--spread-census", str(census)]) == 0
+    assert artifacts.sha256_file(again) == e2e["sha"]
+
+
+class MarkerSpy(Spy):
+    """A panel spy that records which ``h32_pilot*`` files exist in the pinned directory AT THE MOMENT the panel is read."""
+
+    def __init__(self, panel, pinned: Path):
+        super().__init__(panel)
+        self.pinned, self.seen = pinned, None
+
+    def __call__(self, a):
+        self.seen = sorted(p.name for p in self.pinned.glob("h32_pilot*")) if self.pinned.is_dir() else []
+        return super().__call__(a)
+
+
+def test_cli_dec101t2_n4_marker_before_the_panel_abort_after_it_and_a_second_run_only_with_a_dec(e2e, shrunk, monkeypatch, tmp_path):
+    repo = tmp_path / "repo"
+    pinned = _pinned(repo)
+    spy = MarkerSpy(e2e["panel"], pinned)
+    monkeypatch.setattr(H32, "read_union_panel", spy)
+    monkeypatch.setattr(H32, "REPO_ROOT", repo)
+    real_run = H32.pilot_mod.run_pilot
+
+    def die(*a, **k):
+        raise H32Abort("simulated abort after the first variant (pilot values were logged, no file exists)")
+
+    argv = ["--pilot", *e2e["reg_args"], *RUNNER_ARGS, "--out", str(pinned)]
+    # a failure BEFORE the panel (runner pins) leaves no marker: no pilot attempt happened
+    assert H32.main(["--pilot", *e2e["reg_args"], "--as-of", "2026-01-01", "--start-year", "2021", "--end-year", "2026", "--allow-partial",
+                     "--out", str(pinned)]) == 1
+    assert spy.calls == 0 and not pinned.exists()
+    # the attempt: the marker exists when the panel is read; the run dies afterwards
+    monkeypatch.setattr(H32.pilot_mod, "run_pilot", die)
+    assert H32.main(argv) == 1
+    assert spy.calls == 1 and spy.seen == ["h32_pilot_attempt.json"]
+    assert [p.name for p in pinned.iterdir()] == ["h32_pilot_attempt.json"]                           # no result file, only the marker
+    mk = json.loads((pinned / "h32_pilot_attempt.json").read_text(encoding="utf-8"))
+    assert mk["registered_sha256"] == e2e["sha"] and mk["mode"] == "pilot" and mk["rerun_dec"] is None
+    before = artifacts.sha256_file(pinned / "h32_pilot_attempt.json")
+    # a second run without a DEC is refused BEFORE the panel; so is one with a malformed reference
+    assert H32.main(argv) == 1 and spy.calls == 1
+    assert H32.main([*argv, "--pilot-rerun-dec", "x1"]) == 1 and spy.calls == 1
+    # with a DEC reference it is allowed (prefix as before), the marker of the aborted attempt stays untouched
+    monkeypatch.setattr(H32.pilot_mod, "run_pilot", real_run)
+    assert H32.main([*argv, "--pilot-rerun-dec", "DEC-103"]) == 0
+    assert spy.calls == 2 and spy.seen == ["h32_pilot_attempt.json", "h32_pilot_rerun_DEC-103_attempt.json"]       # the re-run's marker is there too
+    assert (pinned / "h32_pilot_rerun_DEC-103.json").is_file() and (pinned / "h32_pilot_rerun_DEC-103_attempt.json").is_file()
+    assert not (pinned / "h32_pilot.json").exists() and artifacts.sha256_file(pinned / "h32_pilot_attempt.json") == before
+    # the re-run is spent too: a further run needs its own DEC
+    assert H32.main([*argv, "--pilot-rerun-dec", "DEC-103"]) == 1 and spy.calls == 2
+    assert H32.main([*argv, "--pilot-rerun-dec", "DEC-104"]) == 0 and spy.calls == 3
+
+
+def test_cli_dec101t2_n4_a_failed_panel_load_after_the_marker_also_needs_a_dec(e2e, shrunk, monkeypatch, tmp_path):
+    repo = tmp_path / "repo"
+    pinned = _pinned(repo)
+    monkeypatch.setattr(H32, "REPO_ROOT", repo)
+    monkeypatch.setattr(H32, "read_union_panel", lambda a: None)                                      # the loader fails loudly (logs, returns None)
+    argv = ["--pilot", *e2e["reg_args"], *RUNNER_ARGS, "--out", str(pinned)]
+    assert H32.main(argv) == 1
+    assert [p.name for p in pinned.iterdir()] == ["h32_pilot_attempt.json"]
+    spy = _env(monkeypatch, e2e["panel"], repo)
+    assert H32.main(argv) == 1 and spy.calls == 0                                                      # refused without a DEC
+    assert H32.main([*argv, "--pilot-rerun-dec", "DEC-105"]) == 0 and spy.calls == 1
+

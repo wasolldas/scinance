@@ -14,6 +14,13 @@ used by ``testrun.py`` and ``gate.py``), the technical exactly-one-pilot lock an
 (``checks.py``, ``schema.py``), the q95 rule and the report-only ``power_line`` (``estimators.frozen_q95``,
 ``estimators.end_power_replicates``, ``powerline.py``), and the PP3 dry run ``pp3.py`` (no IC).
 
+DEC-101 Teil 2 (Nachpruefung N-1..N-5) changes only rule texts and gates, no frozen constant: the positive control judges in production
+configuration with the scaled null (N-1, ``positive_control.py``) and aims its injection at target F (N-2, ``positive_control.
+injection_target_components``; mandatory pin ``null_mean_driftfree`` of the template), hand-over rule U-4 puts ``k_pred`` into the
+(1c) term (N-3, ``handover.py``, ``powerline.py``), ``--pilot`` writes an attempt marker before the panel is loaded (N-4,
+``checks.write_attempt_marker``), the gate refuses a payload without the ``null_scaling`` block (N-5, ``gate.py``) and the template
+documents the code commits of the Vorlauf and of the registration separately (N-5, ``vorlauf.py``).
+
 Modes (``scripts/h32_fm8.py``), every one of them gated before any data is read:
 
   * ``--prelaunch`` (``vorlauf.py``, ``nullsim.py``) -- Vorlauf v6, outcome-free: hard panel cut (``panel_cut.py``)

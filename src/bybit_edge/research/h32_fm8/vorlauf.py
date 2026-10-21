@@ -15,10 +15,16 @@ the artifact and of the template); the frozen ``q95`` is ``max(q95_1000, q95_100
 artifact carries the report-only ``power_line`` (E5, ``powerline.py``) and the ``runner`` arguments that determine the
 union-range fingerprint (E4, pinned by the template); the template header states that the W1 determinism control against v5e
 is dropped (E6, DEC-100 N1).
+
+DEC-101 Teil 2 (Nachpruefung N-1..N-5): the Vorlauf computes NO new constant -- the re-emit of the template from the same artifact
+changes only rule texts (rule U-4, the injection target F, ``fdr.p_formula``), adds the blocks ``positive_control.null_scaling`` /
+``inject_target_label``, the pin ``frozen_v6.null_mean_driftfree`` (already in ``frozen_v6`` of the artifact) and the documentation
+fields ``code_commit_prelaunch`` / ``code_commit_registration`` (N-5).  The power line uses rule U-4 with ``k_pred = 1`` (N-3).
 """
 from __future__ import annotations
 
 import json
+import re
 from pathlib import Path
 from typing import Any, Callable
 
@@ -228,9 +234,20 @@ def assemble_prelaunch(
     return core
 
 
-def build_template(report: dict[str, Any], *, bounce_spread: float) -> dict[str, Any]:
+def _commit_field(code_commit_prelaunch: str | None) -> str:
+    """DEC-101 Teil 2 (N-5): the value of ``code_commit_prelaunch`` (a hash given by the caller, else the explicit 'not given' marker)."""
+    if code_commit_prelaunch in (None, ""):
+        return C.CODE_COMMIT_PRELAUNCH_UNSET
+    val = str(code_commit_prelaunch).strip().lower()
+    if not re.fullmatch(r"[0-9a-f]{7,40}", val):
+        raise ValueError(f"--code-commit-prelaunch {code_commit_prelaunch!r} is not a git commit hash (7..40 hex characters)")
+    return val
+
+
+def build_template(report: dict[str, Any], *, bounce_spread: float, code_commit_prelaunch: str | None = None) -> dict[str, Any]:
     """Skeleton of ``state/registered/h32_v1.yaml`` (ERSTFASSUNG 11) from a Vorlauf v6 report.  The orchestrator reviews
-    and registers it; nothing is registered here."""
+    and registers it; nothing is registered here.  DEC-101 Teil 2 (N-5): the code commit of the Vorlauf (``code_commit_prelaunch``,
+    given by the caller) and the registration commit (``code_commit_registration``, set by the orchestrator) are documented separately."""
     wins = report["windows"]
     p = wins["P"]
     fps = report.get("data_fingerprints") or {}
@@ -265,6 +282,8 @@ def build_template(report: dict[str, Any], *, bounce_spread: float) -> dict[str,
 
     p_cal = p["calibration_report"]
     tpl: dict[str, Any] = {
+        "code_commit_prelaunch": _commit_field(code_commit_prelaunch),
+        "code_commit_registration": C.CODE_COMMIT_REGISTRATION_PLACEHOLDER,
         "hypotheses": {C.ENTRY[v]: {"hypothesis": C.HYPOTHESIS, "variant": v, "direction": C.DIRECTION[v]} for v in C.VARIANTS},
         "primary_statistic": C.PRIMARY_STATISTIC,
         "universe": {"rule": C.UNIVERSE_RULE, "label": C.UNIVERSE_LABEL,
@@ -275,7 +294,7 @@ def build_template(report: dict[str, Any], *, bounce_spread: float) -> dict[str,
         "seal": {"panel_cut_test": C.CUT_TEST, "panel_cut_pilot": C.CUT_PILOT, "stress_list_date_filter": True},
         "fdr": {
             "p_source": C.P_SOURCE, "p_statistic": C.P_STATISTIC, "sided": "one", "combine": "max_p",
-            "p_formula": "p = (1 + #{null replicate window means >= observed window mean, registered direction}) / (1 + R)",
+            "p_formula": C.P_FORMULA,                                           # DEC-101 Teil 2 (N-5): names the scaling (DEC-101 E2)
             "n_reps": int(pr["n_reps"]), "replicates_sha256": pr["file_sha256"],
             "replicates_cell": "per window and variant the drift cell (driftfree / 0.002) with the larger null mean",
             "report_only": list(C.P_REPORT_ONLY),
@@ -320,10 +339,11 @@ def build_template(report: dict[str, Any], *, bounce_spread: float) -> dict[str,
             "t_min": C.T_MIN, "prior_reading": "point",
             "se_T": "max(e_se_rule_W (v6), SE_W,Pilot)", "sd_T": "max(se_mean_W (v6), SE_W,Pilot)",
             "pilot_k_adjusted": "SE_W,Pilot = sqrt(max(1, c_real)) * sqrt(v_fm8_W + F2_real) / sqrt(w_judged_W)",
+            "k_pred": C.HANDOVER_K_PRED,                                         # DEC-101 Teil 2 (N-3)
             "null_mean_credit": "m* = max(0, m_P, m_W1, m_W2) in Richtung",
             "regime_function": "power_p1.assign_regime",
             "double_statement": ["power_p1.assign_regime_a3_practice", "mu_sel"],
-            "mu_sel": "Loesung von P_mu(X >= x_P | X >= c_v) = 0.5, X ~ N(mu, SE_P^2), c_v = max(MDE80*_U + m*, max_W(q95_W,v + z_80 * SD_T,W)) (U-3)",
+            "mu_sel": "Loesung von P_mu(X >= x_P | X >= c_v) = 0.5, X ~ N(mu, SE_P^2), " + C.HANDOVER_C_V,
             "on_fail": {"status": "gl012_pilot", "p_value": 1.0, "in_f_week_m": False},
             "result_lock": "--pilot-result + --pilot-result-sha256 im Testlauf; Uebergabe bitgleich nachgerechnet",
         },
@@ -336,7 +356,10 @@ def build_template(report: dict[str, Any], *, bounce_spread: float) -> dict[str,
             "calibration_seeds_injection": [min(C.PC_SEEDS_INJECT), max(C.PC_SEEDS_INJECT)],
             "calibration_seeds_world": [min(C.PC_SEEDS_SIGMA_G), max(C.PC_SEEDS_SIGMA_G)],
             "world_sd_target": "sqrt(v_fm8_W + max(F2_null_W, F2_real))",
-            "inject_target": "realisiert: z_krit * SE_T,W + 0.8416 * SD_T,W im bindenden Fenster",
+            "inject_target": C.PC_INJECT_TARGET,                                 # DEC-101 Teil 2 (N-2): injection target F
+            "inject_target_label": C.PC_INJECT_LABEL,
+            "inject_target_ref": C.PC_INJECT_REF,
+            "null_scaling": {"enabled": True, "rule": C.PC_NULL_SCALING_RULE, "ref": C.PC_NULL_SCALING_REF},   # DEC-101 Teil 2 (N-1)
             "criteria": {"sd_ratio_max": C.PC_SD_RATIO_MAX, "pass_share_min": C.PC_PASS_SHARE_MIN,
                          "neg_pass_max": C.PC_NEG_PASS_MAX, "injection_tolerance": C.PC_INJECT_JUDGE_TOL},
             "report_only": ["prd_sector_world_0375", "joint_c10_share"],
@@ -359,7 +382,11 @@ def template_yaml_text(template: dict[str, Any], report: dict[str, Any], *, sour
         f"# Stichtag des Panels im Vorlauf: {report['cut']['cut_date']}; result_sha256 des Vorlaufs: {report['result_sha256']}",
     ]
     if source_sha256:
-        header.append(f"# Quelle (Vorlauf-JSON) sha256: {source_sha256}")
+        header.append(f"# Quelle (Vorlauf-JSON) sha256: {source_sha256}")                 # the FULL prelaunch sha256 (DEC-101 Teil 2 (N-5))
+    # DEC-101 Teil 2 (N-5): the Vorlauf code commit and the registration commit are named SEPARATELY (fields of the same names below)
+    header.append(f"# Code-Commit des Vorlaufs (code_commit_prelaunch): {template.get('code_commit_prelaunch')}; "
+                  f"Registrierungs-Commit (code_commit_registration): {template.get('code_commit_registration')}")
+    header.append("# " + C.CODE_COMMIT_NOTE)
     ctl = report.get("w1_determinism_control")
     header.append("# " + C.W1_CONTROL_NOTE + (" [optionale v5e-Referenz: " + ("bestanden" if ctl["ok"] else "NICHT bestanden") + "]" if ctl else ""))
     header.append("# Universum " + C.UNIVERSE_RULE + " (DEC-101 E1): " + C.UNIVERSE_LABEL)

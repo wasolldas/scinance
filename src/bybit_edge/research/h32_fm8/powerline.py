@@ -4,7 +4,9 @@ Per window W and variant v, from the frozen v6 constants only (outcome-free; bef
 ``e_se_rule`` and the spread ``se_mean``, i.e. rule U with ``SE_W,Pilot`` not yet known):
 
   * ``MDE80_1b = z_krit * e_se_rule + z_80 * se_mean + max(0, null_mean)``     (condition (1b) with the null-mean credit)
-  * ``MDE80_1c = q95 + z_80 * se_mean``                                         (condition (1c))
+  * ``MDE80_1c = q95_eff(k_pred = 1) + z_80 * se_mean``                         (condition (1c) under the scaled null; DEC-101 Teil 2
+    (N-3), U-4: before the pilot ``k_pred = 1``, so ``q95_eff = max(0, m) + (q95 - m)`` = ``q95`` for ``m >= 0`` and
+    ``q95 + |m|`` for ``m < 0`` (rev_gap) -- no credit for a negative null mean)
   * ``MDE80_W  = max(MDE80_1b, MDE80_1c)``;  ``MDE80* = max_W MDE80_W``          (DEC-94 (3): max over the conditions)
   * ``m* = max(0, m_P, null_mean_W1, null_mean_W2)`` (rule U), ``MDE80*_U = max_W(z_krit * SE_T + z_80 * SD_T)`` (rule U
     unchanged) and the hand-over threshold on the pilot point ``x_P``:  ``c_v = MDE80*_U + m*``;
@@ -27,6 +29,7 @@ import numpy as np
 
 from . import constants as C
 from . import estimators as est
+from . import handover
 
 __all__ = ["build_power_line", "POWER_LINE_LABEL"]
 
@@ -49,7 +52,7 @@ def build_power_line(frozen: dict[str, dict[str, Any]], m_p: dict[str, float], d
             se_t, sd_t = float(fz["e_se_rule"][v]), float(fz["se_mean"][v])
             nm, q95 = float(fz["null_mean"][v]), float(fz["q95"][v])
             m1b = z * se_t + zp * sd_t + max(0.0, nm)
-            m1c = q95 + zp * sd_t
+            m1c = handover.term_1c(nm, 1.0, q95, sd_t, zp)      # DEC-101 Teil 2 (N-3): U-4 with k_pred = 1 (before the pilot; no gate here)
             per_w[wn] = {"se_t": se_t, "sd_t": sd_t, "null_mean": nm, "q95": q95, "mde80_1b": m1b, "mde80_1c": m1c,
                          "mde80_w": max(m1b, m1c), "binding_condition": "1c" if m1c > m1b else "1b",
                          "rule_u_component": z * se_t + zp * sd_t}
@@ -59,7 +62,7 @@ def build_power_line(frozen: dict[str, dict[str, Any]], m_p: dict[str, float], d
         threshold_u = mde80_u + m_star
         max_1c = max(w["mde80_1c"] for w in per_w.values())
         margin_1c = threshold_u - max_1c
-        c_v = max(threshold_u, max_1c)                      # U-3 (DEC-101 Teil 2): the hand-over threshold covers (1c) by construction
+        c_v = max(threshold_u, max_1c)                      # U-4 (DEC-101 Teil 2) at k_pred = 1: the hand-over threshold covers (1c) by construction
         windows_in = {wn: {"se_t": per_w[wn]["se_t"], "sd_t": per_w[wn]["sd_t"], "null_mean": per_w[wn]["null_mean"],
                            "q95": per_w[wn]["q95"], "draws": np.asarray(draws[wn][v], dtype=np.float64)} for wn in wnames}
         windows_na = {wn: {k: windows_in[wn][k] for k in ("se_t", "sd_t", "null_mean")} for wn in wnames}
@@ -78,7 +81,7 @@ def build_power_line(frozen: dict[str, dict[str, Any]], m_p: dict[str, float], d
             "handover_threshold_binding": "1c" if max_1c > threshold_u else "U",
             "rule_u_covers_1c": {"max_w_mde80_1c": max_1c, "margin": margin_1c, "covers": bool(margin_1c >= 0.0),
                                  "line": f"Regel U deckt (1c): Marge = Schwelle_U - max_W MDE80_1c = {margin_1c:.6f} "
-                                         f"(>= 0: {'ja' if margin_1c >= 0.0 else 'nein'}); U-3-Schwelle auf x_P = "
+                                         f"(>= 0: {'ja' if margin_1c >= 0.0 else 'nein'}); U-4-Schwelle (k_pred = 1) auf x_P = "
                                          f"max({threshold_u:.6f}, {max_1c:.6f}) = {c_v:.6f} (bindend {'1c' if max_1c > threshold_u else 'U'})"},
             "margin_against_gate_mde80_star": c_v - mde80_star,
             "end_power_after_f_week_replicates": end_rep,

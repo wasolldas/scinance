@@ -56,6 +56,11 @@ class PositiveControlAbort(H32Abort):
     """The positive control cannot be run (no handed variant, world cannot reach the target, ...)."""
 
 
+class GateError(H32Abort):
+    """DEC-101 Teil 2 (N-5): a gate payload that is not complete -- a window without the ``null_scaling`` block (the unscaled
+    ``k = 1`` fallback is forbidden in the test run and in the control) or with an incomplete block."""
+
+
 class UniverseError(H32Abort):
     """DEC-101 E1: a symbol outside the registered universe (linear USDT perpetuals) reached a calculation, or the universe
     pin of the registration differs from the rule / the numbers observed on the loaded panel."""

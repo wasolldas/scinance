@@ -23,8 +23,12 @@ das Panel liest, prueft vorher, dass seine CLI-Argumente --as-of / --start-year 
     Berechnet NIE eine reale Charakteristik-gegen-Outcome-IC.
 
   python scripts/h32_fm8.py --emit-template DIR/h32_prelaunch.json OUT.yaml [--spread-census scinance3-impl/state/runs/wp7_20260921/spread_census.json]
+        [--code-commit-prelaunch HASH]
     schreibt das Skelett von state/registered/h32_v1.yaml (kein Panel-Zugriff, keine Registrierung); neu (DEC-101): universe,
-    null_scaling, runner, pilot_window.out_dir, data_fingerprints.delisted_tree_sha256, q95_1000/q95_10000.
+    null_scaling, runner, pilot_window.out_dir, data_fingerprints.delisted_tree_sha256, q95_1000/q95_10000.  Neu (DEC-101 Teil 2,
+    Nachpruefung N-1..N-5): positive_control.null_scaling / inject_target (Ziel F) / inject_target_label, frozen_v6.null_mean_driftfree
+    (aus dem Vorlauf-Artefakt, keine Neuberechnung), Regel U-4 (handover_rule.version / Bedingung ii / k_pred), fdr.p_formula mit
+    Skalierung, code_commit_prelaunch (Option --code-commit-prelaunch) und code_commit_registration (setzt der Orchestrator).
 
   python scripts/h32_fm8.py --pp3-dry-run --registered Y.yaml --registered-sha256 SHA --panel-base ... --delisted-base ... --out DIR
         --as-of ... --start-year ... --end-year ... [--allow-partial]
@@ -38,14 +42,18 @@ das Panel liest, prueft vorher, dass seine CLI-Argumente --as-of / --start-year 
     Stufe P (Schaetzung, nicht urteilstragend): Startsperre (sha256 der YAML), Genau-ein-Pilot-Sperre (ein zweiter Lauf nur mit
     --pilot-rerun-dec nach nachgewiesenem Code-/Datenfehler per DEC; kein Force-Flag; DEC-101 E3: --out MUSS das in der YAML
     gepinnte pilot_window.out_dir sein, und jede h32_pilot*.json unter scinance3-impl/state/runs/ mit gleichem registered_sha256
-    sperrt den Lauf, wo immer sie liegt), Panel-Schnitt <= 2024-06-30, je Variante
+    sperrt den Lauf, wo immer sie liegt; DEC-101 Teil 2 (N-4): VOR dem Laden des Panels schreibt der Lauf h32_pilot_attempt.json
+    (registered_sha256, UTC-Zeitstempel, Modus, Prefix) in das gepinnte Verzeichnis -- der Marker zaehlt wie ein Ergebnis, ein zweiter
+    Lauf nach einem Abbruch braucht --pilot-rerun-dec), Panel-Schnitt <= 2024-06-30, je Variante
     x_P, SE_P (P-1 (4)), t_P, 80-%-Band, Uebergaberegel U (mechanisch), mu_sel als Pflicht-Doppelausweis, DEC-53-Artefakte,
     h32_pilot.json + sha256. rc 0 auch bei "GL-012 (Pilot)" (kein Eintrag uebergeben ist ein Ergebnis); rc 1 bei jedem Abbruch.
 
   python scripts/h32_fm8.py --positive-control --registered Y.yaml --registered-sha256 SHA --pilot-result h32_pilot.json
         --pilot-result-sha256 SHA --panel-base ... --delisted-base ... --out DIR
     PRD 3.3.8, ALLEIN und VOR dem Test: synthetische Renditen auf der realen Wochenform von W1/W2 (nur Wochenraster, PIT-Masken,
-    returns_valid; Panel <= 2026-06-28), Welt an F2_real kalibriert, Injektion auf den REALISIERTEN Effekt, Urteils-Seeds 53..252.
+    returns_valid; Panel <= 2026-06-28), Welt an F2_real kalibriert, Injektion auf den REALISIERTEN Effekt (Ziel F, DEC-101 Teil 2
+    (N-2): max((1b)-Term, (1c)-Term unter der skalierten Null bei k_pred)), Urteils-Seeds 53..252, Gate-Kette mit der skalierten
+    Null wie im Testlauf (N-1: k je Seed aus der Wochen-SD der synthetischen Serie gegen sd_week; k im Artefakt).
     rc 0 nur bei BESTANDEN, 3 bei NICHT BESTANDEN, 1 bei Abbruch.
 
   python scripts/h32_fm8.py --run --registered Y.yaml --registered-sha256 SHA --pilot-result h32_pilot.json --pilot-result-sha256 SHA
@@ -269,7 +277,8 @@ def cmd_prelaunch(a: argparse.Namespace) -> int:
     return 0
 
 
-def cmd_emit_template(prelaunch_json: str, out_yaml: str, spread_census: str = DEFAULT_SPREAD_CENSUS) -> int:
+def cmd_emit_template(prelaunch_json: str, out_yaml: str, spread_census: str = DEFAULT_SPREAD_CENSUS,
+                      code_commit_prelaunch: str = "") -> int:
     src = Path(prelaunch_json)
     dst = Path(out_yaml)
     if "data/harvest" in dst.as_posix():
@@ -285,7 +294,7 @@ def cmd_emit_template(prelaunch_json: str, out_yaml: str, spread_census: str = D
     try:
         spread = read_bounce_spread(census)
         report = json.loads(src.read_text(encoding="utf-8"))
-        template = vorlauf.build_template(report, bounce_spread=spread)
+        template = vorlauf.build_template(report, bounce_spread=spread, code_commit_prelaunch=code_commit_prelaunch or None)
         text = vorlauf.template_yaml_text(template, report, source_sha256=artifacts.sha256_file(src))
     except (ValueError, KeyError, json.JSONDecodeError) as exc:
         log(f"FEHLER (Vorlage): {exc}")
@@ -294,6 +303,9 @@ def cmd_emit_template(prelaunch_json: str, out_yaml: str, spread_census: str = D
     dst.write_text(text, encoding="utf-8")
     log(f"Quelle: {src} sha256={artifacts.sha256_file(src)}")
     log(f"Registrierungs-Vorlage geschrieben: {dst} sha256={artifacts.sha256_file(dst)}")
+    if not code_commit_prelaunch:
+        log("HINWEIS (DEC-101 Teil 2 (N-5)): --code-commit-prelaunch <hash> nicht angegeben -- code_commit_prelaunch bleibt 'nicht angegeben'; "
+            "code_commit_registration setzt der Orchestrator.")
     log("Pruefung Pflicht: alle Werte, Uebergaberegel U und die Fingerprints vor der Registrierung bestaetigen (Registrierung nur durch den Orchestrator).")
     return 0
 
@@ -314,15 +326,24 @@ def cmd_pilot(a: argparse.Namespace) -> int:
         return 1
     if not check_runner(a, registered):
         return 1
+    try:                                    # DEC-101 Teil 2 (N-4): the attempt marker, directly BEFORE the panel is loaded
+        marker = checks.write_attempt_marker(a.out, sha, rerun, mode="pilot")
+    except (H32Abort, OSError, ValueError) as exc:
+        log(f"FEHLER (Versuchsmarker): {exc}\nKEINE UEBERGABE.")
+        return 1
+    note = (f"Der Versuchsmarker {marker['name']} bleibt in {a.out}: ein zweiter Lauf braucht --pilot-rerun-dec DEC-nn "
+            "(DEC-101 Teil 2 (N-4)).")
+    log(f"[Versuchsmarker geschrieben] {marker['file']} ({marker['attempt_utc']}) -- {note}")
     loaded = load_union_panel(a)
     if loaded is None:
+        log(note)
         return 1
     panel, observed, urep = loaded
     try:
         report = pilot_mod.run_pilot(panel, registered, observed, registered_sha256=sha, universe_report=urep, log=log)
         written = pilot_mod.write_pilot_artifacts(a.out, report, registered, rerun)
     except (H32Abort, ValueError) as exc:
-        log(f"FEHLER ({type(exc).__name__}): {exc}\nKEINE UEBERGABE.")
+        log(f"FEHLER ({type(exc).__name__}): {exc}\nKEINE UEBERGABE.\n{note}")
         return 1
     for v in C.VARIANTS:
         s, h = report["variants"][v]["stats"], report["variants"][v]["handover"]
@@ -491,6 +512,8 @@ def build_parser() -> argparse.ArgumentParser:
     ap.add_argument("--emit-template", nargs=2, default=None, metavar=("PRELAUNCH_JSON", "OUT_YAML"),
                     help="Skelett von state/registered/h32_v1.yaml aus einem Vorlauf-v6-Artefakt (kein Panel-Zugriff)")
     ap.add_argument("--spread-census", default=DEFAULT_SPREAD_CENSUS, help="WP-7-Spread-Zensus fuer rules.bounce_spread (Dezil D10)")
+    ap.add_argument("--code-commit-prelaunch", default="", help="nur mit --emit-template (DEC-101 Teil 2 (N-5)): Commit-Hash (7..40 hex), "
+                                                                "mit dem der Vorlauf gerechnet wurde (v6b: 6e4b447); Feld code_commit_prelaunch")
     ap.add_argument("--registered", default="", help="Pfad zur registrierten YAML (h32_v1.yaml)")
     ap.add_argument("--registered-sha256", default="", help="sha256 der --registered-Datei (Startsperre)")
     ap.add_argument("--pilot-result", default="", help="h32_pilot.json (Pilot-Sperre fuer --run / --positive-control)")
@@ -533,7 +556,7 @@ def main(argv: list[str] | None = None) -> int:
     if a.emit_template is not None:
         if a.prelaunch or a.pilot or a.run or a.positive_control or a.pp3_dry_run:
             ap.error("--emit-template ist ein eigenstaendiger Modus")
-        return cmd_emit_template(*a.emit_template, spread_census=a.spread_census)
+        return cmd_emit_template(*a.emit_template, spread_census=a.spread_census, code_commit_prelaunch=a.code_commit_prelaunch)
     modes = [a.prelaunch, a.pilot, a.positive_control, a.run, a.pp3_dry_run]
     if sum(map(bool, modes)) != 1:
         ap.error("genau EINEN Modus waehlen: --prelaunch, --pilot, --positive-control, --run, --pp3-dry-run oder --emit-template")

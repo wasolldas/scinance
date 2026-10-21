@@ -240,10 +240,12 @@ def test_t0_by_threshold_harmonic_number_and_end_power_reproduce_the_herleitung(
 # ============================================================================
 
 def _consts(m_p=0.0005, null_mean=(0.0009, 0.0005), e_se=(0.0079, 0.0064), se_mean=(0.0079, 0.0064), v_fm8=(0.0025, 0.0020),
-            q95=(0.0110, 0.0095)):
-    # q95 small enough that the U component binds in the base case (U-3, DEC-101 Teil 2: threshold = max(U + m*, q95 + z_80 SD_T))
+            q95=(0.0110, 0.0095), sd_week=(0.10, 0.10)):
+    # q95 small enough that the U component binds in the base case (U-3/U-4, DEC-101 Teil 2: threshold = max(U + m*, (1c) term)).
+    # DEC-101 Teil 2 (N-3): rule U-4 reads sd_week (k_pred = max(1, sqrt(v_fm8 + F2_real) / sd_week)); the default 0.10 keeps k_pred = 1
+    # for the F2_real values of these tests (sqrt(0.0025 + 0.00026) = 0.0525), so the earlier numbers of U-3 are unchanged.
     wins = {wn: {"v_fm8": v_fm8[i], "e_se_rule": e_se[i], "se_mean": se_mean[i], "null_mean": null_mean[i], "w_judged": (52, 50)[i],
-                 "q95": q95[i]}
+                 "q95": q95[i], "sd_week": sd_week[i]}
             for i, wn in enumerate(("W1", "W2"))}
     return {"windows": wins, "m_p": m_p, "z_krit": C.Z_KRIT, "z_power": C.Z_POWER, "t_min": 2.0}
 
@@ -315,13 +317,20 @@ def test_t4_handover_is_pure_and_monotone():
 # gate (T4 on a conserved payload), F-WEEK / BH
 # ============================================================================
 
+def _k1(q95):
+    """DEC-101 Teil 2 (N-5): the gate refuses a payload without the ``null_scaling`` block.  This block is the explicit k = 1 case with
+    m = 0 (``sd_real = sd_week``): ``q95_eff = q95`` exactly, i.e. the arithmetic these tests were written for (the unscaled fallback
+    of the gate is gone)."""
+    return {"sd_real": 0.05, "sd_week": 0.05, "m": 0.0, "q95_frozen": q95}
+
+
 def _payload(y1=0.040, y2=0.035, se1=0.010, se2=0.009, q1=0.017, q2=0.015, ceil=0.0085, bounce=(None, None), variant="mom1"):
     thr = lambda e_se, nm: C.Z_KRIT * e_se + max(0.0, nm)                                          # noqa: E731
     return {"entry": f"H-32_{variant}", "variant": variant, "direction": C.DIRECTION[variant], "z_krit": C.Z_KRIT,
             "windows": {"W1": {"y": y1, "mean_ic": y1 if variant != "rev_gap" else -y1, "se_w": se1, "q95": q1, "ceiling_k4": ceil,
-                               "threshold_frozen": thr(0.0105, 0.0009), "bounce_ic": bounce[0], "w_judged": 52},
+                               "threshold_frozen": thr(0.0105, 0.0009), "bounce_ic": bounce[0], "w_judged": 52, "null_scaling": _k1(q1)},
                         "W2": {"y": y2, "mean_ic": y2 if variant != "rev_gap" else -y2, "se_w": se2, "q95": q2, "ceiling_k4": ceil,
-                               "threshold_frozen": thr(0.0085, 0.0005), "bounce_ic": bounce[1], "w_judged": 50}}}
+                               "threshold_frozen": thr(0.0085, 0.0005), "bounce_ic": bounce[1], "w_judged": 50, "null_scaling": _k1(q2)}}}
 
 
 def test_t4_gate_arithmetic_on_a_conserved_payload_is_pure():
@@ -409,7 +418,7 @@ def test_t5_emitted_template_validates_and_pins_equal_the_code_constants(reg_bun
     assert reg["z_krit"] == round(C.Z_KRIT, 7) and reg["alpha"] == 0.05 and reg["mde_faktor"] == 2.4865
     for key in ("pilot_window", "handover_rule", "fweek_counting", "fdr", "seal", "windows", "positive_control", "beta_control", "rules"):
         assert key in reg
-    assert reg["handover_rule"]["version"] == "U-3" and reg["fdr"]["n_perm"] == C.N_PERM and reg["fdr"]["over_family"]["double_statement_m"] == 11
+    assert reg["handover_rule"]["version"] == "U-4" == C.HANDOVER_VERSION and reg["fdr"]["n_perm"] == C.N_PERM and reg["fdr"]["over_family"]["double_statement_m"] == 11
     for wn in ("W1", "W2"):
         fz = reg["windows"][wn]["frozen_v6"]
         for key in schema.FROZEN_VARIANT_KEYS:
@@ -774,9 +783,11 @@ def test_t6_the_a3_code_is_only_imported_never_changed():
 
 def test_u3_threshold_covers_condition_1c_and_binds_when_q95_is_large():
     """DEC-101 Teil 2 (U-3, Review A-4): the hand-over threshold on x_P is max(m* + MDE80*_U, max_W(q95 + z_80 SD_T)); with a
-    large frozen q95 the (1c) term binds, the pilot point below it is NOT handed over although it clears the U component."""
+    large frozen q95 the (1c) term binds, the pilot point below it is NOT handed over although it clears the U component.
+    Since U-4 (N-3) the term is max(0, m) + k_pred (q95 - m) + z_80 SD_T; the ``_consts`` of this file keep ``k_pred = 1`` and
+    ``m >= 0``, where U-4 is U-3 bit for bit (checked in ``test_h32_dec101_part2.py``), so this test is unchanged."""
     base = handover.evaluate_handover(_inputs(x_p=0.04), _consts())
-    assert base["rule_version"] == "U-3" and base["threshold_binding"] == "U"
+    assert base["rule_version"] == "U-4" and base["threshold_binding"] == "U"          # DEC-101 Teil 2 (N-3): U-4 = U-3 at k_pred = 1, m >= 0
     assert base["threshold_on_point"] == pytest.approx(max(base["threshold_u"], base["threshold_1c"]))
     assert base["threshold_u"] == pytest.approx(base["mde80_star"] + base["m_star"])
     big = _consts(q95=(0.030, 0.028))

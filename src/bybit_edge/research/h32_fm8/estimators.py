@@ -17,7 +17,7 @@ from . import constants as C
 
 __all__ = ["se_rule", "pilot_statistics", "signed_selection_ceiling", "mu_sel", "mu_sel_detail", "end_power",
            "end_power_replicates", "by_threshold", "harmonic_number", "bootstrap_means_sha256", "series_sha256",
-           "scale_factor", "q95_effective", "scaled_replicates", "frozen_q95"]
+           "scale_factor", "q95_effective", "scaled_replicates", "frozen_q95", "k_pred"]
 
 _N = NormalDist()
 
@@ -222,11 +222,22 @@ def scale_factor(sd_real: float, sd_week: float) -> float:
 
 def q95_effective(m: float, k: float, q95: float) -> float:
     """DEC-101 E2: ``q95_eff = max(0, m) + k * (q95 - m)`` with ``m`` the frozen null mean of the binding cell.  ``k = 1`` and
-    ``m >= 0`` reproduce ``q95``; for ``m < 0`` (rev_gap) the result is ``k * (q95 + |m|) >= q95`` -- no credit for a negative
+    ``m >= 0`` reproduce ``q95`` bit for bit (DEC-101 Teil 2 (N-3): U-4 and U-3 agree to the last digit at ``k_pred = 1``); for ``m < 0`` (rev_gap) the result is ``k * (q95 + |m|) >= q95`` -- no credit for a negative
     null mean.  NaN if an input is not finite."""
     if not (_is_fin(m) and _is_fin(k) and _is_fin(q95)):
         return float("nan")
+    if float(k) == 1.0 and float(m) >= 0.0:         # DEC-101 Teil 2 (N-3): m + (q95 - m) need not round to q95 -- return q95 bit for bit
+        return float(q95)
     return max(0.0, float(m)) + float(k) * (float(q95) - float(m))
+
+
+def k_pred(v_fm8: float, f2_real: float, sd_week: float) -> float:
+    """DEC-101 Teil 2 (N-2, N-3): ``k_pred,W = max(1, sqrt(v_fm8_W + F2_real) / sd_week_W,v)`` -- the pilot's prediction of the scale factor
+    of the test run (the weekly SD the control world is calibrated on, divided by the frozen null SD).  Never below 1; NaN (callers
+    fail closed) if an input is not finite, ``v_fm8 + F2_real`` is negative or ``sd_week`` is not positive."""
+    if not (_is_fin(v_fm8) and _is_fin(f2_real)) or float(v_fm8) + float(f2_real) < 0.0:
+        return float("nan")
+    return scale_factor(math.sqrt(float(v_fm8) + float(f2_real)), sd_week)
 
 
 def scaled_replicates(draws: Sequence[float] | np.ndarray, m: float, k: float) -> np.ndarray:
@@ -235,6 +246,8 @@ def scaled_replicates(draws: Sequence[float] | np.ndarray, m: float, k: float) -
     d = np.asarray(draws, dtype=np.float64)
     if not (_is_fin(m) and _is_fin(k)):
         return np.full(d.shape, np.nan)
+    if float(k) == 1.0 and float(m) >= 0.0:         # DEC-101 Teil 2 (N-3): the same exact identity as in q95_effective (gate and p agree)
+        return d.copy()
     return max(0.0, float(m)) + float(k) * (d - float(m))
 
 
