@@ -19,6 +19,7 @@ import pyarrow.parquet as pq
 import pytest
 
 from bybit_edge.research.h32_fm8 import artifacts, checks, delisted_tree as dt, schema
+from bybit_edge.research.wp7_universe import bybit_rest
 from bybit_edge.research.h32_fm8.errors import DataFingerprintError, DelistedTreeError
 from bybit_edge.research.wp7_universe import panel_load, panel_store
 
@@ -354,6 +355,21 @@ def test_reader_identical_duplicates_are_counted_and_differing_ones_are_loud(tmp
              ("AAAUSDT", {"symbol": "AAAUSDT", "fundingRate": "0.0002", "fundingRateTimestamp": str(_ms(d))})]
     with pytest.raises(DelistedTreeError, match="DIFFERENT"):
         dt.read_funding(_mini(tmp_path / "d", [("AAAUSDT", _k("2022-03-10"))], f_bad), ["AAAUSDT"])
+
+
+def test_reader_accepts_the_named_kline_layout_of_the_harvest_rest_partitions(tmp_path):
+    """``bybit/rest.kline1d`` stores the kline as a dict with named fields (startTime, openPrice, ...) and the symbol inside
+    the payload; the positional API row stays accepted; a payload symbol that differs from the column is loud."""
+    d = date(2022, 3, 10)
+    named = {"symbol": "AAAUSDT", "category": "linear", "interval": "D", "startTime": str(_ms(d)), "openPrice": "1.0",
+             "highPrice": "2.0", "lowPrice": "0.5", "closePrice": "1.5", "volume": "5.0", "turnover": "7.0"}
+    out, stat = dt.read_klines(_mini(tmp_path / "named", [("AAAUSDT", named), ("BBBUSDT", _k("2022-03-10", "9.0"))]), ["AAAUSDT", "BBBUSDT"])
+    assert out["AAAUSDT"][_ms(d)] == bybit_rest.parse_kline_rows([_k("2022-03-10")])[0]
+    assert out["BBBUSDT"][_ms(d)]["close"] == 9.0 and stat["n_rows"] == 2
+    with pytest.raises(dt.DelistedTreeError, match="payload symbol"):
+        dt.read_klines(_mini(tmp_path / "wrong", [("CCCUSDT", named)]), ["CCCUSDT"])
+    with pytest.raises(dt.DelistedTreeError, match="named fields"):
+        dt.read_klines(_mini(tmp_path / "lack", [("AAAUSDT", {k: v for k, v in named.items() if k != "closePrice"})]), ["AAAUSDT"])
 
 
 def test_reader_layout_errors_are_loud(tmp_path):

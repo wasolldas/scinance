@@ -4,8 +4,10 @@ The union panel of the first build lacked 45 delisted linear USDT perps (survivo
 Data-Harvest delivers (a) the register ``state/data_harvest_delisting_register_*.csv`` (symbol, category, contractType,
 baseCoin, quoteCoin, settleCoin, launch_day, last_trading_day [, announcement_day]) and (b) backfill partitions of the
 streams ``rest.kline1d`` and ``rest.fundingRateAll`` (one partition per day, ``symbol=ALL``, container schema with the
-columns ``symbol`` and ``payload_json``: the Bybit API row as strings -- kline ``[startTime, open, high, low, close, volume,
-turnover]``, funding ``{symbol, fundingRate, fundingRateTimestamp}``).  This module reads those partitions from a LOCAL
+columns ``symbol`` and ``payload_json``: the Bybit API row as strings -- kline either positional ``[startTime, open, high,
+low, close, volume, turnover]`` or, as the Data-Harvest REST partitions store it, NAMED ``{symbol, category, interval,
+startTime, openPrice, highPrice, lowPrice, closePrice, volume, turnover}``; funding ``{symbol, fundingRate,
+fundingRateTimestamp}``).  This module reads those partitions from a LOCAL
 directory (the orchestrator loads them with the Harvest client; nothing here touches the network or ``data/harvest``) and
 writes a tree in exactly the layout of ``wp7_universe.panel_store`` (``frozen/source=bybit/category=linear/symbol=S/year=Y/
 part.parquet`` + ``panel_manifest.sqlite``) that replaces the old ``--delisted-base``, plus ``delisting_dates.json``
@@ -155,6 +157,25 @@ def _read_symbol_payload(path: Path) -> list[tuple[str | None, str]]:
     return list(zip(cols["symbol"], cols["payload_json"]))
 
 
+#: NAMED kline fields of the Data-Harvest REST partitions (``bybit/rest.kline1d``), in the positional order of
+#: ``bybit_rest.KLINE_ROW_FIELDS`` ([sek] Bybit v5 ``GET /v5/market/kline`` field semantics; the partition writer names them).
+KLINE_NAMED_FIELDS: tuple[str, ...] = ("startTime", "openPrice", "highPrice", "lowPrice", "closePrice", "volume", "turnover")
+
+
+def _kline_payload_as_row(obj: Any, sym: str | None, path: Path) -> list[Any]:
+    """A kline payload as the positional row ``parse_kline_rows`` expects: a list is passed through; a dict with the NAMED
+    fields is reordered (its ``symbol`` field, when present, must equal the column symbol -- loud otherwise)."""
+    if isinstance(obj, dict):
+        name = obj.get("symbol")
+        if name not in (None, "") and name != sym:
+            raise DelistedTreeError(f"{path}: kline row of column symbol {sym} carries the payload symbol {name}")
+        missing = [f for f in KLINE_NAMED_FIELDS if f not in obj]
+        if missing:
+            raise DelistedTreeError(f"{path}: kline row of {sym} lacks the named fields {missing}")
+        return [obj[f] for f in KLINE_NAMED_FIELDS]
+    return obj
+
+
 def read_klines(root: Path | str, wanted: Iterable[str]) -> tuple[dict[str, dict[int, dict[str, Any]]], dict[str, Any]]:
     """``{symbol: {start_ms: {start_ms, open, high, low, close, volume, turnover}}}`` of the ``wanted`` symbols from the
     ``rest.kline1d`` partitions below ``root``, plus read statistics.  Rows of other symbols are only counted."""
@@ -173,7 +194,7 @@ def read_klines(root: Path | str, wanted: Iterable[str]) -> tuple[dict[str, dict
                 skipped[sym] += 1
                 continue
             try:
-                rec = bybit_rest.parse_kline_rows([json.loads(payload)])[0]
+                rec = bybit_rest.parse_kline_rows([_kline_payload_as_row(json.loads(payload), sym, path)])[0]
             except (json.JSONDecodeError, TypeError, bybit_rest.BybitFieldLayoutError) as exc:
                 raise DelistedTreeError(f"{path}: kline row of {sym} does not follow the Bybit layout ({exc})") from exc
             if rec["start_ms"] % _DAY_MS != 0:
