@@ -1,0 +1,117 @@
+{
+ "cuts": {
+  "pilot": {
+   "cut_date": "2024-06-30",
+   "last_week": "2024-06-24",
+   "max_date": "2024-06-30",
+   "n_days_removed": 810,
+   "n_symbols": 407,
+   "n_weeks": 183
+  },
+  "test": {
+   "cut_date": "2026-06-28",
+   "last_week": "2026-06-22",
+   "max_date": "2026-06-28",
+   "n_days_removed": 82,
+   "n_symbols": 882,
+   "n_weeks": 287
+  }
+ },
+ "data_fingerprints": {
+  "delisted_tree_sha256": "250a923b5c04f18025f9a7ffc72dbbd3b08b75e44bbcd38876b8effa6427e401",
+  "delisting_dates_sha256": "c1306c561246a684a29b166bc0a8663f2345a0a21e5798ea7e2a7a823bbaf1f3",
+  "delisting_register_sha256": "a28c7eb73c586895f710511a73ca58d33570c283397ff356a5dff46c4d639b22",
+  "union_range_detail": {
+   "as_of": "2026-09-28",
+   "n_partitions": 5940,
+   "n_symbols": 1182,
+   "year_range": [
+    2021,
+    2026
+   ]
+  },
+  "union_range_fingerprint": "e503bedb388cf8aaa9f3f28735cc4d83a659528447d95d027476027a4cb0c589"
+ },
+ "mode": "pp3_dry_run",
+ "not_computed": [
+  "ic",
+  "raw_ic",
+  "lag_profile",
+  "beta_calibration_ic"
+ ],
+ "note": "no IC was computed: weekly arrays, characteristics and PIT betas only (DEC-101 E6)",
+ "ok": true,
+ "registered_sha256": "a3079cf93657c58eed0737972f15ee864ea649442eac33e84557fab4f2cebbe9",
+ "result_sha256": "b3f28b8f45ce7f26d9e31fe29f1075656831d4b094ae0a9cef88e4322c8f494a",
+ "runner": {
+  "allow_partial": true,
+  "as_of": "2026-09-28",
+  "end_year": 2026,
+  "start_year": 2021
+ },
+ "schema": "H-32 PP3 dry run (DEC-101 E6)",
+ "universe": {
+  "excluded": {
+   "dated_future": 48,
+   "other": 0,
+   "usdc_perp": 68
+  },
+  "excluded_sha256": "50aaee3c1e63d560b69a7aa42748abdea0e0cf742f6ff3f618e6f00c54083098",
+  "n_after": 1066,
+  "n_before": 1182,
+  "rule": "linear_usdt_perpetual"
+ },
+ "windows": {
+  "P": {
+   "error": null,
+   "first_formation_week": "2022-04-18",
+   "k_alive": {
+    "max": 339,
+    "median": 206.0,
+    "min": 126
+   },
+   "k_fm8_series_ok": true,
+   "k_fm8_series_sha256": "4a2f09376d8e4b81f735076fea2747f8096ea19c8f7899b9b27dfbce59390012",
+   "last_formation_week": "2024-06-17",
+   "ok": true,
+   "pinned_k_fm8_series_sha256": "4a2f09376d8e4b81f735076fea2747f8096ea19c8f7899b9b27dfbce59390012",
+   "w_judged": 114,
+   "window": "P",
+   "window_pins_ok": true
+  },
+  "W1": {
+   "error": null,
+   "first_formation_week": "2024-07-01",
+   "k_alive": {
+    "max": 500,
+    "median": 416.5,
+    "min": 343
+   },
+   "k_fm8_series_ok": true,
+   "k_fm8_series_sha256": "f35fb20b65144169a53a7e9d1784fa88d7f7acfe75b0406b359bb57b3e1f9cc1",
+   "last_formation_week": "2025-06-23",
+   "ok": true,
+   "pinned_k_fm8_series_sha256": "f35fb20b65144169a53a7e9d1784fa88d7f7acfe75b0406b359bb57b3e1f9cc1",
+   "w_judged": 52,
+   "window": "W1",
+   "window_pins_ok": true
+  },
+  "W2": {
+   "error": null,
+   "first_formation_week": "2025-07-07",
+   "k_alive": {
+    "max": 545,
+    "median": 526.0,
+    "min": 501
+   },
+   "k_fm8_series_ok": true,
+   "k_fm8_series_sha256": "6b69b6f7bbd0505510f37c9cd853bbf19339f5aa36294978aaedcb1e5f574795",
+   "last_formation_week": "2026-06-15",
+   "ok": true,
+   "pinned_k_fm8_series_sha256": "6b69b6f7bbd0505510f37c9cd853bbf19339f5aa36294978aaedcb1e5f574795",
+   "w_judged": 50,
+   "window": "W2",
+   "window_pins_ok": true
+  }
+ }
+}
