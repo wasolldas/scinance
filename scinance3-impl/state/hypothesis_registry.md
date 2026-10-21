@@ -1221,3 +1221,7 @@ data_fingerprints: ["panel_export 03dc0e7cfce96737c31cd6d59bce1767f1bb112a74ac53
 bedingung_welle_1: [WP-7 B2, WP-12b, WP-13a v5d, WP-13a v5e, Delisted-Baum v2 (DEC-100 N1), DEC-101 Teil 1, Vorlauf v6b x2, PP3-Trockenprobe]
 etiketten: ["zugelassen nur durch DEC-99 (Pilot-Prior)", "C.17 (Abschnitt 3)", "fm8-Skala (Daempfung ~25 %)", "beschlossen nach GL-032..034", "Universum bereinigt (Strenge, DEC-101 E1)", "Regel U-4 (Strenge, DEC-101 Teil 2)", "Positivkontrolle korrigiert (DEC-94 (3), DEC-101 Teil 2)"]
 ```
+
+### Nachtrag H-32 (2026-10-21, nach dem Pilot) - append-only
+- **Status: GL-012 (Pilot) fuer H-32_mom1, H-32_mom2, H-32_mom4, H-32_rev_gap (GL-035, DEC-101 Teil 3).** Pilot genau einmal gelaufen (`state/runs/h32_pilot_v1/`, result_sha256 8b63a56eb0a68afb0748f84806b9f491f75f09ac8d980063cdfb8c4893e69627); keine Uebergabe (x_P -0,0385 / -0,0500 / -0,0446 / +0,0167 in Richtung; Schwellen 0,0423 / 0,0458 / 0,0501 / 0,0363); kein Test, keine Positivkontrolle, kein Verdikt; p = 1 im BH-Nenner 4, nicht in m von F-WEEK; W1/W2 blind. Pilotabschnitt verbraucht (DEC-99 (5)).
+

@@ -54,3 +54,20 @@ _(noch keine Eintraege)_
 - Akte: DEC-95, DEC-96 (Nachtraege 1-3), DEC-97; Reviewer: ZUSTIMMUNG MIT AUFLAGEN.
 
 - **Vermerk 2026-10-21 (Erratum-Etikett, DEC-101 Teil 1; keine Neubewertung):** Die Nuisance-Rechnungen hinter GL-032 (Positivkontrolle A3 v5e), GL-033 (A1) und GL-034 (H-27, Panel-Schluesse) nutzten den Ueberlebenden-Baum einschliesslich 68 USDC-Perpetuals (Zwillinge der USDT-Perps) und datierter Futures (Gate-Review Registrierung H-32, B-1). Die Feststellungen bleiben bestehen; das Universum der kuenftigen H-32-Rechnungen ist auf lineare USDT-Perps eingeschraenkt.
+
+### GL-035 · H-32 (A3-fm8, Zweistufen-Design): GL-012 (Pilot) fuer alle vier Varianten - keine Uebergabe, kein Test, W1/W2 bleiben blind (2026-10-21, DEC-101 Teil 3)
+- **Lauf:** `scripts/h32_fm8.py --pilot` genau einmal (DEC-99 (3), DEC-101 E10), registrierte Datei `state/registered/h32_v1.yaml` sha256 0fadda78..., Versuchsmarker 2026-10-21T20:33:05Z, Panel-Schnitt 2024-06-30, Universum lineare USDT-Perps (1.182 -> 1.066), Fenster P 2022-04-18..2024-06-24, w_pilot 114, K 126/206/339; Artefakte `state/runs/h32_pilot_v1/` (result_sha256 8b63a56eb0a68afb0748f84806b9f491f75f09ac8d980063cdfb8c4893e69627, h32_pilot.json sha256 be20a826...). Orchestrator-Nachrechnung aus den Wochenreihen: x_P, SD_P, SE_P bitgleich (W = 114 je Variante).
+- **Ergebnis (Regel U-4, mechanisch):**
+
+| Variante | x_P (in Richtung) | SD_P | SE_P | t_P | 80-%-Band | F2_real | k_pred W1/W2 | Schwelle auf x_P (U-4) | (i)/(ii)/(iii) | Status |
+|---|---:|---:|---:|---:|---|---:|---|---:|---|---|
+| mom1 | -0,03847 | 0,12351 | 0,01157 | -3,33 | [-0,0533, -0,0236] | 0,01033 | 2,20 / 2,49 | 0,04229 | nein/nein/nein | GL-012 (Pilot) |
+| mom2 | -0,05003 | 0,13015 | 0,01219 | -4,10 | [-0,0657, -0,0344] | 0,01202 | 2,11 / 2,45 | 0,04583 | nein/nein/nein | GL-012 (Pilot) |
+| mom4 | -0,04463 | 0,13415 | 0,01256 | -3,55 | [-0,0607, -0,0285] | 0,01307 | 1,88 / 2,23 | 0,05005 | nein/nein/nein | GL-012 (Pilot) |
+| rev_gap | +0,01667 | 0,11611 | 0,01088 | +1,53 | [+0,0027, +0,0306] | 0,00856 | 2,05 / 2,30 | 0,03629 | ja/nein/nein | GL-012 (Pilot) |
+
+- **Feststellung:** keine Variante erfuellt die registrierte Uebergaberegel; H-32 endet als GL-012 (Pilot) mit gemessenem Grund. Es gibt keinen Testlauf, keine Positivkontrolle und kein Verdikt; W1 und W2 bleiben fuer A3-fm8 blind (keine reale IC je berechnet). p = 1 je Eintrag im BH-Nenner 4; H-32 zaehlt nicht in m von F-WEEK (DEC-99 (7)). Der Pilotabschnitt 2022-04-18..2024-06-24 ist fuer jede mit dem fm8-IC korrelierte Statistik verbraucht (DEC-99 (5)).
+- **Gesehen (C.17, nur Pilotfenster):** x_P, SD_P, Bootstrap-SE, F2_real, c_real (1,000), Liquiditaets-Etiketten je Variante (report-only, im Artefakt). Nichts aus W1/W2.
+- **Nebenbefund (nuisance, pilotbezogen):** Die reale Wochen-SD der fm8-IC-Serie im Pilot (0,116..0,134) liegt um das ~2,3..2,6-fache ueber der Wochen-SD der faktorerhaltenden Null (v6b sd_week W1/W2 0,044..0,066; P-Null aehnlich) - F2_real 0,0086..0,0131 gegen v_fm8_P 0,0049. Die skalierte Null (DEC-101 E2, k = 2..2,5) haette im Test entsprechend hoehere Quantile gesetzt. Fuer kuenftige Querschnitts-Designs ist die Querschnitts-Abhaengigkeit jenseits des Ein-Faktor-Modells die bindende Streuungsquelle (Etikett, keine Regelaenderung).
+- **Was nicht folgt:** kein Verdikt ueber Momentum oder Reversal; die negativen Pilot-ICs der mom-Varianten sind Screening-Werte aus einem anderen Marktregime (2022-2024), nicht urteilstragend, und begruenden keine umgedrehte Hypothese auf W1/W2 ohne eigene DEC (Richtung nach Kenntnis des Pilots = Testbarkeit; der Pilot ist verbraucht, ein neuer Prior muesste aus der Literatur kommen).
+

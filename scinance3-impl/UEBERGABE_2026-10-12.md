@@ -204,3 +204,10 @@ Tests: 1.992 passed / 3 failed (Legacy `test_execution_live.py`, Sandbox-bedingt
   (`scratchpad/run_h32_pilot.sh`: `--pilot --registered state/registered/h32_v1.yaml --registered-sha256 <sha> ... --out
   scinance3-impl/state/runs/h32_pilot_v1 --seed 53`); danach GL-/DEC-Vermerk der Uebergabe je Variante, dann
   Positivkontrolle (`--positive-control`, nur mit uebergebenen Varianten), dann `--run`.
+- **Nachtrag 10e (20:50 UTC): H-32 Pilot gelaufen -> GL-012 (Pilot) fuer alle vier Varianten (GL-035, DEC-101 Teil 3).**
+  Momentum-Varianten im Pilot deutlich negativ (x_P -0,038 / -0,050 / -0,045, t -3,3 / -4,1 / -3,6), rev_gap +0,017
+  (t 1,5) unter der Schwelle 0,036. Keine Uebergabe, keine Positivkontrolle, kein Test; W1/W2 bleiben blind; Pilot
+  verbraucht. Nebenbefund: reale Wochen-SD des fm8-IC ~2,3..2,6 x Null-SD (k_pred ~2) - Etikett fuer alle Querschnitts-
+  Designs. Vorlage an den Nutzer in DEC-101 Teil 3 (umgedrehte Hypothese nur als neue DEC mit Literatur-Prior; oder
+  Klasse W ruht). Artefakte `state/runs/h32_pilot_v1/`. **Offen fuer den Nutzer:** Reihenfolge der Blindperiode (DEC-98
+  E4 (b)), Umgang mit dem Pilot-Befund (DEC-101 Teil 3 Vorlage), Weiterleitung der Data-Harvest-Rueckmeldung.
