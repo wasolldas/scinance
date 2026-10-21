@@ -1,9 +1,10 @@
 # H-32 (A3-fm8): automatisch aus einem Vorlauf-v6-Artefakt (--prelaunch) erzeugtes Skelett von state/registered/h32_v1.yaml.
 # NICHT registriert: der Orchestrator prueft (Zuordnung nach Regel U ist mechanisch im Pilot, nicht hier), setzt die
 # Registrierung und zitiert den sha256 dieser Datei als --registered-sha256.
-# Stichtag des Panels im Vorlauf: 2026-06-28; result_sha256 des Vorlaufs: 2ae9bad63a69580d551183764579318f7e5f82f1bc050a30c9bd470c09dd6fa0
-# Quelle (Vorlauf-JSON) sha256: 96edd5ea896834253e376407ea6efc53cc83a5bb158429e7690d42761ddb831a
-# W1-Determinismus-Kontrolle gegen v5e: nicht angefordert
+# Stichtag des Panels im Vorlauf: 2026-06-28; result_sha256 des Vorlaufs: eee9ced98582913b891b2466990f467f8a58db58d8a880bab7d19ca0be965ab1
+# Quelle (Vorlauf-JSON) sha256: f872a3af25753e84db2ac99d412ccfecc349b8bbedab2fc23868d83ffed3f98c
+# W1-Determinismus-Kontrolle gegen v5e: entfaellt (DEC-100 N1); Ersatz: Fixture-T2, Zweitlauf bitgleich, PP3-Trockenprobe
+# Universum linear_usdt_perpetual (DEC-101 E1): Bereinigung (Strenge), beschlossen nach Kenntnis der v6-Nuisance, vor jeder Pilot-Zahl (DEC-101 E1)
 hypotheses:
   H-32_mom1:
     hypothesis: H-32
@@ -22,6 +23,14 @@ hypotheses:
     variant: rev_gap
     direction: negative
 primary_statistic: fm_neutral_8w
+universe:
+  rule: linear_usdt_perpetual
+  label: Bereinigung (Strenge), beschlossen nach Kenntnis der v6-Nuisance, vor jeder
+    Pilot-Zahl (DEC-101 E1)
+  excluded_at_prelaunch:
+    usdc_perp: 68
+    dated_future: 48
+    other: 0
 alpha: 0.05
 z_krit: 1.6448536
 mde_faktor: 2.4865
@@ -37,7 +46,7 @@ fdr:
   p_formula: 'p = (1 + #{null replicate window means >= observed window mean, registered
     direction}) / (1 + R)'
   n_reps: 10000
-  replicates_sha256: f10250dda8e842c7e748e758cad97926361edc30011c43b18c84a70e02847a62
+  replicates_sha256: 3c498e0751f9b35aefa37dd380ad66e783ac6dc6b0c3d10f918fc95ec8f656ef
   replicates_cell: per window and variant the drift cell (driftfree / 0.002) with
     the larger null mean
   report_only:
@@ -59,6 +68,12 @@ fdr:
     binding: true
     m_rule: 'DEC-99 (7): nur getestete Eintraege'
     double_statement_m: 11
+null_scaling:
+  enabled: true
+  rule: k = max(1, SD(IC_t,W)/sd_week_W,v); q95_eff = max(0,m) + k*(q95 - m); p from
+    max(0,m) + k*(d - m)
+  direction: strictness
+  ref: DEC-101 E2
 selection:
   K: 4
   ceiling: ceiling_k4
@@ -77,6 +92,7 @@ pilot_window:
   last_formation_week: '2024-06-17'
   last_outcome_day: '2024-06-30'
   w_pilot: 114
+  out_dir: scinance3-impl/state/runs/h32_pilot_v1
   k_min_rule: 117
   role: pilot_nicht_urteilstragend
   single_run:
@@ -96,21 +112,21 @@ pilot_window:
     z: 1.2816
   frozen_v6:
     m_P:
-      mom1: 0.002176417764961407
-      mom2: 0.003274034863657733
-      mom4: 0.0042963304579969105
-      rev_gap: -0.0025396762293200367
+      mom1: 0.002152116967016032
+      mom2: 0.002857281695594825
+      mom4: 0.003828551461274295
+      rev_gap: -0.0020790599539546955
     calibration:
       stress:
         rho_f: 0.23520674556849896
         beta_sd_calibrated: 0.5276833273137225
-        target_factor_share: 0.03520397436951935
+        target_factor_share: 0.0359052091211948
       sigma_f: 0.07143857241301174
-      sigma_e_used: 0.11739798512635136
+      sigma_e_used: 0.11809700729762282
       rho_f_measured: 0.11760337278424948
-      factor_share_median: 0.017601987184759676
+      factor_share_median: 0.0179526045605974
       note: nur Streuung/Autokorrelation/Faktoranteil, kein Mittel (DEC-94 (5) (i))
-    k_fm8_series_sha256: b2584131bbe216a293b154c6adfffa9f7665f487d42fa382b944f25aed317a1b
+    k_fm8_series_sha256: 4a2f09376d8e4b81f735076fea2747f8096ea19c8f7899b9b27dfbce59390012
   report_only:
   - bootstrap_percentile_band
   - liquidity_buckets_3_10
@@ -157,63 +173,73 @@ windows:
     calibration:
       measured:
         rho_f: 0.0462406062845375
-        beta_sd_calibrated: 0.5365751598212628
-        target_factor_share: 0.026613298046759347
+        beta_sd_calibrated: 0.5395722765290544
+        target_factor_share: 0.025837283950599428
       stress:
         rho_f: 0.092481212569075
-        beta_sd_calibrated: 0.7128576483800596
-        target_factor_share: 0.053226596093518694
+        beta_sd_calibrated: 0.7168394159463193
+        target_factor_share: 0.051674567901198856
       zero:
         rho_f: 0.0
         beta_sd_calibrated: 0.5395722765290544
-        target_factor_share: 0.026613298046759347
+        target_factor_share: 0.025837283950599428
     null_scales:
-      sigma_e_used: 0.12159707206761418
+      sigma_e_used: 0.12323095978582714
       sigma_f: 0.06685192489159383
     frozen_v6:
       se_mean:
-        mom1: 0.00698156256641312
-        mom2: 0.007723024717643827
-        mom4: 0.009397335192545504
-        rev_gap: 0.007097950586160744
+        mom1: 0.007302437893063986
+        mom2: 0.008089705275703178
+        mom4: 0.009768035341097337
+        rev_gap: 0.00742870877469245
       e_se_rule:
-        mom1: 0.007249834169989867
-        mom2: 0.007968168497417862
-        mom4: 0.009313101568783169
-        rev_gap: 0.007234749533603939
+        mom1: 0.007441102766442681
+        mom2: 0.008122760986094501
+        mom4: 0.00936994244458985
+        rev_gap: 0.007424754570079458
       sd_week:
-        mom1: 0.050019329427165665
-        mom2: 0.055792720394213166
-        mom4: 0.06554672192646017
-        rev_gap: 0.04980168568887097
+        mom1: 0.05127914041549264
+        mom2: 0.056865519514139776
+        mom4: 0.0659948199928681
+        rev_gap: 0.05097479870286783
       null_mean:
-        mom1: 0.001101028145112659
-        mom2: 0.0013444156476556993
-        mom4: 0.00183454770838687
-        rev_gap: -0.0008002123771225791
+        mom1: 0.0012901650979848683
+        mom2: 0.0016790699412476185
+        mom4: 0.00206577452448383
+        rev_gap: -0.0011957016278756033
       q95:
-        mom1: 0.012655110128980959
-        mom2: 0.014785747132329418
-        mom4: 0.017766047438509482
-        rev_gap: 0.01014897217362274
+        mom1: 0.013946835538645848
+        mom2: 0.015960035910654202
+        mom4: 0.019827870411726622
+        rev_gap: 0.010532942607397561
       q95_driftfree:
-        mom1: 0.012263156383362867
-        mom2: 0.014785747132329418
-        mom4: 0.017750756067334877
-        rev_gap: 0.010131959227995231
+        mom1: 0.013769802031545141
+        mom2: 0.015960035910654202
+        mom4: 0.01908568957721212
+        rev_gap: 0.010300235707366231
       q95_drifting:
-        mom1: 0.012655110128980959
-        mom2: 0.014604851654177468
-        mom4: 0.017766047438509482
-        rev_gap: 0.01014897217362274
-      ceiling_k4: 0.007601576548610902
-      floor_fm8: 0.04744079152167603
-      v_fm8: 0.0022579885360357317
-      k_fm8_series_sha256: 8b7eb6ff2f3d61a31d0b4a79cffc01371b311f30898585e02ecd4660bbda926c
-    bounce_sigma_true: 0.17236408998176572
+        mom1: 0.013946835538645848
+        mom2: 0.015789938440081402
+        mom4: 0.019827870411726622
+        rev_gap: 0.010229540815454019
+      q95_1000:
+        mom1: 0.013946835538645848
+        mom2: 0.015960035910654202
+        mom4: 0.019827870411726622
+        rev_gap: 0.010300235707366231
+      q95_10000:
+        mom1: 0.013290405683024453
+        mom2: 0.015176120513323718
+        mom4: 0.018379863017060245
+        rev_gap: 0.010532942607397561
+      ceiling_k4: 0.007819957311030808
+      floor_fm8: 0.04882131048278087
+      v_fm8: 0.002391017809866642
+      k_fm8_series_sha256: f35fb20b65144169a53a7e9d1784fa88d7f7acfe75b0406b359bb57b3e1f9cc1
+    bounce_sigma_true: 0.17354241498115813
     survivorship:
-      mom1_diff_in_ic_min_units: -0.6958949582813337
-      rev_gap_diff_in_ic_min_units: -0.506811671999734
+      mom1_diff_in_ic_min_units: -0.4250621739161666
+      rev_gap_diff_in_ic_min_units: -0.44794932968486006
       unit: Schwelle T_W,v = z_krit * e_se_rule + max(0, null_mean) (frozen_v6)
   W2:
     start: '2025-07-01'
@@ -222,63 +248,73 @@ windows:
     calibration:
       measured:
         rho_f: 0.0702025354761522
-        beta_sd_calibrated: 0.4415331678412226
-        target_factor_share: 0.013306470393853062
+        beta_sd_calibrated: 0.43908062071835385
+        target_factor_share: 0.012386912488180742
       stress:
         rho_f: 0.1404050709523044
         beta_sd_calibrated: 0.5704797913207805
-        target_factor_share: 0.026612940787706124
+        target_factor_share: 0.024773824976361485
       zero:
         rho_f: 0.0
-        beta_sd_calibrated: 0.4415331678412226
-        target_factor_share: 0.013306470393853062
+        beta_sd_calibrated: 0.43908062071835385
+        target_factor_share: 0.012386912488180742
     null_scales:
-      sigma_e_used: 0.10612991014979394
+      sigma_e_used: 0.10904950559211316
       sigma_f: 0.054611863018019804
     frozen_v6:
       se_mean:
-        mom1: 0.00638872673559674
-        mom2: 0.00735662450772661
-        mom4: 0.008621488749697785
-        rev_gap: 0.006443893176112732
+        mom1: 0.006196665017793512
+        mom2: 0.007045641134217404
+        mom4: 0.00819047102980608
+        rev_gap: 0.006486324281759836
       e_se_rule:
-        mom1: 0.006405839850730278
-        mom2: 0.006901963174140049
-        mom4: 0.007900192276831754
-        rev_gap: 0.006373582459140744
+        mom1: 0.006630080974731648
+        mom2: 0.007084413354640789
+        mom4: 0.007980594277883989
+        rev_gap: 0.006629079072557149
       sd_week:
-        mom1: 0.0431399385569362
-        mom2: 0.04732279291350554
-        mom4: 0.054705692782655906
-        rev_gap: 0.043002044098689914
+        mom1: 0.044494004396196565
+        mom2: 0.048215030281491954
+        mom4: 0.054924334562550074
+        rev_gap: 0.04448898281356362
       null_mean:
-        mom1: 0.001237625702428581
-        mom2: 0.0016255137914811843
-        mom4: 0.0021718707758592764
-        rev_gap: -0.0011074110191079214
+        mom1: 0.0009358237449385808
+        mom2: 0.0015018690361091225
+        mom4: 0.001953377946189023
+        rev_gap: -0.0012242989105615513
       q95:
-        mom1: 0.011792300472724677
-        mom2: 0.01418177986471412
-        mom4: 0.017003756792670112
-        rev_gap: 0.008571338553315272
+        mom1: 0.011572528174169918
+        mom2: 0.013497858933039111
+        mom4: 0.01639493525389994
+        rev_gap: 0.00923864429518746
       q95_driftfree:
-        mom1: 0.011263642700480175
-        mom2: 0.01392554633120499
-        mom4: 0.017003756792670112
-        rev_gap: 0.008571338553315272
+        mom1: 0.011426121531264368
+        mom2: 0.013277220673745932
+        mom4: 0.015649748450853217
+        rev_gap: 0.00878998502703347
       q95_drifting:
-        mom1: 0.011792300472724677
-        mom2: 0.01418177986471412
-        mom4: 0.016875138363611222
-        rev_gap: 0.00841209116618443
-      ceiling_k4: 0.006975473699357643
-      floor_fm8: 0.041551891334484434
-      v_fm8: 0.001726999486962073
-      k_fm8_series_sha256: 4ea9739edcad49897a00b571e0b01a57ab47c87caac1366cc11811758accdc86
-    bounce_sigma_true: 0.13202006816347162
+        mom1: 0.01133933205114203
+        mom2: 0.01342182192041699
+        mom4: 0.0163529141939398
+        rev_gap: 0.008846831038064263
+      q95_1000:
+        mom1: 0.011426121531264368
+        mom2: 0.01342182192041699
+        mom4: 0.0163529141939398
+        rev_gap: 0.008846831038064263
+      q95_10000:
+        mom1: 0.011572528174169918
+        mom2: 0.013497858933039111
+        mom4: 0.01639493525389994
+        rev_gap: 0.00923864429518746
+      ceiling_k4: 0.006714173988188749
+      floor_fm8: 0.043638979223103405
+      v_fm8: 0.0019045663339909372
+      k_fm8_series_sha256: 6b69b6f7bbd0505510f37c9cd853bbf19339f5aa36294978aaedcb1e5f574795
+    bounce_sigma_true: 0.1342852104278142
     survivorship:
-      mom1_diff_in_ic_min_units: -0.8225573792239215
-      rev_gap_diff_in_ic_min_units: -0.5181536245034822
+      mom1_diff_in_ic_min_units: -0.537659272768145
+      rev_gap_diff_in_ic_min_units: -0.5220594009043773
       unit: Schwelle T_W,v = z_krit * e_se_rule + max(0, null_mean) (frozen_v6)
 beta_control:
   method: fm_neutral_8w
@@ -310,7 +346,13 @@ positive_control:
   report_only:
   - prd_sector_world_0375
   - joint_c10_share
+runner:
+  as_of: '2026-09-28'
+  start_year: 2021
+  end_year: 2026
+  allow_partial: true
 data_fingerprints:
   union_range_fingerprint: e503bedb388cf8aaa9f3f28735cc4d83a659528447d95d027476027a4cb0c589
   delisting_dates_sha256: c1306c561246a684a29b166bc0a8663f2345a0a21e5798ea7e2a7a823bbaf1f3
   delisting_register_sha256: a28c7eb73c586895f710511a73ca58d33570c283397ff356a5dff46c4d639b22
+  delisted_tree_sha256: 250a923b5c04f18025f9a7ffc72dbbd3b08b75e44bbcd38876b8effa6427e401
