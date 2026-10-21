@@ -138,12 +138,13 @@ pilot_window:
   - lag_profile
   - beta_calibration_ic
 handover_rule:
-  version: U-2
+  version: U-3
   conditions:
   - id: i
     text: x_P > 0 in registrierter Richtung
   - id: ii
-    text: x_P - m* >= max_W (z_krit * SE_T,W + 0.8416 * SD_T,W)
+    text: x_P >= max(m* + max_W(z_krit * SE_T,W + z_80 * SD_T,W), max_W(q95_W,v +
+      z_80 * SD_T,W))
   - id: iii
     text: t_P >= t_min
   t_min: 2.0
@@ -157,8 +158,8 @@ handover_rule:
   double_statement:
   - power_p1.assign_regime_a3_practice
   - mu_sel
-  mu_sel: Loesung von P_mu(X >= x_P | X >= c_v) = 0.5, X ~ N(mu, SE_P^2), c_v = MDE80*_v
-    + m*
+  mu_sel: Loesung von P_mu(X >= x_P | X >= c_v) = 0.5, X ~ N(mu, SE_P^2), c_v = max(MDE80*_U
+    + m*, max_W(q95_W,v + z_80 * SD_T,W)) (U-3)
   on_fail:
     status: gl012_pilot
     p_value: 1.0
