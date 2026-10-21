@@ -3,8 +3,12 @@
 # Registrierung und zitiert den sha256 dieser Datei als --registered-sha256.
 # Stichtag des Panels im Vorlauf: 2026-06-28; result_sha256 des Vorlaufs: eee9ced98582913b891b2466990f467f8a58db58d8a880bab7d19ca0be965ab1
 # Quelle (Vorlauf-JSON) sha256: f872a3af25753e84db2ac99d412ccfecc349b8bbedab2fc23868d83ffed3f98c
+# Code-Commit des Vorlaufs (code_commit_prelaunch): 6e4b447; Registrierungs-Commit (code_commit_registration): <wird vom Orchestrator gesetzt>
+# code_commit_prelaunch = Code-Stand, mit dem der Vorlauf gerechnet wurde (nur damit bitgleich reproduzierbar); code_commit_registration = Code-Stand der Registrierung; die seitherigen Aenderungen beruehren keine eingefrorene Konstante (nur Regeltexte, Gate-Kette der Positivkontrolle, Injektionsziel, Uebergaberegel, Pilot-Sperre)
 # W1-Determinismus-Kontrolle gegen v5e: entfaellt (DEC-100 N1); Ersatz: Fixture-T2, Zweitlauf bitgleich, PP3-Trockenprobe
 # Universum linear_usdt_perpetual (DEC-101 E1): Bereinigung (Strenge), beschlossen nach Kenntnis der v6-Nuisance, vor jeder Pilot-Zahl (DEC-101 E1)
+code_commit_prelaunch: 6e4b447
+code_commit_registration: 117dc02
 hypotheses:
   H-32_mom1:
     hypothesis: H-32
@@ -43,8 +47,10 @@ fdr:
   p_statistic: null_replicate_exceedance_fm8_window_mean
   sided: one
   combine: max_p
-  p_formula: 'p = (1 + #{null replicate window means >= observed window mean, registered
-    direction}) / (1 + R)'
+  p_formula: 'p = (1 + #{scaled null replicate window means d'' >= observed window
+    mean y, registered direction}) / (1 + R), d'' = max(0, m) + k * (d - m), k = max(1,
+    SD(IC_t,W) / sd_week_W,v), m = frozen null_mean of the binding cell (DEC-101 E2,
+    block null_scaling)'
   n_reps: 10000
   replicates_sha256: 3c498e0751f9b35aefa37dd380ad66e783ac6dc6b0c3d10f918fc95ec8f656ef
   replicates_cell: per window and variant the drift cell (driftfree / 0.002) with
@@ -138,13 +144,13 @@ pilot_window:
   - lag_profile
   - beta_calibration_ic
 handover_rule:
-  version: U-3
+  version: U-4
   conditions:
   - id: i
     text: x_P > 0 in registrierter Richtung
   - id: ii
-    text: x_P >= max(m* + max_W(z_krit * SE_T,W + z_80 * SD_T,W), max_W(q95_W,v +
-      z_80 * SD_T,W))
+    text: x_P >= max(m* + max_W(z_krit * SE_T,W + z_80 * SD_T,W), max_W(max(0, m_W)
+      + k_pred,W * (q95_W,v - m_W) + z_80 * SD_T,W))
   - id: iii
     text: t_P >= t_min
   t_min: 2.0
@@ -153,13 +159,15 @@ handover_rule:
   sd_T: max(se_mean_W (v6), SE_W,Pilot)
   pilot_k_adjusted: SE_W,Pilot = sqrt(max(1, c_real)) * sqrt(v_fm8_W + F2_real) /
     sqrt(w_judged_W)
+  k_pred: k_pred,W = max(1, sqrt(v_fm8_W + F2_real) / sd_week_W,v); before the pilot
+    (power line of the Vorlauf) k_pred = 1
   null_mean_credit: m* = max(0, m_P, m_W1, m_W2) in Richtung
   regime_function: power_p1.assign_regime
   double_statement:
   - power_p1.assign_regime_a3_practice
   - mu_sel
   mu_sel: Loesung von P_mu(X >= x_P | X >= c_v) = 0.5, X ~ N(mu, SE_P^2), c_v = max(MDE80*_U
-    + m*, max_W(q95_W,v + z_80 * SD_T,W)) (U-3)
+    + m*, max_W(max(0, m_W) + k_pred,W * (q95_W,v - m_W) + z_80 * SD_T,W)) (U-4)
   on_fail:
     status: gl012_pilot
     p_value: 1.0
@@ -233,6 +241,11 @@ windows:
         mom2: 0.015176120513323718
         mom4: 0.018379863017060245
         rev_gap: 0.010532942607397561
+      null_mean_driftfree:
+        mom1: 0.0012207223210487662
+        mom2: 0.0015826633666051091
+        mom4: 0.0019339056030023211
+        rev_gap: -0.0011957016278756033
       ceiling_k4: 0.007819957311030808
       floor_fm8: 0.04882131048278087
       v_fm8: 0.002391017809866642
@@ -308,6 +321,11 @@ windows:
         mom2: 0.013497858933039111
         mom4: 0.01639493525389994
         rev_gap: 0.00923864429518746
+      null_mean_driftfree:
+        mom1: 0.0008472982841040524
+        mom2: 0.0013794971074296684
+        mom4: 0.0017838509527729404
+        rev_gap: -0.0012242989105615513
       ceiling_k4: 0.006714173988188749
       floor_fm8: 0.043638979223103405
       v_fm8: 0.0019045663339909372
@@ -338,7 +356,20 @@ positive_control:
   - 2000
   - 2049
   world_sd_target: sqrt(v_fm8_W + max(F2_null_W, F2_real))
-  inject_target: 'realisiert: z_krit * SE_T,W + 0.8416 * SD_T,W im bindenden Fenster'
+  inject_target: 'realisierter fm8-Effekt im bindenden Fenster (argmax_W): Ziel_W
+    = max(z_krit * SE_T,W + z_80 * SD_T,W - min(0, m_df,W), q95_eff,W(k_pred,W) -
+    m_df,W + z_80 * SD_T,W); m_df,W = eingefrorenes Null-Mittel der driftfreien Zelle
+    (stress), q95_eff,W(k_pred,W) = max(0, m_W) + k_pred,W * (q95_W,v - m_W), m_W
+    = eingefrorenes null_mean (bindende Zelle), k_pred,W = max(1, sqrt(v_fm8_W + F2_real)
+    / sd_week_W,v), SE_T,W / SD_T,W wie Regel U'
+  inject_target_label: 'Injektionsziel F: Korrektur nach DEC-94 (3) (Review B-4/A-4,
+    Nachpruefung N-2), vor jeder Pilot-Zahl'
+  inject_target_ref: DEC-101 Teil 2 (N-2)
+  null_scaling:
+    enabled: true
+    rule: wie Testlauf (DEC-101 E2); k je Seed aus der Wochen-SD der synthetischen
+      Serie gegen sd_week
+    ref: DEC-101 Teil 2 (N-1)
   criteria:
     sd_ratio_max: 1.1
     pass_share_min: 0.734

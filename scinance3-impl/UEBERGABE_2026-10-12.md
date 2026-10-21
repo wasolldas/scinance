@@ -196,3 +196,11 @@ Tests: 1.992 passed / 3 failed (Legacy `test_execution_live.py`, Sandbox-bedingt
   (`REGISTRIERUNG_H32_entwurf.md`). Nachpruefung der Pruefpunkte 1-5 durch den Gate-Auditor angefordert; danach
   Registrierung (DEC-101 Teil 2, Kopie nach `state/registered/h32_v1.yaml`, Registry-Eintrag), dann Pilot
   (`--pilot --out scinance3-impl/state/runs/h32_pilot_v1`, genau einmal).
+- **Nachtrag 10d (20:32 UTC): H-32 REGISTRIERT.** Nachpruefung des Gate-Auditors: VETO aufgehoben, Auflagen
+  N-1..N-5 umgesetzt (Commit 117dc02: Positivkontrolle in Produktionskonfiguration mit skalierter Null und Injektionsziel
+  F, Regel U-4 mit k_pred, Pilot-Versuchsmarker; 307 Tests, Gesamtsuite 2.399 passed / 3 Altfaelle). Registrierungsdatei
+  `state/registered/h32_v1.yaml` sha256 `0fadda785f37a9ab24b31f650611a468f5c6bfef8be8fb65a7dc54261c1bbd60` (Startsperre), Registry-Eintrag
+  H-32, DEC-101 Teil 2. PP3-Trockenprobe auf der registrierten Datei bestanden. **Naechster Schritt: genau ein Pilotlauf**
+  (`scratchpad/run_h32_pilot.sh`: `--pilot --registered state/registered/h32_v1.yaml --registered-sha256 <sha> ... --out
+  scinance3-impl/state/runs/h32_pilot_v1 --seed 53`); danach GL-/DEC-Vermerk der Uebergabe je Variante, dann
+  Positivkontrolle (`--positive-control`, nur mit uebergebenen Varianten), dann `--run`.

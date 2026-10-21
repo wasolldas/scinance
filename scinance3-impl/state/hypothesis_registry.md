@@ -1157,3 +1157,67 @@ keine Rechtswirkung. Die naechste Registrierung beginnt bei H-32.
 H-27 (VRP auf DVOL-Backfill, eroeffnet DEC-61) wurde nach DEC-96 auf blinden, prospektiven Fenstern ab 2026-07-01
 hergeleitet (`state/herleitung_h27/`) und ist vor der Registrierung GL-012 (DEC-97, GL-034). Es gibt keinen
 registrierten Eintrag H-27, kein K, keinen Lauf. Naechste freie Nummer bleibt H-32.
+
+## H-32 - A3-fm8, beta-neutraler Wochen-Querschnitts-IC im Zweistufen-Design (Pilot 2022-04-18..2024-06-17, Test W1/W2) - REGISTRIERT 2026-10-21 (DEC-101 Teil 2)
+
+> Registrierungsdatei `state/registered/h32_v1.yaml`, sha256 `0fadda785f37a9ab24b31f650611a468f5c6bfef8be8fb65a7dc54261c1bbd60` (= `--registered-sha256` der Startsperre; Regel U-4,
+> Universum lineare USDT-Perps, skalierte Null, Positivkontrolle in Produktionskonfiguration, Pilot-Pfad
+> `scinance3-impl/state/runs/h32_pilot_v1`). Code: Vorlauf v6b mit Commit `6e4b447`, Registrierung mit Commit `117dc02`
+> (seitherige Aenderungen beruehren keine eingefrorene Konstante). Vorlauf v6b `state/runs/h32_20261021_v6b/` (zweimal
+> bitgleich, result_sha256 `eee9ced98582913b891b2466990f467f8a58db58d8a880bab7d19ca0be965ab1`), PP3-Trockenprobe
+> bestanden. Herleitung, Reviews und Entscheidungen: `state/herleitung_h32/` (ERSTFASSUNG, REVIEW_H32, REGISTRIERUNG_H32_entwurf
+> Fassung 3 = Pflichtzeilen, EV-2..EV-8, Abweichungen 1-15, C.17; REVIEW_REGISTRIERUNG_H32 + NACHPRUEFUNG), DEC-99,
+> DEC-100 (+N1/N2), DEC-101 Teil 1 und 2. Gate-Text: ERSTFASSUNG Abschnitt 2 mit (1c) = q95_eff (DEC-101 E2).
+> Positivkontroll-Regel: ERSTFASSUNG Abschnitt 4 mit DEC-101 Teil 2 E8. **Kein Lauf auf Outcome-Daten bisher; der Pilot
+> ist genau einmal freigegeben (DEC-101 E10).**
+
+```yaml
+id: H-32
+kohorte: A3 / F-H32
+klasse: W
+capital_free: true
+hypothese: "Mindestens eine von mom1, mom2, mom4 (positiv) bzw. rev_gap (negativ): mittlerer woechentlicher Rank-IC der Charakteristik gegen das fm_neutral_8w-neutralisierte Folgewochen-Outcome in W1 UND W2 in Richtung >= z_krit * SE (P-1) und >= 95-%-Null-Quantil; getestet nur nach Uebergabe durch den Pilot 2022-04-18..2024-06-17 (Regel U); bestaetigt durch F-WEEK-BY."
+ertragsquelle: "Prognose (mom: spaete Trendfolger; rev_gap: Liquiditaetsbereitstellung) - netto Markt-Beta"
+metric: "Mittel des woechentlichen Spearman-IC (Charakteristik_t vs. fm8-Residuum der Folgewochen-Log-Rendite_t+1, close_at_last, min 10) ueber die geurteilten Wochen; fm8-Skala (Daempfung ~25 %)"
+richtung: {mom1: positiv, mom2: positiv, mom4: positiv, rev_gap: negativ}
+windows:
+  - {id: P,  von: 2022-04-18, bis: 2024-06-30, wochen_geurteilt: 114, rolle: pilot_nicht_urteilstragend, panel_schnitt: 2024-06-30, K_min_median_max: [126, 206, 339]}
+  - {id: W1, von: 2024-07-01, bis: 2025-06-30, wochen_geurteilt: 52, rolle: urteilstragend, K_min_median_max: [343, 416, 500]}
+  - {id: W2, von: 2025-07-01, bis: 2026-06-28, wochen_geurteilt: 50, rolle: urteilstragend, panel_schnitt: 2026-06-28, K_min_median_max: [501, 526, 545]}
+fenster_regel: "C10_hart (Regel U laesst nur C10 zu)"
+threshold: {formel: "max(1.6449 * SE_W, q95_eff_W) mit q95_eff = max(0, m) + k * (q95 - m), k = max(1, SD(IC_t,W)/sd_week)", SE_W: "max(floor_fm8/sqrt(W), SD/sqrt(W), SE_stat stationaer Block 4)", ref: "ERSTFASSUNG 1.9; DEC-101 E2; v6b frozen_v6"}
+structural_null: {komponenten: [faktorerhaltende_null_stress_fm8, q95_max_1000_10000, selektionsdecke_k4_vorzeichenbereinigt, bounce_rev_gap, null_scaling_im_testlauf], ref: "v6b windows.<W>.frozen_v6; DEC-101 E2/E5", kill_check: "ceiling_k4 / T_W,v 0.45..0.64 -> kein Vor-Verdikt-Kill"}
+power:
+  alpha: 0.05
+  sided: one
+  power: 0.80
+  z_krit: 1.6449
+  mde_faktor: 2.4865
+  cluster_unit: kalenderwoche
+  se_schwelle: "e_se_rule (v6), max mit Pilot-Quelle"
+  sd_streuung: "se_mean (v6), max mit Pilot-Quelle"
+  n_eff: "W/c, c = max(1, c_hat) aus v6 und Pilot"
+  a_priori_effekt: "Pilot-Punkt x_P je Variante (DEC-99 (6), Lesart A); Doppelausweis mu_sel (DEC-99 (3))"
+  detectable_effect_mde80_v6b: {W1: {mom1: 0.020093, mom2: 0.022769, mom4: 0.028049, rev_gap: 0.018465}, W2: {mom1: 0.017057, mom2: 0.019428, mom4: 0.023288, rev_gap: 0.016363}, rule: "max((1b) mit Gutschrift, (1c))"}
+  handover_threshold_on_pilot_point_v6b_u4_kpred1: {mom1: 0.020538, mom2: 0.023027, mom4: 0.028049, rev_gap: 0.018465}
+  end_power_f_week_at_threshold_v6b_replicates_lower_bound: {m1: [0.70, 0.75], m4: [0.38, 0.44], m11_report_only: [0.12, 0.21]}
+  zuordnungsregel: "Regel U-4 (ERSTFASSUNG 1.8 + DEC-101 Teil 2, k_pred aus dem Pilot), power_p1.assign_regime; Doppelausweis assign_regime_a3_practice"
+  ref: "state/runs/h32_20261021_v6b/h32_prelaunch.json power_line; state/herleitung_h32/REGISTRIERUNG_H32_entwurf.md Abschnitt 2"
+selection: {K: 4, z_max: 1.052, ceiling: "v6b ceiling_k4 (W1 0.007820, W2 0.006714)", bh_denominator: 4, over_family: F-WEEK}
+fdr: {p: "Max-p ueber W1/W2 aus 10.000 Replikaten der faktorerhaltenden Null (DEC-99 N1), transformiert d' = max(0, m) + k (d - m) (DEC-101 E2, Block null_scaling), einseitig; Block-Permutation report-only", n_reps: 10000, replicates_sha256: 3c498e0751f9b35aefa37dd380ad66e783ac6dc6b0c3d10f918fc95ec8f656ef, seed: 53, family: "F-H32 BH 0.10 report-only, Nenner 4", over_family: "F-WEEK BY 0.10 bindend, m nach DEC-99 (7)", doppelausweis_m: 11}
+economic_minimum: {portfolio: 0.0101, einzelposition: 0.062, label: "Etikett C.2"}
+decision_relevance: {on_pass: "Tradability-Registrierung nach F-WEEK", on_drop: "fm8-IC >= MDE80 der Variante nicht vorhanden (beta-unabhaengig ~MDE80/0,75)", on_gl012_pilot: "kein Verdikt, W1/W2 bleiben blind"}
+capital_tax_venue: {kapitalbasis: "n/a kapitalfrei", zahler_post_2024: "Delisting-Hazard ~50 % (Etikett)"}
+stress_episode: {liste_ref: "state/runs/stress_rel.json, stress_abs.json (nur mit Datumsfilter <= Panel-Schnitt)", rolle: abdeckungsnachweis, v6: "W1 22/2, W2 8/1 Tage"}
+irreversibility_probe: {ergebnis: nachladbar}
+positive_control: {vorgeschaltet: true, regel: "ERSTFASSUNG 4 + DEC-101 Teil 2 (N-1 Gate-Kette mit skalierter Null, N-2 Injektionsziel F)", seeds: "53..252", welt: "sigma_g an F2_real (Null-SD Untergrenze); PRD-Sektorwelt report-only"}
+fixtures: {positive: "T1 positiv (realisierter fm8-Effekt = MDE80)", null: "T1 null (stress-Null)", adversarial: "T1 Beta-Proxy + Pilot-Leck + Siegel-Leck + Panel-Schnitt"}
+artifacts: {prelaunch: "state/runs/h32_20261021_v6b/ (result_sha256 eee9ced98582913b891b2466990f467f8a58db58d8a880bab7d19ca0be965ab1; v6a verworfen)", pilot: "h32_pilot_<v>_P_ic_weekly.csv + sha256, h32_pilot.json", test: "h32_run_<v>_<W>_ic_weekly.csv + sha256, h32_run_fingerprint.json"}
+fdr_family: "F-H32 (K = 4, BH 0.10 report-only, p = 1 ohne Uebergabe)"
+over_family: "F-WEEK (BY 0.10, m = getestete Eintraege, DEC-99 (7); Doppelausweis m = 11)"
+feasibility_verdict: "offen bis Pilot (Regel U)"
+constants_hash: "n/a - kapitalfrei"
+data_fingerprints: ["panel_export 03dc0e7cfce96737c31cd6d59bce1767f1bb112a74ac539c2ed5b091c49b16cb", "union_range e503bedb388cf8aaa9f3f28735cc4d83a659528447d95d027476027a4cb0c589", "delisting_register a28c7eb73c586895f710511a73ca58d33570c283397ff356a5dff46c4d639b22", "delisted_tree 250a923b5c04f18025f9a7ffc72dbbd3b08b75e44bbcd38876b8effa6427e401", "delisting_dates c1306c561246a684a29b166bc0a8663f2345a0a21e5798ea7e2a7a823bbaf1f3", "prelaunch_v6b_json f872a3af25753e84... (voll: state/runs/h32_20261021_v6b/, sha256 der JSON-Datei; result_sha256 eee9ced98582913b891b2466990f467f8a58db58d8a880bab7d19ca0be965ab1)", "code_commit_prelaunch 6e4b447", "code_commit_registration 117dc02", "universe_excluded 50aaee3c1e63d560b69a7aa42748abdea0e0cf742f6ff3f618e6f00c54083098", "registered_yaml 0fadda785f37a9ab24b31f650611a468f5c6bfef8be8fb65a7dc54261c1bbd60", "spread_census fa1546be8216564005b21827190549b44edf8f5353602e5173b5d4f6497e7083", "as_of 2026-09-28", "panel_cut_test 2026-06-28", "panel_cut_pilot 2024-06-30"]
+bedingung_welle_1: [WP-7 B2, WP-12b, WP-13a v5d, WP-13a v5e, Delisted-Baum v2 (DEC-100 N1), DEC-101 Teil 1, Vorlauf v6b x2, PP3-Trockenprobe]
+etiketten: ["zugelassen nur durch DEC-99 (Pilot-Prior)", "C.17 (Abschnitt 3)", "fm8-Skala (Daempfung ~25 %)", "beschlossen nach GL-032..034", "Universum bereinigt (Strenge, DEC-101 E1)", "Regel U-4 (Strenge, DEC-101 Teil 2)", "Positivkontrolle korrigiert (DEC-94 (3), DEC-101 Teil 2)"]
+```
