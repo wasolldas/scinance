@@ -143,3 +143,30 @@ Tests: 1.992 passed / 3 failed (Legacy `test_execution_live.py`, Sandbox-bedingt
 - **Naechste Schritte:** (1) Data-Harvest-Backfill abwarten -> Delisted-Baum -> v6 -> Registrierung H-32 (YAML + sha,
   Registry-Eintrag, Doppelausweise) -> Positivkontrolle -> Pilot -> Uebergabe -> Test; (2) Check-in 2026-10-21 12:40 UTC:
   neue Stroeme im Katalog -> HF-RV-Nuisance (nur <= 2024-05-31) und A2-Ereigniszensus; (3) Blind-Siegel DEC-96 E3 gilt.
+
+## 10. Nachtrag 2026-10-21: Datenstroeme geprueft, Panel-Luecke ohne Backfill geschlossen, Vorlauf v6 und HF-RV-Nuisance gestartet
+
+- **Katalog 2026-10-21 (Befund `state/BEFUND_DATENSTROEME_2026-10-21.md`):** alle Stroeme aus DEC-98 N4 sind da und
+  vollstaendig: `rest.kline1m` BTCUSDT 2020-03-25.. / ETHUSDT 2021-03-15.. (1.440 Zeilen je Tag, 0 Luecken),
+  `rest.kline1d` + `rest.fundingRateAll` **ab 2021-01-01** (Data-Harvest hat den Tagesstrom aller Perps rueckgefuellt),
+  `rest.instruments`, `delisting_dates`, `rest.tickers15m` ab 2026-10-20, `deribit/rest.settlements` ab 2017-05-25.
+  Falle: Kline-Payload der REST-Partitionen ist ein Dict mit benannten Feldern (Builder angepasst, 716191b/9364993).
+- **DEC-100 Nachtrag 1:** die 45 delisteten Perps sind im Strom bereits enthalten (280 lueckenlos, 25 ohne Listungstag,
+  LAYERUSDT ohne Kerze); Auftrag P-1 entfaellt (`state/RUECKMELDUNG_DATA_HARVEST_PANEL_2026-10-21.md` an Data-Harvest
+  weiterleiten). Die sechs Symbole sind `Relisted` (delistet, spaeter neu gelistet; nur der neue Kontrakt in der API) ->
+  bleiben Ueberlebende. Delisted-Baum v2 (`state/runs/delisted_tree_v2_20261021/`, Register-sha a28c7eb7..., Baum-sha
+  250a923b...): Union = 877 Ueberlebende + 305 Delistete, lebende USDT-Perps je Tag **identisch** mit dem Strom.
+  Der Baum selbst liegt im Scratchpad (`panel_delisted_v2`), bei neuer Sitzung aus dem Harvest-Cache neu bauen:
+  `scripts/h32_build_delisted_tree.py --register state/data_harvest_delisting_register_2026-10-21.csv --partitions-dir
+  <cache>/raw/bybit --out <neu> --cut 2026-09-28 --start-year 2021` (rc 3 = benannte Luecken; Hash muss 250a923b... sein).
+- **Vorlauf v6 gestartet** (13:33 UTC): `scripts/h32_fm8.py --prelaunch --cut-date 2026-06-28 --n-reps 1000 --n-boot 1000
+  --p-reps 10000 --seed 53 --allow-partial --as-of 2026-09-28`, Ausgabe `state/runs/h32_20261021_v6/`. OHNE
+  `--v5e-reference`: die W1-Determinismus-Kontrolle setzt ein unveraendertes W1-Panel voraus, das DEC-100 geaendert hat
+  (5 Symbole in W1 neu) - sie wuerde hart abbrechen; Ersatz: Zweitlauf-Fingerprint (optional) und T2-Tests.
+  Pilotfenster P: 115 Formationswochen, K 127..353 (vorher 114 / 120..339).
+- **HF-RV-Nuisance + A2-Zensus (Auftrag `scratchpad/SPEC_HFRV_herleitung.md`, Opus-Agent laeuft):** Extrakte unter
+  `scratchpad/hf_data/raw/` (1-min BTC/ETH 2021-03-24..2024-05-31, DVOL roh, Settlement-KALENDER ohne Preise,
+  deliveryPrices-DATEN ohne Preise). Ergebnis nach `state/herleitung_hfrv/`. Nur Streuung/c, kein Mittel.
+- **Naechste Schritte:** v6 auswerten (Kernzahlen nachrechnen) -> `--emit-template` -> `state/registered/h32_v1.yaml`
+  fuellen (Erstfassung Abschnitt 11) -> adversarischer Review -> Registrierung (Registry-Eintrag, sha256) ->
+  Positivkontrolle -> Pilot -> Uebergabe -> Test. Dann HF-RV-Review -> DEC-Nachtrag (Option 3 tragfaehig?) -> Nutzer.
