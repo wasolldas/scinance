@@ -80,3 +80,8 @@ alte Luecke war **31 von ~590 (5,3 %) in W2** und 5 in W1 (Zahlen aus Abschnitt 
 **Was folgt:** Vorlauf v6 (`--prelaunch`, Panel-Schnitt 2026-06-28) auf diesem Union-Panel; Registrierung H-32 mit den
 Fingerprints `delisting_register_sha256 = a28c7eb7...` und dem Baum-Hash. Der Auftrag P-1 an Data-Harvest entfaellt
 (Mitteilung an Data-Harvest: `state/RUECKMELDUNG_DATA_HARVEST_PANEL_2026-10-21.md`).
+
+**Erratum (2026-10-21, DEC-101 Teil 1 / Gate-Review B-1):** "vollstaendig" gilt fuer die linearen USDT-Perpetuals. Der
+Ueberlebenden-Baum enthaelt zusaetzlich 68 USDC-Perpetuals (`*PERP`, Zwillinge) und 48 datierte USDT-Futures; der
+Delisted-Baum v2 nur USDT. H-32 filtert seit DEC-101 E1 auf lineare USDT-Perps; die Union-Abgleiche in Abschnitt 5
+zaehlten bereits nur USDT-Perps.

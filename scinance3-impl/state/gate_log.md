@@ -52,3 +52,5 @@ _(noch keine Eintraege)_
   nicht; H-26 (2.0) unberuehrt. Testbarkeit nur ueber nicht beschlossene Lesarten (Prior-Rand, c ohne Batch-Means,
   Hochfrequenz-RV), jede nur unter DEC-94. Siegel unberuehrt; Blind-Siegel DEC-96 E3 bleibt.
 - Akte: DEC-95, DEC-96 (Nachtraege 1-3), DEC-97; Reviewer: ZUSTIMMUNG MIT AUFLAGEN.
+
+- **Vermerk 2026-10-21 (Erratum-Etikett, DEC-101 Teil 1; keine Neubewertung):** Die Nuisance-Rechnungen hinter GL-032 (Positivkontrolle A3 v5e), GL-033 (A1) und GL-034 (H-27, Panel-Schluesse) nutzten den Ueberlebenden-Baum einschliesslich 68 USDC-Perpetuals (Zwillinge der USDT-Perps) und datierter Futures (Gate-Review Registrierung H-32, B-1). Die Feststellungen bleiben bestehen; das Universum der kuenftigen H-32-Rechnungen ist auf lineare USDT-Perps eingeschraenkt.
