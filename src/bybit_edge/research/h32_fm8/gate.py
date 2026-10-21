@@ -8,7 +8,9 @@ Provisional PASS iff in W1 AND W2 (C.10 hard, no DEC-52 branch -- rule U only ad
 
   (1a) ``y_W > 0`` (NaN fails);
   (1b) ``y_W >= z_krit * SE_W`` (SE_W by rule P-1 (4); NaN or 0 fails);
-  (1c) ``y_W >= q95_W,v`` (frozen 95 % quantile of the null window mean, more extreme of driftfree / drift);
+  (1c) ``y_W >= q95_eff,W,v`` (DEC-101 E2: the frozen 95 % quantile of the null window mean, scaled to the real weekly SD:
+       ``q95_eff = max(0, m) + k (q95 - m)``, ``k = max(1, SD(IC_t,W) / sd_week_W,v)``, ``m`` the frozen null mean of the
+       binding cell; a window payload without a ``null_scaling`` block uses the frozen ``q95`` as before, ``k = 1``);
 
 and, only for ``rev_gap``, (4b) no bounce kill: ``|IC_bounce,W| >= |statistic_W|`` in any window -> NO PASS ("Artefakt
 Bounce").  Before the verdict: the pre-verdict kill ``ceiling_k4_W >= T_W,frozen`` in any window -> DROP, label GL-012
@@ -21,16 +23,33 @@ from __future__ import annotations
 import math
 from typing import Any
 
-__all__ = ["evaluate", "window_conditions"]
+from . import estimators as est
+
+__all__ = ["evaluate", "window_conditions", "effective_q95"]
 
 
 def _finite(x: Any) -> bool:
     return x is not None and isinstance(x, (int, float)) and math.isfinite(float(x))
 
 
+def effective_q95(w: dict[str, Any]) -> dict[str, Any]:
+    """DEC-101 E2: the null quantile that condition (1c) of ONE window payload uses, derived from the payload alone.  With a
+    ``null_scaling`` block ``{"sd_real", "sd_week", "m", "q95_frozen"}``: ``k = max(1, sd_real / sd_week)`` and
+    ``q95_eff = max(0, m) + k (q95_frozen - m)`` (pure arithmetic, T4); without it the frozen ``w["q95"]`` with ``k = 1``."""
+    ns = w.get("null_scaling")
+    if isinstance(ns, dict):
+        k = est.scale_factor(ns.get("sd_real"), ns.get("sd_week"))
+        return {"k": k, "q95_effective": est.q95_effective(ns.get("m"), k, ns.get("q95_frozen")), "scaled": True}
+    q = w.get("q95")
+    return {"k": 1.0, "q95_effective": float(q) if _finite(q) else float("nan"), "scaled": False}
+
+
 def window_conditions(w: dict[str, Any], z_krit: float) -> dict[str, Any]:
-    """Conditions (1a)-(1c) of ONE window payload ``{"y", "se_w", "q95"}`` and the threshold ``T_W = max(z SE_W, q95)``."""
-    y, se, q95 = w.get("y"), w.get("se_w"), w.get("q95")
+    """Conditions (1a)-(1c) of ONE window payload ``{"y", "se_w", "q95"}`` (DEC-101 E2: or with a ``null_scaling`` block) and
+    the threshold ``T_W = max(z SE_W, q95_eff)``."""
+    y, se = w.get("y"), w.get("se_w")
+    eff = effective_q95(w)
+    q95 = eff["q95_effective"]
     a = bool(_finite(y) and float(y) > 0.0)
     b = bool(_finite(y) and _finite(se) and float(se) > 0.0 and float(y) >= z_krit * float(se))
     c = bool(_finite(y) and _finite(q95) and float(y) >= float(q95))
@@ -38,7 +57,8 @@ def window_conditions(w: dict[str, Any], z_krit: float) -> dict[str, Any]:
     if _finite(q95):
         thr_terms.append(float(q95))
     thr = max(thr_terms) if len(thr_terms) == 2 else float("nan")
-    return {"a_sign": a, "b_magnitude": b, "c_null_quantile": c, "window_pass": bool(a and b and c), "threshold_t": thr}
+    return {"a_sign": a, "b_magnitude": b, "c_null_quantile": c, "window_pass": bool(a and b and c), "threshold_t": thr,
+            "k": eff["k"], "q95_effective": eff["q95_effective"]}
 
 
 def evaluate(payload: dict[str, Any]) -> dict[str, Any]:
@@ -63,9 +83,10 @@ def evaluate(payload: dict[str, Any]) -> dict[str, Any]:
         cond = window_conditions(w, z)
         per_window[wn] = cond
         all_pass = all_pass and cond["window_pass"]
-        for key, name in (("a_sign", "(1a) y > 0"), ("b_magnitude", "(1b) y >= z_krit * SE_W"), ("c_null_quantile", "(1c) y >= q95")):
+        for key, name in (("a_sign", "(1a) y > 0"), ("b_magnitude", "(1b) y >= z_krit * SE_W"), ("c_null_quantile", "(1c) y >= q95_eff")):
             if not cond[key]:
-                labels.append(f"{name} verfehlt in {wn} (y={w.get('y')!r}, SE_W={w.get('se_w')!r}, q95={w.get('q95')!r})")
+                labels.append(f"{name} verfehlt in {wn} (y={w.get('y')!r}, SE_W={w.get('se_w')!r}, q95={w.get('q95')!r}, "
+                              f"q95_eff={cond['q95_effective']!r}, k={cond['k']!r})")
     bounce_windows: list[str] = []
     for wn, w in windows.items():
         b, real = w.get("bounce_ic"), w.get("mean_ic")

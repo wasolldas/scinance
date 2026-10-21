@@ -462,19 +462,27 @@ def test_fingerprint_pins_the_register_and_every_parquet_and_detects_tampering(c
 
 
 def test_data_fingerprint_check_pins_the_register_and_optionally_the_tree(clean):
+    """DEC-101 E4 (A-3, Review B-5) adaptation: the file-level tree hash is no longer optional.  A registration that does not
+    pin ``delisted_tree_sha256`` is refused by the check (before DEC-101 it was silently not compared); the register pin and
+    the tree pin differ from the panel's values -> loud fail, as before."""
+    tree = clean["report"]["tree_sha256"]
     fp = {"union_range_fingerprint": "ab" * 32, "delisting_dates_sha256": "cd" * 32,
-          "delisting_register_sha256": artifacts.sha256_file(clean["register"])}
+          "delisting_register_sha256": artifacts.sha256_file(clean["register"]), "delisted_tree_sha256": tree}
     reg = {"data_fingerprints": dict(fp)}
     checks.check_data_fingerprints(reg, dict(fp))
     with pytest.raises(DataFingerprintError, match="delisting_register_sha256"):
         checks.check_data_fingerprints(reg, {**fp, "delisting_register_sha256": "00" * 32})
     with pytest.raises(DataFingerprintError, match="delisting_register_sha256"):
         checks.check_data_fingerprints(reg, {k: v for k, v in fp.items() if k != "delisting_register_sha256"})
-    reg_t = {"data_fingerprints": {**fp, "delisted_tree_sha256": clean["report"]["tree_sha256"]}}
-    checks.check_data_fingerprints(reg_t, {**fp, "delisted_tree_sha256": clean["report"]["tree_sha256"]})
     with pytest.raises(DataFingerprintError, match="delisted_tree_sha256"):
-        checks.check_data_fingerprints(reg_t, {**fp, "delisted_tree_sha256": "00" * 32})
-    checks.check_data_fingerprints(reg, {**fp, "delisted_tree_sha256": "00" * 32})                       # not pinned: not compared
+        checks.check_data_fingerprints(reg, {**fp, "delisted_tree_sha256": "00" * 32})
+    with pytest.raises(DataFingerprintError, match="delisted_tree_sha256"):
+        checks.check_data_fingerprints(reg, {k: v for k, v in fp.items() if k != "delisted_tree_sha256"})
+    unpinned = {"data_fingerprints": {k: v for k, v in fp.items() if k != "delisted_tree_sha256"}}
+    with pytest.raises(DataFingerprintError, match="not pinned"):                                         # DEC-101 E4: not pinned = refused
+        checks.check_data_fingerprints(unpinned, dict(fp))
+    with pytest.raises(DataFingerprintError, match="not pinned"):
+        checks.check_data_fingerprints(unpinned, {k: v for k, v in fp.items() if k != "delisted_tree_sha256"})
 
 
 def test_h32_union_loader_quotes_the_register_fingerprint_and_refuses_a_tampered_tree(clean, tmp_path):
@@ -486,7 +494,8 @@ def test_h32_union_loader_quotes_the_register_fingerprint_and_refuses_a_tampered
                    as_of="2023-03-01", allow_partial=False)
     loaded = H32.load_union_panel(ns)
     assert loaded is not None
-    panel, observed = loaded
+    panel, observed, urep = loaded                                                                        # DEC-101 E1: + the universe report
+    assert urep["rule"] == "linear_usdt_perpetual" and urep["excluded"] == {"usdc_perp": 0, "dated_future": 0, "other": 0}
     assert observed["delisting_register_sha256"] == artifacts.sha256_file(clean["register"])
     assert observed["delisted_tree_sha256"] == clean["report"]["tree_sha256"]
     assert observed["delisting_dates_sha256"] == artifacts.sha256_file(tree / "delisting_dates.json")
@@ -529,7 +538,8 @@ def test_script_output_feeds_the_registration_fingerprints_end_to_end(clean, tmp
     shutil.copytree(clean["out"], tree)
     ns = Namespace(panel_base=str(base), delisted_base=str(tree), delisted_manifest="", delisting_dates="", start_year=2021, end_year=2023,
                    as_of="2023-03-01", allow_partial=False)
-    _panel, observed = H32.load_union_panel(ns)
-    fp = {k: observed[k] for k in ("union_range_fingerprint", "delisting_dates_sha256", "delisting_register_sha256")}
+    _panel, observed, _urep = H32.load_union_panel(ns)
+    fp = {k: observed[k] for k in ("union_range_fingerprint", "delisting_dates_sha256", "delisting_register_sha256",
+                                   "delisted_tree_sha256")}                                                  # DEC-101 E4: the tree hash is pinned too
     assert all(schema.is_hex64(v) for v in fp.values())
     checks.check_data_fingerprints({"data_fingerprints": fp}, observed)

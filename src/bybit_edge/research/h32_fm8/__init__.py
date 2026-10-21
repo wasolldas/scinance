@@ -8,6 +8,12 @@ i.e. the IC_res of the third version H-28..H-30), in the registered direction.
 **Additive.**  This package and ``scripts/h32_fm8.py`` are new; ``wp13_xsec`` and ``wp7_universe`` (code hash of the A3
 registration) are only imported, never changed; ``power_p1`` is only imported.
 
+DEC-101 (H-32 registration, part 1) adds, additively: the universe filter ``universe.py`` (linear USDT perpetuals, in ALL
+modes, before the cut), the scaled null of the test run (``estimators.scale_factor`` / ``q95_effective`` / ``scaled_replicates``,
+used by ``testrun.py`` and ``gate.py``), the technical exactly-one-pilot lock and the runner / delisted-tree / universe pins
+(``checks.py``, ``schema.py``), the q95 rule and the report-only ``power_line`` (``estimators.frozen_q95``,
+``estimators.end_power_replicates``, ``powerline.py``), and the PP3 dry run ``pp3.py`` (no IC).
+
 Modes (``scripts/h32_fm8.py``), every one of them gated before any data is read:
 
   * ``--prelaunch`` (``vorlauf.py``, ``nullsim.py``) -- Vorlauf v6, outcome-free: hard panel cut (``panel_cut.py``)
@@ -18,6 +24,8 @@ Modes (``scripts/h32_fm8.py``), every one of them gated before any data is read:
   * ``--pilot`` (``pilot.py``) -- stage P: start lock, exactly-one-pilot lock, panel cut <= 2024-06-30, per variant mean
     fm8-IC, SE by rule P-1 (4), hand-over rule U (``handover.py``), selection-adjusted ``mu_sel`` as a mandatory double
     statement, DEC-53 artifacts, ``h32_pilot.json`` + sha256.
+  * ``--pp3-dry-run`` (``pp3.py``) -- DEC-101 E6: start lock, runner pins, fingerprints, universe, K_fm8 series and window pins of P
+    (cut 2024-06-30) and W1 / W2 (cut 2026-06-28) against the registration; no IC is computed.
   * ``--positive-control`` (``positive_control.py``) -- PRD 3.3.8 control, alone and before the test, synthetic returns
     on the real week shape, injection calibrated on the REALISED effect.
   * ``--run`` (``testrun.py``, ``gate.py``, ``pnull.py``, ``permutation.py``, ``fweek.py``) -- stage T on the handed-over

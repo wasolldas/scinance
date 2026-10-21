@@ -4,12 +4,18 @@
 invalid field is a loud fail BEFORE any panel byte is read.  Every constant the run checks against the YAML is pinned to
 a code constant of ``constants.py`` (T5): the YAML may repeat a frozen number, never change it.  The frozen v6 constants
 (per window and variant) are the only numbers that come from the registration alone.
+
+DEC-101 adds mandatory blocks: ``universe`` (E1: rule ``linear_usdt_perpetual`` + the excluded counts at the Vorlauf),
+``null_scaling`` (E2: enabled, the rule text, direction strictness), ``pilot_window.out_dir`` (E3: the one pilot directory),
+``runner`` (E4: the CLI arguments that determine the union-range fingerprint), ``data_fingerprints.delisted_tree_sha256``
+(E4) and ``q95_1000`` / ``q95_10000`` next to the frozen ``q95`` (E5).
 """
 from __future__ import annotations
 
 import math
 import re
-from pathlib import Path
+from datetime import date
+from pathlib import Path, PurePosixPath
 from typing import Any
 
 import yaml
@@ -22,7 +28,7 @@ __all__ = ["load_registered_yaml", "validate_registered", "frozen_pin_table", "F
 
 #: per-variant frozen constants of a judged window (ERSTFASSUNG 1.6).
 FROZEN_VARIANT_KEYS: tuple[str, ...] = ("se_mean", "e_se_rule", "sd_week", "null_mean", "q95", "q95_driftfree",
-                                        "q95_drifting")
+                                        "q95_drifting", "q95_1000", "q95_10000")
 #: scalar frozen constants of a judged window.
 FROZEN_SCALAR_KEYS: tuple[str, ...] = ("ceiling_k4", "floor_fm8", "v_fm8")
 _HEX64 = re.compile(r"^[0-9a-f]{64}$")
@@ -54,6 +60,35 @@ def load_registered_yaml(path: Path | str) -> dict[str, Any]:
     return payload
 
 
+def _iso_date(x: Any) -> str | None:
+    """Canonical ISO date string of a YAML date / string, ``None`` if it is neither."""
+    if isinstance(x, date) and not hasattr(x, "hour"):
+        return x.isoformat()
+    if isinstance(x, str):
+        try:
+            return date.fromisoformat(x).isoformat() if date.fromisoformat(x).isoformat() == x else None
+        except ValueError:
+            return None
+    return None
+
+
+def _is_int(x: Any) -> bool:
+    return isinstance(x, int) and not isinstance(x, bool)
+
+
+def validate_out_dir(out_dir: Any) -> str:
+    """DEC-101 E3: ``pilot_window.out_dir`` is a repository-relative POSIX path strictly below ``scinance3-impl/state/runs``
+    (no ``..``, not absolute, not under ``data/harvest``).  Returns the normalised string."""
+    _need(isinstance(out_dir, str) and bool(out_dir.strip()), "pilot_window.out_dir must be a non-empty string (DEC-101 E3)")
+    pp = PurePosixPath(out_dir)
+    root = PurePosixPath(C.RUNS_REL)
+    _need(not pp.is_absolute() and ".." not in pp.parts and "\\" not in out_dir and pp.as_posix() == out_dir
+          and "data/harvest" not in out_dir, f"pilot_window.out_dir {out_dir!r} must be a normalised repository-relative path (DEC-101 E3)")
+    _need(pp.parts[:len(root.parts)] == root.parts and len(pp.parts) > len(root.parts),
+          f"pilot_window.out_dir {out_dir!r} must lie strictly below {C.RUNS_REL} (DEC-101 E3)")
+    return out_dir
+
+
 def _get(d: Any, *keys: str) -> Any:
     cur = d
     for k in keys:
@@ -81,6 +116,26 @@ def validate_registered(reg: dict[str, Any]) -> None:
     zk = _get(reg, "z_krit")
     _pin(_num(zk) and abs(float(zk) - C.Z_KRIT) <= 5e-7, f"z_krit must be the number {C.Z_KRIT:.7f} (DEC-94 (1)/(2))")
     _pin(_num(_get(reg, "mde_faktor")) and float(reg["mde_faktor"]) == C.MDE_FAKTOR, f"mde_faktor must be {C.MDE_FAKTOR}")
+    # --- DEC-101 E1: the universe (rule pinned, counts frozen at the Vorlauf)
+    uni = _get(reg, "universe")
+    _need(isinstance(uni, dict), "universe must be a mapping (DEC-101 E1)")
+    _pin(uni.get("rule") == C.UNIVERSE_RULE, f"universe.rule must be {C.UNIVERSE_RULE!r} (DEC-101 E1), got {uni.get('rule')!r}")
+    _need(isinstance(uni.get("label"), str) and bool(uni["label"].strip()), "universe.label missing (mandatory label, DEC-101 E1)")
+    exc = uni.get("excluded_at_prelaunch")
+    _need(isinstance(exc, dict) and set(exc) == set(C.UNIVERSE_CLASSES) and all(_is_int(exc[c]) and exc[c] >= 0 for c in exc),
+          f"universe.excluded_at_prelaunch must hold a non-negative integer for each of {list(C.UNIVERSE_CLASSES)}")
+    # --- DEC-101 E2: scaled null
+    ns = _get(reg, "null_scaling")
+    _need(isinstance(ns, dict), "null_scaling must be a mapping (DEC-101 E2)")
+    _pin(ns.get("enabled") is True, "null_scaling.enabled must be true (DEC-101 E2)")
+    _pin(ns.get("rule") == C.NULL_SCALING_RULE, f"null_scaling.rule must be {C.NULL_SCALING_RULE!r}")
+    _pin(ns.get("direction") == C.NULL_SCALING_DIRECTION and ns.get("ref") == C.NULL_SCALING_REF,
+         f"null_scaling must carry direction {C.NULL_SCALING_DIRECTION!r} and ref {C.NULL_SCALING_REF!r}")
+    # --- DEC-101 E4: runner pins
+    rn = _get(reg, "runner")
+    _need(isinstance(rn, dict) and _iso_date(rn.get("as_of")) is not None and _is_int(rn.get("start_year"))
+          and _is_int(rn.get("end_year")) and rn["end_year"] >= rn["start_year"] and isinstance(rn.get("allow_partial"), bool),
+          "runner must be {as_of: ISO date, start_year: int, end_year: int >= start_year, allow_partial: bool} (DEC-101 E4)")
     # --- seal
     seal = _get(reg, "seal")
     _pin(seal.get("panel_cut_test") == C.CUT_TEST, f"seal.panel_cut_test must be {C.CUT_TEST}")
@@ -138,6 +193,7 @@ def validate_registered(reg: dict[str, Any]) -> None:
     _pin(pw.get("k_min_rule") == C.K_MIN["P"], f"pilot_window.k_min_rule must be {C.K_MIN['P']}")
     sr = pw.get("single_run") or {}
     _pin(sr.get("required") is True and sr.get("rerun_requires_dec") is True, "pilot_window.single_run must be required, rerun_requires_dec")
+    validate_out_dir(pw.get("out_dir"))                                                                   # DEC-101 E3
     prs = pw.get("pilot_result_sha256")
     _need(prs is None or is_hex64(prs), "pilot_window.pilot_result_sha256 must be null or a sha256")
     se_rule = (pw.get("se_rule") or {}).get("stationary_bootstrap") or {}
@@ -191,6 +247,9 @@ def validate_registered(reg: dict[str, Any]) -> None:
             _need(_num(fz.get(key)), f"windows.{wn}.frozen_v6.{key} missing or not finite (v6 constant)")
         _need(float(fz["floor_fm8"]) > 0.0 and float(fz["v_fm8"]) > 0.0, f"windows.{wn}.frozen_v6.floor_fm8 / v_fm8 must be > 0")
         _need(is_hex64(fz.get("k_fm8_series_sha256")), f"windows.{wn}.frozen_v6.k_fm8_series_sha256 must be a sha256")
+        for v in C.VARIANTS:                                                                               # DEC-101 E5: the q95 rule
+            _pin(float(fz["q95"][v]) == max(float(fz["q95_1000"][v]), float(fz["q95_10000"][v])),
+                 f"windows.{wn}.frozen_v6.q95[{v}] must equal max(q95_1000, q95_10000) (DEC-101 E5)")
     # --- positive control (criteria are pinned to the code constants)
     pc = _get(reg, "positive_control")
     crit = pc.get("criteria") or {}
@@ -204,11 +263,10 @@ def validate_registered(reg: dict[str, Any]) -> None:
     # --- data fingerprints
     fp = _get(reg, "data_fingerprints")
     _need(is_hex64(fp.get("union_range_fingerprint")) and is_hex64(fp.get("delisting_dates_sha256"))
-          and is_hex64(fp.get("delisting_register_sha256")),
-          "data_fingerprints.{union_range_fingerprint, delisting_dates_sha256, delisting_register_sha256} must be sha256 strings "
-          "(DEC-100: fingerprint over the Data-Harvest delisting register)")
-    _need(fp.get("delisted_tree_sha256") is None or is_hex64(fp.get("delisted_tree_sha256")),
-          "data_fingerprints.delisted_tree_sha256 must be absent or a sha256")
+          and is_hex64(fp.get("delisting_register_sha256")) and is_hex64(fp.get("delisted_tree_sha256")),
+          "data_fingerprints.{union_range_fingerprint, delisting_dates_sha256, delisting_register_sha256, delisted_tree_sha256} "
+          "must be sha256 strings (DEC-100: fingerprint over the Data-Harvest delisting register; DEC-101 E4: the delisted tree is "
+          "a mandatory pin)")
 
 
 def window_constants(reg: dict[str, Any], wn: str) -> dict[str, Any]:
@@ -235,6 +293,11 @@ def frozen_pin_table(reg: dict[str, Any]) -> dict[str, Any]:
         "mean_block": reg["rules"]["mean_block"], "n_boot": reg["rules"]["n_boot"], "n_reps": reg["rules"]["n_reps"],
         "panel_cut_test": reg["seal"]["panel_cut_test"], "panel_cut_pilot": reg["seal"]["panel_cut_pilot"],
         "w_pilot": reg["pilot_window"]["w_pilot"], "m_P": dict(reg["pilot_window"]["frozen_v6"]["m_P"]),
+        "universe_rule": reg["universe"]["rule"], "excluded_at_prelaunch": dict(reg["universe"]["excluded_at_prelaunch"]),
+        "null_scaling_rule": reg["null_scaling"]["rule"], "null_scaling_enabled": reg["null_scaling"]["enabled"],
+        "runner": {"as_of": _iso_date(reg["runner"]["as_of"]), "start_year": reg["runner"]["start_year"],
+                   "end_year": reg["runner"]["end_year"], "allow_partial": reg["runner"]["allow_partial"]},
+        "out_dir": reg["pilot_window"]["out_dir"], "delisted_tree_sha256": reg["data_fingerprints"]["delisted_tree_sha256"],
     }
     for wn in ("W1", "W2"):
         w = reg["windows"][wn]

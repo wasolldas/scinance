@@ -26,7 +26,10 @@ from bybit_edge.research.h32_fm8 import constants as C
 
 START = date(2021, 10, 4)               # a Monday
 END = date(2026, 9, 27)                 # a Sunday, after the test cut (2026-06-28)
-FAKE_FINGERPRINTS = {"union_range_fingerprint": "ab" * 32, "delisting_dates_sha256": "cd" * 32, "delisting_register_sha256": "ef" * 32}
+FAKE_FINGERPRINTS = {"union_range_fingerprint": "ab" * 32, "delisting_dates_sha256": "cd" * 32, "delisting_register_sha256": "ef" * 32,
+                     "delisted_tree_sha256": "12" * 32}                                  # DEC-101 E4: the tree hash is a mandatory pin
+#: DEC-101 E4: the runner arguments of the fixture Vorlauf (pinned by the emitted template).
+RUNNER = {"as_of": "2026-09-28", "start_year": 2021, "end_year": 2026, "allow_partial": True}
 
 
 def _zscore(x: np.ndarray, members: np.ndarray) -> np.ndarray:
@@ -156,8 +159,24 @@ def shrink_constants(monkeypatch, *, n_reps: int = 24, n_boot: int = 60, n_perm:
     monkeypatch.setattr(C, "PC_INJECT_TOL", 0.25)
 
 
+def add_twins(panel: dict[str, Any], *, base: str = "S002USDT") -> dict[str, Any]:
+    """DEC-101 E1 fixture: the panel plus a USDC twin (``<base>`` with ``USDT`` replaced by ``PERP``) and a dated future
+    (``<base>-25DEC26``) of a surviving symbol -- same prices as the base column, columns appended at the end."""
+    j = panel["symbols"].index(base)
+    stem = base[:-len("USDT")]
+    out = dict(panel)
+    out["symbols"] = list(panel["symbols"]) + [f"{stem}PERP", f"{base}-25DEC26"]
+    for key in ("close", "turnover", "funding_n", "funding_sum"):
+        a = np.asarray(panel[key])
+        out[key] = np.concatenate([a, a[:, [j]], a[:, [j]]], axis=1)
+    out["is_delisted"] = np.concatenate([np.asarray(panel["is_delisted"]), [False, False]])
+    out["last_alive_day"] = list(panel["last_alive_day"]) + [None, None]
+    out["n_symbols_survivors"] = int(panel["n_symbols_survivors"]) + 2
+    return out
+
+
 def prelaunch_report(panel: dict[str, Any], **kw: Any) -> dict[str, Any]:
-    args = dict(cut_date=C.CUT_TEST, n_reps=C.N_REPS_MIN, n_boot=C.N_BOOT_MIN, calibration_kwargs=calibration_kwargs())
+    args = dict(cut_date=C.CUT_TEST, n_reps=C.N_REPS_MIN, n_boot=C.N_BOOT_MIN, calibration_kwargs=calibration_kwargs(), runner=dict(RUNNER))
     args.update(kw)
     return vorlauf.assemble_prelaunch(panel, dict(FAKE_FINGERPRINTS), **args)
 

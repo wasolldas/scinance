@@ -15,8 +15,9 @@ import numpy as np
 from .. import power_p1
 from . import constants as C
 
-__all__ = ["se_rule", "pilot_statistics", "signed_selection_ceiling", "mu_sel", "end_power", "by_threshold",
-           "harmonic_number", "bootstrap_means_sha256", "series_sha256"]
+__all__ = ["se_rule", "pilot_statistics", "signed_selection_ceiling", "mu_sel", "mu_sel_detail", "end_power",
+           "end_power_replicates", "by_threshold", "harmonic_number", "bootstrap_means_sha256", "series_sha256",
+           "scale_factor", "q95_effective", "scaled_replicates", "frozen_q95"]
 
 _N = NormalDist()
 
@@ -125,24 +126,37 @@ def _log_sf(z: float) -> float:
             + math.log(1.0 - 1.0 / z2 + 3.0 / (z2 * z2) - 15.0 / (z2 * z2 * z2)))
 
 
-def mu_sel(x_p: float, se_p: float, c: float) -> float | None:
-    """DEC-99 (3) / Review B-5: the selection-adjusted pilot estimator -- the solution ``mu`` of
+#: DEC-101 E6 (B-9.5): relative width (in SE_P) of the neighbourhood of the lower bracket edge in which ``mu_sel`` counts as
+#: "no solution" (the root lies at or beyond ``x_P - 40 SE_P``: a placeholder, not an estimate).
+MU_SEL_BRACKET_SE = 40.0
+MU_SEL_EDGE_TOL = 1e-6
+MU_SEL_NO_SOLUTION = "keine Loesung (Platzhalter, report-only)"
+
+
+def mu_sel_detail(x_p: float, se_p: float, c: float) -> dict[str, Any]:
+    """DEC-99 (3) / Review B-5 / DEC-101 E6: the selection-adjusted pilot estimator -- the solution ``mu`` of
 
         ``P_mu(X >= x_P | X >= c) = 0.5``,  ``X ~ N(mu, SE_P^2)``,
 
     i.e. the ``mu`` for which ``x_P`` is the median of ``X`` given the hand-over threshold ``c`` (conditionally
-    median-unbiased).  Defined for ``x_P > c``; for ``x_P <= c`` (not handed over) returns ``None``.  Bisection on the
-    monotone map ``mu -> P`` over ``[x_P - 40 SE_P, x_P + 40 SE_P]`` with log tails (no underflow)."""
+    median-unbiased).  Defined for ``x_P > c``.  Bisection on the monotone map ``mu -> P`` over
+    ``[x_P - 40 SE_P, x_P + 40 SE_P]`` with log tails (no underflow).
+
+    DEC-101 E6 (B-9.5): if ``x_P`` lies barely above ``c`` the root lies at or below the lower bracket edge
+    (``|mu - (x_P - 40 SE_P)|`` small) -- then there is NO solution inside the bracket and the result is
+    ``{"mu_sel": None, "solved": False, "note": "keine Loesung (Platzhalter, report-only)"}``; the bracket edge is never
+    returned as if it were an estimate.  ``x_P <= c`` (not handed over) also gives ``None`` with ``solved`` ``None``."""
     x_p, s, c = float(x_p), float(se_p), float(c)
     if not (s > 0.0) or not (x_p > c):
-        return None
+        return {"mu_sel": None, "solved": None, "note": None, "bracket_lo": None}
 
     def f(mu: float) -> float:
         return math.exp(_log_sf((x_p - mu) / s) - _log_sf((c - mu) / s)) - 0.5
 
-    lo, hi = x_p - 40.0 * s, x_p + 40.0 * s
-    if f(lo) > 0.0:                 # the root lies below the bracket (x_P barely above c): report the bracket edge
-        return lo
+    lo0, hi = x_p - MU_SEL_BRACKET_SE * s, x_p + MU_SEL_BRACKET_SE * s
+    lo = lo0
+    if f(lo) > 0.0:                 # the root lies below the bracket (x_P barely above c): no solution inside it
+        return {"mu_sel": None, "solved": False, "note": MU_SEL_NO_SOLUTION, "bracket_lo": lo0}
     for _ in range(200):
         mid = 0.5 * (lo + hi)
         if f(mid) < 0.0:
@@ -151,7 +165,15 @@ def mu_sel(x_p: float, se_p: float, c: float) -> float | None:
             hi = mid
         if hi - lo < 1e-15 * max(1.0, abs(mid)):
             break
-    return 0.5 * (lo + hi)
+    mu = 0.5 * (lo + hi)
+    if abs(mu - lo0) <= MU_SEL_EDGE_TOL * s:           # converged onto the bracket edge: the same placeholder
+        return {"mu_sel": None, "solved": False, "note": MU_SEL_NO_SOLUTION, "bracket_lo": lo0}
+    return {"mu_sel": mu, "solved": True, "note": None, "bracket_lo": lo0}
+
+
+def mu_sel(x_p: float, se_p: float, c: float) -> float | None:
+    """``mu_sel`` of :func:`mu_sel_detail` (``None`` if not handed over or without a solution inside the bracket)."""
+    return mu_sel_detail(x_p, se_p, c)["mu_sel"]
 
 
 def harmonic_number(m: int) -> float:
@@ -169,11 +191,93 @@ def end_power(prior: float, m: int, windows: dict[str, dict[str, float]], *, alp
     """ERSTFASSUNG 1.9: end power after F-WEEK at the prior ``prior`` (y units).  ``windows[W]`` = ``{"se_t", "sd_t",
     "null_mean"}``.  The BY bound for one rejection is ``alpha / (m H_m)``; ``z_eff = max(z_krit, Phi^-1(1 - bound))``;
     window power ``Phi((prior - max(0, null_mean_W) - z_eff SE_T,W) / SD_T,W)``; end power = product over the windows.
-    Display only -- never an assignment basis."""
+    DEC-101 E5 label: **normal approximation**, report-only -- the end power of the power line is
+    :func:`end_power_replicates`.  Display only -- never an assignment basis."""
     thr = by_threshold(m, alpha)
     z_eff = max(C.Z_KRIT, _N.inv_cdf(1.0 - thr))
     wp: dict[str, float] = {}
     for wn, w in windows.items():
         wp[wn] = power_p1.condition_power(float(prior) - max(0.0, float(w["null_mean"])), z_eff * float(w["se_t"]),
                                           float(w["sd_t"]))
-    return {"m": int(m), "by_threshold_p": thr, "z_eff": z_eff, "window_power": wp, "joint": math.prod(wp.values())}
+    return {"m": int(m), "by_threshold_p": thr, "z_eff": z_eff, "window_power": wp, "joint": math.prod(wp.values()),
+            "method": "Normalnaeherung (report-only)"}
+
+
+# ----------------------------------------------------------------------------
+# DEC-101 E2: scaled null (test run); E5: q95 rule and end power from the replicates
+# ----------------------------------------------------------------------------
+
+def _is_fin(x: Any) -> bool:
+    return x is not None and isinstance(x, (int, float, np.floating)) and math.isfinite(float(x))
+
+
+def scale_factor(sd_real: float, sd_week: float) -> float:
+    """DEC-101 E2 (Review A-1): ``k = max(1, SD(IC_t,W) / sd_week_W,v)`` -- the real weekly SD of the fm8 series against the
+    frozen null weekly SD.  Never below 1 (strictness only: a real SD below the null SD gives no credit).  NaN (the callers
+    fail closed) if either number is not finite or ``sd_week`` is not positive."""
+    if not (_is_fin(sd_real) and _is_fin(sd_week)) or not (float(sd_week) > 0.0):
+        return float("nan")
+    return max(1.0, float(sd_real) / float(sd_week))
+
+
+def q95_effective(m: float, k: float, q95: float) -> float:
+    """DEC-101 E2: ``q95_eff = max(0, m) + k * (q95 - m)`` with ``m`` the frozen null mean of the binding cell.  ``k = 1`` and
+    ``m >= 0`` reproduce ``q95``; for ``m < 0`` (rev_gap) the result is ``k * (q95 + |m|) >= q95`` -- no credit for a negative
+    null mean.  NaN if an input is not finite."""
+    if not (_is_fin(m) and _is_fin(k) and _is_fin(q95)):
+        return float("nan")
+    return max(0.0, float(m)) + float(k) * (float(q95) - float(m))
+
+
+def scaled_replicates(draws: Sequence[float] | np.ndarray, m: float, k: float) -> np.ndarray:
+    """DEC-101 E2: the transformed replicates ``d' = max(0, m) + k * (d - m)`` of the binding cell (NaN stays NaN and counts as
+    an exceedance in the p convention).  All-NaN if ``m`` or ``k`` is not finite (fails closed: p = 1)."""
+    d = np.asarray(draws, dtype=np.float64)
+    if not (_is_fin(m) and _is_fin(k)):
+        return np.full(d.shape, np.nan)
+    return max(0.0, float(m)) + float(k) * (d - float(m))
+
+
+def frozen_q95(q95_1000: float, p_draws: Sequence[float] | np.ndarray) -> dict[str, Any]:
+    """DEC-101 E5 (A-4, B-6): the frozen ``q95`` of one window and variant
+
+        ``q95 = max(q95_1000, q95_10000)``
+
+    with ``q95_1000`` the 95 % quantile of the constants replicates (the more extreme drift cell, as before) and
+    ``q95_10000`` the empirical 95 % quantile of ALL p replicates of the binding cell (``numpy.quantile``, linear
+    interpolation, finite replicates only).  Strictness: the larger of the two binds; both values are reported.  (With fewer
+    p replicates than 10,000 -- fixture runs -- the key names stay, ``n_p_replicates`` states the count.)"""
+    fin = _fin(p_draws)
+    q10000 = float(np.quantile(fin, C.NULL_LEVEL)) if fin.size else float("nan")
+    vals = [x for x in (float(q95_1000), q10000) if math.isfinite(x)]
+    return {"q95_1000": float(q95_1000), "q95_10000": q10000, "q95": max(vals) if vals else float("nan"),
+            "n_p_replicates": int(fin.size), "method": C.Q95_QUANTILE_METHOD}
+
+
+def end_power_replicates(prior: float, m: int, windows: dict[str, dict[str, Any]], *, alpha: float = C.BY_ALPHA) -> dict[str, Any]:
+    """DEC-101 E5 (A-4, Review B-4): end power after F-WEEK at the point ``prior`` (y units) from the REPLICATES of the binding
+    cell instead of the normal approximation.  ``windows[W]`` = ``{"se_t", "sd_t", "null_mean", "q95", "draws"}`` with
+    ``draws`` the p replicates of the binding cell.
+
+    With ``bound = alpha / (m H_m)`` and ``z_eff = max(z_krit, Phi^-1(1 - bound))`` the window power is
+    ``P(Y >= max(z_eff SE_T + max(0, m_W), q_{1-bound}(replicates), q95_W))`` for ``Y ~ N(prior, SD_T^2)``:
+    condition (1b) with the null-mean credit, the BY bound on the p of the replicates, and (1c) (the frozen ``q95_W`` only
+    exceeds ``q_{1-bound}`` for ``m = 1`` where ``bound = 0.10 > 0.05``).  ``q_{1-bound}`` is ``numpy.quantile`` (linear
+    interpolation) of the finite replicates.  The end power is the product over the windows.  Display only -- never an
+    assignment basis; :func:`end_power` (normal approximation) stays as the report-only comparison."""
+    bound = by_threshold(m, alpha)
+    z_eff = max(C.Z_KRIT, _N.inv_cdf(1.0 - bound))
+    wp: dict[str, float] = {}
+    detail: dict[str, Any] = {}
+    for wn, w in windows.items():
+        fin = _fin(w["draws"])
+        if fin.size == 0:
+            raise ValueError(f"window {wn}: no finite replicate for the BY quantile")
+        q_rep = float(np.quantile(fin, 1.0 - bound))
+        t_1b = z_eff * float(w["se_t"]) + max(0.0, float(w["null_mean"]))
+        thr = max(t_1b, q_rep, float(w["q95"]))
+        wp[wn] = power_p1.condition_power(float(prior), thr, float(w["sd_t"]))
+        detail[wn] = {"threshold": thr, "t_1b_with_credit": t_1b, "q_replicates": q_rep, "q95": float(w["q95"]),
+                      "binding": max((("1b", t_1b), ("by_replicates", q_rep), ("1c", float(w["q95"]))), key=lambda kv: kv[1])[0]}
+    return {"m": int(m), "by_threshold_p": bound, "z_eff": z_eff, "window_power": wp, "window_detail": detail,
+            "joint": math.prod(wp.values()), "method": "replicate quantile (DEC-101 E5), not the normal approximation"}

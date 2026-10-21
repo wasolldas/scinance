@@ -115,3 +115,39 @@ P_REPLICATES_FILE = "h32_prelaunch_p_replicates.json"
 
 #: the sealed file name patterns of the programme: no code path here opens a path matching one of them.
 SEALED_PATTERNS: tuple[str, ...] = ("*_L_window_sealed.json", "weekly_ic_series.csv", "ic_series_*_UNION_REAL.csv")
+
+# ----------------------------------------------------------------------------
+# DEC-101 (H-32 registration, part 1): universe, scaled null, technical exactly-one-pilot lock, pins, q95 rule, PP3
+# ----------------------------------------------------------------------------
+
+#: DEC-101 E1 (V-1 (a)): the H-32 universe is the set of linear USDT perpetuals (symbol ends on ``USDT``, no ``-``).
+UNIVERSE_RULE = "linear_usdt_perpetual"
+UNIVERSE_CLASSES: tuple[str, ...] = ("usdc_perp", "dated_future", "other")
+UNIVERSE_LABEL = ("Bereinigung (Strenge), beschlossen nach Kenntnis der v6-Nuisance, vor jeder Pilot-Zahl (DEC-101 E1)")
+#: suffix of the earlier episode column of a relisted symbol in the union panel (``panel_load``): the episode belongs to the
+#: same contract, the universe rule looks at the name in front of it.
+EPISODE_SUFFIX = "#delisted"
+
+#: DEC-101 E2 (A-1): scaled null in the test run; the YAML block ``null_scaling`` repeats exactly this rule text.
+NULL_SCALING_RULE = ("k = max(1, SD(IC_t,W)/sd_week_W,v); q95_eff = max(0,m) + k*(q95 - m); "
+                     "p from max(0,m) + k*(d - m)")
+NULL_SCALING_DIRECTION = "strictness"
+NULL_SCALING_REF = "DEC-101 E2"
+
+#: DEC-101 E3 (A-2): the pilot writes below this repository-relative root; the YAML pins the exact directory.
+RUNS_REL = "scinance3-impl/state/runs"
+PILOT_OUT_DIR = "scinance3-impl/state/runs/h32_pilot_v1"
+PILOT_FILE_GLOB = "h32_pilot*.json"
+
+#: DEC-101 E5 (A-4): the frozen q95 is max(q95 of the constants replicates, empirical 95 % quantile of all p replicates of the
+#: binding cell); numpy default (linear) interpolation.
+Q95_QUANTILE_METHOD = "numpy.quantile(finite replicates, 0.95), linear interpolation (numpy default)"
+#: DEC-101 E5: the numbers of tested entries m for which the power line states the end power after F-WEEK.
+POWER_M_GRID: tuple[int, ...] = (1, 2, 3, 4, 11)
+
+#: DEC-101 E6 (A-5): the PP3 dry run (no IC), its result file and schema marker.
+PP3_SCHEMA = "H-32 PP3 dry run (DEC-101 E6)"
+PP3_FILE = "h32_pp3_dry_run.json"
+W1_CONTROL_NOTE = ("W1-Determinismus-Kontrolle gegen v5e: entfaellt (DEC-100 N1); Ersatz: Fixture-T2, Zweitlauf bitgleich, "
+                   "PP3-Trockenprobe")
+

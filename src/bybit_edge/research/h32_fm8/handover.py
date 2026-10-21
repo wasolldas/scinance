@@ -11,6 +11,8 @@ For every variant ``v`` the pilot result and the frozen v6 constants give
 The variant is HANDED OVER iff (i) ``x_P > 0``, (ii) ``x_P - m* >= MDE80*_v`` and (iii) ``t_P >= 2.0``.  Prior of the
 assignment ``pi_v = x_P`` (reading A); regime ``power_p1.assign_regime`` with the null-mean credit per window, double
 statement ``power_p1.assign_regime_a3_practice``; mandatory double statement ``mu_sel`` and the joint power at it.
+DEC-101 E6: if the root lies at the bracket edge ``x_P - 40 SE_P`` there is no solution -- ``mu_sel`` is ``None``,
+``mu_sel_solved`` False and the note reads "keine Loesung (Platzhalter, report-only)".
 
 ``evaluate_handover`` is a pure function of ``(inputs, consts)``: the same payload gives the identical dict (T4), and the
 test run re-derives the hand-over from the pilot JSON with it, bit for bit (P0').
@@ -83,11 +85,15 @@ def evaluate_handover(inputs: dict[str, Any], consts: dict[str, Any]) -> dict[st
         "pi_v": x_p, "regime_p1": regime_p1, "regime_a3_practice": regime_a3,
         "regime_p1_consistent": (regime_p1["regime"] == power_p1.REGIME_C10) if cond_ii else None,
         "label_only_dec94": regime_a3["label"] if regime_a3.get("zugelassen_nur_durch_dec94") else None,
-        "mu_sel": None, "power_at_mu_sel": None,
+        "mu_sel": None, "mu_sel_solved": None, "mu_sel_note": None, "power_at_mu_sel": None,
     }
     if handed:
-        mu = est.mu_sel(x_p, se_p, c_v)
+        det = est.mu_sel_detail(x_p, se_p, c_v)
+        mu = det["mu_sel"]
         out["mu_sel"] = mu
+        # DEC-101 E6 (B-9.5): at the bracket edge there is no solution -- a placeholder, report-only, never an estimate
+        out["mu_sel_solved"] = det["solved"]
+        out["mu_sel_note"] = det["note"]
         if mu is not None:
             pri_sel = [mu - max(0.0, nm[wn]) for wn in WINDOW_NAMES]
             r_sel = power_p1.assign_regime(pri_sel, ses, sds=sds)

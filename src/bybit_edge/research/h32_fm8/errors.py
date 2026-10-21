@@ -54,3 +54,14 @@ class NullCalibrationError(H32Abort):
 
 class PositiveControlAbort(H32Abort):
     """The positive control cannot be run (no handed variant, world cannot reach the target, ...)."""
+
+
+class UniverseError(H32Abort):
+    """DEC-101 E1: a symbol outside the registered universe (linear USDT perpetuals) reached a calculation, or the universe
+    pin of the registration differs from the rule / the numbers observed on the loaded panel."""
+
+
+class RunnerPinError(PinError):
+    """DEC-101 E4 (A-3, B-9.6): the CLI arguments of a mode differ from the registered ``runner`` pins (as_of, start_year,
+    end_year, allow_partial) that determine the union-range fingerprint."""
+

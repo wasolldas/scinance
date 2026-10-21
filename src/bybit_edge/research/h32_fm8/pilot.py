@@ -5,7 +5,9 @@ Gates in this order, each a loud fail before the next step (rc 1, NO HAND-OVER f
   PP0  start lock: sha256 of the registered YAML (CLI, before the panel is touched);
   PP0' exactly-one-pilot lock (``checks.check_rerun_lock``, CLI, before the panel is touched);
   PP1  schema (``schema.validate_registered``);
-  PP2  data fingerprints of the loaded panel == YAML;
+  PP2  data fingerprints of the loaded panel == YAML (DEC-101 E4: including the delisted-tree pin);
+  PP2u universe (DEC-101 E1): the panel is restricted to the linear USDT perpetuals BEFORE any cut or calculation and the
+       registered ``universe`` pin (rule, excluded counts) is checked; the report travels in the artifact;
   PP2' panel cut <= ``seal.panel_cut_pilot`` (2024-06-30) BEFORE weekly returns, characteristics or betas, with the
        maximum-date guard;
   PP3  pins (w_pilot 114, block 4, n_boot >= 1.000, seed 53, K_fm8 series == the one the v6 constants were frozen on);
@@ -24,7 +26,7 @@ from typing import Any, Callable
 
 import numpy as np
 
-from . import artifacts, checks, fm8, handover, labels, panel_cut, schema
+from . import artifacts, checks, fm8, handover, labels, panel_cut, schema, universe
 from . import constants as C
 from . import estimators as est
 from . import weekly as wkl
@@ -41,18 +43,29 @@ PILOT_LABELS = [
 ]
 
 
+def checks_runner(registered: dict[str, Any]) -> dict[str, Any]:
+    """The registered ``runner`` pins as recorded in the artifacts (DEC-101 E4)."""
+    rn = registered["runner"]
+    return {"as_of": str(rn["as_of"]), "start_year": int(rn["start_year"]), "end_year": int(rn["end_year"]),
+            "allow_partial": bool(rn["allow_partial"])}
+
+
 def _boot_rules(registered: dict[str, Any]) -> tuple[float, int, int]:
     r = registered["rules"]
     return float(r["mean_block"]), int(r["n_boot"]), int(r["seed"])
 
 
 def run_pilot(panel: dict[str, Any], registered: dict[str, Any], observed_fingerprints: dict[str, Any] | None, *,
-              registered_sha256: str | None = None, log: Callable[[str], None] | None = None) -> dict[str, Any]:
+              registered_sha256: str | None = None, universe_report: dict[str, Any] | None = None,
+              log: Callable[[str], None] | None = None) -> dict[str, Any]:
     """The pilot on an UNCUT daily union panel (the cut happens here, after the fingerprint check).  Returns the report
-    (``result_sha256`` over everything that is a pilot result; ``_series`` carries the weekly series for the artifacts)."""
+    (``result_sha256`` over everything that is a pilot result; ``_series`` carries the weekly series for the artifacts).
+    ``universe_report`` is the report of the driver's universe filter (DEC-101 E1); without it the filter is applied here."""
     say = log or (lambda _m: None)
     schema.validate_registered(registered)                                           # PP1
     checks.check_data_fingerprints(registered, observed_fingerprints)               # PP2
+    panel, universe_report = universe.ensure_universe(panel, universe_report)       # PP2u (DEC-101 E1): before the cut
+    checks.check_universe_pin(registered, universe_report)
     cut_date = registered["seal"]["panel_cut_pilot"]
     cut, cut_report = panel_cut.cut_panel_days(panel, cut_date, limit=C.CUT_PILOT)  # PP2'
     mx = panel_cut.assert_panel_max_date(cut, cut_date)
@@ -101,7 +114,7 @@ def run_pilot(panel: dict[str, Any], registered: dict[str, Any], observed_finger
                                          "m_old_count_report_only": est.end_power(ho["mu_sel"], C.FWEEK_DOUBLE_M, wins)}
     core: dict[str, Any] = {
         "schema": C.PILOT_SCHEMA, "mode": "pilot", "registered_sha256": registered_sha256,
-        "data_fingerprints": observed_fingerprints,
+        "data_fingerprints": observed_fingerprints, "universe": universe_report, "runner": checks_runner(registered),
         "panel": {"cut_date": cut_date, **cut_report, "max_date": mx, "last_week": wk.weeks[-1], "n_weeks": len(wk.weeks),
                   "n_symbols": len(wk.symbols)},
         "window": {**wkl.window_geometry_report(win), "w_pilot": win.w_judged, "k": k_sum,
@@ -174,13 +187,20 @@ def render_pilot_markdown(report: dict[str, Any]) -> str:
                      f"[{f(s['band80_normal'][0])}, {f(s['band80_normal'][1])}] | {f(s['f2_real'], 6)} | {f(s['c_real'], 3)} | "
                      f"{f(h['m_star'])} | {f(h['mde80_star'])} | {h['conditions']['i']} | {h['conditions']['ii']} | "
                      f"{h['conditions']['iii']} | {h['status']} |")
+    uni = report.get("universe") or {}
+    if uni:
+        ex = uni.get("excluded", {})
+        lines += ["", f"- Universum {uni.get('rule')} (DEC-101 E1; {C.UNIVERSE_LABEL}): {uni.get('n_before')} -> {uni.get('n_after')} Symbole, "
+                      f"ausgeschlossen usdc_perp {ex.get('usdc_perp')}, dated_future {ex.get('dated_future')}, other {ex.get('other')}; "
+                      f"excluded_sha256 `{uni.get('excluded_sha256')}`"]
     lines += ["", "## Pflicht-Doppelausweis (DEC-99 (3)) und Zuordnung (nur uebergebene Varianten)", "",
               "| Variante | Regime P-1 | Regime A3-Praxis | mu_sel | gemeinsame Power am Punkt | gemeinsame Power an mu_sel |",
               "|---|---|---|---|---|---|"]
     for v in report["handed"]:
         h = report["variants"][v]["handover"]
+        mu_txt = f(h["mu_sel"]) if h.get("mu_sel") is not None else est.MU_SEL_NO_SOLUTION                 # DEC-101 E6 (B-9.5)
         lines.append(f"| {v} | {h['regime_p1']['regime']} | {h['regime_a3_practice']['regime']}"
-                     f"{' (' + h['label_only_dec94'] + ')' if h['label_only_dec94'] else ''} | {f(h['mu_sel'])} | "
+                     f"{' (' + h['label_only_dec94'] + ')' if h['label_only_dec94'] else ''} | {mu_txt} | "
                      f"{f(h['regime_p1']['window_power_joint_product'], 3)} | "
                      f"{f((h['power_at_mu_sel'] or {}).get('joint'), 3)} ({(h['power_at_mu_sel'] or {}).get('regime_p1')} / "
                      f"{(h['power_at_mu_sel'] or {}).get('regime_a3_practice')}) |")
@@ -204,7 +224,9 @@ def write_pilot_artifacts(out_dir: Path | str, report: dict[str, Any], registere
     right before writing and nothing earlier is overwritten."""
     out = Path(out_dir)
     artifacts.refuse_unsafe_path(out / "x", writing=True)
-    checks.check_rerun_lock(out, registered, lock.get("rerun_dec"))                 # belt and braces
+    sc = lock.get("scope") or {}                                                    # DEC-101 E3: the technical lock is re-checked
+    checks.check_rerun_lock(out, registered, lock.get("rerun_dec"), registered_sha256=sc.get("registered_sha256"),
+                            runs_root=sc.get("runs_root"), repo_root=sc.get("repo_root"))             # belt and braces
     prefix = lock["prefix"]
     out.mkdir(parents=True, exist_ok=True)
     arts: dict[str, Any] = {}

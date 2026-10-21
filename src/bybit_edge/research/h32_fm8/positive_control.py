@@ -22,6 +22,11 @@ constants.  BESTANDEN iff for every handed variant (a) the weekly SD of the cont
 power line in each window, (b) the PASS share in the binding window >= 0.734, (c) the false PASS rate of the negative
 control <= 0.086 in each window, (d) the realised injection effect on the judgement seeds within +-10 % of the target.
 Report-only: the same control in the literal PRD sector world (shock 0.375 sigma_e) and the joint C10 share.
+
+DEC-101: the control runs on the week shape of the panel restricted to the linear USDT perpetuals (E1; the report travels in
+the artifact under ``universe`` and the registered ``universe`` pin is checked) and the gate chain keeps the frozen
+``q95`` (which is max(q95_1000, q95_10000), E5).  The scaled null of the test run (E2) is NOT part of the control's gate chain
+(ERSTFASSUNG 4 is quoted literally; DEC-101 E2 names the test run only) -- a point reported to the orchestrator.
 """
 from __future__ import annotations
 
@@ -32,7 +37,7 @@ import numpy as np
 
 from ..wp13_xsec import characteristics, ic, nulls, prelaunch
 from ..wp13_xsec import run as wp13_run
-from . import artifacts, checks, gate, handover, schema
+from . import artifacts, checks, gate, handover, schema, universe
 from . import constants as C
 from . import estimators as est
 from .errors import PositiveControlAbort
@@ -53,6 +58,7 @@ def build_shape(panel: dict[str, Any], cut_date: str) -> tuple[dict[str, Any], l
     ``panel_load`` and dropped here; they never reach the control).  Returns ``(shape, symbols, cut_report)``."""
     from . import panel_cut
     from ..wp7_universe import panel_load
+    universe.assert_universe(panel)                                         # DEC-101 E1: the shape is the shape of the universe panel
     cut, rep = panel_cut.cut_panel_days(panel, cut_date, limit=C.CUT_TEST)
     panel_cut.assert_panel_max_date(cut, cut_date)
     last_alive = cut.get("last_alive_day") or [None] * len(cut["symbols"])
@@ -306,7 +312,7 @@ def _criteria(summary: dict[str, Any]) -> dict[str, Any]:
 def run_positive_control(
     shape: dict[str, Any], symbols: list[str], registered: dict[str, Any], pilot: dict[str, Any], *,
     observed_fingerprints: dict[str, Any] | None = None, registered_sha256: str | None = None, pilot_sha256: str | None = None,
-    log: Callable[[str], None] | None = None,
+    universe_report: dict[str, Any] | None = None, log: Callable[[str], None] | None = None,
 ) -> dict[str, Any]:
     """The control (see the module docstring).  ``shape`` = ``{"weeks", "alive", "returns_valid"}`` of the CUT panel (no
     returns), ``symbols`` its column order, ``pilot`` the lock-verified pilot result.  Loud fails: schema, data
@@ -315,6 +321,9 @@ def run_positive_control(
     schema.validate_registered(registered)
     if observed_fingerprints is not None or registered.get("data_fingerprints"):
         checks.check_data_fingerprints(registered, observed_fingerprints)
+    universe.assert_universe({"symbols": symbols})                          # DEC-101 E1: no column outside the universe in the shape
+    if universe_report is not None:
+        checks.check_universe_pin(registered, universe_report)
     handed = [v for v in C.VARIANTS if pilot["variants"][v]["handover"]["handed_over"]]
     if not handed:
         raise PositiveControlAbort("no variant was handed over: no positive control, no test (GL-012 (Pilot))")
@@ -388,7 +397,7 @@ def run_positive_control(
     passed = all(x["passed"] for x in out_variants.values())
     core: dict[str, Any] = {
         "schema": C.PC_SCHEMA, "mode": "positive_control", "registered_sha256": registered_sha256, "pilot_sha256": pilot_sha256,
-        "data_fingerprints": observed_fingerprints, "handed": handed,
+        "data_fingerprints": observed_fingerprints, "universe": universe_report, "handed": handed,
         "seeds": {"judgement": [min(C.PC_SEEDS_JUDGE), max(C.PC_SEEDS_JUDGE), len(C.PC_SEEDS_JUDGE)],
                   "injection": [min(C.PC_SEEDS_INJECT), max(C.PC_SEEDS_INJECT)], "world": [min(C.PC_SEEDS_SIGMA_G), max(C.PC_SEEDS_SIGMA_G)]},
         "criteria_constants": {"sd_ratio_max": C.PC_SD_RATIO_MAX, "pass_share_min": C.PC_PASS_SHARE_MIN, "neg_pass_max": C.PC_NEG_PASS_MAX,

@@ -5,7 +5,10 @@ Gates in this order (rc 1, NO VERDICT):
   P0   start lock: sha256 of the registered YAML (CLI, before the panel is touched);
   P0'  pilot lock (:func:`load_pilot_result`): the pilot JSON has the given sha256, belongs to this registration and its
        hand-over is re-derived with rule U from the registered constants and must be bit-identical;
-  P1   schema; P3 data fingerprints; P4 pins (w_judged 52 / 50, K_fm8 series, K minimum, n_perm, seed, block, replicates);
+  P1   schema; P3 data fingerprints (DEC-101 E4: incl. the delisted-tree pin); P4 pins (w_judged 52 / 50, K_fm8 series, K minimum,
+       n_perm, seed, block, replicates);
+  P3u  universe (DEC-101 E1): the panel is restricted to the linear USDT perpetuals before the cut, the registered ``universe``
+       pin is checked and the report travels in the result;
   P4'  the p replicates of the v6 factor-preserving null (:func:`pnull.load_replicates`, CLI, before the panel is touched):
        sha256 = ``fdr.replicates_sha256``, ``n_reps`` = ``fdr.n_reps``, belonging to the frozen ``null_mean``;
   P0'' panel cut <= ``seal.panel_cut_test`` (2026-06-28) BEFORE anything is built, maximum-date guard;
@@ -14,9 +17,11 @@ Gates in this order (rc 1, NO VERDICT):
   P7   seal guard (outcome weeks 2024-07-08..2025-06-30 and 2025-07-14..2026-06-22 only, no raw IC, no lag profile, no
        beta-calibration IC); P8 DEC-53 artifacts written and verified before the verdict is published.
 
-Per handed-over entry: fm8 weekly IC series per window, SE_W by rule P-1 (4), the pure gate (``gate.evaluate``), the
-binding p (DEC-99 p convention: exceedance share of the pinned v6 replicates of the factor-preserving null, max-p over the
-windows), BH (denominator 4, report-only), F-WEEK (BY, m = tested entries; double statement m = 11), end power,
+Per handed-over entry: fm8 weekly IC series per window, SE_W by rule P-1 (4), the **scaled null** (DEC-101 E2, Review A-1:
+``k = max(1, SD(IC_t,W) / sd_week_W,v)``, ``q95_eff = max(0, m) + k (q95 - m)`` in condition (1c), p from the transformed
+replicates ``max(0, m) + k (d - m)``; frozen AND effective values are reported), the pure gate (``gate.evaluate``), the
+binding p (DEC-99 p convention: exceedance share of the pinned v6 replicates of the factor-preserving null -- scaled, DEC-101
+E2 -- max-p over the windows), BH (denominator 4, report-only), F-WEEK (BY, m = tested entries; double statement m = 11), end power,
 report-only: block-permutation p (outcome rows, block 4, 10,000) and normal approximation, labels (bounce for rev_gap,
 liquidity, survivorship, contaminated permutation null).
 """
@@ -31,7 +36,7 @@ from typing import Any, Callable
 import numpy as np
 
 from ..wp13_xsec import run as wp13_run
-from . import artifacts, checks, fm8, fweek, gate, handover, labels, nullsim, panel_cut, permutation, pnull, schema
+from . import artifacts, checks, fm8, fweek, gate, handover, labels, nullsim, panel_cut, permutation, pnull, schema, universe
 from . import constants as C
 from . import estimators as est
 from . import weekly as wkl
@@ -109,10 +114,12 @@ def _null_recheck(win: wkl.Window, registered: dict[str, Any], log: Callable[[st
         floor_fm8=float(fz["floor_fm8"]), n_boot=int(r["n_boot"]), mean_block=float(r["mean_block"]), boot_seed=int(r["seed"]))
     rec = nul["frozen"]
     rows: dict[str, Any] = {}
-    for key in ("se_mean", "e_se_rule", "null_mean", "q95"):
+    # DEC-101 E5: the frozen q95 is max(q95_1000, q95_10000); the re-computation runs the constants replicates, so it is compared
+    # with the frozen q95_1000 (the 10,000-replicate quantile is checked through the pinned replicates file, P4').
+    for key, frozen_key in (("se_mean", "se_mean"), ("e_se_rule", "e_se_rule"), ("null_mean", "null_mean"), ("q95", "q95_1000")):
         for v in C.VARIANTS:
-            assert_null_value(rec[key][v], float(fz[key][v]), label=f"{key}[{win.name}][{v}]")
-            rows[f"{key}.{v}"] = {"recomputed": rec[key][v], "frozen": float(fz[key][v])}
+            assert_null_value(rec[key][v], float(fz[frozen_key][v]), label=f"{frozen_key}[{win.name}][{v}]")
+            rows[f"{frozen_key}.{v}"] = {"recomputed": rec[key][v], "frozen": float(fz[frozen_key][v])}
     assert_null_value(rec["ceiling_k4"], float(fz["ceiling_k4"]), label=f"ceiling_k4[{win.name}]")
     rows["ceiling_k4"] = {"recomputed": rec["ceiling_k4"], "frozen": float(fz["ceiling_k4"])}
     log(f"  window {win.name}: null recomputation within tolerance")
@@ -122,11 +129,12 @@ def _null_recheck(win: wkl.Window, registered: dict[str, Any], log: Callable[[st
 def run_test(panel: dict[str, Any] | None, registered: dict[str, Any], pilot: dict[str, Any],
              observed_fingerprints: dict[str, Any] | None, *, registered_sha256: str | None = None,
              wave_p: dict[str, float] | None = None, p_replicates: dict[str, Any] | None = None,
-             log: Callable[[str], None] | None = None) -> dict[str, Any]:
+             universe_report: dict[str, Any] | None = None, log: Callable[[str], None] | None = None) -> dict[str, Any]:
     """The test on an UNCUT daily union panel (the pilot lock was passed by :func:`load_pilot_result`).  ``panel`` may be
     ``None`` only if no variant was handed over (then nothing is computed and the verdict is GL-012 (Pilot)).
     ``p_replicates`` is the payload returned by :func:`pnull.load_replicates` (sha256-pinned, P4'); it is required as soon as
-    a variant is handed over."""
+    a variant is handed over.  ``universe_report`` is the report of the driver's universe filter (DEC-101 E1); without it the
+    filter is applied here.  DEC-101 E2: condition (1c) and the binding p use the scaled null (``k``, ``q95_eff``, ``d'``)."""
     say = log or (lambda _m: None)
     schema.validate_registered(registered)
     handed = [v for v in C.VARIANTS if pilot["variants"][v]["handover"]["handed_over"]]
@@ -135,6 +143,8 @@ def run_test(panel: dict[str, Any] | None, registered: dict[str, Any], pilot: di
                               "no test without the pinned v6 replicates")
     base: dict[str, Any] = {
         "schema": C.RUN_SCHEMA, "mode": "run", "registered_sha256": registered_sha256, "data_fingerprints": observed_fingerprints,
+        "universe": universe_report, "runner": {k: str(v) if k == "as_of" else v for k, v in registered["runner"].items()},
+        "null_scaling": {"enabled": True, "rule": C.NULL_SCALING_RULE, "direction": C.NULL_SCALING_DIRECTION, "ref": C.NULL_SCALING_REF},
         "pilot": {"result_sha256": pilot.get("result_sha256"), "file_sha256": pilot.get("_file_sha256"), "handed": handed},
         "p_replicates": {"p_source": C.P_SOURCE, "file_sha256": str(registered["fdr"]["replicates_sha256"]).lower(),
                          "n_reps": int(registered["fdr"]["n_reps"])},
@@ -158,6 +168,9 @@ def run_test(panel: dict[str, Any] | None, registered: dict[str, Any], pilot: di
         return base
 
     checks.check_data_fingerprints(registered, observed_fingerprints)                              # P3
+    panel, universe_report = universe.ensure_universe(panel, universe_report)                       # P3u (DEC-101 E1): before the cut
+    checks.check_universe_pin(registered, universe_report)
+    base["universe"] = universe_report
     cut_date = registered["seal"]["panel_cut_test"]
     cut, cut_report = panel_cut.cut_panel_days(panel, cut_date, limit=C.CUT_TEST)                   # P0''
     mx = panel_cut.assert_panel_max_date(cut, cut_date)
@@ -210,11 +223,24 @@ def run_test(panel: dict[str, Any] | None, registered: dict[str, Any], pilot: di
             perm_p["p_normal_approx_report_only"] = p_norm
             perm_p["null_sd_over_se_w"] = (perm_p.get("draws_sd", float("nan")) / se["se"]) if se["se"] > 0.0 else float("nan")
             perm_p["report_only"] = True
-            p_null = pnull.replicate_pvalue(y, pnull.draws_for(p_replicates, wn, v))                # binding (DEC-99 p convention)
+            # DEC-101 E2 (Review A-1): the scaled null.  k from the REAL weekly SD against the frozen null weekly SD, m = frozen
+            # null mean of the binding cell (the larger of the two drift cells = the frozen null_mean), q95_eff and d'.
+            sd_real, sd_week, m_null, q95_frozen = float(se["sd_ic"]), float(fz["sd_week"][v]), float(fz["null_mean"][v]), float(fz["q95"][v])
+            k_scale = est.scale_factor(sd_real, sd_week)
+            q95_eff = est.q95_effective(m_null, k_scale, q95_frozen)
+            raw_draws = pnull.draws_for(p_replicates, wn, v)
+            p_null = pnull.replicate_pvalue(y, est.scaled_replicates(raw_draws, m_null, k_scale))   # binding (DEC-99 p convention, DEC-101 E2)
+            p_unscaled = pnull.replicate_pvalue(y, raw_draws)                                       # report-only: the frozen null as it was
             p_null["cell"] = p_replicates["windows"][wn]["cell"][v]
+            p_null["raw_draws_sha256"] = p_unscaled["draws_sha256"]
+            p_null["p_value_unscaled_report_only"] = p_unscaled["p_value"]
+            p_null["scaling"] = {"k": k_scale, "sd_real": sd_real, "sd_week": sd_week, "m": m_null, "q95_frozen": q95_frozen,
+                                 "q95_eff": q95_eff, "p": p_null["p_value"]}
             liq = labels.liquidity_means(win, v, sign)
-            wpay[wn] = {"y": y, "mean_ic": mean_ic, "se_w": se["se"], "q95": float(fz["q95"][v]), "ceiling_k4": float(fz["ceiling_k4"]),
-                        "threshold_frozen": thr_frozen, "bounce_ic": bounce, "w_judged": win.w_judged}
+            wpay[wn] = {"y": y, "mean_ic": mean_ic, "se_w": se["se"], "q95": q95_frozen, "ceiling_k4": float(fz["ceiling_k4"]),
+                        "threshold_frozen": thr_frozen, "bounce_ic": bounce, "w_judged": win.w_judged,
+                        "null_scaling": {"sd_real": sd_real, "sd_week": sd_week, "m": m_null, "q95_frozen": q95_frozen, "k": k_scale,
+                                         "q95_eff": q95_eff}}
             wdet[wn] = {"se_detail": {k: se[k] for k in ("floor_term", "sd_term", "stat_term", "sd_ic", "n_finite")},
                         "bootstrap_means_sha256": se["bootstrap_means_sha256"], "p_null": p_null, "permutation": perm_p, "liquidity": liq,
                         "ic_weekly_sha256": est.series_sha256(ic_w), "k": wkl.k_summary(wkl.k_alive_series(win))}
@@ -224,7 +250,9 @@ def run_test(panel: dict[str, Any] | None, registered: dict[str, Any], pilot: di
                                  "mean_block": mean_block, "seed": seed, "n_perm": n_perm, "block_len": int(registered["fdr"]["block_len"]),
                                  "panel_cut_test": cut_date, "p_source": C.P_SOURCE, "n_reps_p": int(registered["fdr"]["n_reps"]),
                                  "replicates_sha256": str(registered["fdr"]["replicates_sha256"]).lower(),
+                                 "null_scaling": {"enabled": True, "rule": C.NULL_SCALING_RULE},
                                  "frozen": {wn: {"e_se_rule": float(registered["windows"][wn]["frozen_v6"]["e_se_rule"][v]),
+                                                 "sd_week": float(registered["windows"][wn]["frozen_v6"]["sd_week"][v]),
                                                  "null_mean": float(registered["windows"][wn]["frozen_v6"]["null_mean"][v]),
                                                  "q95": float(registered["windows"][wn]["frozen_v6"]["q95"][v]),
                                                  "ceiling_k4": float(registered["windows"][wn]["frozen_v6"]["ceiling_k4"]),
@@ -234,10 +262,17 @@ def run_test(panel: dict[str, Any] | None, registered: dict[str, Any], pilot: di
         p_by_entry[entry] = 1.0 if not math.isfinite(p_max) else p_max
         perm_max = max((wdet[wn]["permutation"]["p_value"] for wn in wins), default=float("nan"))
         norm_max = max((wdet[wn]["permutation"]["p_normal_approx_report_only"] for wn in wins), default=float("nan"))
-        p_report_only = {"block_permutation_max_p": perm_max, "normal_approximation_max_p": norm_max}
+        unscaled_max = max((wdet[wn]["p_null"]["p_value_unscaled_report_only"] for wn in wins), default=float("nan"))
+        p_report_only = {"block_permutation_max_p": perm_max, "normal_approximation_max_p": norm_max,
+                         "unscaled_null_max_p": unscaled_max}
         # report-only labels
-        lab: list[str] = [f"p aus der faktorerhaltenden Null (v6, R = {int(registered['fdr']['n_reps'])}); Blockpermutation und "
-                          "Normalnaeherung report-only"]
+        lab: list[str] = [f"p aus der faktorerhaltenden Null (v6, R = {int(registered['fdr']['n_reps'])}), skaliert (DEC-101 E2); "
+                          "Blockpermutation und Normalnaeherung report-only"]
+        for wn in wins:
+            sc = wdet[wn]["p_null"]["scaling"]
+            lab.append(f"skalierte Null {wn} (DEC-101 E2): k {sc['k']:.3f} (SD_real {sc['sd_real']:.5f} / sd_week {sc['sd_week']:.5f}), "
+                       f"q95 eingefroren {sc['q95_frozen']:.5f} -> effektiv {sc['q95_eff']:.5f}, p {sc['p']:.4f} (unskaliert "
+                       f"{wdet[wn]['p_null']['p_value_unscaled_report_only']:.4f}, report-only)")
         for wn in wins:
             ratio = wdet[wn]["permutation"]["null_sd_over_se_w"]
             if math.isfinite(ratio) and ratio > PERM_NULL_SD_FLAG:
@@ -278,8 +313,14 @@ def run_test(panel: dict[str, Any] | None, registered: dict[str, Any], pilot: di
         ho = pilot["variants"][res["variant"]]["handover"]
         wins_pw = {wn: {"se_t": ho["per_window"][wn]["se_t"], "sd_t": ho["per_window"][wn]["sd_t"], "null_mean": ho["per_window"][wn]["null_mean"]}
                    for wn in handover.WINDOW_NAMES}
+        wins_rep = {wn: {**wins_pw[wn], "q95": float(registered["windows"][wn]["frozen_v6"]["q95"][res["variant"]]),
+                         "draws": pnull.draws_for(p_replicates, wn, res["variant"])} for wn in handover.WINDOW_NAMES}
         res["end_power"] = {"at_pilot_point_m_tested": est.end_power(ho["pi_v"], m_tested, wins_pw),
-                            "at_pilot_point_m_old_count_report_only": est.end_power(ho["pi_v"], C.FWEEK_DOUBLE_M, wins_pw)}
+                            "at_pilot_point_m_old_count_report_only": est.end_power(ho["pi_v"], C.FWEEK_DOUBLE_M, wins_pw),
+                            "label": "Normalnaeherung (report-only); the replicate version (DEC-101 E5, frozen null without the DEC-101 E2 "
+                                     "scaling) is stated next to it",
+                            "at_pilot_point_m_tested_replicates": est.end_power_replicates(ho["pi_v"], m_tested, wins_rep),
+                            "at_pilot_point_m_old_count_replicates_report_only": est.end_power_replicates(ho["pi_v"], C.FWEEK_DOUBLE_M, wins_rep)}
         if ho["mu_sel"] is not None:
             res["end_power"]["at_mu_sel_m_tested"] = est.end_power(ho["mu_sel"], m_tested, wins_pw)
     passed = [res["variant"] for res in entry_results.values() if res["verdict"]["verdict"] == "PASS"]
@@ -350,10 +391,20 @@ def verify_run_artifacts(out_dir: Path | str, report: dict[str, Any], registered
                              n_boot=consts["n_boot"], seed=consts["seed"], with_sha=True)
             if se["se"] != w["se_w"] or se["bootstrap_means_sha256"] != res["details"][wn]["bootstrap_means_sha256"]:
                 raise ArtifactError(f"NO VERDICT: SE_W / bootstrap fingerprint from {ic_path.name} do not reproduce the payload")
+            # DEC-101 E2: the scaled null is re-derived from the series and the frozen constants
+            frz = consts["frozen"][wn]
+            k_re = est.scale_factor(se["sd_ic"], frz["sd_week"])
+            ns = w.get("null_scaling") or {}
+            same = lambda a, b: (a == b) or (a != a and b != b)                                         # noqa: E731  (NaN equals NaN)
+            if not (same(ns.get("sd_real"), se["sd_ic"]) and same(ns.get("sd_week"), frz["sd_week"]) and same(ns.get("m"), frz["null_mean"])
+                    and same(ns.get("q95_frozen"), frz["q95"]) and same(ns.get("k"), k_re)
+                    and same(ns.get("q95_eff"), est.q95_effective(frz["null_mean"], k_re, frz["q95"]))):
+                raise ArtifactError(f"NO VERDICT: the scaled null of {key} (k, sd_real, q95_eff) does not reproduce from {ic_path.name} "
+                                    "and the frozen constants")
             pp = permutation.permutation_pvalue(w["y"], np.asarray(draws))
             if pp["p_value"] != res["details"][wn]["permutation"]["p_value"] or pp["draws_sha256"] != res["details"][wn]["permutation"]["draws_sha256"]:
                 raise ArtifactError(f"NO VERDICT: permutation p from {pd_path.name} does not reproduce the payload")
-            pn = pnull.replicate_pvalue(w["y"], pnull.draws_for(p_replicates, wn, res["variant"]))
+            pn = pnull.replicate_pvalue(w["y"], est.scaled_replicates(pnull.draws_for(p_replicates, wn, res["variant"]), frz["null_mean"], k_re))
             stored = res["details"][wn]["p_null"]
             if (pn["p_value"] != stored["p_value"] or pn["draws_sha256"] != stored["draws_sha256"] or pn["count_ge"] != stored["count_ge"]
                     or pn["n_reps"] != int(registered["fdr"]["n_reps"])):
@@ -382,20 +433,30 @@ def render_run_markdown(report: dict[str, Any]) -> str:
              f"- Pilot-Ergebnis sha256: `{report['pilot'].get('file_sha256')}`; uebergeben: {', '.join(report['handed']) or '-'}", ""]
     if report["handed"]:
         pn = report["panel"]
+        uni = report.get("universe") or {}
+        if uni:
+            ex = uni.get("excluded", {})
+            lines += [f"- Universum {uni.get('rule')} (DEC-101 E1): {uni.get('n_before')} -> {uni.get('n_after')} Symbole, ausgeschlossen "
+                      f"usdc_perp {ex.get('usdc_perp')}, dated_future {ex.get('dated_future')}, other {ex.get('other')}; "
+                      f"excluded_sha256 `{uni.get('excluded_sha256')}`"]
         lines += [f"- Panel-Schnitt {pn['cut_date']}, letzte Woche {pn['last_week']}, Daten bis {pn['max_date']}", "",
                   f"- p-Quelle (bindend): {report['p_replicates']['p_source']}, R = {report['p_replicates']['n_reps']}, "
                   f"Replikate sha256 `{report['p_replicates']['file_sha256']}`; Max-p ueber W1 / W2", "",
-                  "## Eintraege", "", "| Eintrag | Verdikt | p (bindend, Null-Replikate) | p report-only: Permutation / Normal | "
-                  "W1: y / SE / q95 | W2: y / SE / q95 | Etiketten |", "|---|---|---|---|---|---|---|"]
+                  f"- Skalierte Null (DEC-101 E2): {report['null_scaling']['rule']}; q95 eingefroren und effektiv sind ausgewiesen", "",
+                  "## Eintraege", "", "| Eintrag | Verdikt | p (bindend, skalierte Null-Replikate) | p report-only: Permutation / Normal | "
+                  "W1: y / SE / q95 eingefroren -> effektiv (k) | W2: y / SE / q95 eingefroren -> effektiv (k) | Etiketten |",
+                  "|---|---|---|---|---|---|---|"]
         for e, res in report["results"].items():
             if not res.get("computed"):
                 lines.append(f"| {e} | {res['verdict']['verdict']} | 1 | - | - | - | {res['reason']} |")
                 continue
             w1, w2 = res["payload"]["windows"]["W1"], res["payload"]["windows"]["W2"]
             ro = res["p_report_only"]
+            n1, n2 = w1["null_scaling"], w2["null_scaling"]
             lines.append(f"| {e} | {res['verdict']['verdict']} | {f(res['p_max'], 4)} | {f(ro['block_permutation_max_p'], 4)} / "
-                         f"{f(ro['normal_approximation_max_p'], 4)} | {f(w1['y'])} / {f(w1['se_w'])} / {f(w1['q95'])} | "
-                         f"{f(w2['y'])} / {f(w2['se_w'])} / {f(w2['q95'])} | {' / '.join(res['verdict']['labels'])} |")
+                         f"{f(ro['normal_approximation_max_p'], 4)} | {f(w1['y'])} / {f(w1['se_w'])} / {f(n1['q95_frozen'])} -> {f(n1['q95_eff'])} "
+                         f"(k {f(n1['k'], 3)}) | {f(w2['y'])} / {f(w2['se_w'])} / {f(n2['q95_frozen'])} -> {f(n2['q95_eff'])} "
+                         f"(k {f(n2['k'], 3)}) | {' / '.join(res['verdict']['labels'])} |")
         fw = report["fweek"]
         if fw and fw["by"]:
             lines += ["", "## F-WEEK (BY, alpha 0,10, bindend am Wellenschluss)", "",
