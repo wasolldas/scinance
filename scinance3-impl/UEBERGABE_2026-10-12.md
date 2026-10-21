@@ -178,3 +178,12 @@ Tests: 1.992 passed / 3 failed (Legacy `test_execution_live.py`, Sandbox-bedingt
   q95 = max(1.000er, 10.000er Quantil), Endpower aus Replikat-Quantilen, `--pp3-dry-run`. Der Vorlauf 13:28 ist **v6a,
   verworfen** (Akte). Builder-Auftrag `scratchpad/SPEC_DEC101_builder.md` laeuft (Sonnet, Worktree). Danach: Abnahme,
   v6b zweimal bitgleich (je ~2 h), Template, Entwurf, Nachpruefung Pruefpunkte 1-5, PP3, Registrierung (DEC-101 Teil 2).
+- **Nachtrag 10b (17:20 UTC): DEC-101-Umbau abgenommen und uebernommen** (Commit 6e4b447: `universe.py`, `powerline.py`,
+  `pp3.py`, skalierte Null in `testrun.py`/`gate.py`, Pilot-Sperre in `checks.py`, Pins in `schema.py`, Vorlage;
+  Tests `test_h32_dec101.py`, Teilmenge 276 passed). **Vorlauf v6b laeuft zweimal parallel** (Universum 1.182 -> 1.066
+  Symbole: 68 USDC-Perps, 48 datierte Futures ausgeschlossen; `scratchpad/run_h32_v6b.sh`, Ausgaben
+  `scratchpad/h32_v6b_run1|run2`, Logs `h32_v6b_r1|r2.log`; result_sha256 muss bitgleich sein, dann Kopie nach
+  `state/runs/h32_20261021_v6b/`). Danach: `--emit-template` -> Entwurf aktualisieren -> `--pp3-dry-run` ->
+  Nachpruefung Gate-Auditor (Pruefpunkte 1-5) -> Registrierung (DEC-101 Teil 2) -> `--pilot --out
+  scinance3-impl/state/runs/h32_pilot_v1` -> Positivkontrolle -> `--run`. Neue CLI-Pflicht: Runner-Argumente
+  (`--as-of 2026-09-28 --start-year 2021 --end-year 2026 --allow-partial`) muessen den YAML-Pins entsprechen.
