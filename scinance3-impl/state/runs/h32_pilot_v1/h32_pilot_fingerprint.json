@@ -1,0 +1,110 @@
+{
+ "code": {
+  "bit_generator": "PCG64",
+  "code_sha256": "5a00cd238f6a8c6552a651aaa040a9e58b21b642f01d33bf81848bb64ee822d3",
+  "files": {
+   "h32_fm8/__init__.py": "2b1c2b23d9268975bfd34dc8eb9ea83c07f14f8d675207623702841d1450688e",
+   "h32_fm8/artifacts.py": "e8e247a7570253a7de95350ee3313eed86cb3aaeddd5fba2847427d90dfa8db6",
+   "h32_fm8/calibration.py": "9db992b57de1b9e8ae094682cfeac36548f2bf82a7b5d60b5eece55996df046a",
+   "h32_fm8/checks.py": "5f08a910fe6577ec7e6b3b578e355302edf49d67029f2c973042d34fda70c93f",
+   "h32_fm8/constants.py": "bdb32b95d0774c6781577976b8ac0b0421b43cf2eb3afa0cbc94725c3a124517",
+   "h32_fm8/delisted_tree.py": "136dfb34d4b5c9f527e9e9efb661173e72b7269b6346e6428f971328df1c4810",
+   "h32_fm8/errors.py": "4ed4c6c1f5393db4078da85cb7cf35ea64b1f0bb294da6adc587d82a61cd3f76",
+   "h32_fm8/estimators.py": "a1dad08732fcaf807bfcc65ee38427fce9726f7daca1262a26615b4cc9ee078a",
+   "h32_fm8/fm8.py": "6d73de5ccc971f52ba90c545884da0ae54786b3707b49859d23c42a93821c9c3",
+   "h32_fm8/fweek.py": "90cb8817ed15b87436f01250df9a779b5dcac3a2835c86061464f34695161f8d",
+   "h32_fm8/gate.py": "c0efc15903e54e676062078c99362c7dd4530fa84b4a349e7a99f860735f29aa",
+   "h32_fm8/handover.py": "e4b8dfd9d5ba6a056617bd2f0a07766768244bca5ddefbbca7c0da1ab56ab164",
+   "h32_fm8/labels.py": "fc2f3e2ccd701065f5265de66a69cb42f1cfe9bc29c3fc66d1fb01e1864e86dc",
+   "h32_fm8/nullsim.py": "a3d563ace238dbca2f4a13bf212fd4898c6539f74ae0c462dfea3383961b2257",
+   "h32_fm8/panel_cut.py": "57600d850d34df342f1859519eff448f021aaa9ea159d715686b19162dcd4a34",
+   "h32_fm8/permutation.py": "1d116fcfaa91977d624c212eb2f38daa857cd12838f8a7092bc148a1e7dc71d0",
+   "h32_fm8/pilot.py": "093c3acc89de3579755037e9089bd56812c1a140f84f3ad70beda593a5d66cc5",
+   "h32_fm8/pnull.py": "35e2b9e31a33bd667393f689a932b1d6f31d2875f9dfc8b49606b7707613e4da",
+   "h32_fm8/positive_control.py": "74cf4a3e840976c6974378c3964030a0323c4e45789d7743b8533c9731a5653f",
+   "h32_fm8/powerline.py": "6971ae7e61a7ea2a2e115e96498406de71747a0a15812b8bcf234684a4a942ba",
+   "h32_fm8/pp3.py": "a04bbb39faf2d0c3c1c4e871ce242f102693429ec0e2c2623ec51d7721e8ad9c",
+   "h32_fm8/schema.py": "97ebde276da97c4cca824e3ace24a1c36bce86fefa78484be177eb0e2bea2b26",
+   "h32_fm8/testrun.py": "568cd51269e89ff9abc0ea9fdb4cf6cc2bb44020682b473e3be87aef7a9a7524",
+   "h32_fm8/universe.py": "4ec51db321fa866861be496e19d0e7104cf06835709062e1e284bfcb47e96c02",
+   "h32_fm8/vorlauf.py": "e18d36018862975f6e463bec8336e7bda85a9d4ae8997d27ab49d210a8eac0bc",
+   "h32_fm8/weekly.py": "814c4b7761cc6e02b63b5efb6a2c7e3fbfafbdbd0bf76d8bf69d0e95c50fbc78",
+   "power_p1.py": "74a8dedec983a0342af8378533d0e01b907a5293746d6b839dfebf2bfe36d111",
+   "scripts/h32_fm8.py": "2a71e70356cdacb3ba94cc208a44f7f5daf2e98f408ac37cd06c77e6be98b086",
+   "wp13_xsec/__init__.py": "d798c195bcf8f3904b04735132e44ac3b1b0c93c42b4ecd81e89482cd3e6cef4",
+   "wp13_xsec/characteristics.py": "eeb18b7869e33aa9f430e88d06e46cc22dfb210cbe9b9ddb8172098e6bb3e80c",
+   "wp13_xsec/gates.py": "7ef101f04e7d50b8c503c19856adb0c19db57d3a7b7685096f661a363c45d573",
+   "wp13_xsec/ic.py": "57c2b763a11dad1769bf33a2f613bf6c57124eb2b886ed08d84cdfaf4f7cbcc4",
+   "wp13_xsec/nulls.py": "1d026e6532165e4a480ef8444e3b5f941617aa39095215fc98d9fa2c57639d0c",
+   "wp13_xsec/positive_control.py": "e58e65e10358ef8e0d8e910bb49a44d4222b927b2fc0fb6398b4cfc8a47dfaf3",
+   "wp13_xsec/prelaunch.py": "3a19a38ead49be3f0331eaa018ab5d2703c7d296ce8d3fef34db34a436878d60",
+   "wp13_xsec/run.py": "6ef3d34489860bc11e12cfe2cd00ecfeaff10c3da2167f60f736260117fcff9c",
+   "wp7_universe/__init__.py": "e99022e2a1c6894046d3794e4b6fddf4658d01fb56680658439437c995b72477",
+   "wp7_universe/bybit_rest.py": "ec42e2d2029d4e0caf11bb2055a416a2c35a69f9f34efcdeec9f41eed4ba7a3c",
+   "wp7_universe/null_ic.py": "af429b312fef956a28e4752f9992aafe390aab13b7cc9087219e6d92e7c587da",
+   "wp7_universe/pair_corr.py": "8eda9c44f2f92c561592acda46ff63f69de537b8dff5ac201aa663716347bba2",
+   "wp7_universe/panel_load.py": "9c115be5f23a7cae952d380e18dccd89c62ea4232d7bc4301ac008a0eb84e219",
+   "wp7_universe/panel_store.py": "fb96d43f6d8a6fcdebaba309396e5334c4d25c1509205d6d26f13e9c8e220c0e",
+   "wp7_universe/pit_universe.py": "ade4ef62f767a24dc87f34992373b2be59c8b7fcc36c8020201863eaedc9ffe3",
+   "wp7_universe/report.py": "e56cce1cb2fea91e0eb94bd87145858a626baca8c216aeef072a271f4cce2740",
+   "wp7_universe/spread_probe.py": "322507141708285442efe3d5e5b95876e4b361d23623b8c0af11509ac577be5a",
+   "wp7_universe/stats.py": "b366495b39c2f73c34aa92657b7b4910c495624baebccb3c54c6f61423843034"
+  },
+  "numpy": "2.5.3",
+  "python": "3.13.16"
+ },
+ "data_fingerprints": {
+  "delisted_tree_sha256": "250a923b5c04f18025f9a7ffc72dbbd3b08b75e44bbcd38876b8effa6427e401",
+  "delisting_dates_sha256": "c1306c561246a684a29b166bc0a8663f2345a0a21e5798ea7e2a7a823bbaf1f3",
+  "delisting_register_sha256": "a28c7eb73c586895f710511a73ca58d33570c283397ff356a5dff46c4d639b22",
+  "union_range_detail": {
+   "as_of": "2026-09-28",
+   "n_partitions": 5940,
+   "n_symbols": 1182,
+   "year_range": [
+    2021,
+    2026
+   ]
+  },
+  "union_range_fingerprint": "e503bedb388cf8aaa9f3f28735cc4d83a659528447d95d027476027a4cb0c589"
+ },
+ "git_commit": "3e12f3b56cc990bbf7a5b3aca9440b81c0ee1589",
+ "panel_cut": "2024-06-30",
+ "parameters": {
+  "band_z": 1.2815515655446008,
+  "handover_version": "U-4",
+  "mean_block": 4.0,
+  "n_boot": 1000,
+  "seed": 53,
+  "t_min": 2.0,
+  "z_krit": 1.6448536269514715,
+  "z_power": 0.8416212335729144
+ },
+ "registered_sha256": "0fadda785f37a9ab24b31f650611a468f5c6bfef8be8fb65a7dc54261c1bbd60",
+ "rerun_dec": null,
+ "result_sha256": "8b63a56eb0a68afb0748f84806b9f491f75f09ac8d980063cdfb8c4893e69627",
+ "schema": "H-32 pilot generator fingerprint (DEC-53)",
+ "seed": 53,
+ "variants": {
+  "mom1": {
+   "bootstrap_means_sha256": "b4e4b6226251dcdb20a98c5da2b68a2627a1510894c85855e91d40bcdd649dc2",
+   "series_file_sha256": "6308b6fb8315bddfcc54ff212823daac3dcb5fba64d4fce37105143e003f4ea6",
+   "series_float_sha256": "b8e2e4d0b9cb6e3a12f376d66d38204a1d526342e1d5b9f1b6da1bad30137a3a"
+  },
+  "mom2": {
+   "bootstrap_means_sha256": "60275f400167b195fafcf4f82f50651db6bfd65d04c6f8efb281044f58bc804e",
+   "series_file_sha256": "205fc795b84e8dbb41fc97d7e4f7e1f19750a7898a424b9f4ceb6f304816046a",
+   "series_float_sha256": "8a867cecb37e9087976ebebaf37ca27af504ec26fa68a3b89c786b992d54ea78"
+  },
+  "mom4": {
+   "bootstrap_means_sha256": "31f1b0f68dbb9797be5d52c226d3b21b9e395cc927ec2668e19e4609afbc0bc7",
+   "series_file_sha256": "3912ef44900941923cf331213cf7af955ef5ecb0c095857710b61776168c7bd7",
+   "series_float_sha256": "02fc30adf9608144f8eb08acd2cd1bb7eeb829eaf331196a39de368ab599318b"
+  },
+  "rev_gap": {
+   "bootstrap_means_sha256": "24f3b7a9fc256684699d269d498fd51bde15876eada70b16989e5fc15f3b713f",
+   "series_file_sha256": "9151566a7a6fac2532ab503b25ac07019775ad6b25475c5b538bc3cedc461c70",
+   "series_float_sha256": "a83ced42af5ad84c0c358954e9e070962d7b5e7b752d2a168d6ad99cf3d43fb0"
+  }
+ }
+}

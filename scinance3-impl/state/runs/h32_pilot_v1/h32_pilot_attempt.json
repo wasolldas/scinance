@@ -1,0 +1,10 @@
+{
+ "attempt_utc": "2026-10-21T20:33:05Z",
+ "mode": "pilot",
+ "note": "written before the panel is loaded; counts as a pilot attempt for the exactly-one-pilot lock (a further run needs --pilot-rerun-dec DEC-nn) whether or not a result file follows; no pilot number in this file",
+ "prefix": "h32_pilot",
+ "ref": "DEC-101 Teil 2 (N-4)",
+ "registered_sha256": "0fadda785f37a9ab24b31f650611a468f5c6bfef8be8fb65a7dc54261c1bbd60",
+ "rerun_dec": null,
+ "schema": "H-32 pilot attempt marker (DEC-101 Teil 2, N-4)"
+}
