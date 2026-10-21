@@ -16,7 +16,9 @@ UNCHANGED to read it.
 
 Rules (no value is ever interpolated or filled):
 
-  * symbol list: ``category == linear``, ``quoteCoin == USDT``, ``last_trading_day <= cut``;
+  * symbol list: ``category == linear``, ``quoteCoin == USDT``, ``last_trading_day <= cut``, ``status == Closed`` when the
+    register has a ``status`` column (a ``Relisted`` name is left out and named: its earlier episode is not served by the
+    kline endpoint any more, the survivors tree carries the new contract);
   * the partial candle of the last trading day is kept as it is; rows after ``last_trading_day`` (a relisting under the same
     name) and rows before ``start_year`` are dropped and NAMED; a symbol without any usable row is ``NO_HISTORY`` (no
     parquet, a FAILED manifest row -- the same marker as ``delisted_panel``) and named;
@@ -52,6 +54,8 @@ __all__ = ["STREAM_KLINE", "STREAM_FUNDING", "REGISTER_COPY", "FINGERPRINT_FILE"
            "read_register", "select_symbols", "read_klines", "read_funding", "build_tree", "tree_files", "tree_fingerprint",
            "verify_tree", "observed_tree_fingerprints", "REQUIRED_REGISTER_COLUMNS", "FINGERPRINT_SCHEMA"]
 
+#: register ``status`` of a delisted contract whose history the partitions carry (default when the column is absent)
+STATUS_CLOSED = "Closed"
 STREAM_KLINE = "rest.kline1d"
 STREAM_FUNDING = "rest.fundingRateAll"
 REGISTER_COPY = "delisting_register.csv"
@@ -114,7 +118,8 @@ def read_register(path: Path | str) -> list[dict[str, Any]]:
             seen.add(r["symbol"])
             r["launch"] = _iso(r["launch_day"], f"register {p.name} line {i} launch_day")
             r["last"] = _iso(r["last_trading_day"], f"register {p.name} line {i} last_trading_day")
-            if r["last"] < r["launch"]:
+            r["status"] = r.get("status") or STATUS_CLOSED
+            if r["last"] < r["launch"] and r["status"] == STATUS_CLOSED:
                 raise DelistedTreeError(f"register {p.name}: {r['symbol']} last_trading_day {r['last']} before launch_day {r['launch']}")
             r["announcement_day"] = r.get("announcement_day") or None
             rows.append(r)
@@ -124,10 +129,24 @@ def read_register(path: Path | str) -> list[dict[str, Any]]:
 
 
 def select_symbols(rows: list[dict[str, Any]], cut: str) -> list[dict[str, Any]]:
-    """``category == linear``, ``quoteCoin == USDT``, ``last_trading_day <= cut`` (sorted by symbol)."""
+    """``category == linear``, ``quoteCoin == USDT``, ``last_trading_day <= cut``, ``status == Closed`` (sorted by symbol).
+
+    A register row of another status (``Relisted``: the name trades again; Bybit's kline endpoint then serves only the
+    NEW contract, so the earlier episode is not reconstructible from the partitions and the symbol stays a survivor) is
+    left out here and named by :func:`skipped_by_status`."""
     cut_d = _iso(cut, "cut")
-    return sorted((r for r in rows if r["category"] == "linear" and r["quoteCoin"] == "USDT" and r["last"] <= cut_d),
-                  key=lambda r: r["symbol"])
+    return sorted((r for r in rows if r["category"] == "linear" and r["quoteCoin"] == "USDT" and r["last"] <= cut_d
+                   and r["status"] == STATUS_CLOSED), key=lambda r: r["symbol"])
+
+
+def skipped_by_status(rows: list[dict[str, Any]], cut: str) -> dict[str, dict[str, Any]]:
+    """``{symbol: {status, last_trading_day, relisted_launch_day}}`` of the linear USDT rows up to ``cut`` that
+    :func:`select_symbols` leaves out because of their status."""
+    cut_d = _iso(cut, "cut")
+    return {r["symbol"]: {"status": r["status"], "last_trading_day": r["last"].isoformat(),
+                          "relisted_launch_day": r.get("relisted_launch_day") or None}
+            for r in sorted(rows, key=lambda r: r["symbol"])
+            if r["category"] == "linear" and r["quoteCoin"] == "USDT" and r["last"] <= cut_d and r["status"] != STATUS_CLOSED}
 
 
 # ----------------------------------------------------------------------------
@@ -359,7 +378,9 @@ def build_tree(register_path: Path | str, partitions_dir: Path | str, out_dir: P
     if not sel:
         raise DelistedTreeError(f"no register row with category linear, quoteCoin USDT and last_trading_day <= {cut}")
     symbols = [r["symbol"] for r in sel]
-    _say(log, f"register: {len(reg_rows)} rows, {len(sel)} selected (linear USDT, last_trading_day <= {cut})")
+    skipped_status = skipped_by_status(reg_rows, cut)
+    _say(log, f"register: {len(reg_rows)} rows, {len(sel)} selected (linear USDT, last_trading_day <= {cut}, status Closed); "
+              f"{len(skipped_status)} left out by status: {sorted(skipped_status)[:_MAX_LIST]}")
     pdir = Path(partitions_dir)
     klines, kstat = read_klines(pdir, symbols)
     funding, fstat = read_funding(pdir, symbols)
@@ -435,12 +456,13 @@ def build_tree(register_path: Path | str, partitions_dir: Path | str, out_dir: P
     report: dict[str, Any] = {
         "schema": FINGERPRINT_SCHEMA,
         "register": {"file": REGISTER_COPY, "sha256": fp["register_sha256"], "n_rows": len(reg_rows), "n_selected": len(sel)},
-        "selection": {"category": "linear", "quoteCoin": "USDT", "last_trading_day_max": cut, "start_year": int(start_year),
-                      "listing_anchor": listing_anchor},
+        "selection": {"category": "linear", "quoteCoin": "USDT", "last_trading_day_max": cut, "status": STATUS_CLOSED,
+                      "start_year": int(start_year), "listing_anchor": listing_anchor},
         "tree_sha256": fp["tree_sha256"], "files": fp["files"], "delisting_dates": dd,
         "n_symbols": len(sel), "n_symbols_with_history": len(sel) - len(no_history), "n_partitions": n_partitions,
         "status_counts": counts, "symbols": symbols,
         "no_history_symbols": dict(sorted(no_history.items())), "funding_missing_symbols": sorted(funding_missing),
+        "skipped_by_status": skipped_status,
         "dropped_after_last_trading_day": dict(sorted(dropped_after.items())),
         "dropped_before_start_year": dict(sorted(dropped_before.items())), "not_done_partitions": not_done,
         "first_last_candle": dict(sorted(first_last.items())),

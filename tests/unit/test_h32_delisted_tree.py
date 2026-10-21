@@ -181,6 +181,26 @@ def test_register_selection_is_linear_usdt_up_to_the_cut(full):
     assert dt.select_symbols(rows, "2021-01-01") == []
 
 
+def test_register_status_relisted_is_left_out_and_named(tmp_path):
+    """A register with a ``status`` column: ``Closed`` rows are selected; a ``Relisted`` row (launch_day = relaunch, after the
+    last trading day of the earlier episode) is tolerated by the reader, left out of the selection and named."""
+    reg = tmp_path / "reg.csv"
+    reg.write_text("symbol,category,contractType,baseCoin,quoteCoin,settleCoin,launch_day,last_trading_day,status,relisted_launch_day\n"
+                   "AAAUSDT,linear,LinearPerpetual,AAA,USDT,USDT,2022-03-01,2022-06-30,Closed,\n"
+                   "RELUSDT,linear,LinearPerpetual,REL,USDT,USDT,2024-06-20,2024-06-06,Relisted,2024-06-20\n"
+                   "OLDUSDT,linear,LinearPerpetual,OLD,USDT,USDT,2022-03-01,2022-06-30,,\n", encoding="utf-8")
+    rows = dt.read_register(reg)
+    assert [r["status"] for r in rows] == ["Closed", "Relisted", "Closed"]
+    assert [r["symbol"] for r in dt.select_symbols(rows, "2026-09-28")] == ["AAAUSDT", "OLDUSDT"]
+    assert dt.skipped_by_status(rows, "2026-09-28") == {"RELUSDT": {"status": "Relisted", "last_trading_day": "2024-06-06",
+                                                                     "relisted_launch_day": "2024-06-20"}}
+    bad = tmp_path / "bad.csv"
+    bad.write_text("symbol,category,contractType,baseCoin,quoteCoin,settleCoin,launch_day,last_trading_day,status\n"
+                   "AAAUSDT,linear,LinearPerpetual,AAA,USDT,USDT,2022-07-01,2022-06-30,Closed\n", encoding="utf-8")
+    with pytest.raises(dt.DelistedTreeError, match="before launch_day"):
+        dt.read_register(bad)
+
+
 def test_register_errors_are_loud(tmp_path):
     def reg(text: str) -> Path:
         p = tmp_path / f"r{len(list(tmp_path.glob('r*.csv')))}.csv"
