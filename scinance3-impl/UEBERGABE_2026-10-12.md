@@ -226,3 +226,6 @@ Tests: 1.992 passed / 3 failed (Legacy `test_execution_live.py`, Sandbox-bedingt
   Positivkontrolle -> `--run` (Test auf W1/W2, verbraucht die Fenster fuer diese Statistik).
 - **Weiter offen (Nutzer):** Reihenfolge der Blindperiode (DEC-98 E4 (b)); Weiterleitung
   `state/RUECKMELDUNG_DATA_HARVEST_PANEL_2026-10-21.md` an Data-Harvest (inkl. Rueckfrage Options-Deliveries ab 2026-08).
+- **Nachtrag 11a (2026-10-26): Data-Harvest-Antwort zu den Options-Deliveries** (`state/ANTWORT_DATA_HARVEST_SETTLEMENTS_
+  2026-10-26.md`, DEC-98 N6): API-Eigenschaft seit 2026-08-01, keine Luecke; Ersatz `rest.instruments`/`rest.deliveryPrices`/
+  `tickers`. Rueckfrage erledigt; Weiterleitung der Rueckmeldung ist damit geschehen.
