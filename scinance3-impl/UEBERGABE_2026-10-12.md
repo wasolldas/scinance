@@ -229,3 +229,9 @@ Tests: 1.992 passed / 3 failed (Legacy `test_execution_live.py`, Sandbox-bedingt
 - **Nachtrag 11a (2026-10-26): Data-Harvest-Antwort zu den Options-Deliveries** (`state/ANTWORT_DATA_HARVEST_SETTLEMENTS_
   2026-10-26.md`, DEC-98 N6): API-Eigenschaft seit 2026-08-01, keine Luecke; Ersatz `rest.instruments`/`rest.deliveryPrices`/
   `tickers`. Rueckfrage erledigt; Weiterleitung der Rueckmeldung ist damit geschehen.
+- **Nachtrag 11b (2026-10-26, 13:30 UTC): H-33-Herleitung und Review fertig - Prior UNBELEGT, Registrierung blockiert,
+  Nutzerrueckfrage** (`state/VORLAGE_NUTZER_H33_PRIOR_2026-10-26.md`; DEC-102 N1 mit den Auslegungen EV-2..EV-6, Lesart S
+  bindend, Etikett-Ergaenzung Persistenz-Null W2, bedingtes Vorab-VETO des Reviews gegen C10 auf W1/W2, Default bei
+  Stille = alle GL-012). Akte `state/herleitung_h33/` (Herleitung + REVIEW_H33, 300 Groessen bitgleich nachgerechnet).
+  Naechster Schritt haengt am Nutzer: (D) Default -> GL-036-Vermerk; (L) Lockerung -> v7 x2, Bau, Registrierung, PK, Test;
+  (B) blindes Fenster -> Reihenfolge-Frage.

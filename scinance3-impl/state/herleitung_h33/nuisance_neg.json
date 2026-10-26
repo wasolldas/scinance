@@ -1,0 +1,703 @@
+{
+ "meta": {
+  "checks": [
+   "W1/mom1: replicates = drifting cell (hash, mean, sd, q95_1000, q95_10000 bitgleich)",
+   "W1/mom2: replicates = drifting cell (hash, mean, sd, q95_1000, q95_10000 bitgleich)",
+   "W1/mom4: replicates = drifting cell (hash, mean, sd, q95_1000, q95_10000 bitgleich)",
+   "W2/mom1: replicates = drifting cell (hash, mean, sd, q95_1000, q95_10000 bitgleich)",
+   "W2/mom2: replicates = drifting cell (hash, mean, sd, q95_1000, q95_10000 bitgleich)",
+   "W2/mom4: replicates = drifting cell (hash, mean, sd, q95_1000, q95_10000 bitgleich)",
+   "W1: Survivorship-Fixture mit K 417, 53 Wochen reproduziert v6b mom1_diff und rev_gap_diff bitgleich",
+   "W2: Survivorship-Fixture mit K 526, 51 Wochen reproduziert v6b mom1_diff und rev_gap_diff bitgleich"
+  ],
+  "eingaben_sha256": {
+   "h32_v1_yaml": "0fadda785f37a9ab24b31f650611a468f5c6bfef8be8fb65a7dc54261c1bbd60",
+   "spread_census": "fa1546be8216564005b21827190549b44edf8f5353602e5173b5d4f6497e7083",
+   "v6b_json": "f872a3af25753e84db2ac99d412ccfecc349b8bbedab2fc23868d83ffed3f98c",
+   "v6b_replicates": "3c498e0751f9b35aefa37dd380ad66e783ac6dc6b0c3d10f918fc95ec8f656ef"
+  },
+  "erstellt": "2026-10-26",
+  "etikett_dec102_e2": "beschlossen nach Kenntnis von GL-035 (Pilot-Vorzeichen der mom-Varianten); Richtung Testbarkeit; Richtungswahl nach Kenntnis korrelierter Daten eines anderen Fensters (2022-04..2024-06)",
+  "regel": "y = -IC; null_mean_neg = -null_mean_raw; q95_neg = -Q_0.05(Rohreplikate); SD-Groessen richtungsfrei",
+  "schema": "H-33 nuisance in negativer Richtung (aus v6b)"
+ },
+ "skript_sha256": "ef0788a0cca30cfa27b3afe53f106ffeea5411237f8f4c0d821c649a2ef346b0",
+ "windows": {
+  "W1": {
+   "bounce_sigma_true": {
+    "herkunft": "[fj: state/runs/h32_20261021_v6b/h32_prelaunch.json#windows.W1.bounce_sigma_true]",
+    "value": 0.17354241498115813
+   },
+   "calibration_stress": {
+    "beta_sd": 0.7168394159463193,
+    "herkunft": "[fj: state/runs/h32_20261021_v6b/h32_prelaunch.json#windows.W1.null.cells.driftfree]",
+    "rho_f": 0.092481212569075,
+    "sigma_e": 0.12323095978582714,
+    "sigma_f": 0.06685192489159383
+   },
+   "ceiling_k3_neg": {
+    "bericht_k3_positive_richtung_drifting_1000": 0.0052027459893114894,
+    "bericht_v6b_ceiling_k4": {
+     "driftfree": 0.007819957311030808,
+     "drifting": 0.007866467658978972
+    },
+    "driftfree": null,
+    "drifting_raw_1000": 0.001850970751786644,
+    "drifting_raw_10000": 0.0022636115149955453,
+    "drifting_recentred_1000": 0.003520273328072694,
+    "drifting_recentred_10000": 0.003936226742543441,
+    "herkunft": "[fj: state/runs/h32_20261021_v6b/h32_prelaunch_p_replicates.json#windows.W1.variants.(mom1,mom2,mom4)] mit estimators.signed_selection_ceiling, Vorzeichen -1",
+    "registrierbar_aus_v6b": "Drift-Zelle ja (gemeinsame Replikate je Simulation); driftfreie Zelle (H-32-Konvention der Decke) nein -> v7"
+   },
+   "floor_fm8": {
+    "herkunft": "[fj: state/runs/h32_20261021_v6b/h32_prelaunch.json#windows.W1.floor_fm8]",
+    "registrierbar_aus_v6b": "ja",
+    "richtungsfrei": true,
+    "value": 0.04882131048278087
+   },
+   "k_alive_min_median_max": [
+    343,
+    416.5,
+    500
+   ],
+   "k_fm8_series_sha256": {
+    "herkunft": "[fj: state/runs/h32_20261021_v6b/h32_prelaunch.json#windows.W1.k_fm8_series_sha256]",
+    "registrierbar_aus_v6b": "ja (unveraendert)",
+    "value": "f35fb20b65144169a53a7e9d1784fa88d7f7acfe75b0406b359bb57b3e1f9cc1"
+   },
+   "v_fm8": {
+    "herkunft": "[fj: state/runs/h32_20261021_v6b/h32_prelaunch.json#windows.W1.v_fm8]",
+    "registrierbar_aus_v6b": "ja",
+    "richtungsfrei": true,
+    "value": 0.002391017809866642
+   },
+   "variants": {
+    "mom1": {
+     "binding_cell_neg": {
+      "regel": "pnull.binding_cells auf die negativen Null-Mittel (groesseres Null-Mittel in Richtung)",
+      "registrierbar_aus_v6b": "ja (Bestimmung); die Replikate dieser Zelle: nein",
+      "value": "driftfree"
+     },
+     "dev95_neg_drifting": {
+      "regel": "q95_neg_drifting_max - null_mean_neg(drifting) = q95_eff(k=1) bei m < 0 mit Drift-Zellen-Form (vorlaeufig bis v7)",
+      "value": 0.011986297624471693
+     },
+     "dev95_pos_drifting_1000": 0.01265667044066098,
+     "dev95_pos_v6b_frozen": 0.01265667044066098,
+     "e_se_rule": {
+      "herkunft": "[fj: state/runs/h32_20261021_v6b/h32_prelaunch.json#windows.W1.frozen_v6.e_se_rule.mom1]",
+      "registrierbar_aus_v6b": "ja",
+      "richtungsfrei": true,
+      "value": 0.007441102766442681,
+      "zellen": {
+       "driftfree": 0.007433611457918198,
+       "drifting": 0.007441102766442681
+      }
+     },
+     "null_mean_neg": {
+      "driftfree": -0.0012207223210487662,
+      "drifting": -0.0012901650979848683,
+      "frozen_neg": -0.0012207223210487662,
+      "regel": "null_mean_neg = -null_mean_raw je Zelle; eingefroren = groesseres in negativer Richtung",
+      "registrierbar_aus_v6b": "ja"
+     },
+     "null_mean_raw": {
+      "driftfree": 0.0012207223210487662,
+      "drifting": 0.0012901650979848683,
+      "herkunft": "[fj: state/runs/h32_20261021_v6b/h32_prelaunch.json#windows.W1.null.cells.<zelle>.variants.mom1.null_mean] (Rohrichtung = H-32-Richtung positiv)"
+     },
+     "p_replikate_neg": {
+      "driftfree": "nein (v7)",
+      "drifting": "ja: -d der 10.000 Replikate (Datei-sha256 unveraendert, Transformation im Code)"
+     },
+     "q95_neg_driftfree_1000": {
+      "grund": "v6b speichert fuer die driftfreie Zelle nur Mittel, SD, oberes q95 und draws_sha256; die 10.000 driftfreien Replikate wurden gerechnet und verworfen (vorlauf.py: nur die bindende Zelle der positiven Richtung geht in die p-Datei)",
+      "registrierbar_aus_v6b": "nein",
+      "value": null
+     },
+     "q95_neg_driftfree_10000": {
+      "grund": "wie oben",
+      "registrierbar_aus_v6b": "nein",
+      "value": null
+     },
+     "q95_neg_drifting_1000": {
+      "herkunft": "[fj: state/runs/h32_20261021_v6b/h32_prelaunch_p_replicates.json#windows.W1.variants.mom1[0:1000]] -> -Q_0.05",
+      "registrierbar_aus_v6b": "ja",
+      "value": 0.009991797521300309
+     },
+     "q95_neg_drifting_10000": {
+      "herkunft": "[fj: state/runs/h32_20261021_v6b/h32_prelaunch_p_replicates.json#windows.W1.variants.mom1] -> -Q_0.05",
+      "registrierbar_aus_v6b": "ja",
+      "value": 0.010696132526486825
+     },
+     "q95_neg_drifting_max": 0.010696132526486825,
+     "q95_neg_frozen_dec101_e5": {
+      "regel": "max(q95_1000 ueber beide Zellen, q95_10000 der bindenden Zelle) - beides braucht driftfrei",
+      "registrierbar_aus_v6b": "nein",
+      "value": null
+     },
+     "sd_week": {
+      "herkunft": "[fj: state/runs/h32_20261021_v6b/h32_prelaunch.json#windows.W1.frozen_v6.sd_week.mom1]",
+      "registrierbar_aus_v6b": "ja",
+      "richtungsfrei": true,
+      "value": 0.05127914041549264,
+      "zellen": {
+       "driftfree": 0.051223800199550015,
+       "drifting": 0.05127914041549264
+      }
+     },
+     "se_mean": {
+      "herkunft": "[fj: state/runs/h32_20261021_v6b/h32_prelaunch.json#windows.W1.frozen_v6.se_mean.mom1] (= max der Zellen)",
+      "registrierbar_aus_v6b": "ja",
+      "richtungsfrei": true,
+      "value": 0.007302437893063986,
+      "zellen": {
+       "driftfree": 0.007299053338972872,
+       "drifting": 0.007302437893063986
+      }
+     },
+     "skew_hinweis": "dev95_neg < dev95_pos: die Rohreplikate sind rechtsschief (Review B-4), das obere Quantil in negativer Richtung ist das duennere untere Roh-Quantil",
+     "survivorship": {
+      "check_diff_over_t_pos": -0.4250621739161666,
+      "diff_neg": 0.005750959431861937,
+      "diff_raw_drop_minus_close_at_last": -0.005750959431861937,
+      "herkunft": "[fj: state/runs/h32_20261021_v6b/h32_prelaunch.json#windows.W1.survivorship] (prelaunch.survivorship_drawdown_fixture, synthetisch)",
+      "in_negativer_richtung_t_neg_einheiten": 0.469867865878079,
+      "in_negativer_richtung_t_pos_einheiten": 0.4250621739161666,
+      "in_positive_richtung_schwellen_einheiten_v6b": -0.4250621739161666,
+      "richtung": "positiv in H-33-Richtung: das unkontrollierte Ueberlebenden-Panel (drop) erzeugt im signalfreien Fixture mechanisches Reversal - Richtung Testbarkeit, falls nicht kontrolliert; registriert ist close_at_last (kontrolliert)",
+      "t_neg": 0.012239524873901873,
+      "t_pos_v6b": 0.01352968997188674
+     }
+    },
+    "mom2": {
+     "binding_cell_neg": {
+      "regel": "pnull.binding_cells auf die negativen Null-Mittel (groesseres Null-Mittel in Richtung)",
+      "registrierbar_aus_v6b": "ja (Bestimmung); die Replikate dieser Zelle: nein",
+      "value": "driftfree"
+     },
+     "dev95_neg_drifting": {
+      "regel": "q95_neg_drifting_max - null_mean_neg(drifting) = q95_eff(k=1) bei m < 0 mit Drift-Zellen-Form (vorlaeufig bis v7)",
+      "value": 0.013168212627107297
+     },
+     "dev95_pos_drifting_1000": 0.014110868498833784,
+     "dev95_pos_v6b_frozen": 0.014280965969406584,
+     "e_se_rule": {
+      "herkunft": "[fj: state/runs/h32_20261021_v6b/h32_prelaunch.json#windows.W1.frozen_v6.e_se_rule.mom2]",
+      "registrierbar_aus_v6b": "ja",
+      "richtungsfrei": true,
+      "value": 0.008122760986094501,
+      "zellen": {
+       "driftfree": 0.00810786223545933,
+       "drifting": 0.008122760986094501
+      }
+     },
+     "null_mean_neg": {
+      "driftfree": -0.0015826633666051091,
+      "drifting": -0.0016790699412476185,
+      "frozen_neg": -0.0015826633666051091,
+      "regel": "null_mean_neg = -null_mean_raw je Zelle; eingefroren = groesseres in negativer Richtung",
+      "registrierbar_aus_v6b": "ja"
+     },
+     "null_mean_raw": {
+      "driftfree": 0.0015826633666051091,
+      "drifting": 0.0016790699412476185,
+      "herkunft": "[fj: state/runs/h32_20261021_v6b/h32_prelaunch.json#windows.W1.null.cells.<zelle>.variants.mom2.null_mean] (Rohrichtung = H-32-Richtung positiv)"
+     },
+     "p_replikate_neg": {
+      "driftfree": "nein (v7)",
+      "drifting": "ja: -d der 10.000 Replikate (Datei-sha256 unveraendert, Transformation im Code)"
+     },
+     "q95_neg_driftfree_1000": {
+      "grund": "v6b speichert fuer die driftfreie Zelle nur Mittel, SD, oberes q95 und draws_sha256; die 10.000 driftfreien Replikate wurden gerechnet und verworfen (vorlauf.py: nur die bindende Zelle der positiven Richtung geht in die p-Datei)",
+      "registrierbar_aus_v6b": "nein",
+      "value": null
+     },
+     "q95_neg_driftfree_10000": {
+      "grund": "wie oben",
+      "registrierbar_aus_v6b": "nein",
+      "value": null
+     },
+     "q95_neg_drifting_1000": {
+      "herkunft": "[fj: state/runs/h32_20261021_v6b/h32_prelaunch_p_replicates.json#windows.W1.variants.mom2[0:1000]] -> -Q_0.05",
+      "registrierbar_aus_v6b": "ja",
+      "value": 0.01027390786802148
+     },
+     "q95_neg_drifting_10000": {
+      "herkunft": "[fj: state/runs/h32_20261021_v6b/h32_prelaunch_p_replicates.json#windows.W1.variants.mom2] -> -Q_0.05",
+      "registrierbar_aus_v6b": "ja",
+      "value": 0.011489142685859679
+     },
+     "q95_neg_drifting_max": 0.011489142685859679,
+     "q95_neg_frozen_dec101_e5": {
+      "regel": "max(q95_1000 ueber beide Zellen, q95_10000 der bindenden Zelle) - beides braucht driftfrei",
+      "registrierbar_aus_v6b": "nein",
+      "value": null
+     },
+     "sd_week": {
+      "herkunft": "[fj: state/runs/h32_20261021_v6b/h32_prelaunch.json#windows.W1.frozen_v6.sd_week.mom2]",
+      "registrierbar_aus_v6b": "ja",
+      "richtungsfrei": true,
+      "value": 0.056865519514139776,
+      "zellen": {
+       "driftfree": 0.056781432559880635,
+       "drifting": 0.056865519514139776
+      }
+     },
+     "se_mean": {
+      "herkunft": "[fj: state/runs/h32_20261021_v6b/h32_prelaunch.json#windows.W1.frozen_v6.se_mean.mom2] (= max der Zellen)",
+      "registrierbar_aus_v6b": "ja",
+      "richtungsfrei": true,
+      "value": 0.008089705275703178,
+      "zellen": {
+       "driftfree": 0.008067590106469773,
+       "drifting": 0.008089705275703178
+      }
+     },
+     "skew_hinweis": "dev95_neg < dev95_pos: die Rohreplikate sind rechtsschief (Review B-4), das obere Quantil in negativer Richtung ist das duennere untere Roh-Quantil",
+     "survivorship": {
+      "diff_neg": 0.007882611663632298,
+      "diff_raw_drop_minus_close_at_last": -0.007882611663632298,
+      "herkunft": "synthetisch neu gerechnet (Fixture wie prelaunch.survivorship_drawdown_fixture, K 417, 53 Wochen, Seed 53; Groessen reproduzieren v6b mom1/rev_gap bitgleich); kein Datenbezug",
+      "in_negativer_richtung_t_neg_einheiten": 0.5899825961168446,
+      "registrierbar_aus_v6b": "nein (nicht im Artefakt) - aber ohne Daten reproduzierbar; v7 friert es mit ein",
+      "t_neg": 0.013360752868837452
+     }
+    },
+    "mom4": {
+     "binding_cell_neg": {
+      "regel": "pnull.binding_cells auf die negativen Null-Mittel (groesseres Null-Mittel in Richtung)",
+      "registrierbar_aus_v6b": "ja (Bestimmung); die Replikate dieser Zelle: nein",
+      "value": "driftfree"
+     },
+     "dev95_neg_drifting": {
+      "regel": "q95_neg_drifting_max - null_mean_neg(drifting) = q95_eff(k=1) bei m < 0 mit Drift-Zellen-Form (vorlaeufig bis v7)",
+      "value": 0.014831709420392192
+     },
+     "dev95_pos_drifting_1000": 0.01776209588724279,
+     "dev95_pos_v6b_frozen": 0.01776209588724279,
+     "e_se_rule": {
+      "herkunft": "[fj: state/runs/h32_20261021_v6b/h32_prelaunch.json#windows.W1.frozen_v6.e_se_rule.mom4]",
+      "registrierbar_aus_v6b": "ja",
+      "richtungsfrei": true,
+      "value": 0.00936994244458985,
+      "zellen": {
+       "driftfree": 0.009349795354465418,
+       "drifting": 0.00936994244458985
+      }
+     },
+     "null_mean_neg": {
+      "driftfree": -0.0019339056030023211,
+      "drifting": -0.00206577452448383,
+      "frozen_neg": -0.0019339056030023211,
+      "regel": "null_mean_neg = -null_mean_raw je Zelle; eingefroren = groesseres in negativer Richtung",
+      "registrierbar_aus_v6b": "ja"
+     },
+     "null_mean_raw": {
+      "driftfree": 0.0019339056030023211,
+      "drifting": 0.00206577452448383,
+      "herkunft": "[fj: state/runs/h32_20261021_v6b/h32_prelaunch.json#windows.W1.null.cells.<zelle>.variants.mom4.null_mean] (Rohrichtung = H-32-Richtung positiv)"
+     },
+     "p_replikate_neg": {
+      "driftfree": "nein (v7)",
+      "drifting": "ja: -d der 10.000 Replikate (Datei-sha256 unveraendert, Transformation im Code)"
+     },
+     "q95_neg_driftfree_1000": {
+      "grund": "v6b speichert fuer die driftfreie Zelle nur Mittel, SD, oberes q95 und draws_sha256; die 10.000 driftfreien Replikate wurden gerechnet und verworfen (vorlauf.py: nur die bindende Zelle der positiven Richtung geht in die p-Datei)",
+      "registrierbar_aus_v6b": "nein",
+      "value": null
+     },
+     "q95_neg_driftfree_10000": {
+      "grund": "wie oben",
+      "registrierbar_aus_v6b": "nein",
+      "value": null
+     },
+     "q95_neg_drifting_1000": {
+      "herkunft": "[fj: state/runs/h32_20261021_v6b/h32_prelaunch_p_replicates.json#windows.W1.variants.mom4[0:1000]] -> -Q_0.05",
+      "registrierbar_aus_v6b": "ja",
+      "value": 0.012377470039016935
+     },
+     "q95_neg_drifting_10000": {
+      "herkunft": "[fj: state/runs/h32_20261021_v6b/h32_prelaunch_p_replicates.json#windows.W1.variants.mom4] -> -Q_0.05",
+      "registrierbar_aus_v6b": "ja",
+      "value": 0.012765934895908363
+     },
+     "q95_neg_drifting_max": 0.012765934895908363,
+     "q95_neg_frozen_dec101_e5": {
+      "regel": "max(q95_1000 ueber beide Zellen, q95_10000 der bindenden Zelle) - beides braucht driftfrei",
+      "registrierbar_aus_v6b": "nein",
+      "value": null
+     },
+     "sd_week": {
+      "herkunft": "[fj: state/runs/h32_20261021_v6b/h32_prelaunch.json#windows.W1.frozen_v6.sd_week.mom4]",
+      "registrierbar_aus_v6b": "ja",
+      "richtungsfrei": true,
+      "value": 0.0659948199928681,
+      "zellen": {
+       "driftfree": 0.06587529595625309,
+       "drifting": 0.0659948199928681
+      }
+     },
+     "se_mean": {
+      "herkunft": "[fj: state/runs/h32_20261021_v6b/h32_prelaunch.json#windows.W1.frozen_v6.se_mean.mom4] (= max der Zellen)",
+      "registrierbar_aus_v6b": "ja",
+      "richtungsfrei": true,
+      "value": 0.009768035341097337,
+      "zellen": {
+       "driftfree": 0.009732145696032228,
+       "drifting": 0.009768035341097337
+      }
+     },
+     "skew_hinweis": "dev95_neg < dev95_pos: die Rohreplikate sind rechtsschief (Review B-4), das obere Quantil in negativer Richtung ist das duennere untere Roh-Quantil",
+     "survivorship": {
+      "diff_neg": 0.007526140396737797,
+      "diff_raw_drop_minus_close_at_last": -0.007526140396737797,
+      "herkunft": "synthetisch neu gerechnet (Fixture wie prelaunch.survivorship_drawdown_fixture, K 417, 53 Wochen, Seed 53; Groessen reproduzieren v6b mom1/rev_gap bitgleich); kein Datenbezug",
+      "in_negativer_richtung_t_neg_einheiten": 0.4883240744734568,
+      "registrierbar_aus_v6b": "nein (nicht im Artefakt) - aber ohne Daten reproduzierbar; v7 friert es mit ein",
+      "t_neg": 0.015412183814310153
+     }
+    }
+   },
+   "w_judged": 52
+  },
+  "W2": {
+   "bounce_sigma_true": {
+    "herkunft": "[fj: state/runs/h32_20261021_v6b/h32_prelaunch.json#windows.W2.bounce_sigma_true]",
+    "value": 0.1342852104278142
+   },
+   "calibration_stress": {
+    "beta_sd": 0.5704797913207805,
+    "herkunft": "[fj: state/runs/h32_20261021_v6b/h32_prelaunch.json#windows.W2.null.cells.driftfree]",
+    "rho_f": 0.1404050709523044,
+    "sigma_e": 0.10904950559211316,
+    "sigma_f": 0.054611863018019804
+   },
+   "ceiling_k3_neg": {
+    "bericht_k3_positive_richtung_drifting_1000": 0.004557427338665239,
+    "bericht_v6b_ceiling_k4": {
+     "driftfree": 0.006714173988188749,
+     "drifting": 0.006786470181925065
+    },
+    "driftfree": null,
+    "drifting_raw_1000": 0.0016576915207982862,
+    "drifting_raw_10000": 0.0016783741557463519,
+    "drifting_recentred_1000": 0.0030917105718195536,
+    "drifting_recentred_10000": 0.003114292760986601,
+    "herkunft": "[fj: state/runs/h32_20261021_v6b/h32_prelaunch_p_replicates.json#windows.W2.variants.(mom1,mom2,mom4)] mit estimators.signed_selection_ceiling, Vorzeichen -1",
+    "registrierbar_aus_v6b": "Drift-Zelle ja (gemeinsame Replikate je Simulation); driftfreie Zelle (H-32-Konvention der Decke) nein -> v7"
+   },
+   "floor_fm8": {
+    "herkunft": "[fj: state/runs/h32_20261021_v6b/h32_prelaunch.json#windows.W2.floor_fm8]",
+    "registrierbar_aus_v6b": "ja",
+    "richtungsfrei": true,
+    "value": 0.043638979223103405
+   },
+   "k_alive_min_median_max": [
+    501,
+    526.0,
+    545
+   ],
+   "k_fm8_series_sha256": {
+    "herkunft": "[fj: state/runs/h32_20261021_v6b/h32_prelaunch.json#windows.W2.k_fm8_series_sha256]",
+    "registrierbar_aus_v6b": "ja (unveraendert)",
+    "value": "6b69b6f7bbd0505510f37c9cd853bbf19339f5aa36294978aaedcb1e5f574795"
+   },
+   "v_fm8": {
+    "herkunft": "[fj: state/runs/h32_20261021_v6b/h32_prelaunch.json#windows.W2.v_fm8]",
+    "registrierbar_aus_v6b": "ja",
+    "richtungsfrei": true,
+    "value": 0.0019045663339909372
+   },
+   "variants": {
+    "mom1": {
+     "binding_cell_neg": {
+      "regel": "pnull.binding_cells auf die negativen Null-Mittel (groesseres Null-Mittel in Richtung)",
+      "registrierbar_aus_v6b": "ja (Bestimmung); die Replikate dieser Zelle: nein",
+      "value": "driftfree"
+     },
+     "dev95_neg_drifting": {
+      "regel": "q95_neg_drifting_max - null_mean_neg(drifting) = q95_eff(k=1) bei m < 0 mit Drift-Zellen-Form (vorlaeufig bis v7)",
+      "value": 0.010228647166909854
+     },
+     "dev95_pos_drifting_1000": 0.01040350830620345,
+     "dev95_pos_v6b_frozen": 0.010636704429231338,
+     "e_se_rule": {
+      "herkunft": "[fj: state/runs/h32_20261021_v6b/h32_prelaunch.json#windows.W2.frozen_v6.e_se_rule.mom1]",
+      "registrierbar_aus_v6b": "ja",
+      "richtungsfrei": true,
+      "value": 0.006630080974731648,
+      "zellen": {
+       "driftfree": 0.006617510725952858,
+       "drifting": 0.006630080974731648
+      }
+     },
+     "null_mean_neg": {
+      "driftfree": -0.0008472982841040524,
+      "drifting": -0.0009358237449385808,
+      "frozen_neg": -0.0008472982841040524,
+      "regel": "null_mean_neg = -null_mean_raw je Zelle; eingefroren = groesseres in negativer Richtung",
+      "registrierbar_aus_v6b": "ja"
+     },
+     "null_mean_raw": {
+      "driftfree": 0.0008472982841040524,
+      "drifting": 0.0009358237449385808,
+      "herkunft": "[fj: state/runs/h32_20261021_v6b/h32_prelaunch.json#windows.W2.null.cells.<zelle>.variants.mom1.null_mean] (Rohrichtung = H-32-Richtung positiv)"
+     },
+     "p_replikate_neg": {
+      "driftfree": "nein (v7)",
+      "drifting": "ja: -d der 10.000 Replikate (Datei-sha256 unveraendert, Transformation im Code)"
+     },
+     "q95_neg_driftfree_1000": {
+      "grund": "v6b speichert fuer die driftfreie Zelle nur Mittel, SD, oberes q95 und draws_sha256; die 10.000 driftfreien Replikate wurden gerechnet und verworfen (vorlauf.py: nur die bindende Zelle der positiven Richtung geht in die p-Datei)",
+      "registrierbar_aus_v6b": "nein",
+      "value": null
+     },
+     "q95_neg_driftfree_10000": {
+      "grund": "wie oben",
+      "registrierbar_aus_v6b": "nein",
+      "value": null
+     },
+     "q95_neg_drifting_1000": {
+      "herkunft": "[fj: state/runs/h32_20261021_v6b/h32_prelaunch_p_replicates.json#windows.W2.variants.mom1[0:1000]] -> -Q_0.05",
+      "registrierbar_aus_v6b": "ja",
+      "value": 0.009019370860395006
+     },
+     "q95_neg_drifting_10000": {
+      "herkunft": "[fj: state/runs/h32_20261021_v6b/h32_prelaunch_p_replicates.json#windows.W2.variants.mom1] -> -Q_0.05",
+      "registrierbar_aus_v6b": "ja",
+      "value": 0.009292823421971274
+     },
+     "q95_neg_drifting_max": 0.009292823421971274,
+     "q95_neg_frozen_dec101_e5": {
+      "regel": "max(q95_1000 ueber beide Zellen, q95_10000 der bindenden Zelle) - beides braucht driftfrei",
+      "registrierbar_aus_v6b": "nein",
+      "value": null
+     },
+     "sd_week": {
+      "herkunft": "[fj: state/runs/h32_20261021_v6b/h32_prelaunch.json#windows.W2.frozen_v6.sd_week.mom1]",
+      "registrierbar_aus_v6b": "ja",
+      "richtungsfrei": true,
+      "value": 0.044494004396196565,
+      "zellen": {
+       "driftfree": 0.04442499253204633,
+       "drifting": 0.044494004396196565
+      }
+     },
+     "se_mean": {
+      "herkunft": "[fj: state/runs/h32_20261021_v6b/h32_prelaunch.json#windows.W2.frozen_v6.se_mean.mom1] (= max der Zellen)",
+      "registrierbar_aus_v6b": "ja",
+      "richtungsfrei": true,
+      "value": 0.006196665017793512,
+      "zellen": {
+       "driftfree": 0.006172145003193146,
+       "drifting": 0.006196665017793512
+      }
+     },
+     "skew_hinweis": "dev95_neg < dev95_pos: die Rohreplikate sind rechtsschief (Review B-4), das obere Quantil in negativer Richtung ist das duennere untere Roh-Quantil",
+     "survivorship": {
+      "check_diff_over_t_pos": -0.537659272768145,
+      "diff_neg": 0.006366604362164451,
+      "diff_raw_drop_minus_close_at_last": -0.006366604362164451,
+      "herkunft": "[fj: state/runs/h32_20261021_v6b/h32_prelaunch.json#windows.W2.survivorship] (prelaunch.survivorship_drawdown_fixture, synthetisch)",
+      "in_negativer_richtung_t_neg_einheiten": 0.583796884654763,
+      "in_negativer_richtung_t_pos_einheiten": 0.537659272768145,
+      "in_positive_richtung_schwellen_einheiten_v6b": -0.537659272768145,
+      "richtung": "positiv in H-33-Richtung: das unkontrollierte Ueberlebenden-Panel (drop) erzeugt im signalfreien Fixture mechanisches Reversal - Richtung Testbarkeit, falls nicht kontrolliert; registriert ist close_at_last (kontrolliert)",
+      "t_neg": 0.010905512738269299,
+      "t_pos_v6b": 0.01184133648320788
+     }
+    },
+    "mom2": {
+     "binding_cell_neg": {
+      "regel": "pnull.binding_cells auf die negativen Null-Mittel (groesseres Null-Mittel in Richtung)",
+      "registrierbar_aus_v6b": "ja (Bestimmung); die Replikate dieser Zelle: nein",
+      "value": "driftfree"
+     },
+     "dev95_neg_drifting": {
+      "regel": "q95_neg_drifting_max - null_mean_neg(drifting) = q95_eff(k=1) bei m < 0 mit Drift-Zellen-Form (vorlaeufig bis v7)",
+      "value": 0.01132695213974393
+     },
+     "dev95_pos_drifting_1000": 0.011919952884307868,
+     "dev95_pos_v6b_frozen": 0.011995989896929989,
+     "e_se_rule": {
+      "herkunft": "[fj: state/runs/h32_20261021_v6b/h32_prelaunch.json#windows.W2.frozen_v6.e_se_rule.mom2]",
+      "registrierbar_aus_v6b": "ja",
+      "richtungsfrei": true,
+      "value": 0.007084413354640789,
+      "zellen": {
+       "driftfree": 0.007059821393193718,
+       "drifting": 0.007084413354640789
+      }
+     },
+     "null_mean_neg": {
+      "driftfree": -0.0013794971074296684,
+      "drifting": -0.0015018690361091225,
+      "frozen_neg": -0.0013794971074296684,
+      "regel": "null_mean_neg = -null_mean_raw je Zelle; eingefroren = groesseres in negativer Richtung",
+      "registrierbar_aus_v6b": "ja"
+     },
+     "null_mean_raw": {
+      "driftfree": 0.0013794971074296684,
+      "drifting": 0.0015018690361091225,
+      "herkunft": "[fj: state/runs/h32_20261021_v6b/h32_prelaunch.json#windows.W2.null.cells.<zelle>.variants.mom2.null_mean] (Rohrichtung = H-32-Richtung positiv)"
+     },
+     "p_replikate_neg": {
+      "driftfree": "nein (v7)",
+      "drifting": "ja: -d der 10.000 Replikate (Datei-sha256 unveraendert, Transformation im Code)"
+     },
+     "q95_neg_driftfree_1000": {
+      "grund": "v6b speichert fuer die driftfreie Zelle nur Mittel, SD, oberes q95 und draws_sha256; die 10.000 driftfreien Replikate wurden gerechnet und verworfen (vorlauf.py: nur die bindende Zelle der positiven Richtung geht in die p-Datei)",
+      "registrierbar_aus_v6b": "nein",
+      "value": null
+     },
+     "q95_neg_driftfree_10000": {
+      "grund": "wie oben",
+      "registrierbar_aus_v6b": "nein",
+      "value": null
+     },
+     "q95_neg_drifting_1000": {
+      "herkunft": "[fj: state/runs/h32_20261021_v6b/h32_prelaunch_p_replicates.json#windows.W2.variants.mom2[0:1000]] -> -Q_0.05",
+      "registrierbar_aus_v6b": "ja",
+      "value": 0.009668091342438626
+     },
+     "q95_neg_drifting_10000": {
+      "herkunft": "[fj: state/runs/h32_20261021_v6b/h32_prelaunch_p_replicates.json#windows.W2.variants.mom2] -> -Q_0.05",
+      "registrierbar_aus_v6b": "ja",
+      "value": 0.009825083103634807
+     },
+     "q95_neg_drifting_max": 0.009825083103634807,
+     "q95_neg_frozen_dec101_e5": {
+      "regel": "max(q95_1000 ueber beide Zellen, q95_10000 der bindenden Zelle) - beides braucht driftfrei",
+      "registrierbar_aus_v6b": "nein",
+      "value": null
+     },
+     "sd_week": {
+      "herkunft": "[fj: state/runs/h32_20261021_v6b/h32_prelaunch.json#windows.W2.frozen_v6.sd_week.mom2]",
+      "registrierbar_aus_v6b": "ja",
+      "richtungsfrei": true,
+      "value": 0.048215030281491954,
+      "zellen": {
+       "driftfree": 0.04810152800974958,
+       "drifting": 0.048215030281491954
+      }
+     },
+     "se_mean": {
+      "herkunft": "[fj: state/runs/h32_20261021_v6b/h32_prelaunch.json#windows.W2.frozen_v6.se_mean.mom2] (= max der Zellen)",
+      "registrierbar_aus_v6b": "ja",
+      "richtungsfrei": true,
+      "value": 0.007045641134217404,
+      "zellen": {
+       "driftfree": 0.007013711310747616,
+       "drifting": 0.007045641134217404
+      }
+     },
+     "skew_hinweis": "dev95_neg < dev95_pos: die Rohreplikate sind rechtsschief (Review B-4), das obere Quantil in negativer Richtung ist das duennere untere Roh-Quantil",
+     "survivorship": {
+      "diff_neg": 0.008195239569150864,
+      "diff_raw_drop_minus_close_at_last": -0.008195239569150864,
+      "herkunft": "synthetisch neu gerechnet (Fixture wie prelaunch.survivorship_drawdown_fixture, K 526, 51 Wochen, Seed 53; Groessen reproduzieren v6b mom1/rev_gap bitgleich); kein Datenbezug",
+      "in_negativer_richtung_t_neg_einheiten": 0.7032836222007207,
+      "registrierbar_aus_v6b": "nein (nicht im Artefakt) - aber ohne Daten reproduzierbar; v7 friert es mit ein",
+      "t_neg": 0.011652823001204344
+     }
+    },
+    "mom4": {
+     "binding_cell_neg": {
+      "regel": "pnull.binding_cells auf die negativen Null-Mittel (groesseres Null-Mittel in Richtung)",
+      "registrierbar_aus_v6b": "ja (Bestimmung); die Replikate dieser Zelle: nein",
+      "value": "driftfree"
+     },
+     "dev95_neg_drifting": {
+      "regel": "q95_neg_drifting_max - null_mean_neg(drifting) = q95_eff(k=1) bei m < 0 mit Drift-Zellen-Form (vorlaeufig bis v7)",
+      "value": 0.012810588891257482
+     },
+     "dev95_pos_drifting_1000": 0.01439953624775078,
+     "dev95_pos_v6b_frozen": 0.014441557307710916,
+     "e_se_rule": {
+      "herkunft": "[fj: state/runs/h32_20261021_v6b/h32_prelaunch.json#windows.W2.frozen_v6.e_se_rule.mom4]",
+      "registrierbar_aus_v6b": "ja",
+      "richtungsfrei": true,
+      "value": 0.007980594277883989,
+      "zellen": {
+       "driftfree": 0.007949195416763396,
+       "drifting": 0.007980594277883989
+      }
+     },
+     "null_mean_neg": {
+      "driftfree": -0.0017838509527729404,
+      "drifting": -0.001953377946189023,
+      "frozen_neg": -0.0017838509527729404,
+      "regel": "null_mean_neg = -null_mean_raw je Zelle; eingefroren = groesseres in negativer Richtung",
+      "registrierbar_aus_v6b": "ja"
+     },
+     "null_mean_raw": {
+      "driftfree": 0.0017838509527729404,
+      "drifting": 0.001953377946189023,
+      "herkunft": "[fj: state/runs/h32_20261021_v6b/h32_prelaunch.json#windows.W2.null.cells.<zelle>.variants.mom4.null_mean] (Rohrichtung = H-32-Richtung positiv)"
+     },
+     "p_replikate_neg": {
+      "driftfree": "nein (v7)",
+      "drifting": "ja: -d der 10.000 Replikate (Datei-sha256 unveraendert, Transformation im Code)"
+     },
+     "q95_neg_driftfree_1000": {
+      "grund": "v6b speichert fuer die driftfreie Zelle nur Mittel, SD, oberes q95 und draws_sha256; die 10.000 driftfreien Replikate wurden gerechnet und verworfen (vorlauf.py: nur die bindende Zelle der positiven Richtung geht in die p-Datei)",
+      "registrierbar_aus_v6b": "nein",
+      "value": null
+     },
+     "q95_neg_driftfree_10000": {
+      "grund": "wie oben",
+      "registrierbar_aus_v6b": "nein",
+      "value": null
+     },
+     "q95_neg_drifting_1000": {
+      "herkunft": "[fj: state/runs/h32_20261021_v6b/h32_prelaunch_p_replicates.json#windows.W2.variants.mom4[0:1000]] -> -Q_0.05",
+      "registrierbar_aus_v6b": "ja",
+      "value": 0.010826356235671115
+     },
+     "q95_neg_drifting_10000": {
+      "herkunft": "[fj: state/runs/h32_20261021_v6b/h32_prelaunch_p_replicates.json#windows.W2.variants.mom4] -> -Q_0.05",
+      "registrierbar_aus_v6b": "ja",
+      "value": 0.01085721094506846
+     },
+     "q95_neg_drifting_max": 0.01085721094506846,
+     "q95_neg_frozen_dec101_e5": {
+      "regel": "max(q95_1000 ueber beide Zellen, q95_10000 der bindenden Zelle) - beides braucht driftfrei",
+      "registrierbar_aus_v6b": "nein",
+      "value": null
+     },
+     "sd_week": {
+      "herkunft": "[fj: state/runs/h32_20261021_v6b/h32_prelaunch.json#windows.W2.frozen_v6.sd_week.mom4]",
+      "registrierbar_aus_v6b": "ja",
+      "richtungsfrei": true,
+      "value": 0.054924334562550074,
+      "zellen": {
+       "driftfree": 0.05475884682130757,
+       "drifting": 0.054924334562550074
+      }
+     },
+     "se_mean": {
+      "herkunft": "[fj: state/runs/h32_20261021_v6b/h32_prelaunch.json#windows.W2.frozen_v6.se_mean.mom4] (= max der Zellen)",
+      "registrierbar_aus_v6b": "ja",
+      "richtungsfrei": true,
+      "value": 0.00819047102980608,
+      "zellen": {
+       "driftfree": 0.008117826349456528,
+       "drifting": 0.00819047102980608
+      }
+     },
+     "skew_hinweis": "dev95_neg < dev95_pos: die Rohreplikate sind rechtsschief (Review B-4), das obere Quantil in negativer Richtung ist das duennere untere Roh-Quantil",
+     "survivorship": {
+      "diff_neg": 0.00838072417896301,
+      "diff_raw_drop_minus_close_at_last": -0.00838072417896301,
+      "herkunft": "synthetisch neu gerechnet (Fixture wie prelaunch.survivorship_drawdown_fixture, K 526, 51 Wochen, Seed 53; Groessen reproduzieren v6b mom1/rev_gap bitgleich); kein Datenbezug",
+      "in_negativer_richtung_t_neg_einheiten": 0.6384384850998414,
+      "registrierbar_aus_v6b": "nein (nicht im Artefakt) - aber ohne Daten reproduzierbar; v7 friert es mit ein",
+      "t_neg": 0.01312690944320564
+     }
+    }
+   },
+   "w_judged": 50
+  }
+ }
+}
