@@ -211,3 +211,18 @@ Tests: 1.992 passed / 3 failed (Legacy `test_execution_live.py`, Sandbox-bedingt
   Designs. Vorlage an den Nutzer in DEC-101 Teil 3 (umgedrehte Hypothese nur als neue DEC mit Literatur-Prior; oder
   Klasse W ruht). Artefakte `state/runs/h32_pilot_v1/`. **Offen fuer den Nutzer:** Reihenfolge der Blindperiode (DEC-98
   E4 (b)), Umgang mit dem Pilot-Befund (DEC-101 Teil 3 Vorlage), Weiterleitung der Data-Harvest-Rueckmeldung.
+
+## 11. Nachtrag 2026-10-26: Nutzerentscheidung zum Pilotbefund (DEC-102) - H-33 Kurzfrist-Reversal in Herleitung
+
+- **Nutzer 2026-10-26:** Option (a) zum H-32-Pilotbefund; Reihenfolge der Blindperiode prueft er noch (offen); restliche
+  PDFs kostenpflichtig, Nachlieferung nach Moeglichkeit.
+- **DEC-102 (Rahmen H-33):** mom1/mom2/mom4 in negativer Richtung (Reversal 1/2/4 Wochen), fm8-Statistik wie H-32,
+  W1 2024-07-01..2025-06-30 / W2 2025-07-01..2026-06-28 (REZENZ), Universum lineare USDT-Perps, Gate/Null/PK wie
+  DEC-101, F-WEEK zaehlt mit, **Prior nur aus der Literatur** (sonst UNBELEGT -> Nutzerfrage mit Prior-Gitter), kein
+  Pilot (verbraucht), rev_gap ausgeschlossen, Etikett "beschlossen nach Kenntnis von GL-035, Richtung Testbarkeit".
+- **Laufend:** Herleitung H-33 (Opus-Agent, Auftrag `scratchpad/SPEC_H33_herleitung.md`) -> `state/herleitung_h33/`.
+  Danach: adversarischer Review -> Builder (Richtung je Hypothese konfigurierbar, Modus ohne Pilot, ggf. Vorlauf v7 in
+  negativer Richtung zweimal bitgleich) -> Registrierungsentwurf -> Gate-Review -> Registrierung (DEC-103) ->
+  Positivkontrolle -> `--run` (Test auf W1/W2, verbraucht die Fenster fuer diese Statistik).
+- **Weiter offen (Nutzer):** Reihenfolge der Blindperiode (DEC-98 E4 (b)); Weiterleitung
+  `state/RUECKMELDUNG_DATA_HARVEST_PANEL_2026-10-21.md` an Data-Harvest (inkl. Rueckfrage Options-Deliveries ab 2026-08).
