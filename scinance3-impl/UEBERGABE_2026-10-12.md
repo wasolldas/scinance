@@ -235,3 +235,9 @@ Tests: 1.992 passed / 3 failed (Legacy `test_execution_live.py`, Sandbox-bedingt
   Stille = alle GL-012). Akte `state/herleitung_h33/` (Herleitung + REVIEW_H33, 300 Groessen bitgleich nachgerechnet).
   Naechster Schritt haengt am Nutzer: (D) Default -> GL-036-Vermerk; (L) Lockerung -> v7 x2, Bau, Registrierung, PK, Test;
   (B) blindes Fenster -> Reihenfolge-Frage.
+- **Nachtrag 11c (2026-10-27): Nutzer waehlt Option 1 (Default) -> GL-036: H-33 GL-012 vor der Registrierung** (Prior
+  UNBELEGT), kein Bau, kein v7, W1/W2 ungeoeffnet; DEC-102 N2; Registry-Vermerk H-33, naechste Nummer H-34. **Programm im
+  Aufzeichnungsmodus:** keine registrierbare Hypothese in der Pipeline; offen beim Nutzer: Reihenfolge der Blindperiode
+  (DEC-98 E4 (b)), PDFs (optional). Zulaessige optionsneutrale Vorarbeiten (ohne Nutzerentscheid): A2-Placebo-Design und
+  sigma30-Nuisance (Vorperiode, 1-min-Kerzen), Universums-Zensus nach USD-Umsatz (nur Zaehlungen, Kline-`turnover`, fuer
+  kuenftige Prior-Zuordnung), theta-/V-5b-Belege nach PDF-Lage.

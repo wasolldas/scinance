@@ -1225,3 +1225,6 @@ etiketten: ["zugelassen nur durch DEC-99 (Pilot-Prior)", "C.17 (Abschnitt 3)", "
 ### Nachtrag H-32 (2026-10-21, nach dem Pilot) - append-only
 - **Status: GL-012 (Pilot) fuer H-32_mom1, H-32_mom2, H-32_mom4, H-32_rev_gap (GL-035, DEC-101 Teil 3).** Pilot genau einmal gelaufen (`state/runs/h32_pilot_v1/`, result_sha256 8b63a56eb0a68afb0748f84806b9f491f75f09ac8d980063cdfb8c4893e69627); keine Uebergabe (x_P -0,0385 / -0,0500 / -0,0446 / +0,0167 in Richtung; Schwellen 0,0423 / 0,0458 / 0,0501 / 0,0363); kein Test, keine Positivkontrolle, kein Verdikt; p = 1 im BH-Nenner 4, nicht in m von F-WEEK; W1/W2 blind. Pilotabschnitt verbraucht (DEC-99 (5)).
 
+## Vermerk H-33 (Kurzfrist-Reversal, 2026-10-27) - NICHT registriert
+- H-33 (beta-neutrales Kurzfrist-Reversal 1/2/4 Wochen, W1/W2, DEC-102) wurde hergeleitet und adversarisch geprueft (`state/herleitung_h33/`), aber **nicht registriert**: Literatur-Prior UNBELEGT, Mindest-Prior fuer C10 0,0395..0,0431 (fm8-Skala, Lesart S) ueber jeder belegten Zahl; GL-036 (GL-012 vor der Registrierung, Nutzerentscheid Default). Kein K, kein Lauf, kein Verdikt; W1/W2 fuer fm8-Statistiken weiterhin ungeoeffnet. Naechste freie Nummer: **H-34**.
+
