@@ -241,3 +241,15 @@ Tests: 1.992 passed / 3 failed (Legacy `test_execution_live.py`, Sandbox-bedingt
   (DEC-98 E4 (b)), PDFs (optional). Zulaessige optionsneutrale Vorarbeiten (ohne Nutzerentscheid): A2-Placebo-Design und
   sigma30-Nuisance (Vorperiode, 1-min-Kerzen), Universums-Zensus nach USD-Umsatz (nur Zaehlungen, Kline-`turnover`, fuer
   kuenftige Prior-Zuordnung), theta-/V-5b-Belege nach PDF-Lage.
+
+## 12. Nachtrag 2026-10-29: Vorarbeiten nach GL-036 (Nutzerauftrag: Punkte 1 und 2)
+
+- **Zensus des Universums nach USD-Wochenumsatz** (`state/ZENSUS_UNIVERSUM_UMSATZ_2026-10-29.md` + JSON + Skript, nur
+  Zaehlungen, <= 2026-06-28): kein lineares USDT-Perp unter 100 Tsd. USD/Woche; Median 10..25 Mio USD/Woche; 75..85 % der
+  Symbole >= 5 Mio. Nach Umsatz ist das Universum "liquide" (Ficura-Gruppen Momentum), Lesart R3..R4 - konsistent mit
+  GL-036; Vorbehalt Perp-Turnover vs. Spot-Volumen. Etikett: Pilot-Vorzeichen (GL-035, negativ) widerspricht der
+  Literaturerwartung fuer liquide Universen.
+- **A2-Vorarbeit laeuft** (Opus, `scratchpad/SPEC_A2_vorarbeit.md`): Placebo-Design neu (jeder Tag Verfallstag; Ereignis-
+  groesse ueber `position` aus den Settlement-Rohpartitionen, nur Zaehlungen bis 2026-06-30), sigma30/rho/c der
+  Vorperiode aus 1-min-Kerzen (nur Streuung, Waechter kein Mittel), SE(Delta)/MDE80 je Design, Prior-Gitter. Ergebnis
+  nach `state/herleitung_a2/`. Danach kurzer Review, DEC-98 Nachtrag 7, Bericht.
