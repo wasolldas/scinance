@@ -249,7 +249,22 @@ Tests: 1.992 passed / 3 failed (Legacy `test_execution_live.py`, Sandbox-bedingt
   Symbole >= 5 Mio. Nach Umsatz ist das Universum "liquide" (Ficura-Gruppen Momentum), Lesart R3..R4 - konsistent mit
   GL-036; Vorbehalt Perp-Turnover vs. Spot-Volumen. Etikett: Pilot-Vorzeichen (GL-035, negativ) widerspricht der
   Literaturerwartung fuer liquide Universen.
-- **A2-Vorarbeit laeuft** (Opus, `scratchpad/SPEC_A2_vorarbeit.md`): Placebo-Design neu (jeder Tag Verfallstag; Ereignis-
-  groesse ueber `position` aus den Settlement-Rohpartitionen, nur Zaehlungen bis 2026-06-30), sigma30/rho/c der
-  Vorperiode aus 1-min-Kerzen (nur Streuung, Waechter kein Mittel), SE(Delta)/MDE80 je Design, Prior-Gitter. Ergebnis
-  nach `state/herleitung_a2/`. Danach kurzer Review, DEC-98 Nachtrag 7, Bericht.
+- **A2-Vorarbeit fertig** (Opus-Herleitung + adversarischer Review, Akte `state/herleitung_a2/`: PLACEBO_DESIGN_A2.md,
+  NUISANCE_SIGMA30.md, ENTSCHEIDUNGSVORLAGEN.md, a2_vorarbeit.json, REVIEW_A2_VORARBEIT.md (Zustimmung mit Auflagen A-1..A-6, kein Veto, 203 Zahlen exakt),
+  NACHRECHNUNG_ORCHESTRATOR.md; DEC-98 Nachtrag 7). Befund: jeder registrierbare A2-Kontrast ist ein Groessen-Kontrast
+  (Freitag gegen Tagesverfall, 12,8 / 13,5 x Kontrakte), Referenz-Design D_i (alle Freitage gegen Mo-Do 07:30-08:00,
+  Wochenende raus); sigma30 Freitag gemessen (Cluster 43,8 bp, BTC 40,2 / ETH 52,6; rho 0,78; c 1,15..1,46), die
+  PRD-Vol-Kette (36 bp) lag 10..20 % zu niedrig; Rauschboden je 12-Monats-Fenster D_i SE 7,34 / MDE80 18,25 bp
+  (gegen alle drei Placebos gemeinsam 19,8, Produkt-Untergrenze 21,9; Stress-Jahr 24,6), Monat+Quartal gegen Woche 19,70 / 49,0 bp = GL-012 auf jedem Gitterpunkt. Bilanz 2.4 war um
+  34..43 % bzw. 75 % zu optimistisch (Erratum-Vermerk in der Bilanz-Datei, zusammen mit dem nachgeholten N5-Erratum).
+  **V-5b bleibt UNBELEGT und blockierend:** A2 ist GL-012 vor der Registrierung, solange kein Effektgroessen-Beleg
+  fuer Freitags-/Wochenverfaelle vorliegt (C10 braeuchte Kontrast >= ~18,25 bp gegen den Einzel-Placebo, ~21,9 bp gegen den Placebosatz). Nichts beschlossen, nichts
+  registriert, Null-Simulation nicht gebaut.
+  Festlegungen des Orchestrators (N7 (4), prospektiv, Strenge): Zuordnung bei Placebo-Konjunktion ueber das Produkt der
+  Einzel-Powers (analog DEC-94 (6)); die PRD-Null ist unter taeglichen Verfaellen leer und vor jeder A2-Registrierung
+  neu zu definieren (Vorlage Label-Permutation in der ISO-Woche); taegliche Deribit-Futures-Verfaelle ab 2026-04-04
+  machen den Placebo P2' zwischen W1 und W2 inhomogen (48 von 207 Mo-Do-Tagen in W2) - Klassenregel ergaenzt;
+  CME-Referenzfenster UNBELEGT.
+- **Stand nach Punkt 1 und 2:** Programm weiter im Aufzeichnungsmodus; keine registrierbare Hypothese in der Pipeline
+  (naechste Nummer H-34). Offen beim Nutzer: Reihenfolge der Blindperiode (DEC-98 E4 (b)); PDFs (optional, Weiss et al.
+  waere der einzige Richtungsbeleg fuer V-5b).

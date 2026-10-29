@@ -8,6 +8,24 @@
 > zurueckgenommen; "Einmal-Gut" gilt je Zeitabschnitt fuer alle vorher registrierten Hypothesen; (A-4) H-26 bleibt
 > gesperrt (Default R-1), done_days-Inventur beauftragt.
 
+> **ORCHESTRATOR-VERMERK 2026-10-29 (Errata nach Messung; die Zahlen dieser Akte bleiben als Stand 2026-10-18 stehen,
+> nichts wird neu gerechnet, die Entscheidungen 1-4 von DEC-98 bleiben):**
+> (E-1, aus DEC-98 Nachtrag 5 vom 2026-10-21; der dort angekuendigte Eintrag in diese Datei war unterblieben und wird
+> am 2026-10-29 nachgeholt) Abschnitt 2.3 (Zeilen "HF-RV (UNBELEGT)"), 2.7 (Zeile "VRP HF-RV + Konsens-c"), 2.8 (Spalte
+> VRP, Zeile "HF-Statistik") und Teil C Option 3: die SD 15,1 VP fuer eine Hochfrequenz-RV-Praemie und die daraus
+> gerechneten 442,9 / 292,4 Tage je Fenster sind durch die Messung widerlegt (SD HF 18,6 VP, Langfristvarianz HF/cc
+> 0,87..1,31; die Zeilen rechneten zudem mit SE_null 1,39 statt 4,17). Option 3 ist geschlossen. Massgeblich ist
+> `decisions.md`, DEC-98 Nachtrag 5, Akte `state/herleitung_hfrv/`.
+> (E-2, aus DEC-98 Nachtrag 7 vom 2026-10-29) Abschnitt 2.4 (A2) und 2.7 (Zeile "A2 monatlich"): die Placebo-Konstruktion
+> "verfallsfreie Tage" ist leer (seit 2020-03-25 ist jeder Kalendertag Verfallstag), jeder registrierbare A2-Kontrast ist
+> ein Groessen-Kontrast; sigma30 ist gemessen (Freitag, Vorperiode 2021-03-24..2024-05-31: Cluster-Mittel 43,8 bp,
+> BTC 40,2 / ETH 52,6, gestapelt 46,8) statt 36 bp Arbeitswert, c 1,15..1,46 statt 1, der Placebo-SE skaliert mit dem
+> Ereignis-SE statt aus den PRD-Werten. SE(Delta) je 12-Monats-Fenster: Freitags-Kontrast (alle Freitage gegen Mo-Do
+> 07:30-08:00) 7,34 bp, MDE80 18,25 bp gegen den bindenden Einzel-Placebo (gegen alle drei Placebos gemeinsam 19,8,
+> Produkt-Untergrenze 21,9) statt 5,13 / 12,8; Monat+Quartal gegen Woche 19,70 bp, MDE80 49,0 bp statt
+> 11,28 / 28,0 (beim Aktien-Prior 16,5 bp [sek] ~8,8 Jahre je Fenster statt 2,89). Die Formel `[pb:A2]` gilt als
+> Sonderfall (c = 1, Placebo-SE fest). Massgeblich ist `decisions.md`, DEC-98 Nachtrag 7, Akte `state/herleitung_a2/`.
+
 > Herleitungs-Akte P-2 (Power, Rauschboden, Gate-Design). ENTWURF: nichts hier ist beschlossen oder registriert;
 > entscheiden darf nur der Orchestrator, die Programmrichtung waehlt der Nutzer (PRD Par. 8). Keine Aussage dieser
 > Akte lockert eine Regel zugunsten eines Kandidaten; Regelaenderungen erscheinen nur als programmweite Optionen mit
