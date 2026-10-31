@@ -268,3 +268,27 @@ Tests: 1.992 passed / 3 failed (Legacy `test_execution_live.py`, Sandbox-bedingt
 - **Stand nach Punkt 1 und 2:** Programm weiter im Aufzeichnungsmodus; keine registrierbare Hypothese in der Pipeline
   (naechste Nummer H-34). Offen beim Nutzer: Reihenfolge der Blindperiode (DEC-98 E4 (b)); PDFs (optional, Weiss et al.
   waere der einzige Richtungsbeleg fuer V-5b).
+
+## 13. Nachtrag 2026-10-31: DEC-103 (A2-Placebo-Design neu, Nutzerentscheid), V-5b ohne Volltext, Teil C gestartet
+
+- **Nutzerentscheid 2026-10-31:** Placebo-Design neu fassen (ja); die kostenpflichtigen Volltexte (V-5b) sind nicht
+  beschaffbar; Programm laeuft weiter.
+- **DEC-103 beschlossen** (prospektiv, vor jeder A2-Zahl mit Prior): Ereignis = alle Freitage; Kontrast gegen P2''
+  (Mo-Do 07:30-08:00 ohne Futures-Verfallstage); Placebosatz {P2'', P3fix ohne Monatsend-Freitage, P3all}; Zuordnung
+  ueber das Produkt der Einzel-Powers; Null = Label-Permutation Freitag <-> Mo-Do in der ISO-Woche; Negativ-Panel
+  beta-residualisiert; CME-Referenzfenster 15:00-16:00 London [sek, Suchauszug]; Fenster nach DEC-99 (8). Richtung
+  Strenge. V-5b bleibt UNBELEGT (Weiss et al.: nur Abstract-Fakten, keine bp-Zahl); ohne weiteren Schritt A2 GL-012.
+- **Pilot-Schaetzfenster-Route** (DEC-99) als Vorlage: Vorperiode 2021-03-24..2024-05-31 als Pilot mit vorab fixierter
+  Uebergaberegel (analog U-4). Default: Vorbereitung ja, **Registrierung und Pilotlauf erst nach Nutzer-OK**
+  (Lockerung der PRD-5.2-Vorbedingung, Programmfrage).
+- **Datenauftrag** `state/ANFRAGE_DATA_HARVEST_NEGATIVPANEL_2026-10-31.md`: 1-min-Kerzen XRPUSDT/BNBUSDT/SOLUSDT
+  2021-03-24..2026-06-28 (im Archiv nur BTC/ETH). Bitte an Data-Harvest weiterleiten.
+- **Arbeitsumgebung:** der bisherige Scratch-Bereich der Sitzung ist nicht mehr nutzbar; Harvest-Client und versiegelte
+  Extrakte (1-min BTC/ETH nur <= 2024-05-31, Settlement-Kalender ohne Preisfelder <= 2026-06-30, Funding-Zeitstempel
+  W2) liegen neu unter `/home/user/scinance_work/` (ausserhalb des Repos, nicht committet).
+- **Laeuft:** Teil C der A2-Vorarbeit (Opus-Herleitung + Review): Null-Simulation nach DEC-103 E4 auf der Vorperiode,
+  bindende SE nach DEC-94 (5), Funding-Intervall W2 (DEC-84 Auto-Switch), Pilot-Uebergaberegel und PK-Design als Vorlage.
+  Ergebnis nach `state/herleitung_a2/` (NULL_SIMULATION_A2.md, PILOT_ROUTE_A2.md, a2_teilC.json), dann DEC-103 Nachtrag
+  und Vorlage an den Nutzer.
+- Netzsperre: `www.cmegroup.com` und `www.sciencedirect.com` sind in der Sitzung nicht erreichbar (Primaerbelege nur
+  als Suchauszug [sek]); Freigabe in den Netzwerkeinstellungen der Umgebung waere noetig, um Volltexte zu lesen.
