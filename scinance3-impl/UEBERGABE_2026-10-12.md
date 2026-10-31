@@ -286,9 +286,29 @@ Tests: 1.992 passed / 3 failed (Legacy `test_execution_live.py`, Sandbox-bedingt
 - **Arbeitsumgebung:** der bisherige Scratch-Bereich der Sitzung ist nicht mehr nutzbar; Harvest-Client und versiegelte
   Extrakte (1-min BTC/ETH nur <= 2024-05-31, Settlement-Kalender ohne Preisfelder <= 2026-06-30, Funding-Zeitstempel
   W2) liegen neu unter `/home/user/scinance_work/` (ausserhalb des Repos, nicht committet).
-- **Laeuft:** Teil C der A2-Vorarbeit (Opus-Herleitung + Review): Null-Simulation nach DEC-103 E4 auf der Vorperiode,
-  bindende SE nach DEC-94 (5), Funding-Intervall W2 (DEC-84 Auto-Switch), Pilot-Uebergaberegel und PK-Design als Vorlage.
-  Ergebnis nach `state/herleitung_a2/` (NULL_SIMULATION_A2.md, PILOT_ROUTE_A2.md, a2_teilC.json), dann DEC-103 Nachtrag
-  und Vorlage an den Nutzer.
+- **Teil C fertig (2026-10-31 abends):** Herleitung (Null-Simulation, Pilot-Regel) und adversarischer Review liegen vor;
+  alle Zahlen vom Review und von mir unabhaengig reproduziert. **Review-Veto (aufloesbar) gegen die JSON-Fassung 1:**
+  ein Feld speicherte die Streuung der Vereinigung Ereignis+Placebo neben den Klassen-Streuungen; per
+  Varianzzerlegung waere daraus der Betrag des realen Pilot-Kontrasts exakt rekonstruierbar gewesen. Niemand hat ihn
+  gebildet, die Datei war nie im Repo; Fassung 2 ohne das Feld, mit erweiterter Ausgaberegel und Kanal-Test, von mir
+  vor dem Commit per Struktur-Scan geprueft. **Programmweiter Befund (B-2):** derselbe Kanaltyp steckt ueber
+  geschachtelte Klassen (ALL = FRI + NONFRI usw., 16..17 Stellen) in der bereits committeten Teil-B-JSON
+  (`a2_vorarbeit.json`, Commit 363f3d9) - die Blindheit der Vorperiode fuer A2 haengt seither an Disziplin; kein
+  History-Rewrite, dafuer C.17-Vermerk, Kombinationsverbot und Ausgaberegel fuer alle kuenftigen Nuisance-Dateien
+  (DEC-103 Nachtrag 1 (2)).
+- **Zahlen Teil C:** Null-SD je Vorperioden-Jahr 7,5 / 6,0 / 4,5 bp, gepoolt 3,75 (normal, label-invariant); bindende
+  SE P2'' bleibt 7,34 / 7,58. Zwei neue Befunde: P3fix ist in der DEC-103-Fassung die bindende Einzelbedingung (SE
+  7,93, MDE80 19,7), und in W2 sind 12 von 52 Wochen nicht permutierbar (alle Mo-Do 2026-04-06..06-25 sind
+  Futures-Tage; P2'' hat im letzten W2-Quartal keinen Tag; Festlegung F-1). Produkt-MDE80 (Zuordnung) zentral 23,4 /
+  24,4 bp, **stress 26,1 / 27,2 (bindend nach Festlegung, DEC-94 (5))**. Funding W2: 8h-Takt an allen 363 Tagen
+  (Vorperiode und W1 ebenso: an allen 1.165 bzw. 365 Tagen 8h-Takt). Pilot-Regel U-A2 (Vorlage): Schwelle stress 32,1 (ohne Gate-4-Faktor 29,3; zentral 28,8) bp Pilot-Kontrast (zentral
+  24,4), Pilot-Power bei 16,5 bp stress 0,0001 (zentral 0,027 / 0,005), bei 25 bp stress 0,041 / 0,003 (zentral 0,56 /
+  0,21). Festlegungen fuer eine etwaige Registrierung in Nachtrag 1 (8) (Null-Faktor, skalierte Null im Test, Stress
+  bindend, Regel R0, PK-Kriterium, Gate (4) als Faktor).
+- **Entscheidung beim Nutzer (Vorlage P-0..P-3, PILOT_ROUTE_A2.md Abschnitt 8; Review A-9 zuerst):** beim einzigen
+  belegten Prior (16,5 bp) uebergibt die Route in ~3 % (zentral) bzw. unter 1 % (stress) der Faelle und verbraucht
+  sonst die Vorperiode. Default P-0 = vorbereiten, nicht registrieren; P-1 Pilot-Route registrieren (Lockerung); P-2 A2
+  ruht; P-3 blindes Fenster (Reihenfolge-Frage). Bis zur Entscheidung kein Code-Bau fuer A2.
+- **Offen beim Nutzer:** Vorlage P-0..P-3; Datenauftrag Negativ-Panel weiterleiten; Reihenfolge der Blindperiode.
 - Netzsperre: `www.cmegroup.com` und `www.sciencedirect.com` sind in der Sitzung nicht erreichbar (Primaerbelege nur
   als Suchauszug [sek]); Freigabe in den Netzwerkeinstellungen der Umgebung waere noetig, um Volltexte zu lesen.
