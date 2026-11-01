@@ -1,0 +1,36 @@
+c80 = 2.4865
+gemeinsame Power je 0,90, rho 0.82 -> 0.858 (Produkt 0,810)
+gemeinsame Power je 0,90, rho 0.91 -> 0.87 (Produkt 0,810)
+gemeinsame Power je 0,90, rho 0.999999 -> 0.9 (Produkt 0,810)
+VRP Prior 9.47: SE12 5.170, SR_eff 1.832, Jahre je Fenster 1.843 = 673 Tage
+VRP Prior 7.14: SE12 5.170, SR_eff 1.381, Jahre je Fenster 3.242 = 1183 Tage
+VRP Prior 10.48: SE12 5.170, SR_eff 2.027, Jahre je Fenster 1.505 = 549 Tage
+VRP Prior 3.16: SE12 5.170, SR_eff 0.611, Jahre je Fenster 16.549 = 6040 Tage
+F1 K 600 N 365: MDE80 0.0133
+F1 K 600 N 730: MDE80 0.0094
+F1 K 600 N 2130: MDE80 0.0055
+F1 K 500 N 365: MDE80 0.0146
+F1 K 500 N 730: MDE80 0.0103
+F1 K 500 N 2130: MDE80 0.0060
+F1 K 300 N 365: MDE80 0.0188
+F1 K 300 N 730: MDE80 0.0133
+F1 K 300 N 2130: MDE80 0.0078
+TS N 2400: MDE80 0.0508, Ausschluss95 0.0336, bp/Tag MDE 10.6
+TS N 2000: MDE80 0.0556, Ausschluss95 0.0368, bp/Tag MDE 11.6
+TS N 365: MDE80 0.1301, Ausschluss95 0.0861, bp/Tag MDE 27.2
+phi 0.0: Wechselrate 0.500, IC_min Maker4 0.0096, Taker11 0.0263, gesamt15 0.0359
+phi 0.5: Wechselrate 0.333, IC_min Maker4 0.0064, Taker11 0.0175, gesamt15 0.0239
+phi 0.8: Wechselrate 0.205, IC_min Maker4 0.0039, Taker11 0.0108, gesamt15 0.0147
+OBF K4 alpha 0.05: c 1.735, Maximum/fix 1.034, E[N|H1]/fix 0.814
+OBF K4 alpha 0.0025: c 2.834, Maximum/fix 1.008, E[N|H1]/fix 0.872
+C.10 heute (gemeinsam 0,64): Basisrate 0.1: PPV 0.966; Falsch-PASS/Jahr bei 10 Nulltests 0.025
+C.10 heute (gemeinsam 0,64): Basisrate 0.25: PPV 0.988; Falsch-PASS/Jahr bei 10 Nulltests 0.025
+gepoolt 0,0025 Power 0,80: Basisrate 0.1: PPV 0.973; Falsch-PASS/Jahr bei 10 Nulltests 0.025
+gepoolt 0,0025 Power 0,80: Basisrate 0.25: PPV 0.991; Falsch-PASS/Jahr bei 10 Nulltests 0.025
+gepoolt 0,01 Power 0,80: Basisrate 0.1: PPV 0.899; Falsch-PASS/Jahr bei 10 Nulltests 0.100
+gepoolt 0,01 Power 0,80: Basisrate 0.25: PPV 0.964; Falsch-PASS/Jahr bei 10 Nulltests 0.100
+ein Fenster alpha 0,05: Basisrate 0.1: PPV 0.640; Falsch-PASS/Jahr bei 10 Nulltests 0.500
+ein Fenster alpha 0,05: Basisrate 0.25: PPV 0.842; Falsch-PASS/Jahr bei 10 Nulltests 0.500
+C.10 gemeinsam 0,80 vs je 0,80: 1.356
+gepoolt 0,0025 vs C.10 je 0,80 (Power 0,80): 1.077
+C.10 gemeinsam 0,80 vs gepoolt 0,0025: 1.259

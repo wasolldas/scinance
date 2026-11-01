@@ -312,3 +312,44 @@ Tests: 1.992 passed / 3 failed (Legacy `test_execution_live.py`, Sandbox-bedingt
 - **Offen beim Nutzer:** Vorlage P-0..P-3; Datenauftrag Negativ-Panel weiterleiten; Reihenfolge der Blindperiode.
 - Netzsperre: `www.cmegroup.com` und `www.sciencedirect.com` sind in der Sitzung nicht erreichbar (Primaerbelege nur
   als Suchauszug [sek]); Freigabe in den Netzwerkeinstellungen der Umgebung waere noetig, um Volltexte zu lesen.
+
+## 14. Nachtrag 2026-11-01: PRD-Gesamtanalyse (Nutzerauftrag) - Synthese mit Entscheidungsvorlage "Verfassung 3.1"
+
+- **Auftrag des Nutzers (2026-11-01):** das komplette PRD noch einmal analysieren (Fehler, ungenaue Annahmen), Edge-
+  Hinweise aus allen bisherigen Ergebnissen, Stand der Grundidee "Naturwissenschaft und Technik auf grosse Tradingdaten",
+  konzeptionell/strukturell Uebersehenes, neue Forschungsfelder mit den Data-Harvest-Daten, weise Nutzung der
+  Datenfenster ohne jahrelange Wartezeit, Ziel einer vollautomatischen Analyseinstitution; Subagenten nach Rolle.
+- **Ergebnis:** `state/PRD_ANALYSE_2026-11-01.md` (Orchestrator-Synthese, Abschnitt 0 = Antwort in Kuerze, Abschnitt 9 =
+  Entscheidungsvorlage P-1..P-12, Anhang C = Review-Auflagen). Anhang `state/prd_analyse_2026-11-01/`: sechs
+  Agentenanalysen (Listen; Faktenblatt aller Hypothesen/Kandidaten/Stroeme/Warteregeln; PRD-Kritik K-1..K-14;
+  Edge-Inventur E-1..E-32; Grundsatzanalyse mit zwoelf Forschungsfeldern F1..F12; Architektur der Automation mit zehn
+  Bausteinen und Fahrplan F0..F6), adversarischer Review (21 Befunde, 47 Nachrechnungen, 12 Widersprueche, 7 Luecken),
+  Dateninventar (29 Stroeme, Katalogstand 2026-11-01), Auftraege nach Rollen, Rechenskripte (nur Formeln). **Nur
+  Lesearbeit; keine Marktdaten gerechnet, keine Siegeldatei geoeffnet, kein Fenster beruehrt, keine Regelaenderung,
+  keine Registrierung, kein Verdikt.**
+- **Kernbefunde (vom Review und von mir unabhaengig nachgerechnet):** (K-1) die Horizont-Friktions-Kurve des PRD
+  unterschaetzt die Kante eines Signals um pi/2 (Rang-IC pi^2/6); Mindesthorizont x2,5 zu lang, IC_min 0,040 statt
+  0,062; PRD-Rechenfehler "7 h Maker" = 8,7 h. (K-2) "Praemie statt Sharpe" verkuerzt nichts: SR_eff >= 2,49 je
+  12-Monats-Fenster; VRP mit dem gueltigen Prior 7,14 VP (DEC-98 N2) 1.183 Tage je Fenster, Urteil 2029-07..2033-01.
+  (K-3) der WP-7-Permutationsboden ist eine Identitaet (Var 1/(K-1)); PRD 4.1 / DEC-67 B2 waren falsch. (K-4) Power
+  0,80 je Fenster ist Entscheidungs-Power 0,64. (K-5) A2-Kette 18,8 -> 19,7 -> 23,1 -> 24,4 -> 27,2 -> 29,3 -> 32,1 bp;
+  der Null-Faktor im Produkt ist nur zu 0,5..0,6 bp Rechenartefakt (Korrelation 0,82/0,91; exakte Bedingung 22,93/23,77
+  steht in der Akte), der Rest sind meine Festlegungen vom 2026-10-31 -> Programmfrage P-7.
+- **Review-Vetos, alle angenommen:** nicht "A2 heute gegen 22 bp registrierbar" (unter geltendem Placebosatz 22,3..27,2
+  bp); nicht "F1 heute registrierbar" (auf W1/W2 MDE80 IC 0,013..0,019; Bianchi-Prior misst ein Design ohne Luecke);
+  BTC/ETH-Tagesfelder nur mit zwei Power-Spalten (Exploration Vorperiode 0,056 / Konfirmation prospektiv 0,13 je Jahr);
+  **W1/W2 sind fuer Klasse W blind** (nur die A2-Vorperiode ist "durch Disziplin" blind); "neutral in alpha" nur bei
+  festem alpha je Test (GSD bei 0,0025: E[N bei H1] 0,87, Ersparnis -31 % nur gegen C.10 mit gemeinsamer Power 0,80).
+- **Fuer die Akte neu:** H-21 in der registrierten Form vermutlich nicht entsperrbar (14-Tage-Ausfallmuster aller
+  Live-Stroeme; [V] bis Lueckenliste S0); `tardis/options_chain` 91 Monatsstichtage 2019-04..2026-10 (87 vor dem Siegel;
+  D.17 bleibt); Bedarfsbilanz der knappen Blinddaten (W1/W2, Siegelperiode) erstmals tabelliert; Gesamt-OC-Ueberschlag
+  (PPV 0,97 bei alpha 0,0025, 0,90 bei 0,01).
+- **Offen beim Nutzer:** P-1..P-12 (Empfehlung: P-1..P-7 als Paket "Verfassung 3.1" mit festem alpha je Test 0,0025),
+  dazu weiterhin A2 P-0..P-3 (Default P-0), Reihenfolge der Blindperiode (mit P-4 gegenstandslos), Datenauftrag
+  Negativ-Panel; neu: Datenauftraege Abschnitt 8 (Marktkapitalisierung/Spot-Volumen je Coin, Inhaltsproben, OI-Historie,
+  Stablecoin-Angebot, Ausfalltage des Live-Sammlers). Bis zur Entscheidung gilt alles Bisherige; ich bereite 9.2 vor
+  (Errata, Pflicht-Berichtszeile, OC-Simulation des Pakets, F0 Skripte ins Repo, Konto-Inventar, H-21-Lueckenliste,
+  Inhaltsproben nur Vorperiode, PRD v3 als Entwurf).
+- **Hygiene:** alle neuen Dateien ASCII, ohne Hostname, Zugangsdaten oder Modellnamen (Rollen statt Modelle); keine
+  Nuisance-/JSON-Dateien im Paket, Struktur-Scan nach DEC-103 N1 (2c) daher gegenstandslos. Rechenskripte der Analyse
+  liegen versioniert unter `state/prd_analyse_2026-11-01/scripts/` (Lehre aus dem Scratch-Verlust, F0 begonnen).

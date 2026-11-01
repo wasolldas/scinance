@@ -1,0 +1,21 @@
+Aufloesungsgrenze einer Tageskorrelation (Pearson/IC), Power 0,80, alpha 0,05 einseitig: r_min ~ z/sqrt(n)
+  n=  365 Tage: r_min = 0.1301
+  n=  730 Tage: r_min = 0.0920
+  n= 1165 Tage: r_min = 0.0728
+  n= 2000 Tage: r_min = 0.0556
+  n= 2400 Tage: r_min = 0.0508
+  n= 2330 Tage: r_min = 0.0515
+
+Was heisst r auf Tagesbasis in bp Ertrag? E[r_tag * sign(signal)] ~ r * E|r_tag| = r * 0,798 * sigma_tag (Normal)
+  sigma_tag 250 bp, r 0.05: Brutto ~ 10.0 bp/Tag  (Wand Taker 11, Maker 4, inkl. Slippage ~15)
+  sigma_tag 250 bp, r 0.06: Brutto ~ 12.0 bp/Tag  (Wand Taker 11, Maker 4, inkl. Slippage ~15)
+  sigma_tag 250 bp, r 0.08: Brutto ~ 16.0 bp/Tag  (Wand Taker 11, Maker 4, inkl. Slippage ~15)
+  sigma_tag 250 bp, r 0.10: Brutto ~ 20.0 bp/Tag  (Wand Taker 11, Maker 4, inkl. Slippage ~15)
+  sigma_tag 350 bp, r 0.05: Brutto ~ 14.0 bp/Tag  (Wand Taker 11, Maker 4, inkl. Slippage ~15)
+  sigma_tag 350 bp, r 0.06: Brutto ~ 16.8 bp/Tag  (Wand Taker 11, Maker 4, inkl. Slippage ~15)
+  sigma_tag 350 bp, r 0.08: Brutto ~ 22.3 bp/Tag  (Wand Taker 11, Maker 4, inkl. Slippage ~15)
+  sigma_tag 350 bp, r 0.10: Brutto ~ 27.9 bp/Tag  (Wand Taker 11, Maker 4, inkl. Slippage ~15)
+
+Zwei 12-Monats-Fenster je 365 Tage (C.10, je Fenster Power 0,80): r_min je Fenster = 0.1301; Produkt-Power bei r=0,10 je Fenster: 0.37
+Vergleich: Wochen-IC-Design (52 Wochen je Fenster, SD_week ~0,045): MDE80 IC = 0.0155
+Hit-Rate-Aequivalent: r=0,06 entspricht etwa p = 0,5 + r/2*... (grobe Naeherung p ~ 0,5 + 0,318*r) = 0.519
