@@ -353,3 +353,42 @@ Tests: 1.992 passed / 3 failed (Legacy `test_execution_live.py`, Sandbox-bedingt
 - **Hygiene:** alle neuen Dateien ASCII, ohne Hostname, Zugangsdaten oder Modellnamen (Rollen statt Modelle); keine
   Nuisance-/JSON-Dateien im Paket, Struktur-Scan nach DEC-103 N1 (2c) daher gegenstandslos. Rechenskripte der Analyse
   liegen versioniert unter `state/prd_analyse_2026-11-01/scripts/` (Lehre aus dem Scratch-Verlust, F0 begonnen).
+
+## 15. Nachtrag 2026-11-02: Verfassung 3.1 beschlossen (DEC-104), Errata (DEC-105), Skripte versioniert (F0/F0b), Methoden-Sweep, Konto-Inventar, Zone-X-Programm 1
+
+- **Nutzerentscheid 2026-11-02:** "Paket Verfassung 3.1 annehmen, fahre mit 9.2 fort." Festgehalten als **DEC-104** (E0..E10, Etikett je
+  Zeile): Messinstitution mit Pflichtausgabe Schaetzer/CI/Ausschlussgrenze; Konfirmation = gepoolt alpha 0,0025 + REZENZ-Screen,
+  gemeinsame Power 0,80, alpha je Test fest; SESOI als Kostenkurve (Default Taker, etikettiert) statt Literatur-Punktprior,
+  UNBELEGT symmetrisch, A1/VRP strukturell geschlossen; Drei Zonen X (vor 2024-07-01, Konto `state/KONTO_ZONE_X.md`) / V (W1/W2,
+  blind, ein Blick je Familie) / K (ab Siegel, GSD-Blicke, Futility), Kohorten-Stichtage je Quartal (erste Kohorte 2027-01-01),
+  BY q 0,10, Jahresbuch, Lockbox, Vorwissens-Klassen (`state/FENSTERREGISTER.md`); nuisance-adaptive Designwahl; REZENZ als
+  Screen und Stabilitaetstest; A2 exakte Konjunktion und Assurance. Vorbedingung der ersten Registrierung: Gesamt-OC (laeuft).
+  CLAUDE.md traegt die 3.1-Zeile. P-8 gegenstandslos, P-9 folgt E7 (d), P-10..P-12 offen mit Defaults.
+- **DEC-105 Errata** (13 Punkte: pi/2-Kurvenschar, Lo q = 365, K-0.6 Faktor 5,2, DEC-52-Rate, WP-7-Identitaet, VRP 7,14 VP / 1.183
+  Tage, A2-Kette mit skalierter Null und Doppelausweis, Persistenz-Tabelle der Kostendeckung, Pivot-Begruendung, D.17, H-26/H-21,
+  A4-Widerspruch, Zahlwoerter) und Format der Pflicht-Berichtszeile. `state/DATENANNAHMEN_REGISTER.md` (17 Annahmen).
+- **H-21-Lueckenliste** (`state/H21_LUECKENLISTE_2026-11-02.md`, S0 aus dem Katalog-Cache): W1 hat 13 Fehltage im
+  Liquidationsstrom und einen im ETH-Trade-Strom; W2 bisher lueckenlos. H-21 in der registrierten Form nicht entsperrbar
+  (Nachladbarkeit [V]). 14 gemeinsame Ausfalltage aller Live-Sammler (10,1 %) -> Budget-Regel >= 10 % je Quartal.
+- **F0/F0b:** 171 Herleitungs-, Review- und Pruefskripte byte-identisch versioniert (`derivations/`, `verify/`, `tools/channel_scan.py`;
+  Manifeste `derivations/MANIFEST_F0*_2026-11-02.md`); alle Hash-Pins der Akte vom Orchestrator geprueft; Hygiene ohne Befund;
+  Laufausgaben/JSON per .gitignore ausgeschlossen. Das Sitzungs-Scratchpad war nicht verloren; die Pins stimmten.
+- **Methoden-Sweep** (`state/prd_analyse_2026-11-01/METHODEN_SWEEP_2026-11-02.md`; PRD_ANALYSE Nachtrag 1): 37 Methodenfamilien x 13
+  Stromgruppen, elf Ideenkarten IK-01..IK-11. Befund: Mess-, Kosten- und Nullwelt-Programme statt neuer Praemienquellen; die
+  SESOI-Kostenkurve (E3) existiert nicht -> IK-01/IK-02 Vorbedingung; IK-10 (Price Delay) einziger neuer Querschnittskandidat an der
+  Kante (0,015..0,021 gegen 0,017); Programmfrage P-13 (W1/W2-Mikrostruktur-Zaehlgroessen mit A2-Maske als Zone X, Lockerung, N);
+  sechs neue Datenauftraege. Kernzahlen vom Orchestrator reproduziert.
+- **Konto-Inventar** (`state/KONTO_INVENTAR_2026-11-02.md`, 72 Oeffnungen, 21 Unklarheiten) und **DEC-104 Nachtrag 1:** Zone K ist
+  nicht rein - fuer BTC/ETH-Aggregate und Mikrostruktur erst ab **2026-10-01**, Funding-Lage ab 2026-09-15, Panel-Querschnitte/
+  Optionskette/Live-Stroeme ab 2026-07-01; ein 12-Monats-K-Fenster fuer BTC/ETH-Statistiken endet 2027-09-30. W1/W2 fuer die
+  fm8-Reversal-Familie vorbelastet (Strenge). Kuerzel SK0..SK3 fuer Statistikklassen.
+- **Zone-X-Programm 1** (IK-05 RMT-Faktorzahl, IK-04 Momente; `src/bybit_edge/research/zone_x/`, 80 Tests) gebaut und
+  abgenommen; Konto-Zeilen 1 und 2 eingetragen; **Lauf wartet auf den Datendienst** (seit 2026-11-02 vormittags nicht
+  erreichbar; Katalog-Cache 2026-11-01 18:46 UTC). Spezifikationen `derivations/zone_x/`, `derivations/feasibility31/` (F3).
+- **Geplante Aufgaben:** monatlicher Stromcheck (jeden 2. um 04:17 UTC, erster Lauf 2026-12-02); Selbst-Check-in 2026-11-02 13:12 UTC
+  fuer Datendienst-Retry und Zone-X-Lauf.
+- **Offen beim Nutzer:** Datenauftraege weiterleiten (Negativ-Panel `state/ANFRAGE_DATA_HARVEST_NEGATIVPANEL_2026-10-31.md`; Abschnitt 8
+  der PRD-Analyse; Abschnitt 6 des Sweeps); P-11 Netzfreigabe/Budget; P-13 (Default nein).
+- **Naechste Schritte (Orchestrator):** Gesamt-OC abnehmen -> DEC-104 Nachtrag 2 -> A2-Feasibility unter 3.1 (E7 (d)) ->
+  Feasibility-Rechner F3 bauen -> Zone-X-Laeufe (IK-05/IK-04, danach IK-01-Trade-Stichprobe) -> Inhaltsproben (tardis <= 2026-06-01,
+  deribit/publicTrade) -> PRD v3 Entwurf -> Kohorte 1 vorbereiten.
