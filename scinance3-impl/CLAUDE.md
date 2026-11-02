@@ -73,6 +73,20 @@
   als Pilot-Schaetzfenster oder zusaetzliches Urteilsfenster; genau ein
   Pilotlauf, Panel-Waechter, Doppelausweis; F-WEEK zaehlt nur getestete
   Hypothesen; W2 endet 2026-06-28. Etikett "Lockerung".
+- **Seit 2026-11-02 (DEC-104, Verfassung 3.1, Nutzerentscheid; prospektiv ab
+  Kohorte 1 = 2027-01-01, Verschaerfungen sofort):** Messinstitution (jeder Lauf
+  gibt Schaetzer, 95-%-CI, obere Ausschlussgrenze aus, auch GL-012); Konfirmation =
+  gepoolter Test alpha 0,0025 plus REZENZ-Screen (juengstes Fenster 0,05), Power
+  0,80 fuer die gemeinsame Regel, alpha je Test fest; SESOI (Kostenkurve, Default
+  Taker, etikettiert) statt Literatur-Punktprior, Literatur als Etikett, UNBELEGT
+  symmetrisch; Drei Zonen: X = vor 2024-07-01 (Exploration nur mit Konto
+  `state/KONTO_ZONE_X.md`, nie Verdikt), V = W1/W2 (blind, ein Blick je Familie),
+  K = ab 2026-07-01 (versiegelt, gruppensequentielle Blicke O'Brien-Fleming, Futility);
+  Kohorten-Stichtage je Quartal mit BY q 0,10, Jahresbuch erwarteter Falsch-PASS;
+  Vorwissens-Klasse je Datenfamilie (BTC/ETH-Aggregate nur prospektiv); nuisance-
+  adaptive Designwahl ohne Nutzerfrage; REZENZ als Screen und Stabilitaetstest; A2:
+  exakte Konjunktion statt Produkt, Assurance-Uebergabe. Ersetzt fuer 3.1-
+  Registrierungen C.10/DEC-52/DEC-94 (6). Etikett je Zeile in DEC-104.
 - **Zwoelf Pflichtzeilen jeder Registrierung** (PRD Par. 3.3): Power,
   Entscheidungsrelevanz (mit oekonomischer Mindestmagnitude als ETIKETT),
   Cluster-Einheit, Selektions-Deflation, adversariales Fixture,
