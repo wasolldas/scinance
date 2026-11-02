@@ -1,0 +1,272 @@
+Stabilitaetstest P-2 (c) - stab_sim.py (deterministisch; Seeds 31104..31107, 31144/31147/31150)
+
+================ (0) Reproduktion OC (a) Nr. 6 / DEC-104 N2 (4) ================
+r 0.500: alpha_eff 0.002375, MDE 2.6942 SE_12, Daten/gepoolt 1.0905, /C.10 je 0,80 1.1741, PASS nur aelter 1/2 MDE 0.0729/0.0128, abklingend 0.3931
+r 0.333: alpha_eff 0.002375, MDE 2.1998 SE_12, Daten/gepoolt 1.0905, /C.10 je 0,80 1.1741, PASS nur aelter 1/2 MDE 0.1736/0.0254, abklingend 0.4971
+r 0.250: alpha_eff 0.002375, MDE 1.9051 SE_12, Daten/gepoolt 1.0905, /C.10 je 0,80 1.1741, PASS nur aelter 1/2 MDE 0.2591/0.0489, abklingend 0.5564
+Konstanten: z95 1.6449, z9975 2.8070, z80 0.8416, MU_FIX 3.6487, C80_05 2.4865, MU_C = z9975 + Phi^-1(0,8/0,95) = 3.8102, Phi^-1(0,8/0,95) = 1.0031
+
+================ (1) Definition, Unabhaengigkeit, Nicht-Unterlegenheit ================
+Korrelation gepoolt (Mittel aller Cluster) / D je r und SD-Verhaeltnis k = SD_juengst / SD_aelter [Info-Anteil r_I]:
+  r0.500: k 0.5: -0.6000 [r_I 0.8000]; k 0.7: -0.3423 [r_I 0.6711]; k 0.85: -0.1611 [r_I 0.5806]; k 1.0: +0.0000 [r_I 0.5000]; k 1.25: +0.2195 [r_I 0.3902]; k 1.5: +0.3846 [r_I 0.3077]; k 2.0: +0.6000 [r_I 0.2000]
+  r0.333: k 0.5: -0.5774 [r_I 0.6667]; k 0.7: -0.3248 [r_I 0.5051]; k 0.85: -0.1521 [r_I 0.4090]; k 1.0: -0.0000 [r_I 0.3333]; k 1.25: +0.2075 [r_I 0.2424]; k 1.5: +0.3656 [r_I 0.1818]; k 2.0: +0.5774 [r_I 0.1111]
+  r0.250: k 0.5: -0.5447 [r_I 0.5714]; k 0.7: -0.3009 [r_I 0.4049]; k 0.85: -0.1400 [r_I 0.3157]; k 1.0: +0.0000 [r_I 0.2500]; k 1.25: +0.1913 [r_I 0.1758]; k 1.5: +0.3394 [r_I 0.1290]; k 2.0: +0.5447 [r_I 0.0769]
+Nicht-Unterlegenheit f 0,5 (MDE in SE_12; gemeinsame Power 0,80): je r MDE stab / NI-Nachweis (Last beim Effekt) / NI-Marge (Abfall unter 0,5 x gepoolt verwirft) / Screen 0,05; q(NI-Marge) an ihrer MDE:
+  r0.500: 2.6942 / 3.9361 / 2.5803 / 2.7603; corr(gepoolt, NI) 0.4472; q_NI-Marge 0.9999
+  r0.333: 2.1998 / 4.3067 / 2.1083 / 2.5588; corr(gepoolt, NI) 0.3333; q_NI-Marge 0.9989
+  r0.250: 1.9051 / 4.4826 / 1.8279 / 2.5025; corr(gepoolt, NI) 0.2774; q_NI-Marge 0.9975
+  r0.167: 1.5555 / 4.6518 / 1.4960 / 2.4869; corr(gepoolt, NI) 0.2182; q_NI-Marge 0.9946
+  r0.100: 1.2049 / 4.7828 / 1.1632 / 2.4865; corr(gepoolt, NI) 0.1644; q_NI-Marge 0.9898
+  Boden NI-Nachweis f 0,5 (r -> 0): (z95 + z80)/(1 - f) = 4.9729 SE_12 (Screen 0,05: 2.4865)
+
+================ (2) Entscheidungsregel und Power-Planung (ein Blick) ================
+Homogen, gleiche Varianz: je r MDE (SE_12), q = P(Stabilitaet haelt | gepoolt besteht), Daten gegen gepoolt / C.10 je 0,80 / C.10 gemeinsam 0,80, Power des Stabilitaetstests gegen Abfall auf 0 an der MDE:
+  r0.500: 2.6942, q 0.950000, 1.0905 / 1.1741 / 0.8659, Power gegen Abfall 0.6027
+  r0.333: 2.1998, q 0.950000, 1.0905 / 1.1741 / 0.8659, Power gegen Abfall 0.5601
+  r0.250: 1.9051, q 0.950000, 1.0905 / 1.1741 / 0.8659, Power gegen Abfall 0.5020
+  r0.167: 1.5555, q 0.950000, 1.0905 / 1.1741 / 0.8659, Power gegen Abfall 0.4110
+  r0.100: 1.2049, q 0.950000, 1.0905 / 1.1741 / 0.8659, Power gegen Abfall 0.3079
+Ungleiche Varianz (k = SD juengst / SD aelter je Cluster): alpha_eff, q an der MDE, Daten gegen gepoolt (gleiches k), realisierte Power bei Planung mit q = 0,95:
+  r0.500: k 0.5: 0.000989, q 0.9413, x1.1093, P 0.7923; k 0.7: 0.001828, q 0.9430, x1.1055, P 0.7939; k 0.85: 0.002192, q 0.9460, x1.0991, P 0.7965; k 1.0: 0.002375, q 0.9500, x1.0905, P 0.8000; k 1.25: 0.002478, q 0.9579, x1.0743, P 0.8065; k 1.5: 0.002497, q 0.9658, x1.0588, P 0.8126; k 2.0: 0.002500, q 0.9789, x1.0351, P 0.8226
+  r0.333: k 0.5: 0.001076, q 0.9414, x1.1091, P 0.7923; k 0.7: 0.001871, q 0.9432, x1.1050, P 0.7941; k 0.85: 0.002205, q 0.9461, x1.0987, P 0.7967; k 1.0: 0.002375, q 0.9500, x1.0905, P 0.8000; k 1.25: 0.002476, q 0.9574, x1.0753, P 0.8060; k 1.5: 0.002496, q 0.9648, x1.0608, P 0.8119; k 2.0: 0.002500, q 0.9774, x1.0377, P 0.8214
+  r0.250: k 0.5: 0.001198, q 0.9415, x1.1089, P 0.7924; k 0.7: 0.001928, q 0.9436, x1.1043, P 0.7944; k 0.85: 0.002223, q 0.9464, x1.0981, P 0.7969; k 1.0: 0.002375, q 0.9500, x1.0905, P 0.8000; k 1.25: 0.002472, q 0.9567, x1.0767, P 0.8055; k 1.5: 0.002495, q 0.9635, x1.0633, P 0.8108; k 2.0: 0.002500, q 0.9752, x1.0415, P 0.8198
+  Spanne k 0,7..1,5 (r 1/2..1/4): Datenfaktor 1.0588..1.1055; Power bei Planung q 0,95: 0.7939..0.8126
+Niveau alpha_stab des Stabilitaetstests: Daten gegen gepoolt / C.10 je 0,80, alpha_eff, PASS nur aelter 1/2 MDE (r 1/2; r 1/4):
+  0.05: x1.0905 / x1.1741, 0.002375; 0.0729/0.0128; 0.2591/0.0489
+  0.1: x1.2185 / x1.3119, 0.002250; 0.0496/0.0027; 0.1882/0.0137
+  0.15: x1.4356 / x1.5457, 0.002125; 0.0335/0.0004; 0.1335/0.0030
+  0.2: unerreichbar (1 - alpha_stab <= 0,80)
+
+================ (3) Schutzwirkung ================
+r 0.500 (MDE_c 2.6942 SE_12): Regel | MDE | nur aelter 0,5/1/1,5/2 x eigene MDE | abklingend | nur juengst | nur aelter 1/2 x MDE_c | sup nur aelter (bei SE_12)
+         pool | 2.5800 | 0.0291/0.1629/0.4719/0.8000 | 0.4719 | 0.1629 | 0.1835/0.8421 | 1.0000 (16.000)
+    screen005 | 2.7603 | 0.0154/0.0394/0.0492/0.0500 | 0.3333 | 0.1957 | 0.0385/0.0500 | 0.0500 (10.600)
+    screen020 | 2.5992 | 0.0250/0.1009/0.1776/0.1986 | 0.4327 | 0.1662 | 0.1078/0.1991 | 0.2000 (11.931)
+         stab | 2.6942 | 0.0241/0.0729/0.0586/0.0128 | 0.3931 | 0.1835 | 0.0729/0.0128 | 0.0787 (3.148)
+      ni_last | 3.9361 | 0.0046/0.0018/0.0002/0.0000 | 0.1514 | 0.4885 | 0.0041/0.0004 | 0.0046 (2.084)
+     ni_marge | 2.5803 | 0.0289/0.1548/0.3794/0.4547 | 0.4700 | 0.1629 | 0.1729/0.4434 | 0.4597 (4.893)
+r 0.333 (MDE_c 2.1998 SE_12): Regel | MDE | nur aelter 0,5/1/1,5/2 x eigene MDE | abklingend | nur juengst | nur aelter 1/2 x MDE_c | sup nur aelter (bei SE_12)
+         pool | 2.1066 | 0.0558/0.3540/0.8000/0.9802 | 0.5923 | 0.0558 | 0.3948/0.9885 | 1.0000 (10.000)
+    screen005 | 2.5588 | 0.0217/0.0472/0.0500/0.0500 | 0.3421 | 0.0909 | 0.0432/0.0500 | 0.0500 (8.978)
+    screen020 | 2.1992 | 0.0395/0.1469/0.1966/0.2000 | 0.4774 | 0.0620 | 0.1469/0.2000 | 0.2000 (7.847)
+         stab | 2.1998 | 0.0480/0.1736/0.1238/0.0254 | 0.4971 | 0.0621 | 0.1736/0.0254 | 0.1839 (2.495)
+      ni_last | 4.3067 | 0.0050/0.0005/0.0000/0.0000 | 0.1093 | 0.3737 | 0.0048/0.0004 | 0.0055 (1.716)
+     ni_marge | 2.1083 | 0.0547/0.3162/0.5692/0.5047 | 0.5838 | 0.0559 | 0.3470/0.4787 | 0.5770 (3.383)
+r 0.250 (MDE_c 1.9051 SE_12): Regel | MDE | nur aelter 0,5/1/1,5/2 x eigene MDE | abklingend | nur juengst | nur aelter 1/2 x MDE_c | sup nur aelter (bei SE_12)
+         pool | 1.8243 | 0.0751/0.4719/0.9028/0.9962 | 0.6501 | 0.0291 | 0.5202/0.9982 | 1.0000 (7.447)
+    screen005 | 2.5025 | 0.0272/0.0494/0.0500/0.0500 | 0.3436 | 0.0588 | 0.0445/0.0500 | 0.0500 (10.200)
+    screen020 | 1.9953 | 0.0494/0.1677/0.1993/0.2000 | 0.4889 | 0.0350 | 0.1597/0.2000 | 0.2000 (7.359)
+         stab | 1.9051 | 0.0667/0.2591/0.1892/0.0489 | 0.5564 | 0.0318 | 0.2591/0.0489 | 0.2741 (2.158)
+      ni_last | 4.4826 | 0.0046/0.0002/0.0000/0.0000 | 0.0911 | 0.2855 | 0.0059/0.0006 | 0.0066 (1.534)
+     ni_marge | 1.8279 | 0.0731/0.4144/0.6445/0.5485 | 0.6366 | 0.0292 | 0.4486/0.5235 | 0.6447 (2.772)
+r 0.167 (MDE_c 1.5555 SE_12): Regel | MDE | nur aelter 0,5/1/1,5/2 x eigene MDE | abklingend | nur juengst | nur aelter 1/2 x MDE_c | sup nur aelter (bei SE_12)
+         pool | 1.4896 | 0.0991/0.5923/0.9603/0.9995 | 0.7046 | 0.0139 | 0.6436/0.9998 | 1.0000 (5.800)
+    screen005 | 2.4869 | 0.0366/0.0500/0.0500/0.0500 | 0.3440 | 0.0355 | 0.0452/0.0500 | 0.0500 (5.818)
+    screen020 | 1.7983 | 0.0667/0.1877/0.2000/0.2000 | 0.4962 | 0.0188 | 0.1686/0.2000 | 0.2000 (5.353)
+         stab | 1.5555 | 0.0919/0.3791/0.3059/0.1160 | 0.6217 | 0.0149 | 0.3791/0.1160 | 0.4042 (1.785)
+      ni_last | 4.6518 | 0.0037/0.0001/0.0000/0.0000 | 0.0753 | 0.1819 | 0.0081/0.0012 | 0.0087 (1.321)
+     ni_marge | 1.4960 | 0.0960/0.5209/0.7190/0.6224 | 0.6862 | 0.0140 | 0.5553/0.6022 | 0.7201 (2.179)
+r 0.100 (MDE_c 1.2049 SE_12): Regel | MDE | nur aelter 0,5/1/1,5/2 x eigene MDE | abklingend | nur juengst | nur aelter 1/2 x MDE_c | sup nur aelter (bei SE_12)
+         pool | 1.1538 | 0.1220/0.6832/0.9829/0.9999 | 0.7451 | 0.0073 | 0.7331/1.0000 | 1.0000 (4.200)
+    screen005 | 2.4865 | 0.0463/0.0500/0.0500/0.0500 | 0.3440 | 0.0206 | 0.0454/0.0500 | 0.0500 (3.924)
+    screen020 | 1.6926 | 0.1036/0.1989/0.2000/0.2000 | 0.4997 | 0.0111 | 0.1733/0.2000 | 0.2000 (3.949)
+         stab | 1.2049 | 0.1179/0.5074/0.4676/0.2607 | 0.6797 | 0.0076 | 0.5074/0.2607 | 0.5501 (1.423)
+      ni_last | 4.7828 | 0.0029/0.0001/0.0000/0.0000 | 0.0642 | 0.0977 | 0.0116/0.0028 | 0.0119 (1.094)
+     ni_marge | 1.1632 | 0.1187/0.6120/0.7861/0.7110 | 0.7242 | 0.0074 | 0.6433/0.6975 | 0.7883 (1.666)
+Abfall (Effekt nur im aelteren Teil), den der Stabilitaetstest mit 0,80 verwirft: r0.500: 3.5164 SE_12 = 1.3052 MDE_c; r0.333: 3.0453 SE_12 = 1.3843 MDE_c; r0.250: 2.8711 SE_12 = 1.5071 MDE_c; r0.167: 2.7238 SE_12 = 1.7511 MDE_c; r0.100: 2.6210 SE_12 = 2.1753 MDE_c
+
+================ (4) Gruppensequentiell (OBF, alpha 0,0025, Power 0,80 der gemeinsamen Regel) ================
+OBF-Konstante (B-Skala, alpha 0,0025, Gitter): K 1: 2.8070, K 2: 2.8080, K 3: 2.8200, K 4: 2.8320
+K 1, r 0.500,        none: Max/N_fix 0.9999, alpha 0.00247, E[N|H1] 0.9999, E[N|H0] 0.9999, q 1.0000, Power 0.8000, Power 0,5 MDE 0.1627
+K 1, r 0.500,        last: Max/N_fix 1.0915, alpha 0.00235, E[N|H1] 1.0915, E[N|H0] 1.0915, q 0.9495, Power 0.8000, Power 0,5 MDE 0.1743
+K 1, r 0.333,        last: Max/N_fix 1.0915, alpha 0.00236, E[N|H1] 1.0915, E[N|H0] 1.0915, q 0.9495, Power 0.8000, Power 0,5 MDE 0.1743
+K 1, r 0.250,        last: Max/N_fix 1.0915, alpha 0.00234, E[N|H1] 1.0915, E[N|H0] 1.0915, q 0.9495, Power 0.8000, Power 0,5 MDE 0.1742
+K 2, r 0.500,        none: Max/N_fix 1.0001, alpha 0.00248, E[N|H1] 0.9589, E[N|H0] 1.0001, q 1.0000, Power 0.8000, Power 0,5 MDE 0.1628
+K 2, r 0.500,        last: Max/N_fix 1.0272, alpha 0.00238, E[N|H1] 0.9822, E[N|H0] 1.0272, q 0.9834, Power 0.8000, Power 0,5 MDE 0.1629
+K 2, r 0.500,   each_cont: Max/N_fix 1.0272, alpha 0.00238, E[N|H1] 0.9822, E[N|H0] 1.0272, q 0.9834, Power 0.8000, Power 0,5 MDE 0.1629
+K 2, r 0.500,   each_term: Max/N_fix 1.0272, alpha 0.00238, E[N|H1] 0.9822, E[N|H0] 1.0272, q 0.9834, Power 0.8000, Power 0,5 MDE 0.1629
+K 2, r 0.333,        last: Max/N_fix 1.0475, alpha 0.00239, E[N|H1] 0.9994, E[N|H0] 1.0475, q 0.9719, Power 0.8000, Power 0,5 MDE 0.1662
+K 2, r 0.333,   each_cont: Max/N_fix 1.0496, alpha 0.00238, E[N|H1] 1.0036, E[N|H0] 1.0495, q 0.9708, Power 0.8000, Power 0,5 MDE 0.1665
+K 2, r 0.333,   each_term: Max/N_fix 1.0576, alpha 0.00238, E[N|H1] 1.0079, E[N|H0] 1.0576, q 0.9664, Power 0.8000, Power 0,5 MDE 0.1681
+K 2, r 0.250,        last: Max/N_fix 1.0550, alpha 0.00236, E[N|H1] 1.0057, E[N|H0] 1.0550, q 0.9679, Power 0.8000, Power 0,5 MDE 0.1673
+K 2, r 0.250,   each_cont: Max/N_fix 1.0566, alpha 0.00236, E[N|H1] 1.0096, E[N|H0] 1.0566, q 0.9669, Power 0.8000, Power 0,5 MDE 0.1676
+K 2, r 0.250,   each_term: Max/N_fix 1.0654, alpha 0.00236, E[N|H1] 1.0145, E[N|H0] 1.0654, q 0.9623, Power 0.8000, Power 0,5 MDE 0.1694
+K 3, r 0.500,        none: Max/N_fix 1.0044, alpha 0.00248, E[N|H1] 0.8963, E[N|H0] 1.0043, q 1.0000, Power 0.8000, Power 0,5 MDE 0.1624
+K 3, r 0.500,        last: Max/N_fix 1.0204, alpha 0.00241, E[N|H1] 0.9076, E[N|H0] 1.0203, q 0.9901, Power 0.8000, Power 0,5 MDE 0.1624
+K 3, r 0.500,   each_cont: Max/N_fix 1.0269, alpha 0.00240, E[N|H1] 0.9175, E[N|H0] 1.0268, q 0.9863, Power 0.8000, Power 0,5 MDE 0.1633
+K 3, r 0.500,   each_term: Max/N_fix 1.0535, alpha 0.00240, E[N|H1] 0.9308, E[N|H0] 1.0534, q 0.9711, Power 0.8000, Power 0,5 MDE 0.1684
+K 3, r 0.333,        last: Max/N_fix 1.0067, alpha 0.00246, E[N|H1] 0.8979, E[N|H0] 1.0066, q 0.9986, Power 0.8000, Power 0,5 MDE 0.1621
+K 3, r 0.333,   each_cont: Max/N_fix 1.0098, alpha 0.00245, E[N|H1] 0.9048, E[N|H0] 1.0097, q 0.9967, Power 0.8000, Power 0,5 MDE 0.1623
+K 3, r 0.333,   each_term: Max/N_fix 1.0363, alpha 0.00244, E[N|H1] 0.9188, E[N|H0] 1.0362, q 0.9807, Power 0.8000, Power 0,5 MDE 0.1673
+K 3, r 0.250,        last: Max/N_fix 1.0149, alpha 0.00242, E[N|H1] 0.9038, E[N|H0] 1.0148, q 0.9935, Power 0.8000, Power 0,5 MDE 0.1620
+K 3, r 0.250,   each_cont: Max/N_fix 1.0179, alpha 0.00241, E[N|H1] 0.9110, E[N|H0] 1.0178, q 0.9916, Power 0.8000, Power 0,5 MDE 0.1624
+K 3, r 0.250,   each_term: Max/N_fix 1.0470, alpha 0.00240, E[N|H1] 0.9262, E[N|H0] 1.0469, q 0.9746, Power 0.8000, Power 0,5 MDE 0.1678
+K 4, r 0.500,        none: Max/N_fix 1.0079, alpha 0.00247, E[N|H1] 0.8716, E[N|H0] 1.0078, q 1.0000, Power 0.8000, Power 0,5 MDE 0.1621
+K 4, r 0.500,        last: Max/N_fix 1.0184, alpha 0.00242, E[N|H1] 0.8784, E[N|H0] 1.0183, q 0.9934, Power 0.8000, Power 0,5 MDE 0.1619
+K 4, r 0.500,   each_cont: Max/N_fix 1.0210, alpha 0.00240, E[N|H1] 0.8836, E[N|H0] 1.0209, q 0.9918, Power 0.8000, Power 0,5 MDE 0.1619
+K 4, r 0.500,   each_term: Max/N_fix 1.0470, alpha 0.00240, E[N|H1] 0.8970, E[N|H0] 1.0468, q 0.9766, Power 0.8000, Power 0,5 MDE 0.1663
+K 4, r 0.500, screen_each: Max/N_fix 1.0702, alpha 0.00211, E[N|H1] 0.9127, E[N|H0] 1.0701, q 0.9640, Power 0.8000, Power 0,5 MDE 0.1576
+K 4, r 0.333,        last: Max/N_fix 1.0120, alpha 0.00245, E[N|H1] 0.8742, E[N|H0] 1.0118, q 0.9974, Power 0.8000, Power 0,5 MDE 0.1619
+K 4, r 0.333,   each_cont: Max/N_fix 1.0144, alpha 0.00244, E[N|H1] 0.8794, E[N|H0] 1.0143, q 0.9959, Power 0.8000, Power 0,5 MDE 0.1619
+K 4, r 0.333,   each_term: Max/N_fix 1.0389, alpha 0.00243, E[N|H1] 0.8918, E[N|H0] 1.0388, q 0.9812, Power 0.8000, Power 0,5 MDE 0.1663
+K 4, r 0.250,        last: Max/N_fix 1.0079, alpha 0.00247, E[N|H1] 0.8716, E[N|H0] 1.0078, q 1.0000, Power 0.8000, Power 0,5 MDE 0.1621
+K 4, r 0.250,   each_cont: Max/N_fix 1.0084, alpha 0.00246, E[N|H1] 0.8742, E[N|H0] 1.0083, q 0.9997, Power 0.8000, Power 0,5 MDE 0.1621
+K 4, r 0.250,   each_term: Max/N_fix 1.0245, alpha 0.00246, E[N|H1] 0.8824, E[N|H0] 1.0244, q 0.9897, Power 0.8000, Power 0,5 MDE 0.1649
+K 4, r 0.500, each_cont + Futility Z<0 Blicke 1-3: Max 1.0468, alpha 0.00232, E[N|H1] 0.8756, E[N|H0] 0.5724, q 0.9920
+K 4, r 0.333, each_cont + Futility Z<0 Blicke 1-3: Max 1.0401, alpha 0.00236, E[N|H1] 0.8712, E[N|H0] 0.5688, q 0.9960
+K 4, r 0.250, each_cont + Futility Z<0 Blicke 1-3: Max 1.0342, alpha 0.00238, E[N|H1] 0.8659, E[N|H0] 0.5655, q 0.9997
+K 4, r 0.500, each_term + Futility Z<0 Blicke 1-3: Max 1.0745, alpha 0.00232, E[N|H1] 0.8904, E[N|H0] 0.5876, q 0.9765
+K 4, r 0.333, each_term + Futility Z<0 Blicke 1-3: Max 1.0664, alpha 0.00235, E[N|H1] 0.8851, E[N|H0] 0.5832, q 0.9808
+K 4, r 0.250, each_term + Futility Z<0 Blicke 1-3: Max 1.0515, alpha 0.00237, E[N|H1] 0.8751, E[N|H0] 0.5750, q 0.9893
+Effekt nur bis Info-Zeit t0 (K 4; Effekt = f x Design-theta der Variante): P(PASS) / davon veraltet
+   r0.500_none_t00.500_1MDE: 0.2062 / 0.0586
+   r0.500_none_t00.500_2MDE: 0.9286 / 0.0152
+   r0.500_last_t00.500_1MDE: 0.1901 / 0.0398
+   r0.500_last_t00.500_2MDE: 0.9215 / 0.0040
+   r0.500_each_cont_t00.500_1MDE: 0.1856 / 0.0414
+   r0.500_each_cont_t00.500_2MDE: 0.9188 / 0.0045
+   r0.500_each_term_t00.500_1MDE: 0.1909 / 0.0400
+   r0.500_each_term_t00.500_2MDE: 0.9272 / 0.0035
+   r0.333_none_t00.500_1MDE: 0.2062 / 0.0586
+   r0.333_none_t00.500_2MDE: 0.9286 / 0.0152
+   r0.333_none_t00.667_1MDE: 0.4165 / 0.0000
+   r0.333_none_t00.667_2MDE: 0.9941 / 0.0000
+   r0.333_last_t00.500_1MDE: 0.2027 / 0.0541
+   r0.333_last_t00.500_2MDE: 0.9276 / 0.0126
+   r0.333_last_t00.667_1MDE: 0.4048 / 0.0000
+   r0.333_last_t00.667_2MDE: 0.9930 / 0.0000
+   r0.333_each_cont_t00.500_1MDE: 0.1954 / 0.0580
+   r0.333_each_cont_t00.500_2MDE: 0.8958 / 0.0193
+   r0.333_each_cont_t00.667_1MDE: 0.3953 / 0.0000
+   r0.333_each_cont_t00.667_2MDE: 0.9795 / 0.0000
+   r0.333_each_term_t00.500_1MDE: 0.1976 / 0.0549
+   r0.333_each_term_t00.500_2MDE: 0.8930 / 0.0113
+   r0.333_each_term_t00.667_1MDE: 0.4020 / 0.0000
+   r0.333_each_term_t00.667_2MDE: 0.9546 / 0.0000
+   r0.250_none_t00.500_1MDE: 0.2062 / 0.1273
+   r0.250_none_t00.500_2MDE: 0.9286 / 0.0487
+   r0.250_none_t00.750_1MDE: 0.5479 / 0.0856
+   r0.250_none_t00.750_2MDE: 0.9993 / 0.0003
+   r0.250_last_t00.500_1MDE: 0.2062 / 0.1273
+   r0.250_last_t00.500_2MDE: 0.9286 / 0.0487
+   r0.250_last_t00.750_1MDE: 0.5479 / 0.0856
+   r0.250_last_t00.750_2MDE: 0.9993 / 0.0003
+   r0.250_each_cont_t00.500_1MDE: 0.1990 / 0.1239
+   r0.250_each_cont_t00.500_2MDE: 0.9027 / 0.0547
+   r0.250_each_cont_t00.750_1MDE: 0.5452 / 0.0879
+   r0.250_each_cont_t00.750_2MDE: 0.9986 / 0.0005
+   r0.250_each_term_t00.500_1MDE: 0.1972 / 0.1192
+   r0.250_each_term_t00.500_2MDE: 0.8930 / 0.0366
+   r0.250_each_term_t00.750_1MDE: 0.5494 / 0.0850
+   r0.250_each_term_t00.750_2MDE: 0.9674 / 0.0003
+   r0.500_screen_each_t00.500_1MDE: 0.1792 / 0.0179
+Umrechnung (N_0,05-Einheiten; gegen C.10 gemeinsam 0,80 / je 0,80; gegen GSD ohne Stabilitaetstest):
+   K4_r0.500_none: E[N|H1] 1.8767 N_0,05, x0.6921 / x0.9383; Max 2.1704; E[N] x1.0000, Max x1.0000 gegen GSD ohne
+   K4_r0.500_each_cont: E[N|H1] 1.9027 N_0,05, x0.7017 / x0.9513; Max 2.1985; E[N] x1.0139, Max x1.0130 gegen GSD ohne
+   K4_r0.333_each_cont: E[N|H1] 1.8936 N_0,05, x0.6983 / x0.9468; Max 2.1843; E[N] x1.0090, Max x1.0064 gegen GSD ohne
+   K4_r0.250_each_cont: E[N|H1] 1.8823 N_0,05, x0.6942 / x0.9412; Max 2.1714; E[N] x1.0030, Max x1.0005 gegen GSD ohne
+   K4_r0.500_each_term: E[N|H1] 1.9315 N_0,05, x0.7123 / x0.9657; Max 2.2544; E[N] x1.0292, Max x1.0387 gegen GSD ohne
+   K4_r0.333_each_term: E[N|H1] 1.9202 N_0,05, x0.7081 / x0.9601; Max 2.2371; E[N] x1.0232, Max x1.0307 gegen GSD ohne
+   K4_r0.250_each_term: E[N|H1] 1.9000 N_0,05, x0.7007 / x0.9500; Max 2.2061; E[N] x1.0124, Max x1.0165 gegen GSD ohne
+   K4_r0.500_last: E[N|H1] 1.8915 N_0,05, x0.6975 / x0.9458; Max 2.1929; E[N] x1.0079, Max x1.0104 gegen GSD ohne
+   K4_r0.500_screen_each: E[N|H1] 1.9653 N_0,05, x0.7247 / x0.9826; Max 2.3045; E[N] x1.0472, Max x1.0618 gegen GSD ohne
+[Zeit (4): 162.3 s CPU]
+
+================ (4b) Blickplaene in Monaten (Zone V + K) und Niveau des Stabilitaetstests ================
+V24+K_27_30_33_36: C 2.8820, Info-Anteile 0.750, 0.833, 0.917, 1.000
+          none: Max/N_fix 1.0184, alpha 0.00261, E[N|H1] 0.8705, q 1.0000; Effekt nur in den ersten 24 Monaten (1/2 x theta): P(PASS) 0.4256/0.9944, veraltet 0.0286/0.0007
+          last: Max/N_fix 1.0195, alpha 0.00259, E[N|H1] 0.8713, q 0.9993; Effekt nur in den ersten 24 Monaten (1/2 x theta): P(PASS) 0.4214/0.9940, veraltet 0.0238/0.0002
+     each_cont: Max/N_fix 1.0260, alpha 0.00257, E[N|H1] 0.8797, q 0.9951; Effekt nur in den ersten 24 Monaten (1/2 x theta): P(PASS) 0.3972/0.8193, veraltet 0.0271/0.0011
+     each_term: Max/N_fix 1.0810, alpha 0.00255, E[N|H1] 0.9139, q 0.9643; Effekt nur in den ersten 24 Monaten (1/2 x theta): P(PASS) 0.4066/0.7926, veraltet 0.0234/0.0002
+   screen_each: Max/N_fix 1.1266, alpha 0.00202, E[N|H1] 0.9592, q 0.9426; Effekt nur in den ersten 24 Monaten (1/2 x theta): P(PASS) 0.3574/0.9590, veraltet 0.0078/0.0002
+V24+K_30_33_36_39: C 2.8860, Info-Anteile 0.769, 0.846, 0.923, 1.000
+          none: Max/N_fix 1.0207, alpha 0.00254, E[N|H1] 0.8791, q 1.0000; Effekt nur in den ersten 24 Monaten (1/2 x theta): P(PASS) 0.3448/0.9812, veraltet 0.0599/0.0054
+          last: Max/N_fix 1.0216, alpha 0.00253, E[N|H1] 0.8797, q 0.9994; Effekt nur in den ersten 24 Monaten (1/2 x theta): P(PASS) 0.3423/0.9804, veraltet 0.0569/0.0045
+     each_cont: Max/N_fix 1.0277, alpha 0.00251, E[N|H1] 0.8877, q 0.9954; Effekt nur in den ersten 24 Monaten (1/2 x theta): P(PASS) 0.3033/0.5486, veraltet 0.0642/0.0234
+     each_term: Max/N_fix 1.0842, alpha 0.00249, E[N|H1] 0.9243, q 0.9639; Effekt nur in den ersten 24 Monaten (1/2 x theta): P(PASS) 0.2987/0.4977, veraltet 0.0495/0.0014
+   screen_each: Max/N_fix 1.1520, alpha 0.00194, E[N|H1] 0.9904, q 0.9327; Effekt nur in den ersten 24 Monaten (1/2 x theta): P(PASS) 0.2184/0.7139, veraltet 0.0236/0.0064
+V24+K_33_36_39_42: C 2.8880, Info-Anteile 0.786, 0.857, 0.929, 1.000
+          none: Max/N_fix 1.0202, alpha 0.00261, E[N|H1] 0.8851, q 1.0000; Effekt nur in den ersten 24 Monaten (1/2 x theta): P(PASS) 0.2794/0.9553, veraltet 0.0907/0.0231
+          last: Max/N_fix 1.0209, alpha 0.00261, E[N|H1] 0.8857, q 0.9994; Effekt nur in den ersten 24 Monaten (1/2 x theta): P(PASS) 0.2777/0.9540, veraltet 0.0889/0.0216
+     each_cont: Max/N_fix 1.0271, alpha 0.00259, E[N|H1] 0.8937, q 0.9955; Effekt nur in den ersten 24 Monaten (1/2 x theta): P(PASS) 0.2338/0.3292, veraltet 0.1043/0.1094
+     each_term: Max/N_fix 1.0857, alpha 0.00255, E[N|H1] 0.9329, q 0.9626; Effekt nur in den ersten 24 Monaten (1/2 x theta): P(PASS) 0.2136/0.2101, veraltet 0.0742/0.0055
+   screen_each: Max/N_fix 1.1762, alpha 0.00193, E[N|H1] 1.0208, q 0.9229; Effekt nur in den ersten 24 Monaten (1/2 x theta): P(PASS) 0.1250/0.3135, veraltet 0.0427/0.0358
+K 4 gleichverteilt, r 0.500, each_term, alpha_stab 0.1: Max 1.1049, alpha 0.00230, E[N|H1] 0.9336, q 0.9472; t00.500_1MDE: 0.1892/0.0294; t00.500_2MDE: 0.9404/0.0011
+K 4 gleichverteilt, r 0.500, each_term, alpha_stab 0.2: Max 1.2786, alpha 0.00208, E[N|H1] 1.0361, q 0.8851; t00.500_1MDE: 0.2112/0.0161; t00.500_2MDE: 0.9725/0.0001
+K 4 gleichverteilt, r 0.250, each_term, alpha_stab 0.1: Max 1.0621, alpha 0.00240, E[N|H1] 0.9067, q 0.9683; t00.500_1MDE: 0.1874/0.1069; t00.500_2MDE: 0.8576/0.0236; t00.750_1MDE: 0.5495/0.0783; t00.750_2MDE: 0.9281/0.0002
+K 4 gleichverteilt, r 0.250, each_term, alpha_stab 0.2: Max 1.2087, alpha 0.00224, E[N|H1] 0.9962, q 0.9060; t00.500_1MDE: 0.1813/0.0841; t00.500_2MDE: 0.8083/0.0074; t00.750_1MDE: 0.5619/0.0537; t00.750_2MDE: 0.8484/0.0000
+[Zeit (4b): 64.1 s CPU]
+
+================ (5) Schwere Raender, t-Grenzen, Autokorrelation ================
+Schiefe Fernandez-Steel t(7), gamma 1,5: 1.0543 (neg: Vorzeichen gespiegelt)
+Stabilitaetstest (nominal 0,05) und gemeinsame Regel (nominal alpha 0,002375, Power 0,80) mit geschaetzter Varianz, 200.000 Pfade:
+  Zelle: alpha_stab z / Welch / Student | alpha gemeinsam z / t+Welch | Power gemeinsam z / t+Welch | q t+Welch | Power gegen Abfall z / Welch (nominal 0,80)
+  nj40_r0.50_normal (n_a 40): 0.0518 / 0.0498 / 0.0499 | 0.00294 / 0.00230 | 0.7954 / 0.7775 | 0.9501 | 0.7995 / 0.7937
+  nj40_r0.50_t7_kurt5 (n_a 40): 0.0520 / 0.0501 / 0.0501 | 0.00298 / 0.00232 | 0.7933 / 0.7764 | 0.9498 | 0.8011 / 0.7956
+  nj40_r0.50_t4.857_kurt10 (n_a 40): 0.0522 / 0.0501 / 0.0502 | 0.00250 / 0.00204 | 0.7939 / 0.7778 | 0.9498 | 0.8029 / 0.7974
+  nj40_r0.50_t5.2_exkurt5 (n_a 40): 0.0516 / 0.0493 / 0.0494 | 0.00257 / 0.00201 | 0.7936 / 0.7775 | 0.9505 | 0.8027 / 0.7970
+  nj40_r0.50_t4.6_exkurt10 (n_a 40): 0.0524 / 0.0503 / 0.0504 | 0.00269 / 0.00210 | 0.7941 / 0.7776 | 0.9495 | 0.8042 / 0.7988
+  nj40_r0.50_skewt7_pos (n_a 40): 0.0517 / 0.0494 / 0.0496 | 0.00129 / 0.00096 | 0.8310 / 0.8142 | 0.9507 | 0.8030 / 0.7973
+  nj40_r0.50_skewt7_neg (n_a 40): 0.0513 / 0.0492 / 0.0494 | 0.00624 / 0.00525 | 0.7670 / 0.7505 | 0.9506 | 0.8003 / 0.7946
+  nj40_r0.25_normal (n_a 120): 0.0527 / 0.0504 / 0.0502 | 0.00264 / 0.00235 | 0.7968 / 0.7891 | 0.9494 | 0.7988 / 0.7923
+  nj40_r0.25_t7_kurt5 (n_a 120): 0.0516 / 0.0494 / 0.0494 | 0.00269 / 0.00237 | 0.7959 / 0.7889 | 0.9505 | 0.8006 / 0.7942
+  nj40_r0.25_t4.857_kurt10 (n_a 120): 0.0521 / 0.0499 / 0.0499 | 0.00241 / 0.00213 | 0.7942 / 0.7871 | 0.9495 | 0.8041 / 0.7981
+  nj40_r0.25_t5.2_exkurt5 (n_a 120): 0.0517 / 0.0495 / 0.0497 | 0.00252 / 0.00224 | 0.7942 / 0.7870 | 0.9495 | 0.8021 / 0.7958
+  nj40_r0.25_t4.6_exkurt10 (n_a 120): 0.0523 / 0.0501 / 0.0504 | 0.00248 / 0.00215 | 0.7937 / 0.7868 | 0.9488 | 0.8073 / 0.8014
+  nj40_r0.25_skewt7_pos (n_a 120): 0.0618 / 0.0597 / 0.0473 | 0.00120 / 0.00105 | 0.8144 / 0.8067 | 0.9401 | 0.7874 / 0.7811
+  nj40_r0.25_skewt7_neg (n_a 120): 0.0441 / 0.0416 / 0.0532 | 0.00478 / 0.00430 | 0.7799 / 0.7728 | 0.9579 | 0.8174 / 0.8112
+  nj52_r0.50_normal (n_a 52): 0.0523 / 0.0506 / 0.0506 | 0.00289 / 0.00247 | 0.7952 / 0.7821 | 0.9491 | 0.7989 / 0.7946
+  nj52_r0.50_t7_kurt5 (n_a 52): 0.0518 / 0.0503 / 0.0503 | 0.00275 / 0.00235 | 0.7952 / 0.7823 | 0.9499 | 0.7998 / 0.7955
+  nj52_r0.50_t4.857_kurt10 (n_a 52): 0.0518 / 0.0502 / 0.0503 | 0.00279 / 0.00231 | 0.7950 / 0.7824 | 0.9496 | 0.8035 / 0.7990
+  nj52_r0.50_t5.2_exkurt5 (n_a 52): 0.0513 / 0.0497 / 0.0497 | 0.00248 / 0.00199 | 0.7945 / 0.7821 | 0.9500 | 0.8022 / 0.7976
+  nj52_r0.50_t4.6_exkurt10 (n_a 52): 0.0507 / 0.0491 / 0.0492 | 0.00253 / 0.00209 | 0.7965 / 0.7842 | 0.9511 | 0.8039 / 0.7998
+  nj52_r0.50_skewt7_pos (n_a 52): 0.0522 / 0.0506 / 0.0507 | 0.00120 / 0.00095 | 0.8267 / 0.8145 | 0.9493 | 0.8028 / 0.7984
+  nj52_r0.50_skewt7_neg (n_a 52): 0.0508 / 0.0491 / 0.0492 | 0.00570 / 0.00485 | 0.7705 / 0.7577 | 0.9510 | 0.8006 / 0.7963
+  nj52_r0.25_normal (n_a 156): 0.0517 / 0.0499 / 0.0499 | 0.00265 / 0.00244 | 0.7973 / 0.7917 | 0.9502 | 0.7998 / 0.7948
+  nj52_r0.25_t7_kurt5 (n_a 156): 0.0508 / 0.0491 / 0.0490 | 0.00231 / 0.00214 | 0.7961 / 0.7905 | 0.9505 | 0.8006 / 0.7957
+  nj52_r0.25_t4.857_kurt10 (n_a 156): 0.0515 / 0.0498 / 0.0498 | 0.00248 / 0.00225 | 0.7963 / 0.7908 | 0.9495 | 0.8047 / 0.7997
+  nj52_r0.25_t5.2_exkurt5 (n_a 156): 0.0521 / 0.0503 / 0.0501 | 0.00242 / 0.00221 | 0.7950 / 0.7896 | 0.9491 | 0.8007 / 0.7958
+  nj52_r0.25_t4.6_exkurt10 (n_a 156): 0.0517 / 0.0500 / 0.0500 | 0.00219 / 0.00200 | 0.7962 / 0.7907 | 0.9493 | 0.8041 / 0.7993
+  nj52_r0.25_skewt7_pos (n_a 156): 0.0604 / 0.0586 / 0.0474 | 0.00139 / 0.00129 | 0.8127 / 0.8075 | 0.9412 | 0.7901 / 0.7853
+  nj52_r0.25_skewt7_neg (n_a 156): 0.0441 / 0.0423 / 0.0523 | 0.00462 / 0.00422 | 0.7813 / 0.7759 | 0.9578 | 0.8158 / 0.8113
+AR(1), n_juengst 52, 100.000 Pfade: alpha_stab (nominal 0,05) naiv / SB-max Block 4 / c analytisch / SB-max+Welch; gepoolt (nominal 0,0025) naiv / SB-max / c analytisch:
+  phi0.0_r0.50 (c_j 1.0000, c_a 1.0000): 0.0510 / 0.0473 / 0.0510 / 0.0461; 0.00268 / 0.00231 / 0.00268
+  phi0.0_r0.25 (c_j 1.0000, c_a 1.0000): 0.0515 / 0.0480 / 0.0515 / 0.0462; 0.00271 / 0.00223 / 0.00271
+  phi0.3_r0.50 (c_j 1.8336, c_a 1.8336): 0.1155 / 0.0850 / 0.0531 / 0.0831; 0.02093 / 0.00967 / 0.00338
+  phi0.3_r0.25 (c_j 1.8336, c_a 1.8493): 0.1138 / 0.0798 / 0.0515 / 0.0778; 0.02089 / 0.00756 / 0.00299
+q = Phi(z95 sqrt(c_benutzt / c_wahr)) (Abhaengigkeit unterschaetzt): c_true1.857_c_used1.000: 0.8863; c_true1.857_c_used1.300: 0.9156; c_true1.857_c_used1.857: 0.9500; c_true1.5_c_used1.000: 0.9104; c_true1.5_c_used1.300: 0.9371; c_true1.5_c_used1.500: 0.9500
+[Zeit (5): 66.4 s CPU]
+
+================ (6) Beispiele A2 und Klasse W ================
+A2 MDE80 (bp) gegen Konfirmationslaenge T Monate: Q6 (a) Screen | Q6 (c) exakt | Q6 (c) unabh. Ziel 0,8/0,95 (OC) | Q6 gepoolt ohne | q an MDE | Q1 (c) / Q1 (a) | SQ (c) / SQ (a) | SE(D) stress
+   T 24: 28.053 | 28.969 | 28.985 | 27.176 | 0.9503 | 20.077 / 20.702 | 1.4429 / 1.3551 | 11.860
+   T 27: 27.003 | 27.314 | 27.331 | 25.622 | 0.9504 | 18.929 / 20.169 | 1.4429 / 1.3388 | 11.287
+   T 30: 26.235 | 25.913 | 25.926 | 24.310 | 0.9503 | 17.961 / 19.787 | 1.4427 / 1.3259 | 10.884
+   T 36: 25.248 | 23.657 | 23.664 | 22.195 | 0.9502 | 16.403 / 19.308 | 1.4422 / 1.3077 | 10.353
+   T 42: 24.733 | 21.901 | 21.910 | 20.549 | 0.9503 | 15.187 / 19.059 | 1.4420 / 1.2977 | 10.018
+   T 48: 24.482 | 20.487 | 20.496 | 19.222 | 0.9503 | 14.209 / 18.939 | 1.4419 / 1.2927 | 9.787
+   T 60: 24.330 | 18.325 | 18.331 | 17.193 | 0.9502 | 12.708 / 18.863 | 1.4420 / 1.2898 | 9.488
+   T 72: 24.308 | 16.729 | 16.733 | 15.696 | 0.9502 | 11.602 / 18.850 | 1.4418 / 1.2895 | 9.304
+   T 84: 24.306 | 15.486 | 15.491 | 14.532 | 0.9502 | 10.742 / 18.848 | 1.4416 / 1.2895 | 9.179
+   T 96: 24.305 | 14.487 | 14.491 | 13.593 | 0.9501 | 10.050 / 18.848 | 1.4415 / 1.2895 | 9.088
+   T 120: 24.305 | 12.959 | 12.962 | 12.158 | 0.9502 | 8.989 / 18.848 | 1.4416 / 1.2895 | 8.965
+A2 Schutz (Effekt in bp als Vielfaches der MDE (c) dieser Laenge; gleiche Effektgroesse fuer beide Regeln): P(PASS) Screen (a) / Stabilitaet (c): T24_nur_aelter_1MDE: 0.0329 / 0.0416; T24_nur_aelter_2MDE: 0.0453 / 0.0005; T24_abklingend_1MDE: 0.3975 / 0.3887; T24_homogen_1MDE: 0.8224 / 0.8000; T42_nur_aelter_1MDE: 0.0411 / 0.1556; T42_nur_aelter_2MDE: 0.0453 / 0.0029; T42_abklingend_1MDE: 0.3028 / 0.5166; T42_homogen_1MDE: 0.7127 / 0.8000
+A2 fruehester Konfirmationszeitpunkt (Lesart B; F1: V 24 Monate + K ab 2026-10-01; OC-Konvention: durchgehend ab 2024-07):
+   sesoi22: Q6_a_screen: T nie Mon. -> nie (OC-Konv. nie); Q6_c_stab_exakt: T 41.62 Mon. -> 2028-04 (OC-Konv. 2028-01); Q6_c_unabh_0.8_0.95: T 41.66 Mon. -> 2028-04 (OC-Konv. 2028-01)
+   sesoi25: Q6_a_screen: T 38.76 Mon. -> 2028-01 (OC-Konv. 2027-10); Q6_c_stab_exakt: T 32.23 Mon. -> 2027-07 (OC-Konv. 2027-04); Q6_c_unabh_0.8_0.95: T 32.26 Mon. -> 2027-07 (OC-Konv. 2027-04)
+A2 Boden unter (a): 24.304 bp
+Klasse W (Wochen-IC, SE_12 = SD/sqrt(52)); Lesart B, F2 durchgehend ab 2024-07, bei Registrierung 2027-01 30 Monate:
+   sd0.09_sesoi0.04: SE_12 0.01248, Boden (a) 0.0310; MDE80 bei 104 / 130 Wochen (a) 0.0345 / 0.0328, (c) 0.0336 / 0.0301; T (a) 15.66 Mon. -> 2027-01; T (c) 16.96 Mon. (1.413 J.) -> 2027-01; GSD-Max (c) 17.76 Mon. -> 2027-01
+   sd0.09_sesoi0.0085: SE_12 0.01248, Boden (a) 0.0310; MDE80 bei 104 / 130 Wochen (a) 0.0345 / 0.0328, (c) 0.0336 / 0.0301; T (a) nie Mon. -> nie; T (c) 375.6 Mon. (31.3 J.) -> 2055-11; GSD-Max (c) 384.8 Mon. -> 2056-08
+   sd0.13_sesoi0.04: SE_12 0.01803, Boden (a) 0.0448; MDE80 bei 104 / 130 Wochen (a) 0.0498 / 0.0474, (c) 0.0486 / 0.0434; T (a) nie Mon. -> nie; T (c) 35.39 Mon. (2.949 J.) -> 2027-07; GSD-Max (c) 36.77 Mon. -> 2027-08
+   sd0.13_sesoi0.0085: SE_12 0.01803, Boden (a) 0.0448; MDE80 bei 104 / 130 Wochen (a) 0.0498 / 0.0474, (c) 0.0486 / 0.0434; T (a) nie Mon. -> nie; T (c) 783.6 Mon. (65.3 J.) -> 2089-11; GSD-Max (c) 802.9 Mon. -> 2091-06
+[Zeit (6): 222.2 s CPU]
+
+================ (7) Zusatzrechnungen ================
+Schranke: Erstkreuzung am letzten Blick (K 4, r 1/4, Blick 3 bei 1 - r) => z_D > -C sqrt(r/(1-r)) = -1.6351 > -1,6449
+Mittleres z_D bei Effekt nur im aelteren Teil in Hoehe MDE_c (= -MU_C sqrt(r(1-r))): r0.500: -1.9051; r0.333: -1.7961; r0.250: -1.6499; r0.167: -1.4200; r0.100: -1.1431
+Boden Screen 0,20: 1.6832 SE_12
+Aelterer Teil am ersten Blick (Monate): Plan 27_30_33_36: 15, Plan 30_33_36_39: 18, Plan 33_36_39_42: 21
+Zitierte OC-Werte (oc_results.json, nur gelesen): gitter_fut_R_max: 1.0327; gitter_fut_EN_H1: 0.862692; gitter_fut_EN_H0: 0.565143; screen_all_r05_R_max: 1.06947; screen_all_r05_EN_H1: 0.912506; screen_all_r025_t05_veraltet: 0.04772; A2_sesoi22_P6_lesartB: 2028-01; A2_sesoi25_P6_lesartB: 2027-04; A2_sesoi25_fest_lesartB: 2027-10; W_sd013_P6_lesartB: 2027-07
+
+Gesamt-CPU: 597.5 s; stab_results.json geschrieben.

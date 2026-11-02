@@ -428,3 +428,14 @@ Tests: 1.992 passed / 3 failed (Legacy `test_execution_live.py`, Sandbox-bedingt
   UNBELEGT und teils widerspruechlich, Governance-Konflikte (Live-Order-Code, GPU, Freigaben). Uebernommen: neue Messkarte
   IK-12 Liquidations-Kaskaden (SK0 sofort, Registrierung Kohorte 1), Praezisierungen IK-01/02/04, Methodik aus Dok 5 fuer den
   Lauf-Rahmen. Eingaben bleiben ausserhalb des Repos (Fremdoeffnung O-981: Kennzahlen eines Zone-K-Tages).
+
+## 18. Nachtrag 2026-11-02 (nachts): F1 Registrierungs-Schema/Linter, Stabilitaetstest hergeleitet (DEC-104 N4), Datendienst weiter ausgefallen
+
+- F1 `src/bybit_edge/research/registry31/` (33 Regeln, 347 Tests, Template 3.1) committet; Zone-X-Programm 1 und Inhaltsproben
+  warten auf den Datendienst (Retry 2026-11-03 08:00 UTC; Register Zeile 15).
+- Stabilitaetstest (P-2 (c)) hergeleitet (`state/herleitung_stabilitaetstest/`), DEC-104 N4 mit aktualisierter Vorlage: (c) hat
+  keinen Boden, aber schwaecheren Schutz bei langer Konfirmation; A2 bei 22 bp unter (c) ab 2028-04; Klasse W gegen die
+  persistenzbereinigte Dezil-SESOI unter keiner Regel konfirmierbar (31..65 Jahre) - Kostenkurven IK-01/IK-02 und Persistenz je
+  Praediktor sind damit die entscheidenden Messungen vor Kohorte 1.
+- Naechste Schritte (PLAN_2026-11-02 Phase 0/1): Zone-X-Lauf, Inhaltsproben, IK-12-SK0, Kostenkurven, F2 Register als Code,
+  DEC-104 N5 (WD-06/08/13/16), F3-Korrektur (q unter 12 Monaten).
