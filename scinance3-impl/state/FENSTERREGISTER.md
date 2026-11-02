@@ -82,3 +82,10 @@ K-Fenster endet dort am 2027-09-30, nicht am 2027-06-30. Zone V fuer Tagesstatis
 
 F-XSEC1 7 (0 gerechnet); F-H32 4 (4 Pilot, Zone X); H-33 3 (0); F-WEEK m = 0 (Doppelausweis 11); A1, H-27, A2 je 0;
 Renditefamilie Panel-Querschnitt kumuliert: 4 Outcome-gerechnete Varianten (Pilot), 14 benannte. Zone-X-Konto unter DEC-104: 0.
+
+## Nachtrag 2026-11-02 (abends): Fremdoeffnung und Offenlegung (Pruefung der Nutzer-Konzepte)
+
+| Nr | Datum | Statistik | Fenster | Zone | Art | Quelle | Bemerkung |
+|---|---|---|---|---|---|---|---|
+| O-981 | 2026-11-02 | Anzahl/Mittel/Maximum/Quantil/b-Wert der BTCUSDT-Liquidationen eines Tages; Payload-Beispiele mit Zeitstempeln und BTC-Preisniveaus | ein Tag August 2026 (K); ein Tag Ende W2 (V) | K, V | SK2-nah (Fremdquelle, Echtheit [V]) | Nutzer-Eingabe research_seismology.md (nicht im Repo); `state/PRUEFUNG_PHYSIK_KONZEPTE_2026-11-02.md` Abschnitt 4 | Oeffnung durch Fremdquelle (Praezedenz DEC-97 A-3); Tag auf C.17-Liste von IK-12 und BTC-Renditestatistiken; keine Rohwerte im Repo |
+| O-982 | 2026-11-02 | Namenssuche (grep -l) ueber `state/runs/*_L_window_sealed.json` | - | - | keine Oeffnung (0 Treffer, kein Inhalt) | Review-Agent, Offenlegung | dokumentiert; Suchen kuenftig mit `--exclude-dir=runs` |

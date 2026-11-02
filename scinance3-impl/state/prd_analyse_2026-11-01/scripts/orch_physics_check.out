@@ -1,0 +1,10 @@
+Horizont   0.25 s: sigma 0.446 bp; perfektes Orakel E|r| = 0,798 sigma = 0.356 bp gegen Taker-Rundreise 11 bp (Wand) -> Faktor 31x
+Horizont   0.50 s: sigma 0.630 bp; perfektes Orakel E|r| = 0,798 sigma = 0.503 bp gegen Taker-Rundreise 11 bp (Wand) -> Faktor 22x
+Horizont   1.00 s: sigma 0.891 bp; perfektes Orakel E|r| = 0,798 sigma = 0.711 bp gegen Taker-Rundreise 11 bp (Wand) -> Faktor 15x
+Horizont   5.00 s: sigma 1.993 bp; perfektes Orakel E|r| = 0,798 sigma = 1.590 bp gegen Taker-Rundreise 11 bp (Wand) -> Faktor 7x
+Horizont  60.00 s: sigma 6.904 bp; perfektes Orakel E|r| = 0,798 sigma = 5.510 bp gegen Taker-Rundreise 11 bp (Wand) -> Faktor 2x
+Horizont 300.00 s: sigma 15.438 bp; perfektes Orakel E|r| = 0,798 sigma = 12.320 bp gegen Taker-Rundreise 11 bp (Wand) -> Faktor 1x
+Gutenberg-Richter b 0,314 -> Pareto gamma = b ln10 = 0.723 (Dokument: 0,723; konsistent); Mittel divergiert fuer gamma < 1
+Perkolationsschwelle Quadratgitter (site) 0,592746: Standardwert [sek]; Bezug zum Orderbuch ohne Gitterdefinition UNBELEGT
+Omori-Integral K c^(1-p)/(p-1) bei K 1, c 0,01 s, p 1,2: 12.559 -> n haengt vollstaendig an K (UNBELEGT)
+Datenlage: allLiquidation/insurance ab 2026-06-16 (Zone K, SK0 nur Zaehlung); L2-Orderbuch Zone-X-Anteil 2023-01..2024-06 = 18 Monate; Options-Ticker ab 2026-06 (Zone K)

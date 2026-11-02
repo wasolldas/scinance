@@ -417,3 +417,14 @@ Tests: 1.992 passed / 3 failed (Legacy `test_execution_live.py`, Sandbox-bedingt
   Inhaltsproben warten; automatische Wiederholung 15:50 UTC, danach taeglich. Monatlicher Stromcheck geplant (2026-12-02).
 - **Offen beim Nutzer:** P-2 Variante (Vorlage N2 (4)); P-11; P-13; PRD v3 Beschluss (BE-01..BE-14); Datenauftraege weiterleiten;
   Ursache des Datendienst-Ausfalls beim Data-Harvest-Betrieb.
+
+## 17. Nachtrag 2026-11-02 (spaet): Pruefung der Nutzer-Konzepte "Physik-Transfer" (sechs Dokumente)
+
+- Nutzer-Eingaben (PRD_QUANT_PHYSICS_EDGE, research_seismology/thermodynamics/biophysics, CRYPTO_CASCADE_INTELLIGENCE_PRD,
+  Interaktiver KI-Trading-Edge, Uebersicht) adversarisch geprueft (`state/prd_analyse_2026-11-01/REVIEW_PHYSIK_KONZEPTE_2026-11-02.md`,
+  66 Vorschlaege, 30 Zahlen) und vom Orchestrator beurteilt (`state/PRUEFUNG_PHYSIK_KONZEPTE_2026-11-02.md`). Urteil: Dok 1, 3, 6
+  ablehnen; Dok 2, 4 als Ideenquelle; Dok 5 als Methodenquelle (nicht als PRD). Gruende: Horizont 50 ms..5 s unter der Wand
+  (perfektes Orakel 0,2..0,7 bp gegen 11 bp), Daten im Siegel oder zu grob (Orderbuch 200 ms, DVOL stuendlich), Zahlen
+  UNBELEGT und teils widerspruechlich, Governance-Konflikte (Live-Order-Code, GPU, Freigaben). Uebernommen: neue Messkarte
+  IK-12 Liquidations-Kaskaden (SK0 sofort, Registrierung Kohorte 1), Praezisierungen IK-01/02/04, Methodik aus Dok 5 fuer den
+  Lauf-Rahmen. Eingaben bleiben ausserhalb des Repos (Fremdoeffnung O-981: Kennzahlen eines Zone-K-Tages).
