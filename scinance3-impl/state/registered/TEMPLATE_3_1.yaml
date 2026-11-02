@@ -1,0 +1,131 @@
+# TEMPLATE, nicht registriert.
+# Kommentiertes Muster einer Registrierung unter Verfassung 3.1 (PRD v3 Entwurf Abschnitt 3.2 / 3.3; DEC-104 E9).
+# KEINE echte Registrierung: jede Stelle "<...>" ist auszufuellen; der Linter lehnt Platzhalter ab (Regel R02).
+#   python -m bybit_edge.research.registry31.lint scinance3-impl/state/registered/<datei>.yaml
+# Regeln: src/bybit_edge/research/registry31/README.md.  Kein Feld hat einen Default: fehlt ein Pflichtfeld, ist es ein Fehler.
+# Zahlen mit Herleitung tragen "ref: <pfad#test_id>" (Dateipfad + Test-ID, PRD 3.1 (b)), nie einen nackten Skalar.
+# Feste Werte (alpha_test, z_krit, Berichtszeile, BY-q) sind unten eingetragen und duerfen nicht geaendert werden.
+# Keine Hostnamen, keine Zugangsdaten, keine Modellnamen in irgendeinem Text (Projektregeln, oeffentliches Repository).
+# Erweiterungen gegenueber dem PRD-Template 3.3 (Linter-Schema): code_sha256, test_pflichten (PZ-12),
+# decision_rule.variante (PZ-16), sesoi_curve.{horizont_tage, punkte, gabelung_etikett, persistenz_herkunft, persistenz_ref}.
+
+id: "<H-nn>"                                   # naechste freie Nummer; Muster Buchstaben-Zahl, z. B. H-34
+klasse: "<P|W|E>"                              # PRD 3.2: P Praemie, W Querschnitt, E Ereignis
+capital_free: true                             # C.2
+hypothese: "<ein Satz, falsifizierbar>"
+ertragsquelle: "<Praemie|Prognose|Ereignis|Struktur> + Zahler"   # PZ-09 (c)
+metric: "<genau eine urteilstragende Groesse>"
+richtung: "<positiv|negativ>"                  # DEC-51 (1)
+
+cohort: "<YYYY-MM-DD>"                         # PZ-14: erster Tag eines Quartals, frueheste 2027-01-01 (DEC-104 E4 (f))
+zone:                                          # PZ-13: genutzte Abschnitte; Datenfamilie F1..F6 und "rein ab" nach FENSTERREGISTER Abschn. 6
+  - abschnitt: "<YYYY-MM-DD..YYYY-MM-DD>"
+    zone: "<X|V|K>"
+    datenfamilie: "<F1..F6>"
+    rein_ab: "<YYYY-MM-DD>"                    # K: >= K-Start der Familie (F1 2026-10-01, F2 2026-07-01, F3 2026-09-15, F4 2026-07-01, F5 2026-07-01, F6 2026-10-01); V: >= 2024-07-01
+    # ausnahme: a2_r_pre                       # nur F1 in Zone V (DEC-104 E4 (i))
+    # outcome_beruehrend: false                # nur F3 in Zone V: nur nicht-outcome-beruehrende Statistiken
+vorwissens_klasse: "<F-Code: Regel der Vorwissens-Klasse>"       # PZ-30; nennt alle Familien der Zone-Eintraege
+lesestatus:                                    # PZ-25 (DEC-104 N1 (6)); status: nie_berechnet | berechnet_versiegelt_ungelesen | gelesen
+  - datei: "<repo-relativer pfad>"
+    status: "<nie_berechnet|berechnet_versiegelt_ungelesen|gelesen>"
+c17_refs: ["<O-nnn>"]                          # PZ-29: Zeilen aus state/KONTO_INVENTAR_2026-11-02.md (Alias c17_list wird angenommen)
+windows:                                       # DEC-99 (1); DEC-104 E4 (d)/(e); Zone aus den Daten, nie Zone X als urteilstragend
+  - id: "<W1|W2|K1..>"
+    von: "<YYYY-MM-DD>"                        # Zone V: 2024-07-01..2026-06-30; Zone K: ab K-Start der Familie
+    bis: "<YYYY-MM-DD>"
+    zone: "<X|V|K>"
+    rolle: "<urteilstragend|pilot_nicht_urteilstragend|aera_profil>"
+    # datenfamilie: F2                         # optional: schraenkt die Abdeckung durch Zone-Eintraege ein
+
+decision_rule:                                 # PZ-15, PZ-16, PZ-01
+  alpha_test: 0.0025                           # fest je Test (DEC-104 E2)
+  z_krit: 2.8070                               # gepoolt einseitig (VR-b14)
+  variante: "a"                                # a (beschlossen) | a' | c; bis zum Nutzerentscheid P-2 ist nur "a" registrierbar
+  screen: {fenster: "juengste_12_monate_bzw_4_quartale", alpha: 0.05, z_krit: 1.6449}   # Variante a; a': alpha 0.20, z_krit 0.8416; c: null
+  stability_test: null                         # nur Variante c: {statistik, alpha, power, ref}; als Bericht immer (DEC-104 E6)
+  power_target_gemeinsam: 0.80                 # DEC-104 E2 (>= 0,80)
+  mde_faktor: "<Zahl>"                         # nie Schwelle (DEC-94 (1))
+
+looks:                                         # PZ-17; Zone V genau ein Blick, Zone K bis 4 Blicke
+  zone_v: {anzahl: 1}                          # nur wenn ein urteilstragendes V-Fenster existiert
+  zone_k:                                      # nur wenn ein urteilstragendes K-Fenster existiert
+    anzahl: "<1..4>"
+    plan: obrien_fleming
+    spending: "<Spending-Plan>"
+    zeitpunkte: ["<YYYY-MM-DD>"]               # genau "anzahl" Daten, aufsteigend, nicht vor cohort
+    screen_an_jedem_stopp: true
+    futility: "Z < 0 an Blicken 1-3"
+    grenzen: t_artig
+
+sesoi_curve:                                   # PZ-18
+  kostenmodell_constants_hash: "<sha256>"
+  rahmen: "<einzelposition|dezil_ls>"          # Klasse W: dezil_ls (DEC-104 N3 (1))
+  kostenbasis: "<taker_vip0|maker_vip0>"
+  gabelung_etikett: "Gabelung Richtung Testbarkeit gegen Maker"   # bei taker_vip0 Pflicht (E3 (a))
+  persistenz_phi: "<Zahl in [-1, 1)>"
+  persistenz_herkunft: "<gemessen|default_0_etikett>"   # default: phi = 0 mit Etikett
+  persistenz_ref: "<Konto-Zeile oder pfad | null>"      # bei gemessen Pflicht
+  horizont_tage: "<ganze Zahl>"
+  punkte:                                      # Kurve ueber Horizont und Persistenz (mindestens zwei verschiedene Punkte)
+    - {horizont_tage: "<ganze Zahl>", phi: "<Zahl>", sesoi: "<Zahl>"}
+  ref: "<pfad#test_id>"
+
+prior_label:                                   # PZ-19; Literatur ist Etikett, nie Blockade (VR-c05)
+  literatur: "<primaer|sek|UNBELEGT>"
+  prior_verteilung_ref: "<KONTO_ZONE_X Zeile | null>"
+  selektionsbereinigt: true                    # DEC-99 (3)
+  # sensitivitaetsspanne:                      # Pflicht bei UNBELEGT, in beide Richtungen (DEC-104 E3 (d))
+  #   {groesse: "<...>", nominal: "<Zahl>", untere: "<Zahl>", obere: "<Zahl>"}
+
+threshold: {regel: "Statistik in Richtung >= z_krit * SE", ref: "<pfad#test_id>"}          # DEC-94 (1)
+structural_null: {komponenten: ["<...>"], skalierung: "k = max(1, Ist/Null)", ref: "<pfad#test_id>"}   # C.4; VR-e06
+nuisance:                                      # DEC-94 (5); DEC-104 E6
+  quellen: [vorperiode_nur_streuung, null_simulation]
+  bindend: "<juengstes_vorfenster|groessere_SE_ueber_quellen_und_stress>"
+  stress_zeile: "<...>"
+power:                                         # PZ-01: gerechnet mit der SE-Regel des Tests
+  se_regel: "<identisch mit dem Lauf>"
+  sd_teststatistik: {wert: "<Zahl>", ref: "<pfad>"}
+  c: "max(1, c_hat)"
+  blocklaenge: "<aus gemessener Autokorrelation>"
+  mde80: {wert: "<Zahl>", ref: "<pfad#test_id>"}
+  sesoi: "<Zahl, gleich dem Kurvenpunkt (horizont_tage, persistenz_phi)>"
+  testbar: "<true wenn mde80 <= sesoi, sonst false>"
+cluster_unit: "<kalendertag|kalenderwoche|ereignis|fenster>"   # PZ-03
+n_eff: "<Zahl > 0, gemessenes rho>"            # PZ-23; auch {wert: <Zahl>, ref: <pfad>} moeglich
+c_overlap: "<Zahl >= 1>"                       # PZ-24
+selection: {K: "<ganze Zahl >= 1>", K_kumuliert_familie: "<ganze Zahl >= K>", z_max: "<Zahl>", ceiling_ref: "<pfad#test_id>"}   # PZ-04/PZ-20
+design_menu: {optionen: ["<...>"], auswahlregel: "<mechanisch, nur Vorperioden-Nuisance + SESOI/Prior>", gewaehlt: "<eine der optionen>"}   # PZ-26
+reachability:                                  # PZ-27
+  - {parameter: "<...>", beobachtungen_in_urteilsfenstern: "<ganze Zahl>"}
+oc_line: {p_pass_0: "<0..1>", p_pass_sesoi: "<0..1>", p_pass_prior_median: "<0..1>", seeds: "<ganze Zahl >= 1000>", ref: "<pfad#test_id>"}   # PZ-21
+strictness_ratio: {wert: "<Zahl>", zerlegung: ["<Festlegung>"], gabelungsregister_ref: "<pfad>"}   # PZ-22; ab 1,3 Nutzer-Vorlage
+annual_book: {jahr: "<YYYY>", erwartete_falsch_pass_vorher: "<Zahl>", mit_dieser_registrierung: "<Zahl>"}   # PZ-28; ab 0,10 Nutzer-Vorlage
+economic_minimum: {wert: "<Zahl>", ref: "<pfad>", label: "<ueber_wand|unter_wand>"}   # PZ-02, Etikett nie Gate
+decision_relevance: {on_pass: "<naechster Mess-/Tradability-Schritt>", on_drop: "<...>", on_gl012: "<kein Verdikt>"}   # PZ-02
+capital_tax_venue: {kapitalbasis: "<...>", steuer: "UNBELEGT - PRD 8.2", venue_event: "<...>", zahler_post_2024: "<...>"}   # PZ-09
+stress_episode: {liste_ref: "<STRESS_REL oder STRESS_ABS, Blank, sha256:64 Hexzeichen>", rolle: abdeckungsnachweis, tage_in_fenstern: "<ganze Zahl>"}   # PZ-10
+irreversibility_probe: {ergebnis: "<nachladbar|irreversibel>", ref: "<pfad>"}   # PZ-07
+positive_control: {vorgeschaltet: "<true|false>", produktionskonfiguration: "<true|false>", welt: "<kalibrierte Null-Welt>", kriterium: "<vorab>", ref: "<pfad>"}   # PZ-08
+fixtures: {positive: "<...>", "null": "<...>", adversarial: "<Klasse-spezifisches adversariales Fixture>"}   # PZ-05; Schluessel "null" in Anfuehrungszeichen
+test_pflichten:                                # PZ-12: je Test ein Verweis pfad#test_id (fehlt etwas: KEIN VERDIKT)
+  T0: "<pfad#test_id>"                         # Unit
+  T1: "<pfad#test_id>"                         # drei Fixtures positiv/null/adversarial
+  T2: "<pfad#test_id>"                         # Determinismus N>=3 mit Fingerprint
+  T3: "<pfad#test_id>"                         # Checkpoint-Round-Trip
+  T4: "<pfad#test_id>"                         # Gate-Arithmetik auf konserviertem Payload
+  T5: "<pfad#test_id>"                         # Konstanten-Pin
+  T6: "<pfad#test_id>"                         # Legacy-Import-Sperre
+  T7: "<pfad#test_id>"                         # Artefakt-Round-Trip
+artifacts:                                     # PZ-11 (DEC-53): Form der Ergebnis-Artefakte, Hash entsteht im Lauf
+  cluster_series_ref: "<pfad + sha256 (im Lauf)>"
+  bootstrap_replicates_ref: "<pfad + sha256 | seed + generator_fingerprint>"
+report_line: [estimate, se, ci95, upper_limit95, n_eff, c_overlap, selection_k, shrinkage_note, zone]   # DEC-105: alle neun Felder
+fdr: {family: "<F-...>", bh_alpha: 0.10, p: "Max-p ueber Fenster (Methode: WD-16)", over_family: "<F-...>", kohorte_by_q: 0.10}   # VR-b16/b17; VR-d13
+constants_hash: "<sha256 | n/a - kapitalfrei ohne Kostenmodell>"   # PZ-06; gleich sesoi_curve.kostenmodell_constants_hash
+code_sha256:                                   # keine Zahl ohne versioniertes Skript
+  - {pfad: "<repo-relativer pfad>", sha256: "<sha256>"}
+data_fingerprints: ["<Panel, Register, Code-Commit, registrierte YAML>"]
+feasibility_verdict: "<testbar|GL-012 strukturell nicht testbar>"   # muss zu mde80 <= sesoi passen
+etiketten: ["<z. B. C.17, zugelassen nur durch DEC-.., Gabelungen>"]
