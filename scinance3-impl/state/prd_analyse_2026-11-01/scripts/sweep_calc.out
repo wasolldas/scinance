@@ -1,0 +1,193 @@
+
+==============================================================================
+A. Datenvolumen und Transferzeit (Inventar 2026-11-01 [F]; 2 MB/s [F Verfassung, Marktdaten])
+==============================================================================
+bybit/publicTrade          309.26 GB    10519 Part.       29.4 MB/Part.      0.67 Mio Zeilen/Part.    44.0 Byte/Zeile  ganzer Strom   43.0 h
+bybit/orderbook            377.14 GB     2006 Part.      188.0 MB/Part.      0.71 Mio Zeilen/Part.   263.1 Byte/Zeile  ganzer Strom   52.4 h
+tardis/options_chain       386.63 GB       91 Part.     4248.7 MB/Part.     57.95 Mio Zeilen/Part.    73.3 Byte/Zeile  ganzer Strom   53.7 h
+binance/publicTrade         46.23 GB     1486 Part.       31.1 MB/Part.      2.19 Mio Zeilen/Part.    14.2 Byte/Zeile  ganzer Strom    6.4 h
+deribit/tickers            542.12 GB   216243 Part.        2.5 MB/Part.      0.06 Mio Zeilen/Part.    45.0 Byte/Zeile  ganzer Strom   75.3 h
+bybit/tickers              504.61 GB   154306 Part.        3.3 MB/Part.      0.08 Mio Zeilen/Part.    40.7 Byte/Zeile  ganzer Strom   70.1 h
+deribit/publicTrade          3.12 GB     1004 Part.        3.1 MB/Part.      0.10 Mio Zeilen/Part.    32.2 Byte/Zeile  ganzer Strom    0.4 h
+BTC publicTrade aktuell ~28 GB je Symbol-Jahr [F DEC-96 N] -> 76.7 MB/Tag -> 38 s je BTC-Tag
+orderbook.500 0,4..1,3 GB/Tag [F WP-1] -> 3.3..10.8 min je BTC-Tag
+tardis 386,63 GB / 91 Tage -> 4.25 GB/Tag -> 35.4 min/Tag; Zone X Stichtage 2019-04..2024-06 = 63 (2019: 9, 2020-2023: 48, 2024: 6)
+Plan K-01 Trades 5 Symb., 2 Tage/Monat 2020-03..2024-06 + Stress:  560 Einheiten x    35.0 MB =    19.6 GB ->    2.7 h Transfer
+Plan K-02 L2 BTC/ETH 40 Tage Zone X                            :   40 Einheiten x   850.0 MB =    34.0 GB ->    4.7 h Transfer
+Plan K-06 Tardis 24 Stichtage, Spaltenauswahl 50 % [V]         :   24 Einheiten x  2124.5 MB =    51.0 GB ->    7.1 h Transfer
+Plan K-06 Tardis alle 63 Zone-X-Stichtage, 50 % [V]            :   63 Einheiten x  2124.5 MB =   133.8 GB ->   18.6 h Transfer
+Plan K-08 S0-Metadaten aller Stroeme (Katalog)                 :    1 Einheiten x     1.0 MB =     0.0 GB ->    0.0 h Transfer
+
+==============================================================================
+B. K-10 Tages-Querschnitts-IC (Price Delay): MDE80 und SESOI
+==============================================================================
+Annahme SD(IC_t) = 2,5/sqrt(K-1) [V, wie F1-Zeile PRD_ANALYSE; GL-035 2,3..2,6x]
+K 200: SD(IC_t) 0.1772 | Zone V (730 d, pooled 0,0025 + Screen W2 0,05, gem. Power 0,8) MDE 0.0256 (nur pooled 0.0239) | Zone K 12 M GSD 0.0341 | Zone X 1.277 d MDE(0,05) 0.0123, Ausschlussgrenze bei IC 0 0.0082
+K 300: SD(IC_t) 0.1446 | Zone V (730 d, pooled 0,0025 + Screen W2 0,05, gem. Power 0,8) MDE 0.0209 (nur pooled 0.0195) | Zone K 12 M GSD 0.0278 | Zone X 1.277 d MDE(0,05) 0.0101, Ausschlussgrenze bei IC 0 0.0067
+K 500: SD(IC_t) 0.1119 | Zone V (730 d, pooled 0,0025 + Screen W2 0,05, gem. Power 0,8) MDE 0.0162 (nur pooled 0.0151) | Zone K 12 M GSD 0.0215 | Zone X 1.277 d MDE(0,05) 0.0078, Ausschlussgrenze bei IC 0 0.0052
+K 600: SD(IC_t) 0.1021 | Zone V (730 d, pooled 0,0025 + Screen W2 0,05, gem. Power 0,8) MDE 0.0148 (nur pooled 0.0138) | Zone K 12 M GSD 0.0197 | Zone X 1.277 d MDE(0,05) 0.0071, Ausschlussgrenze bei IC 0 0.0047
+SESOI Maker 4 bp RT    Umschlag 1.0/Tag: IC_min = 2*c*u/(3,51*370) = 0.0062
+SESOI Maker 4 bp RT    Umschlag 0.5/Tag: IC_min = 2*c*u/(3,51*370) = 0.0031
+SESOI Taker 11 bp RT   Umschlag 1.0/Tag: IC_min = 2*c*u/(3,51*370) = 0.0169
+SESOI Taker 11 bp RT   Umschlag 0.5/Tag: IC_min = 2*c*u/(3,51*370) = 0.0085
+SESOI gesamt 15 bp RT  Umschlag 1.0/Tag: IC_min = 2*c*u/(3,51*370) = 0.0231
+SESOI gesamt 15 bp RT  Umschlag 0.5/Tag: IC_min = 2*c*u/(3,51*370) = 0.0116
+Rang-IC: Gauss-Kante x pi^2/6 Korrektur (K-1) hier NICHT angewandt (3,51-Formel ist Pearson-Dezil) [U]
+
+==============================================================================
+C. K-09 Delisting-Hazard (Cox): Ereignisraten und MDE
+==============================================================================
+Spanne 2021-01-01..2026-10-31 = 5.83 Jahre; 306 Delistungen [F DEC-100] -> 52.5/Jahr; ~800 Listungen [F Konzept F5] -> 137/Jahr
+Zone X 2021-01-01..2024-06-30 = 3.50 Jahre -> erwartete Delistungen ~184 [V gleichmaessig]
+D  52 Ereignisse, Design-Effekt 1: SE(log HR je SD) 0.139 -> MDE80 (0,0025, GSD) log HR 0.51 = HR 1.67 je SD; (alpha 0,05: HR 1.41)
+D  52 Ereignisse, Design-Effekt 2: SE(log HR je SD) 0.196 -> MDE80 (0,0025, GSD) log HR 0.72 = HR 2.06 je SD; (alpha 0,05: HR 1.63)
+D  52 Ereignisse, Design-Effekt 3: SE(log HR je SD) 0.240 -> MDE80 (0,0025, GSD) log HR 0.88 = HR 2.42 je SD; (alpha 0,05: HR 1.82)
+D 105 Ereignisse, Design-Effekt 1: SE(log HR je SD) 0.098 -> MDE80 (0,0025, GSD) log HR 0.36 = HR 1.43 je SD; (alpha 0,05: HR 1.27)
+D 105 Ereignisse, Design-Effekt 2: SE(log HR je SD) 0.138 -> MDE80 (0,0025, GSD) log HR 0.51 = HR 1.66 je SD; (alpha 0,05: HR 1.41)
+D 105 Ereignisse, Design-Effekt 3: SE(log HR je SD) 0.169 -> MDE80 (0,0025, GSD) log HR 0.62 = HR 1.86 je SD; (alpha 0,05: HR 1.52)
+D 186 Ereignisse, Design-Effekt 1: SE(log HR je SD) 0.073 -> MDE80 (0,0025, GSD) log HR 0.27 = HR 1.31 je SD; (alpha 0,05: HR 1.20)
+D 186 Ereignisse, Design-Effekt 2: SE(log HR je SD) 0.104 -> MDE80 (0,0025, GSD) log HR 0.38 = HR 1.46 je SD; (alpha 0,05: HR 1.29)
+D 186 Ereignisse, Design-Effekt 3: SE(log HR je SD) 0.127 -> MDE80 (0,0025, GSD) log HR 0.47 = HR 1.60 je SD; (alpha 0,05: HR 1.37)
+
+==============================================================================
+D. K-07 Lebenszyklus (APC): Alterskontrast log-Vol
+==============================================================================
+Zone X ~3,5 J x 137/J  n 480, SD(log Vol) zwischen Symbolen 0.4 [V], deff 1: MDE80 Alterskontrast 0.094 log = Faktor 1.10
+Zone X ~3,5 J x 137/J  n 480, SD(log Vol) zwischen Symbolen 0.4 [V], deff 2: MDE80 Alterskontrast 0.133 log = Faktor 1.14
+Zone X ~3,5 J x 137/J  n 480, SD(log Vol) zwischen Symbolen 0.6 [V], deff 1: MDE80 Alterskontrast 0.141 log = Faktor 1.15
+Zone X ~3,5 J x 137/J  n 480, SD(log Vol) zwischen Symbolen 0.6 [V], deff 2: MDE80 Alterskontrast 0.200 log = Faktor 1.22
+Zone V W1/W2           n 275, SD(log Vol) zwischen Symbolen 0.4 [V], deff 1: MDE80 Alterskontrast 0.124 log = Faktor 1.13
+Zone V W1/W2           n 275, SD(log Vol) zwischen Symbolen 0.4 [V], deff 2: MDE80 Alterskontrast 0.176 log = Faktor 1.19
+Zone V W1/W2           n 275, SD(log Vol) zwischen Symbolen 0.6 [V], deff 1: MDE80 Alterskontrast 0.187 log = Faktor 1.21
+Zone V W1/W2           n 275, SD(log Vol) zwischen Symbolen 0.6 [V], deff 2: MDE80 Alterskontrast 0.264 log = Faktor 1.30
+Zone K 12 M            n 137, SD(log Vol) zwischen Symbolen 0.4 [V], deff 1: MDE80 Alterskontrast 0.176 log = Faktor 1.19
+Zone K 12 M            n 137, SD(log Vol) zwischen Symbolen 0.4 [V], deff 2: MDE80 Alterskontrast 0.249 log = Faktor 1.28
+Zone K 12 M            n 137, SD(log Vol) zwischen Symbolen 0.6 [V], deff 1: MDE80 Alterskontrast 0.265 log = Faktor 1.30
+Zone K 12 M            n 137, SD(log Vol) zwischen Symbolen 0.6 [V], deff 2: MDE80 Alterskontrast 0.374 log = Faktor 1.45
+
+==============================================================================
+E. K-05 RMT: Marchenko-Pastur-Kante und noetiger Eigenwert fuer die 2,3..2,6-fache IC-Streuung
+==============================================================================
+K 200, T 1277: q 0.157, MP-Oberkante 1.95
+K 300, T 1277: q 0.235, MP-Oberkante 2.20
+K 500, T 1277: q 0.392, MP-Oberkante 2.64
+K 300, T 905: q 0.331, MP-Oberkante 2.48
+SD-Verhaeltnis 2.3: sum (x'l)^2/(K-1) = 4.29; bei Ausrichtung cos^2 1.0: Eigenwert der Residual-Korrelation >= 5.3
+SD-Verhaeltnis 2.3: sum (x'l)^2/(K-1) = 4.29; bei Ausrichtung cos^2 0.5: Eigenwert der Residual-Korrelation >= 9.6
+SD-Verhaeltnis 2.3: sum (x'l)^2/(K-1) = 4.29; bei Ausrichtung cos^2 0.25: Eigenwert der Residual-Korrelation >= 18.2
+SD-Verhaeltnis 2.5: sum (x'l)^2/(K-1) = 5.25; bei Ausrichtung cos^2 1.0: Eigenwert der Residual-Korrelation >= 6.2
+SD-Verhaeltnis 2.5: sum (x'l)^2/(K-1) = 5.25; bei Ausrichtung cos^2 0.5: Eigenwert der Residual-Korrelation >= 11.5
+SD-Verhaeltnis 2.5: sum (x'l)^2/(K-1) = 5.25; bei Ausrichtung cos^2 0.25: Eigenwert der Residual-Korrelation >= 22.0
+SD-Verhaeltnis 2.6: sum (x'l)^2/(K-1) = 5.76; bei Ausrichtung cos^2 1.0: Eigenwert der Residual-Korrelation >= 6.8
+SD-Verhaeltnis 2.6: sum (x'l)^2/(K-1) = 5.76; bei Ausrichtung cos^2 0.5: Eigenwert der Residual-Korrelation >= 12.5
+SD-Verhaeltnis 2.6: sum (x'l)^2/(K-1) = 5.76; bei Ausrichtung cos^2 0.25: Eigenwert der Residual-Korrelation >= 24.0
+Lesart: x'Rx/(K-1) = 1 + sum_f (x'l_f)^2/(K-1); Eigenwert = 1 + |l|^2 [R, Normalnaeherung, Spearman ~ Pearson]
+
+==============================================================================
+F. K-04 Schwere Raender: effektive Freiheitsgrade, t-Kritik, Edgeworth-alpha
+==============================================================================
+n  40, Exzess-Kurtosis  0.0: df_eff   39.0; t_krit(0,0025) 2.976 vs z 2,807; t_krit(0,05) 1.685 vs 1,645; MDE-Faktor (0,0025) 1.049
+n  40, Exzess-Kurtosis  2.6: df_eff   17.2; t_krit(0,0025) 3.217 vs z 2,807; t_krit(0,05) 1.738 vs 1,645; MDE-Faktor (0,0025) 1.118
+n  40, Exzess-Kurtosis  5.0: df_eff   11.3; t_krit(0,0025) 3.471 vs z 2,807; t_krit(0,05) 1.791 vs 1,645; MDE-Faktor (0,0025) 1.191
+n  40, Exzess-Kurtosis 10.0: df_eff    6.6; t_krit(0,0025) 4.120 vs z 2,807; t_krit(0,05) 1.910 vs 1,645; MDE-Faktor (0,0025) 1.376
+n  52, Exzess-Kurtosis  0.0: df_eff   51.0; t_krit(0,0025) 2.934 vs z 2,807; t_krit(0,05) 1.675 vs 1,645; MDE-Faktor (0,0025) 1.037
+n  52, Exzess-Kurtosis  2.6: df_eff   22.4; t_krit(0,0025) 3.112 vs z 2,807; t_krit(0,05) 1.716 vs 1,645; MDE-Faktor (0,0025) 1.088
+n  52, Exzess-Kurtosis  5.0: df_eff   14.8; t_krit(0,0025) 3.294 vs z 2,807; t_krit(0,05) 1.755 vs 1,645; MDE-Faktor (0,0025) 1.140
+n  52, Exzess-Kurtosis 10.0: df_eff    8.6; t_krit(0,0025) 3.737 vs z 2,807; t_krit(0,05) 1.842 vs 1,645; MDE-Faktor (0,0025) 1.267
+n 104, Exzess-Kurtosis  0.0: df_eff  103.0; t_krit(0,0025) 2.869 vs z 2,807; t_krit(0,05) 1.660 vs 1,645; MDE-Faktor (0,0025) 1.018
+n 104, Exzess-Kurtosis  2.6: df_eff   45.0; t_krit(0,0025) 2.952 vs z 2,807; t_krit(0,05) 1.679 vs 1,645; MDE-Faktor (0,0025) 1.042
+n 104, Exzess-Kurtosis  5.0: df_eff   29.6; t_krit(0,0025) 3.033 vs z 2,807; t_krit(0,05) 1.698 vs 1,645; MDE-Faktor (0,0025) 1.065
+n 104, Exzess-Kurtosis 10.0: df_eff   17.3; t_krit(0,0025) 3.214 vs z 2,807; t_krit(0,05) 1.738 vs 1,645; MDE-Faktor (0,0025) 1.117
+n 365, Exzess-Kurtosis  0.0: df_eff  364.0; t_krit(0,0025) 2.824 vs z 2,807; t_krit(0,05) 1.649 vs 1,645; MDE-Faktor (0,0025) 1.005
+n 365, Exzess-Kurtosis  2.6: df_eff  158.5; t_krit(0,0025) 2.847 vs z 2,807; t_krit(0,05) 1.655 vs 1,645; MDE-Faktor (0,0025) 1.012
+n 365, Exzess-Kurtosis  5.0: df_eff  104.2; t_krit(0,0025) 2.868 vs z 2,807; t_krit(0,05) 1.660 vs 1,645; MDE-Faktor (0,0025) 1.018
+n 365, Exzess-Kurtosis 10.0: df_eff   60.8; t_krit(0,0025) 2.913 vs z 2,807; t_krit(0,05) 1.670 vs 1,645; MDE-Faktor (0,0025) 1.031
+Edgeworth (Hall 1987 [sek]): P(T > z) ~ alpha - n^-1/2 (g/6)(2z^2+1) phi(z); g = Schiefe der Clusterstatistik
+alpha 0.0025: n  40 -> g -1.0: 0.0059; g -0.5: 0.0042; g +0.5: 0.0008
+alpha 0.0025: n  52 -> g -1.0: 0.0055; g -0.5: 0.0040; g +0.5: 0.0010
+alpha 0.0025: n 104 -> g -1.0: 0.0046; g -0.5: 0.0036; g +0.5: 0.0014
+alpha 0.0025: n 365 -> g -1.0: 0.0036; g -0.5: 0.0031; g +0.5: 0.0019
+alpha 0.05: n  40 -> g -1.0: 0.0674; g -0.5: 0.0587; g +0.5: 0.0413
+alpha 0.05: n  52 -> g -1.0: 0.0653; g -0.5: 0.0576; g +0.5: 0.0424
+alpha 0.05: n 104 -> g -1.0: 0.0608; g -0.5: 0.0554; g +0.5: 0.0446
+alpha 0.05: n 365 -> g -1.0: 0.0558; g -0.5: 0.0529; g +0.5: 0.0471
+Vorbehalt: Edgeworth ist in den aeussersten Raendern (z 2,8) nur Groessenordnung [U].
+
+==============================================================================
+G. K-04 Ereigniszeit / Vol-Gewichtung: Effizienzgewinn bei Varianzheterogenitaet
+==============================================================================
+Varianzverhaeltnis 1.67: gleichgewichtet 1.335, invers-varianzgewichtet 1.251 (x v/N) -> Datenersparnis 6.3%, MDE-Faktor 0.968
+Varianzverhaeltnis 2.3: gleichgewichtet 1.650, invers-varianzgewichtet 1.394 (x v/N) -> Datenersparnis 15.5%, MDE-Faktor 0.919
+Varianzverhaeltnis 2.8: gleichgewichtet 1.900, invers-varianzgewichtet 1.474 (x v/N) -> Datenersparnis 22.4%, MDE-Faktor 0.881
+Gilt fuer Effekte konstant in bp; fuer vol-proportionale Effekte ist Standardisierung ohnehin die natuerliche Skala [U].
+
+==============================================================================
+H. K-03 Diskretes Delta-Hedging: Leland-Aufschlag dsigma = kappa*sqrt(2/pi)/sqrt(dt)
+==============================================================================
+Herleitung: Kosten je Intervall kappa*Gamma*S^2*sigma*sqrt(dt)*E|z|; Gamma-P&L 1/2 Gamma S^2 dsigma^2 dt; gleichsetzen -> dsigma = kappa*E|z|/sqrt(dt) (annualisiert, unabhaengig von sigma) [R]
+Maker 2 bp             Aufschlag in VP (Gauss E|z| 0,798): 1 min: 11.57 | 5 min:  5.17 | 1 h:  1.49 | 4 h:  0.75 | 8 h:  0.53 | 1 d:  0.30
+Taker 5,5 bp           Aufschlag in VP (Gauss E|z| 0,798): 1 min: 31.81 | 5 min: 14.23 | 1 h:  4.11 | 4 h:  2.05 | 8 h:  1.45 | 1 d:  0.84
+Taker+Slippage 7,5 bp  Aufschlag in VP (Gauss E|z| 0,798): 1 min: 43.38 | 5 min: 19.40 | 1 h:  5.60 | 4 h:  2.80 | 8 h:  1.98 | 1 d:  1.14
+E|z| Student-t4 auf Einheitsvarianz = 0.7071 (Gauss 0,7979): Formfaktor 0.886; Kurzfrist-Umkehr (H-24, Bid-Ask-Bounce) wirkt entgegen - Nettowirkung UNGEMESSEN
+Vergleich: Options-Gebuehr 2/3 bp Index [F B.4]; C-33-Schwelle 3 VP [F]; VRP-Prior 7,14 VP [F/sek]; VRP-MDE80 12,9 VP [F DEC-104 E3 (e)]
+
+==============================================================================
+I. K-01 Quadratwurzel-Impact: Groessenordnung I = Y*sigma_d*sqrt(Q/V) [Y aus SEK, nur Orientierung]
+==============================================================================
+BTC sigma_d 262 bp [F]   Y 0.5: Q/V 1e-05:   0.41 bp | Q/V 0.0001:   1.31 bp | Q/V 0.001:   4.14 bp | Q/V 0.01:  13.10 bp
+BTC sigma_d 262 bp [F]   Y 1.0: Q/V 1e-05:   0.83 bp | Q/V 0.0001:   2.62 bp | Q/V 0.001:   8.29 bp | Q/V 0.01:  26.20 bp
+Alt sigma_d 650 bp [V]   Y 0.5: Q/V 1e-05:   1.03 bp | Q/V 0.0001:   3.25 bp | Q/V 0.001:  10.28 bp | Q/V 0.01:  32.50 bp
+Alt sigma_d 650 bp [V]   Y 1.0: Q/V 1e-05:   2.06 bp | Q/V 0.0001:   6.50 bp | Q/V 0.001:  20.55 bp | Q/V 0.01:  65.00 bp
+Vergleich: 'ungemessene ~4 bp Slippage' (B.1, K-11): bei BTC Y 0,5..1 entspricht das Q/V ~ 2.3e-04..9.3e-04 des Tagesvolumens
+
+==============================================================================
+J. K-01 Akten-Vorpruefung Kyle-Obizhaeva: Spread-Dezile gegen Umsatzquantile (nur Groessenordnung)
+==============================================================================
+Spread-Verhaeltnis D10/D1 19.1; Umsatz-Verhaeltnis Q95/Q5 394; implizierter Exponent bei gleicher Vol 0.494
+KO (Spread ~ (sigma^2/PV)^(1/3)) braucht Vol-Verhaeltnis 4.21 zwischen den Extrem-Dezilen; Exponent 1/2 braucht 0.96 (sigma^1)
+Vorbehalt: Tick-Bindung am liquiden Ende, Snapshot n=1 je Dezil, Perp-Turnover statt Spot [V].
+
+==============================================================================
+K. K-01 Aequivalenztest (TOST) fuer Invarianz-Exponenten: noetige Marge
+==============================================================================
+SE(Exponent) 0.01: TOST alpha 0,0025 je Seite, Power 0,8 bei wahrem Wert in der Mitte -> Marge >= 0.041
+SE(Exponent) 0.02: TOST alpha 0,0025 je Seite, Power 0,8 bei wahrem Wert in der Mitte -> Marge >= 0.082
+SE(Exponent) 0.03: TOST alpha 0,0025 je Seite, Power 0,8 bei wahrem Wert in der Mitte -> Marge >= 0.123
+Steigung log N_trades auf log W: s_res 0.2 [V], sd(log W) 0.5 [V], D 365 Tage -> SE 0.0209
+Steigung log N_trades auf log W: s_res 0.3 [V], sd(log W) 0.4 [V], D 365 Tage -> SE 0.0393
+Steigung log N_trades auf log W: s_res 0.3 [V], sd(log W) 0.4 [V], D 1500 Tage -> SE 0.0194
+
+==============================================================================
+L. K-06 Put-Call-Paritaet: Genauigkeit der impliziten Basis
+==============================================================================
+T   7 d,  1 Strike-Paare: Forward-Fehler 0.52 bp -> annualisierte Basis +-27.3 bp p.a. (unabhaengige Fehler [V])
+T   7 d, 10 Strike-Paare: Forward-Fehler 0.17 bp -> annualisierte Basis +-8.6 bp p.a. (unabhaengige Fehler [V])
+T   7 d, 20 Strike-Paare: Forward-Fehler 0.12 bp -> annualisierte Basis +-6.1 bp p.a. (unabhaengige Fehler [V])
+T  30 d,  1 Strike-Paare: Forward-Fehler 0.52 bp -> annualisierte Basis +-6.4 bp p.a. (unabhaengige Fehler [V])
+T  30 d, 10 Strike-Paare: Forward-Fehler 0.17 bp -> annualisierte Basis +-2.0 bp p.a. (unabhaengige Fehler [V])
+T  30 d, 20 Strike-Paare: Forward-Fehler 0.12 bp -> annualisierte Basis +-1.4 bp p.a. (unabhaengige Fehler [V])
+T  90 d,  1 Strike-Paare: Forward-Fehler 0.52 bp -> annualisierte Basis +-2.1 bp p.a. (unabhaengige Fehler [V])
+T  90 d, 10 Strike-Paare: Forward-Fehler 0.17 bp -> annualisierte Basis +-0.7 bp p.a. (unabhaengige Fehler [V])
+T  90 d, 20 Strike-Paare: Forward-Fehler 0.12 bp -> annualisierte Basis +-0.5 bp p.a. (unabhaengige Fehler [V])
+
+==============================================================================
+M. Erstes gegen zweites Moment: was hohe Abtastrate kauft (Merton 1980 [sek])
+==============================================================================
+BTC sigma_annual = 262 bp x sqrt(365) = 50.1% [R aus F]
+Drift-SE nach 2.0 Jahren: 35.4% p.a. - unabhaengig von der Abtastrate
+Drift-SE nach 4.25 Jahren: 24.3% p.a. - unabhaengig von der Abtastrate
+Drift-SE nach 6.6 Jahren: 19.5% p.a. - unabhaengig von der Abtastrate
+rel. SE der Varianz, Tage 6,6 J   (N      2413), Kurtosis 0.0: 2.8790% (ohne Mikrostrukturrauschen)
+rel. SE der Varianz, Tage 6,6 J   (N      2413), Kurtosis 5.0: 5.3860% (ohne Mikrostrukturrauschen)
+rel. SE der Varianz, 1-min 6,6 J  (N   3474720), Kurtosis 0.0: 0.0759% (ohne Mikrostrukturrauschen)
+rel. SE der Varianz, 1-min 6,6 J  (N   3474720), Kurtosis 5.0: 0.1419% (ohne Mikrostrukturrauschen)
+IC-MDE80 (0,05) bei Tage/Jahr   : 0.1301
+IC-MDE80 (0,05) bei 30-min/Jahr : 0.0188
+IC-MDE80 (0,05) bei 1-min/Jahr  : 0.0034
+
+==============================================================================
+N. Zeitlinie unter DEC-104 (Kohorte 1 = 2027-01-01)
+==============================================================================
+Zone V (W1/W2): ein Blick je Familie in Kohorte 1 -> Rechnung Q1 2027 (sofern OC E0 vorliegt)
+Zone K 12-M-Konfirmation 2026-07-01..2027-06-30: Blicke nach Q3-2026/Q4-2026 (bei Registrierung schon vorhanden), Q1-2027, Q2-2027 -> letzter Blick Anfang Juli 2027; Kohorte 2 (2027-04-01) aendert das Ende nicht
+GSD OBF 4 Blicke alpha 0,0025: Maximum-Inflation 1,008, E[N|H1] 0,872 [F PRD_ANALYSE 6]

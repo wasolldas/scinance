@@ -633,3 +633,74 @@ rekonstruierbar" ohne Siegel-Grenze; Grundsatzanalyse 0.4/F1 "registrierbar heut
 T-5/T-12 (4) Blindheitsbegruendungen, T-12 "neutral in alpha", T-3 Zustaendigkeit, "14 Monate", "sechs Gate-Eintraege";
 Edge-Inventur E-25 "D.17 revidieren", Kurzfassung 9 ohne Vorbehalt, "unplausibel hoch"; Architektur 3.5 VRP-Zeitlinie,
 3.4 Faktor 1,54 als Vergleich.
+
+---
+
+## Nachtrag 1 (2026-11-02): Methoden-Sweep "Naturwissenschaft und Technik x Datenstroeme" - Antwort auf die Nutzerfrage, ob neue Forschungsansaetze systematisch abgegrast wurden
+
+**Anlass.** Nutzer 2026-11-02: "Haben wir denn auch den Auftrag abgearbeitet, nochmal komplett neue Forschungsansaetze
+abzugrasen?" Ehrliche Antwort des Orchestrators: nein, nicht systematisch - F1..F12 sind hypothesengetriebene Finanzfelder
+im heutigen Klassenschema. Nachgeholt mit einem eigenen Herleitungsauftrag (`prd_analyse_2026-11-01/BRIEF_methoden_sweep.md`),
+Ergebnis `prd_analyse_2026-11-01/METHODEN_SWEEP_2026-11-02.md` (945 Zeilen; Rechenweg `scripts/sweep_calc.py`). Nur Lesearbeit und
+Formeln; keine Marktdaten, keine Siegeldatei. Literaturwerte dort durchgehend [sek] (aus dem Gedaechtnis, Primaerquellen zu
+beschaffen).
+
+**Abnahme durch den Orchestrator (eigener Code `scripts/orch_sweep_check.py`, Ausgabe `.out`):** alle Kernzahlen reproduziert -
+IK-10 Zone-V-MDE80 0,0148 / 0,0162 / 0,0209 (K 600 / 500 / 300; gepoolt 0,0025 + REZENZ-Screen W2, Korrelation sqrt(1/2)),
+Zone K 12 Monate 0,0197..0,0278, Zone X (K ~200, 1.277 Tage) 0,0123; Taker-/Maker-SESOI im Dezil-L/S-Rahmen (3,51 x IC x
+sigma_xs 370 bp [V]) 0,0169 / 0,0062 (gesamt 15 bp 0,0231); schwere Raender: Kurtosis 5 / 10 bei 40..52 Clustern senkt die
+effektiven Freiheitsgrade der SE auf 15..7, hebt den kritischen Wert zu alpha 0,0025 von 2,807 auf 3,29..4,12 und die MDE um
+1,14..1,38 (bei 365 Clustern <= 1,03); Schiefe -0,5 / -1 hebt das effektive einseitige alpha auf ~0,0040 / ~0,0057
+(Edgeworth, Groessenordnung); Marchenko-Pastur-Kante 1,95 / 2,64 (K 200 / 500, T 1.277), noetiger Eigenwert 6,25 (volle
+Ausrichtung) bzw. 11,5 fuer die 2,5-fache IC-Streuung; Drift-SE von BTC nach 6,6 Jahren 19,5 % p.a. unabhaengig von der
+Abtastrate. Ein Punkt des Auftrags war fehlerhaft und ist vom Agenten richtig nach DEC-104 aufgeloest: BTC/ETH-Daten aus
+W1/W2 sind Zone V, nicht X (der Brief sprach von "agentenbekannten Aggregaten bis 2026-06 in Zone X").
+
+**Befund in Kuerze (uebernommen, [U]):**
+1. Die Methoden der Naturwissenschaft tragen auf unseren Daten **Mess-, Kosten- und Nullwelt-Programme, kaum neue
+   Praemienquellen**. Grund ist Arithmetik, nicht Methodenmangel: hohe Abtastrate kauft Praezision fuer Varianzen, Kosten und
+   Strukturen, nicht fuer Tagesmittel (Merton). 37 Methodenfamilien x 13 Stromgruppen; elf Ideenkarten IK-01..IK-11 (neun
+   Messprogramme, zwei Hypothesen), Platz zwoelf bewusst frei gelassen.
+2. **Die SESOI-Kurve nach DEC-104 E3 existiert noch nicht** - die Wand ist eine Konstante, die Slippage ungemessen, der
+   Maker-Pfad ein Band. Die Kostenkurven **IK-01** (Taker-Impact, Kyle-Obizhaeva-Invarianz auf ~20 GB Trades, 2,7 h Transfer)
+   und **IK-02** (Maker-Warteschlange auf ~34 GB L2, besser auf dem Nutzer-PC oder per Vorextraktion) sind damit **Vorbedingung
+   jeder 3.1-Registrierung**, nicht Beifang. Taker gegen Maker entscheidet um den Faktor 2,7, ob ein Querschnittsdesign testbar ist.
+3. **IK-04** (Skalengesetze, Ereigniszeit, schwere Raender -> minimale Nullwelt) liefert die Momente, die die Gesamt-OC vor
+   Kohorte 1 braucht; Permutationstests unter Austauschbarkeit (A2) halten alpha, verlieren nur Power; Tests mit geschaetzter
+   SE und Normal-Kritik (Bootstrap-SE, gepoolte z-Tests) brauchen t-artige Grenzen.
+4. **IK-05** instrumentiert den groessten ungeprueften Hebel der Klasse W (S-4): ob eine Faktorstruktur die 2,5-fache
+   IC-Streuung erklaert, ist in Zone X per Zufallsmatrixtheorie entscheidbar (Eigenwert >= 6 gegen Rauschkante 2,0..2,6).
+5. **IK-10** (verzoegerte Marktreaktion im Perp-Querschnitt) ist der einzige neue Querschnittskandidat und liegt genau an der
+   Kante: Zone-V-Blick in Kohorte 1 loest 0,015..0,021 auf gegen Taker-SESOI 0,017; a priori geringe Plausibilitaet fuer liquide
+   Perps; die Ausschlussgrenze aus Zone X (0,008 bei K ~200) ist auch ohne PASS informativ. F1 und IK-10 sind ueber die
+   Renditefamilie korreliert und muessen in dieselbe Kohorte (ein V-Blick je Familie, E4 (d)).
+6. Weitere Karten: IK-03 Leland-Kurve (Hedge-Kosten Klasse P), IK-06 Optionsketten-Invarianten (Datenfund: die Tardis-Kette
+   hat ~58 Mio Zeilen je Stichtag, also Intraday an 63 Zone-X-Stichtagen -> implizite Basis-Terminstruktur seit 2019 als
+   F10-Einstiegsbasis, [V] bis zur Inhaltsprobe), IK-07 Demografie des Perp-Lebenszyklus (ersetzt die unbewiesene
+   8-Wochen-Regel), IK-08 Metrologie der Datenstroeme (Ausfallbudget, Kalibrierbuch; S0 auch im Siegel), IK-09
+   Delisting-Hazard mit Kovariaten (IPCW fuer jeden Querschnittstest), IK-11 Funding-Regelkreis (Reserve).
+7. **Groesste Luecke der Felderliste F1..F12:** Erst-Moment-Hypothesen auf ungemessenen Zweit-Moment- und Kosteneingaben; nur
+   F4 enthaelt eine Invarianz; die 1,07 TB Trades/L2/Kette werden nirgends dort eingesetzt, wo sie einen komparativen Vorteil
+   haben (Kosten, Nullwelten, Invarianten).
+8. **Sofort in Zone X (Minuten CPU):** IK-04, IK-05, IK-07, IK-09, IK-10, IK-03, IK-11 auf Tages-/Minutenkerzen und Funding;
+   IK-08 als S0 auch im Siegel; IK-01 nach Trade-Stichprobe; IK-06 nach Tardis-Inhaltsprobe. **Innerhalb 12 Monaten
+   konfirmierbar:** IK-01, IK-02 (Gesetzeshypothesen in TOST-Form), IK-06 Teil b, IK-07, IK-09, IK-10.
+9. **Neue Datenauftraege** (Abschnitt 6 des Sweeps, ergaenzen Abschnitt 8 oben): Tardis-Inhaltsprobe erweitert (Feldliste,
+   gefiltertes Laden; nur Stichtage <= 2026-06-01); Index- und Mark-Preis-Tageskerzen aller linearen Perps ab 2021-01 inkl.
+   Delisteter; Tagesaggregate (Tradezahl, Buy/Sell-Volumen, Groessenquantile) aus dem Trade-Archiv fuer alle Perps;
+   L2-Vorextraktion fuer eine Stichtagsliste; Ausfall- und Wartungsregister des Live-Sammlers; Kontraktspezifikations-Historie.
+10. **Neue Programmfrage P-13 (Lockerung, N):** DEC-104 E4 laesst BTC/ETH-Trades und -Orderbuecher 2024-07..2026-06 fuer jede
+    Nicht-A2-Statistik weder explorieren noch konfirmieren ("Brachland"). Fuer Nicht-Rendite-Mikrostruktur (Tradezahlen,
+    Groessenverteilungen, Queue-Intensitaeten, Zeitstempel) ist der Schutzzweck schwach, weil die W1/W2-Vol ohnehin bekannt ist
+    (DEC-95 E2). Vorschlag des Sweeps: diese Statistiken mit A2-Maske (Ausschluss der Freitags-Slots 07:30-08:00) als Zone X
+    fuehren. Preis: weiteres Agentenwissen ueber W1/W2-Aktivitaet. Default bis zum Entscheid: nein (IK-01/IK-02 rechnen auf
+    2020..2024-06 und ab 2026-07).
+11. **Fuer PRD v3:** Aequivalenzform (TOST) fuer Gesetzeshypothesen (Skalengesetze, Invarianzen) neben dem einseitigen
+    Ueberlegenheitstest; Enrichment-Design fuer Querschnitte (N).
+
+**Was nicht folgt:** kein Verdikt, keine Registrierung, keine Kostenzahl ist gemessen (alle SESOI-Werte beruhen auf der
+PRD-Wand und sigma_xs 370 bp [V]); alle Streuungs-Nuisancen der neuen Groessen sind in Zone X erst zu messen (Konto).
+Reihenfolge der naechsten Orchestrator-Schritte daraus: (1) Gesamt-OC (laeuft) mit IK-04-Korrekturen; (2) Zone-X-Programm
+IK-05 und IK-04 auf dem Tages-Panel (Konto-Eintraege 1 und 2); (3) IK-01-Stichprobe (Trades 2020..2024-06) als erste
+Kostenkurve; (4) Feasibility-Rechner (F3) mit SESOI-Kurve in beiden Rahmen (Dezil-L/S fuer Klasse W, Einzelposition fuer
+Klasse E/P).

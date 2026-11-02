@@ -1,0 +1,21 @@
+z_0.0025 = 2.807
+IK-10 Zone V K 600: SD 0.1021 MDE80 0.0148; Zone K 12M (OBF 1,008): 0.0197; Zone X 1.277 d: 0.0071
+IK-10 Zone V K 500: SD 0.1119 MDE80 0.0162; Zone K 12M (OBF 1,008): 0.0215; Zone X 1.277 d: 0.0078
+IK-10 Zone V K 300: SD 0.1446 MDE80 0.0209; Zone K 12M (OBF 1,008): 0.0278; Zone X 1.277 d: 0.0101
+SESOI Dezil-L/S c 11 bp: IC 0.0169
+SESOI Dezil-L/S c 4 bp: IC 0.0062
+SESOI Dezil-L/S c 15 bp: IC 0.0231
+kappa 5 n 40: df_eff 11.3 t_crit 3.471 MDE-Faktor 1.191
+kappa 5 n 52: df_eff 14.8 t_crit 3.294 MDE-Faktor 1.140
+kappa 5 n 365: df_eff 104.2 t_crit 2.868 MDE-Faktor 1.018
+kappa 10 n 40: df_eff 6.6 t_crit 4.120 MDE-Faktor 1.376
+kappa 10 n 52: df_eff 8.6 t_crit 3.737 MDE-Faktor 1.267
+kappa 10 n 365: df_eff 60.8 t_crit 2.913 MDE-Faktor 1.031
+Schiefe -0.5 n 40: alpha_eff ~ 0.0042
+Schiefe -0.5 n 52: alpha_eff ~ 0.0040
+Schiefe -1.0 n 40: alpha_eff ~ 0.0059
+Schiefe -1.0 n 52: alpha_eff ~ 0.0055
+MP-Kante K 200 T 1277: 1.948
+MP-Kante K 500 T 1277: 2.643
+Eigenwert fuer SD-Verhaeltnis 2,5 (cos^2 = 1 / 0,5): 6.25 11.5
+Drift-SE BTC sigma 50 % nach 6,6 J: 0.195 ; rel. Var-SE 1-min (N=6,6*365*1440, kappa 10): 0.00186  Tage (kappa 6): 0.0576
