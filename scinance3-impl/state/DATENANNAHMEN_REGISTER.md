@@ -31,3 +31,4 @@
 | Datum | Nr. | Stand | Folge |
 |---|---|---|---|
 | 2026-11-02 13:48 UTC | 15 | Datendienst seit 2026-11-02 vormittags durchgehend nicht erreichbar (fuenf Pruefungen 11:00..13:48 UTC, Katalog-Refresh wirft RuntimeError); gearbeitet wird mit dem Katalog-Cache vom 2026-11-01 18:46 UTC [F] | Zone-X-Programm 1 (Konto 1/2) und Inhaltsproben warten; naechste automatische Pruefung in 2 Stunden; Ursache beim Data-Harvest-Betreiber zu klaeren (Nutzer) |
+| 2026-11-02 16:50 UTC | 15 | Datendienst weiterhin nicht erreichbar (siebte Pruefung seit 11:00 UTC) [F] | naechste automatische Pruefung 2026-11-03 08:00 UTC; Nutzer informiert; Ursache beim Data-Harvest-Betrieb zu klaeren |
