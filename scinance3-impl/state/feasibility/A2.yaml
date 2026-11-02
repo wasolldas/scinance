@@ -1,0 +1,209 @@
+# Regression candidate for the feasibility calculator (feasibility31), schema_version 1.
+# Every number carries its source (file, field, sha256 as of 2026-11-02, repo-relative).  The calculator does not open
+# the cited files; `--verify-sources REPO_ROOT` reports drift.  `expected` lists the dossier values the report must
+# reproduce (relative tolerance 1 %).  No market data, no sealed file.
+schema_version: 1
+candidate_id: A2
+title: "A2 (EXP-CLOCK) r_pre on expiry Fridays, contrast P2'' with three placebo conditions and null condition"
+notes: "Chain of DEC-105 (7) and DEC-104 Nachtrag 2 (3); product versus exact joint power (double statement); structural floor 24,30 bp with stress SE 8,52 and Gate-(4) factor 0,9025 against the Taker SESOI 22 bp. Zone K starts 2026-10-01 for BTC/ETH aggregates (FENSTERREGISTER section 6); zone V only by the A2 exception (discipline label)."
+statistic: {name: "A2 r_pre contrast P2'' (event minus placebo), mean", unit: bp, direction: positive}
+nuisance:
+  cluster_unit: event
+  units_per_year: 52
+  c_overlap: {value: 1.3177, source: {file: "scinance3-impl/state/herleitung_a2/NULL_SIMULATION_A2.md", field: "T2 header / Reproduktion Teil B: c_bind 1,1491 (Freitag) / 1,3177 (Mo-Do)", sha256: "3ae17fa1eac4292857763478511ac724466d5bc0e71caf06bdf03fc566c743cc"}}
+  se12:
+    central: {value: 7.58, source: {file: "scinance3-impl/state/herleitung_a2/NULL_SIMULATION_A2.md", field: "T3 row 'W2 zentral': SE_bind P2'' 7,58", sha256: "3ae17fa1eac4292857763478511ac724466d5bc0e71caf06bdf03fc566c743cc"}}
+    stress: {value: 8.52, source: {file: "scinance3-impl/state/herleitung_a2/NULL_SIMULATION_A2.md", field: "T3 row 'W2 stress': SE_bind P2'' 8,52", sha256: "3ae17fa1eac4292857763478511ac724466d5bc0e71caf06bdf03fc566c743cc"}}
+  null_sd: {value: 6.24, source: {file: "scinance3-impl/state/herleitung_a2/NULL_SIMULATION_A2.md", field: "T3 row 'W2 zentral': Null-SD 6,24", sha256: "3ae17fa1eac4292857763478511ac724466d5bc0e71caf06bdf03fc566c743cc"}}
+  condition_correlation: {value: 0.82, source: {file: "scinance3-impl/state/decisions.md", field: "DEC-105 erratum 7: Korrelation 0,82 (W2) / 0,91 (W1)", sha256: "55f47b5fdc4c2850f96b2d702fb08f33bfea392a2ee453e382d79ddc09f39944"}}
+sesoi:
+  mode: direct
+  unit: bp
+  label: "2 x 11 bp Taker = 22 bp (Maker measured 2 x 5,4 = 10,8 bp)"
+  value: {value: 22.0, source: {file: "scinance3-impl/state/prd_analyse_2026-11-01/KRITIK_PRD.md", field: "K-10 table, row A2: SESOI 2 x 11 bp Taker = 22 bp (DEC-104 E7 (d))", sha256: "8c198d01ed98f06765e78c8c0379f94c7f50c20e43b53272ea27f568b56249b9"}}
+prior:
+  label: UNBELEGT
+  sensitivity_span: [5.0, 25.0]
+  source: {file: "scinance3-impl/state/herleitung_a2/NULL_SIMULATION_A2.md", field: "T6 prior grid 5,0 .. 25,0 bp (reference row 16,5 bp)", sha256: "3ae17fa1eac4292857763478511ac724466d5bc0e71caf06bdf03fc566c743cc"}
+  note: "V-5b magnitude UNBELEGT (Weiss et al. missing, DEC-98 N2 (3)); span = prior grid T6; 16,5 bp is the pilot reference row"
+  extra_points:
+    pilot_ref_16p5: {value: 16.5, source: {file: "scinance3-impl/state/herleitung_a2/NULL_SIMULATION_A2.md", field: "T6 prior grid reference row 16,5 bp (pilot hand-over, OC (g) F)", sha256: "3ae17fa1eac4292857763478511ac724466d5bc0e71caf06bdf03fc566c743cc"}}
+gate_factor: {value: 0.9025, source: {file: "scinance3-impl/state/herleitung_a2/NULL_SIMULATION_A2.md", field: "section 5.2: Gate (4) as factor 0,95^2 = 0,9025 (provisional, R-C15)", sha256: "3ae17fa1eac4292857763478511ac724466d5bc0e71caf06bdf03fc566c743cc"}}
+data:
+  knowledge_class: btc_eth_aggregate
+  cohort_date: 2027-01-01
+  selection_k: 0
+  a2_exception: true
+  zones:
+    X: {start: 2021-03-24, end: 2024-05-31, units: 167, se: {value: 4.1, source: {file: "scinance3-impl/state/herleitung_a2/NULL_SIMULATION_A2.md", field: "T2 row VP_2021-03-24..2024-05-31 P2ss: SE analytic 4,10", sha256: "3ae17fa1eac4292857763478511ac724466d5bc0e71caf06bdf03fc566c743cc"}}, source: {file: "scinance3-impl/state/herleitung_a2/NULL_SIMULATION_A2.md", field: "T2 row VP_2021-03-24..2024-05-31 (167 Fridays of the pre-period, count from the calendar)", sha256: "3ae17fa1eac4292857763478511ac724466d5bc0e71caf06bdf03fc566c743cc"}}
+    V: {start: 2024-07-01, end: 2026-06-28, months: 24, source: {file: "scinance3-impl/state/FENSTERREGISTER.md", field: "section 1: zone V = W1/W2 2024-07-01..2026-06-28; section 2: A2 exception", sha256: "210e5469bb88041edb8041fb050e1e18cdc39b498537a6e549464faf2a395c98"}}
+    K: {start: 2026-07-01}
+design_menu:
+  window_months: [6, 9, 12]
+  looks: [1, 2, 3, 4]
+  screen_alphas: [0.05, 0.10, 0.20, 0.50]
+  horizon_limit_months: 60
+  mc_reps: 20000
+  gsd_paths: 200000
+  conjunction_mc: 400000
+  placebo_set_variants:
+    p2_only: [P2]
+    p2_p3fix: [P2, P3fix]
+    three_placebos: [P2, P3fix, P3all]
+    three_plus_null: [P2, P3fix, P3all, null_test]
+conjunction:
+  tau95: 1.6553
+  pair: [P2, null_test]
+  reference_window: W2
+  windows:
+      W1:
+        kappa: 0.999
+        event:
+          n: 52
+          c: 1.1491
+          sd:
+            central: {value: 43.83, source: {file: "scinance3-impl/state/herleitung_a2/NULL_SIMULATION_A2.md", field: "T2 row VP_2021-03-24..2024-05-31 P2ss: SD class E 43,83", sha256: "3ae17fa1eac4292857763478511ac724466d5bc0e71caf06bdf03fc566c743cc"}}
+            stress: {value: 49.37, source: {file: "scinance3-impl/state/herleitung_a2/NULL_SIMULATION_A2.md", field: "T2 row V1_2021-06..2022-05 P2ss: SD class E 49,37", sha256: "3ae17fa1eac4292857763478511ac724466d5bc0e71caf06bdf03fc566c743cc"}}
+        conditions:
+          P2:
+            n: 208
+            c: 1.3177
+            sd:
+              central: {value: 42.45, source: {file: "scinance3-impl/state/herleitung_a2/NULL_SIMULATION_A2.md", field: "T2 row VP_2021-03-24..2024-05-31 P2ss: SD placebo class 42.45", sha256: "3ae17fa1eac4292857763478511ac724466d5bc0e71caf06bdf03fc566c743cc"}}
+              stress: {value: 47.45, source: {file: "scinance3-impl/state/herleitung_a2/NULL_SIMULATION_A2.md", field: "T2 row V1_2021-06..2022-05 P2ss: SD placebo class 47.45", sha256: "3ae17fa1eac4292857763478511ac724466d5bc0e71caf06bdf03fc566c743cc"}}
+            se:
+              central: {value: 7.34, source: {file: "scinance3-impl/state/herleitung_a2/NULL_SIMULATION_A2.md", field: "T3 row 'W1 zentral': SE_bind P2 = 7.34", sha256: "3ae17fa1eac4292857763478511ac724466d5bc0e71caf06bdf03fc566c743cc"}}
+              stress: {value: 8.25, source: {file: "scinance3-impl/state/herleitung_a2/NULL_SIMULATION_A2.md", field: "T3 row 'W1 stress': SE_bind P2 = 8.25", sha256: "3ae17fa1eac4292857763478511ac724466d5bc0e71caf06bdf03fc566c743cc"}}
+          P3fix:
+            n: 248
+            c: 1.168
+            sd:
+              central: {value: 61.39, source: {file: "scinance3-impl/state/herleitung_a2/NULL_SIMULATION_A2.md", field: "T2 row VP_2021-03-24..2024-05-31 P3fix: SD placebo class 61.39", sha256: "3ae17fa1eac4292857763478511ac724466d5bc0e71caf06bdf03fc566c743cc"}}
+              stress: {value: 62.11, source: {file: "scinance3-impl/state/herleitung_a2/NULL_SIMULATION_A2.md", field: "T2 row V1_2021-06..2022-05 P3fix: SD placebo class 62.11", sha256: "3ae17fa1eac4292857763478511ac724466d5bc0e71caf06bdf03fc566c743cc"}}
+            se:
+              central: {value: 7.93, source: {file: "scinance3-impl/state/herleitung_a2/NULL_SIMULATION_A2.md", field: "T3 row 'W1 zentral': SE_bind P3fix = 7.93", sha256: "3ae17fa1eac4292857763478511ac724466d5bc0e71caf06bdf03fc566c743cc"}}
+              stress: {value: 8.66, source: {file: "scinance3-impl/state/herleitung_a2/NULL_SIMULATION_A2.md", field: "T3 row 'W1 stress': SE_bind P3fix = 8.66", sha256: "3ae17fa1eac4292857763478511ac724466d5bc0e71caf06bdf03fc566c743cc"}}
+          P3all:
+            n: 260
+            c: 1.0
+            sd:
+              central: {value: 8.53, source: {file: "scinance3-impl/state/herleitung_a2/NULL_SIMULATION_A2.md", field: "T2 row VP_2021-03-24..2024-05-31 P3all: SD placebo class 8.53", sha256: "3ae17fa1eac4292857763478511ac724466d5bc0e71caf06bdf03fc566c743cc"}}
+              stress: {value: 9.67, source: {file: "scinance3-impl/state/herleitung_a2/NULL_SIMULATION_A2.md", field: "T2 row V1_2021-06..2022-05 P3all: SD placebo class 9.67", sha256: "3ae17fa1eac4292857763478511ac724466d5bc0e71caf06bdf03fc566c743cc"}}
+            se:
+              central: {value: 6.56, source: {file: "scinance3-impl/state/herleitung_a2/NULL_SIMULATION_A2.md", field: "T3 row 'W1 zentral': SE_bind P3all = 6.56", sha256: "3ae17fa1eac4292857763478511ac724466d5bc0e71caf06bdf03fc566c743cc"}}
+              stress: {value: 7.39, source: {file: "scinance3-impl/state/herleitung_a2/NULL_SIMULATION_A2.md", field: "T3 row 'W1 stress': SE_bind P3all = 7.39", sha256: "3ae17fa1eac4292857763478511ac724466d5bc0e71caf06bdf03fc566c743cc"}}
+        null_test:
+          sd:
+            central: {value: 6.7, source: {file: "scinance3-impl/state/herleitung_a2/NULL_SIMULATION_A2.md", field: "T3 row 'W1 zentral': Null-SD 6.7", sha256: "3ae17fa1eac4292857763478511ac724466d5bc0e71caf06bdf03fc566c743cc"}}
+            stress: {value: 7.53, source: {file: "scinance3-impl/state/herleitung_a2/NULL_SIMULATION_A2.md", field: "T3 row 'W1 stress': Null-SD 7.53", sha256: "3ae17fa1eac4292857763478511ac724466d5bc0e71caf06bdf03fc566c743cc"}}
+          d95:
+            central: {value: 11.1, source: {file: "scinance3-impl/state/herleitung_a2/NULL_SIMULATION_A2.md", field: "T3 row 'W1 zentral': d95 11.1", sha256: "3ae17fa1eac4292857763478511ac724466d5bc0e71caf06bdf03fc566c743cc"}}
+            stress: {value: 12.47, source: {file: "scinance3-impl/state/herleitung_a2/NULL_SIMULATION_A2.md", field: "T3 row 'W1 stress': d95 12.47", sha256: "3ae17fa1eac4292857763478511ac724466d5bc0e71caf06bdf03fc566c743cc"}}
+          centre_sd:
+            central: {value: 0.23, source: {file: "scinance3-impl/state/herleitung_a2/NULL_SIMULATION_A2.md", field: "T3 row 'W1 zentral': SD Null-Verschiebung 0.23", sha256: "3ae17fa1eac4292857763478511ac724466d5bc0e71caf06bdf03fc566c743cc"}}
+            stress: {value: 0.26, source: {file: "scinance3-impl/state/herleitung_a2/NULL_SIMULATION_A2.md", field: "T3 row 'W1 stress': SD Null-Verschiebung 0.26", sha256: "3ae17fa1eac4292857763478511ac724466d5bc0e71caf06bdf03fc566c743cc"}}
+      W2:
+        kappa: 0.815
+        event:
+          n: 52
+          c: 1.1491
+          sd:
+            central: {value: 43.83, source: {file: "scinance3-impl/state/herleitung_a2/NULL_SIMULATION_A2.md", field: "T2 row VP_2021-03-24..2024-05-31 P2ss: SD class E 43,83", sha256: "3ae17fa1eac4292857763478511ac724466d5bc0e71caf06bdf03fc566c743cc"}}
+            stress: {value: 49.37, source: {file: "scinance3-impl/state/herleitung_a2/NULL_SIMULATION_A2.md", field: "T2 row V1_2021-06..2022-05 P2ss: SD class E 49,37", sha256: "3ae17fa1eac4292857763478511ac724466d5bc0e71caf06bdf03fc566c743cc"}}
+        conditions:
+          P2:
+            n: 159
+            c: 1.3177
+            sd:
+              central: {value: 42.45, source: {file: "scinance3-impl/state/herleitung_a2/NULL_SIMULATION_A2.md", field: "T2 row VP_2021-03-24..2024-05-31 P2ss: SD placebo class 42.45", sha256: "3ae17fa1eac4292857763478511ac724466d5bc0e71caf06bdf03fc566c743cc"}}
+              stress: {value: 47.45, source: {file: "scinance3-impl/state/herleitung_a2/NULL_SIMULATION_A2.md", field: "T2 row V1_2021-06..2022-05 P2ss: SD placebo class 47.45", sha256: "3ae17fa1eac4292857763478511ac724466d5bc0e71caf06bdf03fc566c743cc"}}
+            se:
+              central: {value: 7.58, source: {file: "scinance3-impl/state/herleitung_a2/NULL_SIMULATION_A2.md", field: "T3 row 'W2 zentral': SE_bind P2 = 7.58", sha256: "3ae17fa1eac4292857763478511ac724466d5bc0e71caf06bdf03fc566c743cc"}}
+              stress: {value: 8.52, source: {file: "scinance3-impl/state/herleitung_a2/NULL_SIMULATION_A2.md", field: "T3 row 'W2 stress': SE_bind P2 = 8.52", sha256: "3ae17fa1eac4292857763478511ac724466d5bc0e71caf06bdf03fc566c743cc"}}
+          P3fix:
+            n: 247
+            c: 1.168
+            sd:
+              central: {value: 61.39, source: {file: "scinance3-impl/state/herleitung_a2/NULL_SIMULATION_A2.md", field: "T2 row VP_2021-03-24..2024-05-31 P3fix: SD placebo class 61.39", sha256: "3ae17fa1eac4292857763478511ac724466d5bc0e71caf06bdf03fc566c743cc"}}
+              stress: {value: 62.11, source: {file: "scinance3-impl/state/herleitung_a2/NULL_SIMULATION_A2.md", field: "T2 row V1_2021-06..2022-05 P3fix: SD placebo class 62.11", sha256: "3ae17fa1eac4292857763478511ac724466d5bc0e71caf06bdf03fc566c743cc"}}
+            se:
+              central: {value: 7.93, source: {file: "scinance3-impl/state/herleitung_a2/NULL_SIMULATION_A2.md", field: "T3 row 'W2 zentral': SE_bind P3fix = 7.93", sha256: "3ae17fa1eac4292857763478511ac724466d5bc0e71caf06bdf03fc566c743cc"}}
+              stress: {value: 8.67, source: {file: "scinance3-impl/state/herleitung_a2/NULL_SIMULATION_A2.md", field: "T3 row 'W2 stress': SE_bind P3fix = 8.67", sha256: "3ae17fa1eac4292857763478511ac724466d5bc0e71caf06bdf03fc566c743cc"}}
+          P3all:
+            n: 259
+            c: 1.0
+            sd:
+              central: {value: 8.53, source: {file: "scinance3-impl/state/herleitung_a2/NULL_SIMULATION_A2.md", field: "T2 row VP_2021-03-24..2024-05-31 P3all: SD placebo class 8.53", sha256: "3ae17fa1eac4292857763478511ac724466d5bc0e71caf06bdf03fc566c743cc"}}
+              stress: {value: 9.67, source: {file: "scinance3-impl/state/herleitung_a2/NULL_SIMULATION_A2.md", field: "T2 row V1_2021-06..2022-05 P3all: SD placebo class 9.67", sha256: "3ae17fa1eac4292857763478511ac724466d5bc0e71caf06bdf03fc566c743cc"}}
+            se:
+              central: {value: 6.56, source: {file: "scinance3-impl/state/herleitung_a2/NULL_SIMULATION_A2.md", field: "T3 row 'W2 zentral': SE_bind P3all = 6.56", sha256: "3ae17fa1eac4292857763478511ac724466d5bc0e71caf06bdf03fc566c743cc"}}
+              stress: {value: 7.39, source: {file: "scinance3-impl/state/herleitung_a2/NULL_SIMULATION_A2.md", field: "T3 row 'W2 stress': SE_bind P3all = 7.39", sha256: "3ae17fa1eac4292857763478511ac724466d5bc0e71caf06bdf03fc566c743cc"}}
+        null_test:
+          sd:
+            central: {value: 6.24, source: {file: "scinance3-impl/state/herleitung_a2/NULL_SIMULATION_A2.md", field: "T3 row 'W2 zentral': Null-SD 6.24", sha256: "3ae17fa1eac4292857763478511ac724466d5bc0e71caf06bdf03fc566c743cc"}}
+            stress: {value: 7.01, source: {file: "scinance3-impl/state/herleitung_a2/NULL_SIMULATION_A2.md", field: "T3 row 'W2 stress': Null-SD 7.01", sha256: "3ae17fa1eac4292857763478511ac724466d5bc0e71caf06bdf03fc566c743cc"}}
+          d95:
+            central: {value: 10.33, source: {file: "scinance3-impl/state/herleitung_a2/NULL_SIMULATION_A2.md", field: "T3 row 'W2 zentral': d95 10.33", sha256: "3ae17fa1eac4292857763478511ac724466d5bc0e71caf06bdf03fc566c743cc"}}
+            stress: {value: 11.61, source: {file: "scinance3-impl/state/herleitung_a2/NULL_SIMULATION_A2.md", field: "T3 row 'W2 stress': d95 11.61", sha256: "3ae17fa1eac4292857763478511ac724466d5bc0e71caf06bdf03fc566c743cc"}}
+          centre_sd:
+            central: {value: 2.97, source: {file: "scinance3-impl/state/herleitung_a2/NULL_SIMULATION_A2.md", field: "T3 row 'W2 zentral': SD Null-Verschiebung 2.97", sha256: "3ae17fa1eac4292857763478511ac724466d5bc0e71caf06bdf03fc566c743cc"}}
+            stress: {value: 3.34, source: {file: "scinance3-impl/state/herleitung_a2/NULL_SIMULATION_A2.md", field: "T3 row 'W2 stress': SD Null-Verschiebung 3.34", sha256: "3ae17fa1eac4292857763478511ac724466d5bc0e71caf06bdf03fc566c743cc"}}
+chains:
+  - id: window_c10
+    label: "A2 chain today (C.10 product, window W2) - DEC-105 (7)"
+    kind: computed
+    reference_window: W2
+    steps:
+      - {id: base, label: "Grundfassung P2'' einzeln (zentral)", line: central, conditions: [P2], null_scaled: false, mode: product, gate: 1.0}
+      - {id: p3fix, label: "P3fix bindend (zentral)", line: central, conditions: [P3fix], null_scaled: false, mode: product, gate: 1.0}
+      - {id: three_placebos, label: "drei Placebos, Produkt", line: central, conditions: [P2, P3fix, P3all], null_scaled: false, mode: product, gate: 1.0}
+      - {id: null_in_product, label: "Null-Faktor im Produkt (unskaliert)", line: central, conditions: [P2, P3fix, P3all, null_test], null_scaled: false, mode: product, gate: 1.0}
+      - {id: stress, label: "Stress bindend", line: stress, conditions: [P2, P3fix, P3all, null_test], null_scaled: false, mode: product, gate: 1.0}
+      - {id: scaled_null, label: "skalierte Null (k = SE/Null-SD)", line: stress, conditions: [P2, P3fix, P3all, null_test], null_scaled: true, mode: product, gate: 1.0}
+      - {id: gate4, label: "Gate-(4)-Faktor 0,9025", line: stress, conditions: [P2, P3fix, P3all, null_test], null_scaled: true, mode: product, gate: 0.9025}
+  - id: pooled_31
+    label: "A2 chain under E2 (pooled 0,0025 + screen, 24 months) - OC derivation (g)"
+    kind: declared
+    base_step: q1
+    steps:
+      - {id: q0, label: "pooled P2'' without screen (central)", mde80: 19.2582, source: {file: "scinance3-impl/state/prd_analyse_2026-11-01/scripts/oc_results.json", field: "g.gepoolt_31.Q0_P2_gepoolt_ohne_screen_zentral", sha256: "2c5b5754d3518ad2f046ffdfb3f5ca3a6fef5227ea24a9cbd78d62016b08b2f8"}}
+      - {id: q1, label: "pooled P2'' with recency screen (Grundfassung 3.1)", mde80: 20.7068, source: {file: "scinance3-impl/state/prd_analyse_2026-11-01/scripts/oc_results.json", field: "g.gepoolt_31.Q1_P2_gepoolt_mit_screen_zentral", sha256: "2c5b5754d3518ad2f046ffdfb3f5ca3a6fef5227ea24a9cbd78d62016b08b2f8"}}
+      - {id: q2, label: "three placebo conditions, exact joint", mde80: 22.2395, source: {file: "scinance3-impl/state/prd_analyse_2026-11-01/scripts/oc_results.json", field: "g.gepoolt_31.Q2_drei_z_gemeinsam_zentral", sha256: "2c5b5754d3518ad2f046ffdfb3f5ca3a6fef5227ea24a9cbd78d62016b08b2f8"}}
+      - {id: q3, label: "plus null condition (unscaled)", mde80: 22.4331, source: {file: "scinance3-impl/state/prd_analyse_2026-11-01/scripts/oc_results.json", field: "g.gepoolt_31.Q3_plus_null_unskaliert_zentral", sha256: "2c5b5754d3518ad2f046ffdfb3f5ca3a6fef5227ea24a9cbd78d62016b08b2f8"}}
+      - {id: q4, label: "stress line binding", mde80: 24.8749, source: {file: "scinance3-impl/state/prd_analyse_2026-11-01/scripts/oc_results.json", field: "g.gepoolt_31.Q4_stress", sha256: "2c5b5754d3518ad2f046ffdfb3f5ca3a6fef5227ea24a9cbd78d62016b08b2f8"}}
+      - {id: q5, label: "scaled null", mde80: 25.7083, source: {file: "scinance3-impl/state/prd_analyse_2026-11-01/scripts/oc_results.json", field: "g.gepoolt_31.Q5_skalierte_null", sha256: "2c5b5754d3518ad2f046ffdfb3f5ca3a6fef5227ea24a9cbd78d62016b08b2f8"}}
+      - {id: q6, label: "Gate-(4) factor 0,9025", mde80: 28.0576, source: {file: "scinance3-impl/state/prd_analyse_2026-11-01/scripts/oc_results.json", field: "g.gepoolt_31.Q6_gate4_09025", sha256: "2c5b5754d3518ad2f046ffdfb3f5ca3a6fef5227ea24a9cbd78d62016b08b2f8"}}
+pilot:
+  se: {value: 4.1, source: {file: "scinance3-impl/state/herleitung_a2/NULL_SIMULATION_A2.md", field: "T2 row VP_2021-03-24..2024-05-31 P2ss: SE analytic 4,10", sha256: "3ae17fa1eac4292857763478511ac724466d5bc0e71caf06bdf03fc566c743cc"}}
+  threshold: {value: 32.1, source: {file: "scinance3-impl/state/decisions.md", field: "DEC-105 erratum 7: chain end 32,1 bp (W2)", sha256: "55f47b5fdc4c2850f96b2d702fb08f33bfea392a2ee453e382d79ddc09f39944"}}
+  true_effects: [16.5, 25.0, 32.1]
+expected:
+  - {key: "inputs.se12.central", value: 7.58, rel_tol: 0.01, source: {file: "scinance3-impl/state/herleitung_a2/NULL_SIMULATION_A2.md", field: "T3 row 'W2 zentral'", sha256: "3ae17fa1eac4292857763478511ac724466d5bc0e71caf06bdf03fc566c743cc"}}
+  - {key: "inputs.se12.stress", value: 8.52, rel_tol: 0.01, source: {file: "scinance3-impl/state/herleitung_a2/NULL_SIMULATION_A2.md", field: "T3 row 'W2 stress'", sha256: "3ae17fa1eac4292857763478511ac724466d5bc0e71caf06bdf03fc566c743cc"}}
+  - {key: "conjunction.se_by_window.W1.central.P2", value: 7.34, rel_tol: 0.01, source: {file: "scinance3-impl/state/herleitung_a2/NULL_SIMULATION_A2.md", field: "T3 row 'W1 zentral': SE_bind P2'' 7,34", sha256: "3ae17fa1eac4292857763478511ac724466d5bc0e71caf06bdf03fc566c743cc"}}
+  - {key: "conjunction.se_by_window.W2.central.P2", value: 7.58, rel_tol: 0.01, source: {file: "scinance3-impl/state/herleitung_a2/NULL_SIMULATION_A2.md", field: "T3 row 'W2 zentral': SE_bind P2'' 7,58", sha256: "3ae17fa1eac4292857763478511ac724466d5bc0e71caf06bdf03fc566c743cc"}}
+  - {key: "conjunction.se_by_window.W1.stress.P2", value: 8.25, rel_tol: 0.01, source: {file: "scinance3-impl/state/herleitung_a2/NULL_SIMULATION_A2.md", field: "T3 row 'W1 stress': SE_bind P2'' 8,25", sha256: "3ae17fa1eac4292857763478511ac724466d5bc0e71caf06bdf03fc566c743cc"}}
+  - {key: "conjunction.se_by_window.W2.stress.P2", value: 8.52, rel_tol: 0.01, source: {file: "scinance3-impl/state/herleitung_a2/NULL_SIMULATION_A2.md", field: "T3 row 'W2 stress': SE_bind P2'' 8,52", sha256: "3ae17fa1eac4292857763478511ac724466d5bc0e71caf06bdf03fc566c743cc"}}
+  - {key: "inputs.null_scale_k.central", value: 1.214, rel_tol: 0.01, source: {file: "scinance3-impl/state/herleitung_a2/NULL_SIMULATION_A2.md", field: "T3 row 'W2 zentral': k (R-C13) 1,214", sha256: "3ae17fa1eac4292857763478511ac724466d5bc0e71caf06bdf03fc566c743cc"}}
+  - {key: "conjunction.variants.p2_only.W1.central.unscaled.product", value: 18.25, rel_tol: 0.01, source: {file: "scinance3-impl/state/prd_analyse_2026-11-01/scripts/oc_sim.out", field: "(g) table, Grundfassung_P2_zentral Akte 18.25", sha256: "93a111e00be62c0fd14e4b2f5b8fec4ecf5c375746b289152d575022cf1b8ad5"}}
+  - {key: "conjunction.variants.p2_only.W2.central.unscaled.product", value: 18.8, rel_tol: 0.01, source: {file: "scinance3-impl/state/decisions.md", field: "DEC-105 erratum 7: chain start 18,8 (Einzel-Placebo)", sha256: "55f47b5fdc4c2850f96b2d702fb08f33bfea392a2ee453e382d79ddc09f39944"}}
+  - {key: "conjunction.variants.three_plus_null.W1.central.unscaled.product", value: 23.43, rel_tol: 0.01, source: {file: "scinance3-impl/state/decisions.md", field: "DEC-104 E7 (a): product 23,43 / 24,36", sha256: "55f47b5fdc4c2850f96b2d702fb08f33bfea392a2ee453e382d79ddc09f39944"}}
+  - {key: "conjunction.variants.three_plus_null.W2.central.unscaled.product", value: 24.36, rel_tol: 0.01, source: {file: "scinance3-impl/state/decisions.md", field: "DEC-104 E7 (a): product 23,43 / 24,36", sha256: "55f47b5fdc4c2850f96b2d702fb08f33bfea392a2ee453e382d79ddc09f39944"}}
+  - {key: "conjunction.variants.three_plus_null.W1.central.unscaled.pair", value: 22.93, rel_tol: 0.01, source: {file: "scinance3-impl/state/decisions.md", field: "DEC-104 E7 (a) / DEC-105 erratum 7: exact 22,93 / 23,77", sha256: "55f47b5fdc4c2850f96b2d702fb08f33bfea392a2ee453e382d79ddc09f39944"}}
+  - {key: "conjunction.variants.three_plus_null.W2.central.unscaled.pair", value: 23.77, rel_tol: 0.01, source: {file: "scinance3-impl/state/decisions.md", field: "DEC-105 erratum 7: exact 22,93 / 23,77", sha256: "55f47b5fdc4c2850f96b2d702fb08f33bfea392a2ee453e382d79ddc09f39944"}}
+  - {key: "conjunction.variants.three_plus_null.W1.central.unscaled.joint", value: 21.2, rel_tol: 0.01, source: {file: "scinance3-impl/state/prd_analyse_2026-11-01/scripts/oc_sim.py", field: "section (g) dict 'akte': gemeinsam_zentral_unskaliert (21.2, 22.3)", sha256: "17e8ffe373c6906a9a52fa7cef76590f77284f2b34656ab95ed0de48ee405b09"}}
+  - {key: "conjunction.variants.three_plus_null.W2.central.unscaled.joint", value: 22.3, rel_tol: 0.01, source: {file: "scinance3-impl/state/prd_analyse_2026-11-01/scripts/oc_sim.py", field: "section (g) dict 'akte': gemeinsam_zentral_unskaliert (21.2, 22.3)", sha256: "17e8ffe373c6906a9a52fa7cef76590f77284f2b34656ab95ed0de48ee405b09"}}
+  - {key: "conjunction.two_conditions_power_0_90.exact", value: 0.858, rel_tol: 0.01, source: {file: "scinance3-impl/state/decisions.md", field: "DEC-105 erratum 7: two conditions of power 0,90, exact 0,858 (W2) instead of 0,81", sha256: "55f47b5fdc4c2850f96b2d702fb08f33bfea392a2ee453e382d79ddc09f39944"}}
+  - {key: "conjunction.two_conditions_power_0_90.product", value: 0.81, rel_tol: 0.01, source: {file: "scinance3-impl/state/decisions.md", field: "DEC-105 erratum 7: product 0,81", sha256: "55f47b5fdc4c2850f96b2d702fb08f33bfea392a2ee453e382d79ddc09f39944"}}
+  - {key: "strictness.chains.window_c10.steps.base.mde80", value: 18.8, rel_tol: 0.01, source: {file: "scinance3-impl/state/decisions.md", field: "DEC-105 erratum 7: chain 18,8", sha256: "55f47b5fdc4c2850f96b2d702fb08f33bfea392a2ee453e382d79ddc09f39944"}}
+  - {key: "strictness.chains.window_c10.steps.p3fix.mde80", value: 19.7, rel_tol: 0.01, source: {file: "scinance3-impl/state/decisions.md", field: "DEC-105 erratum 7: chain 19,7", sha256: "55f47b5fdc4c2850f96b2d702fb08f33bfea392a2ee453e382d79ddc09f39944"}}
+  - {key: "strictness.chains.window_c10.steps.three_placebos.mde80", value: 23.1, rel_tol: 0.01, source: {file: "scinance3-impl/state/decisions.md", field: "DEC-105 erratum 7: chain 23,1", sha256: "55f47b5fdc4c2850f96b2d702fb08f33bfea392a2ee453e382d79ddc09f39944"}}
+  - {key: "strictness.chains.window_c10.steps.null_in_product.mde80", value: 24.4, rel_tol: 0.01, source: {file: "scinance3-impl/state/decisions.md", field: "DEC-105 erratum 7: chain 24,4", sha256: "55f47b5fdc4c2850f96b2d702fb08f33bfea392a2ee453e382d79ddc09f39944"}}
+  - {key: "strictness.chains.window_c10.steps.stress.mde80", value: 27.2, rel_tol: 0.01, source: {file: "scinance3-impl/state/decisions.md", field: "DEC-105 erratum 7: chain 27,2", sha256: "55f47b5fdc4c2850f96b2d702fb08f33bfea392a2ee453e382d79ddc09f39944"}}
+  - {key: "strictness.chains.window_c10.steps.scaled_null.mde80", value: 29.3, rel_tol: 0.01, source: {file: "scinance3-impl/state/decisions.md", field: "DEC-105 erratum 7: chain 29,3", sha256: "55f47b5fdc4c2850f96b2d702fb08f33bfea392a2ee453e382d79ddc09f39944"}}
+  - {key: "strictness.chains.window_c10.steps.gate4.mde80", value: 32.1, rel_tol: 0.01, source: {file: "scinance3-impl/state/decisions.md", field: "DEC-105 erratum 7: chain 32,1", sha256: "55f47b5fdc4c2850f96b2d702fb08f33bfea392a2ee453e382d79ddc09f39944"}}
+  - {key: "strictness.chains.window_c10.quotient", value: 1.707, rel_tol: 0.01, source: {file: "scinance3-impl/state/prd_analyse_2026-11-01/scripts/oc_sim.out", field: "(g) 'Kette W2 heute_produkt ... Strenge-Quotient 1.707'", sha256: "93a111e00be62c0fd14e4b2f5b8fec4ecf5c375746b289152d575022cf1b8ad5"}}
+  - {key: "strictness.chains.pooled_31.quotient", value: 1.355, rel_tol: 0.01, source: {file: "scinance3-impl/state/decisions.md", field: "DEC-104 Nachtrag 2 (3): Strenge-Quotient 1,355", sha256: "55f47b5fdc4c2850f96b2d702fb08f33bfea392a2ee453e382d79ddc09f39944"}}
+  - {key: "strictness.chains.pooled_31.steps.q6.mde80", value: 28.06, rel_tol: 0.01, source: {file: "scinance3-impl/state/decisions.md", field: "DEC-104 Nachtrag 2 (3): chain under E2 at 24 months 28,06 bp", sha256: "55f47b5fdc4c2850f96b2d702fb08f33bfea392a2ee453e382d79ddc09f39944"}}
+  - {key: "rules.R4_a05.floor.stress", value: 24.3, rel_tol: 0.01, source: {file: "scinance3-impl/state/decisions.md", field: "DEC-104 Nachtrag 2 (3): floor 24,30 bp (A2, all commitments)", sha256: "55f47b5fdc4c2850f96b2d702fb08f33bfea392a2ee453e382d79ddc09f39944"}}
+  - {key: "pilot_handover.p_handover.16p5", value: 7.1e-05, rel_tol: 0.01, source: {file: "scinance3-impl/state/prd_analyse_2026-11-01/scripts/oc_sim.out", field: "(g)/F: mu 16.5: P(x_P >= 32,1 | SE 4,10) = 7.09e-05", sha256: "93a111e00be62c0fd14e4b2f5b8fec4ecf5c375746b289152d575022cf1b8ad5"}}

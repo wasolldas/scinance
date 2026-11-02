@@ -1,0 +1,52 @@
+# Regression candidate for the feasibility calculator (feasibility31), schema_version 1.
+# Every number carries its source (file, field, sha256 as of 2026-11-02, repo-relative).  The calculator does not open
+# the cited files; `--verify-sources REPO_ROOT` reports drift.  `expected` lists the dossier values the report must
+# reproduce (relative tolerance 1 %).  No market data, no sealed file.
+schema_version: 1
+candidate_id: H27
+title: "H-27 VRP on DVOL (BTC, premium S1), SE per 12 months (GL-034)"
+notes: "GL-034/DEC-97; prior pi-2 7,14 VP (DEC-98 N2, band 3,16..10,48); the former central value 9,47 VP is kept as an extra point because GL-034 and the reference table quote it (673 days)."
+statistic: {name: "VRP BTC S1 (implied minus realised volatility), mean", unit: VP, direction: positive}
+nuisance:
+  cluster_unit: day
+  units_per_year: 365
+  c_overlap: {value: 28.2, source: {file: "scinance3-impl/state/herleitung_h27/FEASIBILITY.md", field: "section 0 item 5: variance factor c = 28,2 binding (batch means L 90); rule P-3 maximum 28,17", sha256: "b786081001e13a5edf775a58e42f26e11d1cdceb948e4faa468a6d71a8dcb43e"}}
+  sd_per_unit:
+    central: {value: 18.6, source: {file: "scinance3-impl/state/herleitung_h27/FEASIBILITY.md", field: "section 0 item 5: BTC premium S1 SD 18,60 vol points", sha256: "b786081001e13a5edf775a58e42f26e11d1cdceb948e4faa468a6d71a8dcb43e"}}
+sesoi:
+  mode: direct
+  unit: VP
+  label: "~1,5 VP (2 x 25 % of 3 VP, B.7); [U] derived label, not a measured cost curve"
+  value: {value: 1.5, source: {file: "scinance3-impl/state/prd_analyse_2026-11-01/KRITIK_PRD.md", field: "K-10 table, row VRP: SESOI ~1,5 VP (2 x 25 % von 3 VP, B.7)", sha256: "8c198d01ed98f06765e78c8c0379f94c7f50c20e43b53272ea27f568b56249b9"}}
+prior:
+  label: primaer
+  median: {value: 7.14, source: {file: "scinance3-impl/state/decisions.md", field: "DEC-105 erratum 6: prior pi-2 7,14 VP (DEC-98 N2)", sha256: "55f47b5fdc4c2850f96b2d702fb08f33bfea392a2ee453e382d79ddc09f39944"}}
+  band: [3.16, 10.48]
+  source: {file: "scinance3-impl/state/BELEGE_AUS_PDF_2026-10-20.md", field: "DEC-98 Nachtrag 2 (2) VRP prior: Almeida et al. v1 BVIX route pi-2 7,14 VP, pi-1 10,48 VP, Q-density 3,16 VP", sha256: "18dfc34f386701c341ecc43cca07c2de747db32093c4726ec68be3f7080e23c3"}
+  note: "pi-2 central (Almeida et al. v1 via user PDFs, DEC-98 N2); band 3,16 (Q-density route) .. 10,48 (pi-1)"
+  extra_points:
+    pi2_old_central: {value: 9.47, source: {file: "scinance3-impl/state/decisions.md", field: "DEC-105 erratum 6: former central value 9,47 VP (GL-034, orch_review_check.out)", sha256: "55f47b5fdc4c2850f96b2d702fb08f33bfea392a2ee453e382d79ddc09f39944"}}
+data:
+  knowledge_class: btc_eth_aggregate
+  cohort_date: 2027-01-01
+  selection_k: 0
+  zones:
+    X: {start: 2021-03-24, end: 2024-05-31, units: 1165, source: {file: "scinance3-impl/state/herleitung_h27/FEASIBILITY.md", field: "dossier DVOL 2021-03-24..2024-05-31 (nuisance period); 1165 calendar days", sha256: "b786081001e13a5edf775a58e42f26e11d1cdceb948e4faa468a6d71a8dcb43e"}}
+    V: {start: 2024-07-01, end: 2026-06-28, months: 24, source: {file: "scinance3-impl/state/FENSTERREGISTER.md", field: "section 1: zone V = W1/W2 2024-07-01..2026-06-28", sha256: "210e5469bb88041edb8041fb050e1e18cdc39b498537a6e549464faf2a395c98"}}
+    K: {start: 2026-07-01}
+design_menu:
+  window_months: [6, 9, 12]
+  looks: [1, 2, 3, 4]
+  screen_alphas: [0.05, 0.10, 0.20, 0.50]
+  horizon_limit_months: 60
+  mc_reps: 20000
+  gsd_paths: 200000
+  conjunction_mc: 400000
+expected:
+  - {key: "inputs.se12.central", value: 5.17, rel_tol: 0.01, source: {file: "scinance3-impl/state/prd_analyse_2026-11-01/scripts/orch_review_check.out", field: "line 'VRP Prior ...: SE12 5.170'", sha256: "a749945362fc9bd56dd697d3c1bee9a74e484bdbfde6a8759ee052c93b6b5da9"}}
+  - {key: "rules.R1.by_T.24.mde80.central", value: 12.9, rel_tol: 0.01, source: {file: "scinance3-impl/state/herleitung_h27/FEASIBILITY.md", field: "section 5 table, L = 12: MDE80 C10 12,9", sha256: "b786081001e13a5edf775a58e42f26e11d1cdceb948e4faa468a6d71a8dcb43e"}}
+  - {key: "prior.points.median.r1.window_days", value: 1183, rel_tol: 0.01, source: {file: "scinance3-impl/state/prd_analyse_2026-11-01/scripts/orch_review_check.out", field: "line 'VRP Prior 7.14 ... = 1183 Tage'", sha256: "a749945362fc9bd56dd697d3c1bee9a74e484bdbfde6a8759ee052c93b6b5da9"}, note: "days per C.10 window at prior 7,14 VP"}
+  - {key: "prior.points.pi2_old_central.r1.window_days", value: 673, rel_tol: 0.01, source: {file: "scinance3-impl/state/prd_analyse_2026-11-01/scripts/orch_review_check.out", field: "line 'VRP Prior 9.47 ... = 673 Tage'", sha256: "a749945362fc9bd56dd697d3c1bee9a74e484bdbfde6a8759ee052c93b6b5da9"}}
+  - {key: "prior.points.band_high.r1.window_days", value: 549, rel_tol: 0.01, source: {file: "scinance3-impl/state/decisions.md", field: "DEC-105 erratum 6: upper band edge 549 days", sha256: "55f47b5fdc4c2850f96b2d702fb08f33bfea392a2ee453e382d79ddc09f39944"}}
+  - {key: "prior.points.band_low.r1.window_days", value: 6040, rel_tol: 0.01, source: {file: "scinance3-impl/state/decisions.md", field: "DEC-105 erratum 6: lower band edge 6.040 days", sha256: "55f47b5fdc4c2850f96b2d702fb08f33bfea392a2ee453e382d79ddc09f39944"}}
+  - {key: "prior.points.median.sr_eff", value: 1.381, rel_tol: 0.01, source: {file: "scinance3-impl/state/prd_analyse_2026-11-01/scripts/orch_review_check.out", field: "line 'VRP Prior 7.14: ... SR_eff 1.381'", sha256: "a749945362fc9bd56dd697d3c1bee9a74e484bdbfde6a8759ee052c93b6b5da9"}}

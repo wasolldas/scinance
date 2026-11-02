@@ -718,3 +718,21 @@ der Aufloesung. Die P-6-Lesart (gepoolt + registrierter Stabilitaetstest, kein B
 fuer P-2 vorgelegt (DEC-104 N2 (4)); bis zum Entscheid gilt die beschlossene Variante. Alle uebrigen Zahlen der Synthese
 bleiben; die Aussagen zu Selektion (Power-Planung nur gegen SESOI) und schweren Raendern (t-Grenzen Pflicht) sind als
 Verschaerfungen festgehalten.
+
+## Nachtrag 3 (2026-11-02): Feasibility-Rechner F3 verfuegbar; Praezisierung der SESOI-Rahmen (Korrektur an Nachtrag 1, IK-10)
+
+Der Feasibility-Rechner `src/bybit_edge/research/feasibility31/` (DEC-104 E9, F3; 126 Tests; Regressionsfaelle
+`state/feasibility/{A1,H27,A2,KLASSE_W}.yaml` mit Quelle und sha256 je Zahl, alle 53 Referenzwerte innerhalb 1 %) rechnet die
+Entscheidungsregeln R1 (C.10 je 0,80), R2 (C.10 gemeinsam 0,80), R3 (gepoolt 0,0025), R4 (gepoolt + Screen bei 0,05/0,10/0,20/0,50
+mit Boden), R5 (P-6-Lesart, kein Boden) und R6 (GSD mit/ohne Screen) nebeneinander, zwei Spalten Exploration/Konfirmation,
+Strenge-Quotient mit Zerlegung, OC-Zeile und DEC-105-Berichtsfelder; Zone K fuer BTC/ETH-Aggregate ab 2026-10-01
+(FENSTERREGISTER Abschnitt 6). Aufruf: `python3 -m bybit_edge.research.feasibility31.cli <kandidat.yaml> --format both --check-expected`.
+
+**Praezisierung SESOI-Rahmen (Korrektur an Nachtrag 1, Punkt 5):** Die Dezil-L/S-SESOI 0,0169 (Taker) / 0,0062 (Maker) des
+Sweeps gilt fuer **vollen Tagesumschlag** (Vorzeichenwechsel jeden Tag, phi = -1). Persistenzbereinigt (Wechselrate
+arccos(phi)/pi) liegt die Dezil-SESOI bei **0,0085 / 0,0056 / 0,0035** (Taker, phi 0 / 0,5 / 0,8) und die Maker-SESOI
+entsprechend niedriger [R, F3]. Da die SESOI die kleinste relevante Wirkung ist, die der Test mit Power 0,80 sehen muss, ist
+IK-10 auf W1/W2 (MDE80 0,015..0,021) gegen die persistenzbereinigte SESOI **nicht testbar**; "an der Kante" gilt nur gegen die
+Obergrenze bei vollem Umschlag. Der Einzelpositionsrahmen (0,0263 / 0,0175 / 0,0108, PRD K-0.1 korrigiert) bleibt fuer Klasse
+E/P; fuer Klasse W ist der Dezil-Rahmen massgeblich (L-18, Dezilfaktor 3,51). Beide Rahmen sind im Rechner hinterlegt; die
+Persistenz je Praediktor ist in Zone X zu messen (IK-04/Konto), bis dahin gilt phi = 0 als Default (Etikett).

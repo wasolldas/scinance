@@ -1,0 +1,58 @@
+# Regression candidate for the feasibility calculator (feasibility31), schema_version 1.
+# Every number carries its source (file, field, sha256 as of 2026-11-02, repo-relative).  The calculator does not open
+# the cited files; `--verify-sources REPO_ROOT` reports drift.  `expected` lists the dossier values the report must
+# reproduce (relative tolerance 1 %).  No market data, no sealed file.
+schema_version: 1
+candidate_id: KLASSE_W
+title: "Class W weekly IC (A3 raw IC), pooled 0.0025 versus SESOI 0.040 (OC derivation 2026-11-02)"
+notes: "SD per week 0,090 (measured W1) is the central line, 0,130 (stress W1) the stress line (OC document, sources of the inputs). SESOI 0,040 = corrected IC_min (DEC-105 erratum 1). The informational curves reproduce the Taker references 0,0263 / 0,0175 / 0,0108 (single position, sigma 262 bp) and 0,0169 (decile, sigma_xs 370 bp, full turnover)."
+statistic: {name: "weekly cross-sectional IC (A3 raw), mean over weeks", unit: IC, direction: positive}
+nuisance:
+  cluster_unit: week
+  units_per_year: 52
+  c_overlap: {value: 1.0, source: {file: "scinance3-impl/state/prd_analyse_2026-11-01/OC_VERFASSUNG31_2026-11-02.md", field: "(a) conventions: Z = theta sqrt(I) + N(0,1); weekly IC series treated with c = 1 (derivation: no overlap, weekly cluster)", sha256: "a0292790392624205a6b44976474617d00689d9b19218ff22a0b2f5361210d67"}}
+  sd_per_unit:
+    central: {value: 0.09, source: {file: "scinance3-impl/state/prd_analyse_2026-11-01/OC_VERFASSUNG31_2026-11-02.md", field: "(h) 'Quellen der Eingaben': SD je Woche A3-roh-IC 0,090 (gemessen W1)", sha256: "a0292790392624205a6b44976474617d00689d9b19218ff22a0b2f5361210d67"}}
+    stress: {value: 0.13, source: {file: "scinance3-impl/state/prd_analyse_2026-11-01/OC_VERFASSUNG31_2026-11-02.md", field: "(h) 'Quellen der Eingaben': 0,130 (stress W1)", sha256: "a0292790392624205a6b44976474617d00689d9b19218ff22a0b2f5361210d67"}}
+sesoi:
+  mode: direct
+  unit: IC
+  label: "corrected economic IC_min 0,040 (DEC-105 erratum 1: 0,062 -> 0,040)"
+  value: {value: 0.04, source: {file: "scinance3-impl/state/decisions.md", field: "DEC-105 erratum 1: oekonomisches IC-Minimum 0,062 -> 0,040", sha256: "55f47b5fdc4c2850f96b2d702fb08f33bfea392a2ee453e382d79ddc09f39944"}}
+  cost_bp:
+    maker: {value: 4, source: {file: "scinance3-impl/state/decisions.md", field: "DEC-105 erratum 8: Maker 4 bp", sha256: "55f47b5fdc4c2850f96b2d702fb08f33bfea392a2ee453e382d79ddc09f39944"}}
+    taker: {value: 11, source: {file: "scinance3-impl/state/decisions.md", field: "DEC-105 erratum 8: Taker 11 bp", sha256: "55f47b5fdc4c2850f96b2d702fb08f33bfea392a2ee453e382d79ddc09f39944"}}
+    total: {value: 15, source: {file: "scinance3-impl/state/decisions.md", field: "DEC-105 erratum 8: gesamt 15 bp", sha256: "55f47b5fdc4c2850f96b2d702fb08f33bfea392a2ee453e382d79ddc09f39944"}}
+  curve_phis: [-1.0, 0.0, 0.5, 0.8]
+  curve_sigma_bp:
+    single_position: {value: 262, source: {file: "scinance3-impl/state/prd_analyse_2026-11-01/scripts/orch_review_check.py", field: "section (5): IC_min = c w / (0.798 * 262), sigma 262 bp per day", sha256: "06eaefd37d8ac8891850d5057787e1e5f6b71cfcfed3dfbaa6a4095e2fe9a6f4"}}
+    decile: {value: 370, source: {file: "scinance3-impl/state/prd_analyse_2026-11-01/scripts/orch_sweep_check.py", field: "line 'SESOI Portfoliorahmen: 2 c / (3,51 * 370 bp)', sigma_xs_d 370 bp [V]", sha256: "6fa36a3723a912a28ef18749d7f02c6250b0ebcec349801a7963ead48b5a8a3c"}}
+prior: null
+data:
+  knowledge_class: panel_crosssection
+  cohort_date: 2027-01-01
+  selection_k: 0
+  v_blind_confirmed: true
+  zones:
+    X: {start: 2022-04-18, end: 2024-06-24, units: 114, source: {file: "scinance3-impl/state/FENSTERREGISTER.md", field: "section 8 / zone X Pilot section 2022-04-18..2024-06-24 (114 weeks)", sha256: "210e5469bb88041edb8041fb050e1e18cdc39b498537a6e549464faf2a395c98"}}
+    V: {start: 2024-07-01, end: 2026-06-28, months: 24, source: {file: "scinance3-impl/state/FENSTERREGISTER.md", field: "section 1: zone V = W1/W2 2024-07-01..2026-06-28", sha256: "210e5469bb88041edb8041fb050e1e18cdc39b498537a6e549464faf2a395c98"}}
+    K: {start: 2026-07-01}
+design_menu:
+  window_months: [6, 9, 12]
+  looks: [1, 2, 3, 4]
+  screen_alphas: [0.05, 0.10, 0.20, 0.50]
+  horizon_limit_months: 60
+  mc_reps: 20000
+  gsd_paths: 200000
+  conjunction_mc: 400000
+expected:
+  - {key: "rules.R4_a05.floor.central", value: 0.031, rel_tol: 0.01, source: {file: "scinance3-impl/state/prd_analyse_2026-11-01/scripts/orch_oc_check.out", field: "line 'Klasse W SD 0.09: Boden 0.0310'", sha256: "d6e0d71159dc12e330e96ba21bf6d436aded3f38048b6288f1995fad211adcbf"}}
+  - {key: "rules.R4_a05.floor.stress", value: 0.0448, rel_tol: 0.01, source: {file: "scinance3-impl/state/prd_analyse_2026-11-01/scripts/orch_oc_check.out", field: "line 'Klasse W SD 0.13: Boden 0.0448'", sha256: "d6e0d71159dc12e330e96ba21bf6d436aded3f38048b6288f1995fad211adcbf"}}
+  - {key: "rules.R3.at_sesoi.central.n_units", value: 67.4, rel_tol: 0.01, source: {file: "scinance3-impl/state/prd_analyse_2026-11-01/scripts/orch_oc_check.out", field: "line 'Klasse W SD 0.09: ... gepoolt 0,0025: 67.4' (weeks)", sha256: "d6e0d71159dc12e330e96ba21bf6d436aded3f38048b6288f1995fad211adcbf"}}
+  - {key: "rules.R3.at_sesoi.stress.n_units", value: 140.6, rel_tol: 0.01, source: {file: "scinance3-impl/state/prd_analyse_2026-11-01/scripts/orch_oc_check.out", field: "line 'Klasse W SD 0.13: ... gepoolt 0,0025: 140.6' (weeks)", sha256: "d6e0d71159dc12e330e96ba21bf6d436aded3f38048b6288f1995fad211adcbf"}}
+  - {key: "sesoi.curve_by_key.single_position_taker_h1_phi0", value: 0.0263, rel_tol: 0.01, source: {file: "scinance3-impl/state/decisions.md", field: "DEC-105 erratum 8: IC_min Taker 11 bp 0,0263 (phi 0)", sha256: "55f47b5fdc4c2850f96b2d702fb08f33bfea392a2ee453e382d79ddc09f39944"}}
+  - {key: "sesoi.curve_by_key.single_position_taker_h1_phi50", value: 0.0175, rel_tol: 0.01, source: {file: "scinance3-impl/state/decisions.md", field: "DEC-105 erratum 8: 0,0175 (phi 0,5)", sha256: "55f47b5fdc4c2850f96b2d702fb08f33bfea392a2ee453e382d79ddc09f39944"}}
+  - {key: "sesoi.curve_by_key.single_position_taker_h1_phi80", value: 0.0108, rel_tol: 0.01, source: {file: "scinance3-impl/state/decisions.md", field: "DEC-105 erratum 8: 0,0108 (phi 0,8)", sha256: "55f47b5fdc4c2850f96b2d702fb08f33bfea392a2ee453e382d79ddc09f39944"}}
+  - {key: "sesoi.curve_by_key.single_position_maker_h1_phi0", value: 0.0096, rel_tol: 0.01, source: {file: "scinance3-impl/state/decisions.md", field: "DEC-105 erratum 8: Maker 4 bp 0,0096 (phi 0)", sha256: "55f47b5fdc4c2850f96b2d702fb08f33bfea392a2ee453e382d79ddc09f39944"}}
+  - {key: "sesoi.curve_by_key.decile_taker_h1_phi-100", value: 0.0169, rel_tol: 0.01, source: {file: "scinance3-impl/state/prd_analyse_2026-11-01/METHODEN_SWEEP_2026-11-02.md", field: "Taker-SESOI at full daily turnover IC 0,0169 (decile, 370 bp, 3,51)", sha256: "4b4e978ac5f479ba9a2831431a2c2e7e5681bdb50f4a2619c223ecf92fe5c525"}}
+  - {key: "sesoi.curve_by_key.decile_maker_h1_phi-100", value: 0.0062, rel_tol: 0.01, source: {file: "scinance3-impl/state/prd_analyse_2026-11-01/METHODEN_SWEEP_2026-11-02.md", field: "Maker-SESOI 0,0062 at full turnover", sha256: "4b4e978ac5f479ba9a2831431a2c2e7e5681bdb50f4a2619c223ecf92fe5c525"}}

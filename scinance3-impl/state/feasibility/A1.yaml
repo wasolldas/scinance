@@ -1,0 +1,49 @@
+# Regression candidate for the feasibility calculator (feasibility31), schema_version 1.
+# Every number carries its source (file, field, sha256 as of 2026-11-02, repo-relative).  The calculator does not open
+# the cited files; `--verify-sources REPO_ROOT` reports drift.  `expected` lists the dossier values the report must
+# reproduce (relative tolerance 1 %).  No market data, no sealed file.
+schema_version: 1
+candidate_id: A1
+title: "A1 (H-31) funding carry, mean test D1 minus universe, window W1 (GL-033)"
+notes: "GL-033/DEC-93; DEC-104 E3 (e): structurally not testable against the economic label 36 bp/week. theta stays UNBELEGT; the premium at theta 1 (upper end) is the span end, never a worst-case default."
+statistic: {name: "A1 total return D1 minus universe, mean per week (W1, c = 1)", unit: bp, direction: positive}
+nuisance:
+  cluster_unit: week
+  units_per_year: 52
+  c_overlap: {value: 1.0, source: {file: "scinance3-impl/state/herleitung_a1/FEASIBILITY.md", field: "section 0 item 5 / section 2 (c = max(1, measured) = 1 binding; Section 4 item 2)", sha256: "ad249d651ab7c1144606bd8cd067144c4ff795eb3d0c492f270d36ff26ff3baa"}}
+  sd_per_unit:
+    central: {value: 372.91193224152494, source: {file: "scinance3-impl/state/herleitung_a1/feasibility.json", field: "configs.A_dec70_1h_eingeschlossen.power.inputs.sigma_projections.W1.binding_bp", sha256: "b4680f7c0b7e58ce9a6fa256f6913656cb8b432b55b40bc915aa0f930ca72d9e"}}
+sesoi:
+  mode: direct
+  unit: bp
+  label: "36 bp/week economic label of PRD 5.1 (no gate, C.2); Taker basis not separately derived"
+  value: {value: 36.0, source: {file: "scinance3-impl/state/prd_analyse_2026-11-01/KRITIK_PRD.md", field: "K-10 table, row A1: SESOI 36 bp/Woche (PRD 5.1 Etikett)", sha256: "8c198d01ed98f06765e78c8c0379f94c7f50c20e43b53272ea27f568b56249b9"}}
+prior:
+  label: UNBELEGT
+  sensitivity_span: [25.2, 100.7]
+  source: {file: "scinance3-impl/state/herleitung_a1/FEASIBILITY.md", field: "section 5 table: prem W1 at theta 0.25 (25.2) and theta 1.0 (100.7) bp/Woche", sha256: "ad249d651ab7c1144606bd8cd067144c4ff795eb3d0c492f270d36ff26ff3baa"}
+  note: "premium W1 at theta 0.25 .. 1.0 (bp/week); theta has no source (DEC-98 N2 (2))"
+data:
+  knowledge_class: funding_oi_volume
+  cohort_date: 2027-01-01
+  selection_k: 0
+  zones:
+    X: {start: 2022-04-18, end: 2024-06-24, units: 114, source: {file: "scinance3-impl/state/herleitung_a1/FEASIBILITY.md", field: "section 1.3 table: nuisance basis 2022-04-18..2024-06-17, 114 weeks (holding weeks to 2024-06-24)", sha256: "ad249d651ab7c1144606bd8cd067144c4ff795eb3d0c492f270d36ff26ff3baa"}}
+    V: {start: 2024-07-01, end: 2026-06-28, months: 24, source: {file: "scinance3-impl/state/FENSTERREGISTER.md", field: "section 1: zone V = W1/W2 2024-07-01..2026-06-28", sha256: "210e5469bb88041edb8041fb050e1e18cdc39b498537a6e549464faf2a395c98"}}
+    K: {start: 2026-07-01}
+design_menu:
+  window_months: [6, 9, 12]
+  looks: [1, 2, 3, 4]
+  screen_alphas: [0.05, 0.10, 0.20, 0.50]
+  horizon_limit_months: 60
+  mc_reps: 20000
+  gsd_paths: 200000
+  conjunction_mc: 400000
+expected:
+  - {key: "inputs.se12.central", value: 51.7, rel_tol: 0.01, source: {file: "scinance3-impl/state/herleitung_a1/FEASIBILITY.md", field: "section 0 item 5: SE per window 51,7 / 49,2 bp", sha256: "ad249d651ab7c1144606bd8cd067144c4ff795eb3d0c492f270d36ff26ff3baa"}}
+  - {key: "rules.R1.by_T.24.mde80.central", value: 128.6, rel_tol: 0.01, source: {file: "scinance3-impl/state/herleitung_a1/FEASIBILITY.md", field: "section 6: MDE80 per window W1 128,6 bp (GL-033: ~129 bp)", sha256: "ad249d651ab7c1144606bd8cd067144c4ff795eb3d0c492f270d36ff26ff3baa"}}
+  - {key: "rules.R1.at_sesoi.central.years_per_window", value: 12.8, rel_tol: 0.01, source: {file: "scinance3-impl/state/decisions.md", field: "DEC-104 E3 (e): A1 MDE80 ~129 bp against Taker SESOI 36 bp (~12,8 years per window)", sha256: "55f47b5fdc4c2850f96b2d702fb08f33bfea392a2ee453e382d79ddc09f39944"}}
+  - {key: "prior.points.span_high.sr_eff", value: 1.95, rel_tol: 0.01, source: {file: "scinance3-impl/state/prd_analyse_2026-11-01/KRITIK_PRD.md", field: "section 8 table GL-033 row: SR_eff 1,95 < 2,49 (K-2)", sha256: "8c198d01ed98f06765e78c8c0379f94c7f50c20e43b53272ea27f568b56249b9"}}
+  - {key: "sr_equivalent.needed.1y_per_window.R1", value: 2.49, rel_tol: 0.01, source: {file: "scinance3-impl/state/decisions.md", field: "DEC-105 erratum 2: SR_eff 2,49 / 1,76 / 1,44 at 1 / 2 / 3 years per window", sha256: "55f47b5fdc4c2850f96b2d702fb08f33bfea392a2ee453e382d79ddc09f39944"}}
+  - {key: "sr_equivalent.needed.2y_per_window.R1", value: 1.76, rel_tol: 0.01, source: {file: "scinance3-impl/state/decisions.md", field: "DEC-105 erratum 2: SR_eff 2,49 / 1,76 / 1,44", sha256: "55f47b5fdc4c2850f96b2d702fb08f33bfea392a2ee453e382d79ddc09f39944"}}
+  - {key: "sr_equivalent.needed.3y_per_window.R1", value: 1.44, rel_tol: 0.01, source: {file: "scinance3-impl/state/decisions.md", field: "DEC-105 erratum 2: SR_eff 2,49 / 1,76 / 1,44", sha256: "55f47b5fdc4c2850f96b2d702fb08f33bfea392a2ee453e382d79ddc09f39944"}}
