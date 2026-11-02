@@ -1,0 +1,8 @@
+#!/bin/bash
+# DEC-101: Vorlauf v6b twice (bitwise-identical result_sha256 required), universe filter inside the driver
+cd /home/user/scinance
+for R in 1 2; do
+  date -u +%H:%M:%S > /tmp/claude-0/-home-user-scinance/632fbebe-92f6-553b-ba2e-14f1a2521e17/scratchpad/h32_v6b_r$R.start
+  ( PYTHONPATH=/home/user/scinance/src python -u scripts/h32_fm8.py --prelaunch --panel-base /tmp/claude-0/-home-user-scinance/632fbebe-92f6-553b-ba2e-14f1a2521e17/scratchpad/panel/panel_1d --delisted-base /tmp/claude-0/-home-user-scinance/632fbebe-92f6-553b-ba2e-14f1a2521e17/scratchpad/panel_delisted_v2 --start-year 2021 --end-year 2026 --as-of 2026-09-28 --allow-partial --cut-date 2026-06-28 --n-reps 1000 --n-boot 1000 --p-reps 10000 --seed 53 --stress-rel scinance3-impl/state/runs/stress_rel.json --stress-abs scinance3-impl/state/runs/stress_abs.json --out /tmp/claude-0/-home-user-scinance/632fbebe-92f6-553b-ba2e-14f1a2521e17/scratchpad/h32_v6b_run$R > /tmp/claude-0/-home-user-scinance/632fbebe-92f6-553b-ba2e-14f1a2521e17/scratchpad/h32_v6b_r$R.log 2>&1; echo "rc=$? end=$(date -u +%H:%M:%S) start=$(cat /tmp/claude-0/-home-user-scinance/632fbebe-92f6-553b-ba2e-14f1a2521e17/scratchpad/h32_v6b_r$R.start)" >> /tmp/claude-0/-home-user-scinance/632fbebe-92f6-553b-ba2e-14f1a2521e17/scratchpad/h32_v6b_r$R.log ) &
+done
+wait

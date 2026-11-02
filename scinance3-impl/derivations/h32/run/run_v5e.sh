@@ -1,0 +1,5 @@
+#!/bin/bash
+cd /home/user/scinance
+date -u +%H:%M:%S > /tmp/claude-0/-home-user-scinance/632fbebe-92f6-553b-ba2e-14f1a2521e17/scratchpad/wp13a_v5e.start
+python -u scripts/wp13_xsec.py --prelaunch --panel-base /tmp/claude-0/-home-user-scinance/632fbebe-92f6-553b-ba2e-14f1a2521e17/scratchpad/panel/panel_1d --delisted-base /tmp/claude-0/-home-user-scinance/632fbebe-92f6-553b-ba2e-14f1a2521e17/scratchpad/panel/panel_1d_delisted --start-year 2021 --end-year 2026 --as-of 2026-09-28 --out scinance3-impl/state/runs/wp13a_20261012_v5e --seed 53 --n-sims 1000 --convention close_at_last --n-reps-beta-control-study 300 --n-reps-beta-control-winner 1000 --stress-rel scinance3-impl/state/runs/stress_rel.json --stress-abs scinance3-impl/state/runs/stress_abs.json --allow-partial > /tmp/claude-0/-home-user-scinance/632fbebe-92f6-553b-ba2e-14f1a2521e17/scratchpad/wp13a_v5e.log 2>&1
+echo "rc=$? end=$(date -u +%H:%M:%S) start=$(cat /tmp/claude-0/-home-user-scinance/632fbebe-92f6-553b-ba2e-14f1a2521e17/scratchpad/wp13a_v5e.start)" >> /tmp/claude-0/-home-user-scinance/632fbebe-92f6-553b-ba2e-14f1a2521e17/scratchpad/wp13a_v5e.log

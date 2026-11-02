@@ -11,3 +11,12 @@ logs/
 # F0 (DEC-104 E9): Laufausgaben der Herleitungs- und Pruefskripte nie ins Repo (DEC-103 N1 (2c))
 scinance3-impl/derivations/**/work/
 scinance3-impl/verify/**/work/
+# F0b: Laufausgaben, Caches und Ergebnis-JSON der Herleitungs-/Pruefskripte nie ins Repo (Nuisance-Ausgaben, DEC-103 N1 (2c))
+scinance3-impl/derivations/**/cache/
+scinance3-impl/derivations/**/hcache/
+scinance3-impl/verify/**/cache/
+scinance3-impl/derivations/**/*.json
+!scinance3-impl/derivations/a2/data_manifest/EXTRACT_LOG.json
+scinance3-impl/verify/**/*.json
+scinance3-impl/derivations/**/tables.md
+*.pkl
