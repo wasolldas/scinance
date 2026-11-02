@@ -1,0 +1,433 @@
+OC Verfassung 3.1 - oc_sim.py (deterministisch; Seeds 31001..31010 + Zellindex)
+Konstanten: z95 1.6449, z9975 2.8070, z80 0.8416, MDE-Faktor gepoolt 0,0025 3.6487, 0,05 2.4865
+
+================ (0) Reproduktion der Vorarbeiten ================
+--- orch_review_check.py (sha256 06eaefd37d8ac889..., rc 0), identisch mit orch_review_check.out: True
+    c80 = 2.4865
+    gemeinsame Power je 0,90, rho 0.82 -> 0.858 (Produkt 0,810)
+    gemeinsame Power je 0,90, rho 0.91 -> 0.87 (Produkt 0,810)
+    gemeinsame Power je 0,90, rho 0.999999 -> 0.9 (Produkt 0,810)
+    VRP Prior 9.47: SE12 5.170, SR_eff 1.832, Jahre je Fenster 1.843 = 673 Tage
+    VRP Prior 7.14: SE12 5.170, SR_eff 1.381, Jahre je Fenster 3.242 = 1183 Tage
+    VRP Prior 10.48: SE12 5.170, SR_eff 2.027, Jahre je Fenster 1.505 = 549 Tage
+    VRP Prior 3.16: SE12 5.170, SR_eff 0.611, Jahre je Fenster 16.549 = 6040 Tage
+    F1 K 600 N 365: MDE80 0.0133
+    F1 K 600 N 730: MDE80 0.0094
+    F1 K 600 N 2130: MDE80 0.0055
+    F1 K 500 N 365: MDE80 0.0146
+    F1 K 500 N 730: MDE80 0.0103
+    F1 K 500 N 2130: MDE80 0.0060
+    F1 K 300 N 365: MDE80 0.0188
+    F1 K 300 N 730: MDE80 0.0133
+    F1 K 300 N 2130: MDE80 0.0078
+    TS N 2400: MDE80 0.0508, Ausschluss95 0.0336, bp/Tag MDE 10.6
+    TS N 2000: MDE80 0.0556, Ausschluss95 0.0368, bp/Tag MDE 11.6
+    TS N 365: MDE80 0.1301, Ausschluss95 0.0861, bp/Tag MDE 27.2
+    phi 0.0: Wechselrate 0.500, IC_min Maker4 0.0096, Taker11 0.0263, gesamt15 0.0359
+    phi 0.5: Wechselrate 0.333, IC_min Maker4 0.0064, Taker11 0.0175, gesamt15 0.0239
+    phi 0.8: Wechselrate 0.205, IC_min Maker4 0.0039, Taker11 0.0108, gesamt15 0.0147
+    OBF K4 alpha 0.05: c 1.735, Maximum/fix 1.034, E[N|H1]/fix 0.814
+    OBF K4 alpha 0.0025: c 2.834, Maximum/fix 1.008, E[N|H1]/fix 0.872
+    C.10 heute (gemeinsam 0,64): Basisrate 0.1: PPV 0.966; Falsch-PASS/Jahr bei 10 Nulltests 0.025
+    C.10 heute (gemeinsam 0,64): Basisrate 0.25: PPV 0.988; Falsch-PASS/Jahr bei 10 Nulltests 0.025
+    gepoolt 0,0025 Power 0,80: Basisrate 0.1: PPV 0.973; Falsch-PASS/Jahr bei 10 Nulltests 0.025
+    gepoolt 0,0025 Power 0,80: Basisrate 0.25: PPV 0.991; Falsch-PASS/Jahr bei 10 Nulltests 0.025
+    gepoolt 0,01 Power 0,80: Basisrate 0.1: PPV 0.899; Falsch-PASS/Jahr bei 10 Nulltests 0.100
+    gepoolt 0,01 Power 0,80: Basisrate 0.25: PPV 0.964; Falsch-PASS/Jahr bei 10 Nulltests 0.100
+    ein Fenster alpha 0,05: Basisrate 0.1: PPV 0.640; Falsch-PASS/Jahr bei 10 Nulltests 0.500
+    ein Fenster alpha 0,05: Basisrate 0.25: PPV 0.842; Falsch-PASS/Jahr bei 10 Nulltests 0.500
+    C.10 gemeinsam 0,80 vs je 0,80: 1.356
+    gepoolt 0,0025 vs C.10 je 0,80 (Power 0,80): 1.077
+    C.10 gemeinsam 0,80 vs gepoolt 0,0025: 1.259
+--- review_calc.py (sha256 dfac34c8dcb9f7e3..., rc 0)
+    == A. K-1 Horizont-Friktions-Kurve ==
+    IC 0.01: Gauss/PRD-Kante 1.5708; Spearman-IC (Pearson=2sin(pi r/6)) / PRD 1.6449
+    IC 0.03: Gauss/PRD-Kante 1.5706; Spearman-IC (Pearson=2sin(pi r/6)) / PRD 1.6446
+    IC 0.05: Gauss/PRD-Kante 1.5701; Spearman-IC (Pearson=2sin(pi r/6)) / PRD 1.6441
+    IC 0.1: Gauss/PRD-Kante 1.5682; Spearman-IC (Pearson=2sin(pi r/6)) / PRD 1.6414
+    IC 0.156: Gauss/PRD-Kante 1.5644; Spearman-IC (Pearson=2sin(pi r/6)) / PRD 1.6364
+    Grenzwerte pi/2 = 1.5708  Horizont x 2.467 ; Spearman pi^2/6 = 1.6449  Horizont x 2.706
+    PRD IC 0,05: Kante/Tag 6.657 bp; Taker 11 ->  2.73 Tage; Maker 4 -> 8.67 h (PRD nennt ~7 h)
+    Gauss IC 0,05: Taker 1.108 Tage; Maker 5,4 -> 0.267 Tage
+    p 0,55: PRD 6.65 h; Gauss (rho 0.1564 ) 2.72 h
+    Break-even Wochen-IC PRD 0.0312  Gauss 0.0199
+    MC bivariat normal rho 0,05: E[y sign(x)] = 0.03972  Theorie rho*0,798 = 0.03989  PRD-Formel 0.02541
+    
+    == B. K-2 Lo / Praemientest ==
+    SR 2: q365 1.554  q12 1.803  Kurzform 1.546
+    VRP prior 9.47: SR_eff 1.832 -> Jahre je Fenster 1.843 = 673 Tage
+    VRP prior 7.14: SR_eff 1.381 -> Jahre je Fenster 3.242 = 1183 Tage
+    VRP prior 10.48: SR_eff 2.027 -> Jahre je Fenster 1.505 = 549 Tage
+    VRP prior 3.16: SR_eff 0.611 -> Jahre je Fenster 16.549 = 6040 Tage
+    A1 theta 1: SR_eff 1.947
+    SR_eff noetig bei L Jahren 1 2.486
+    SR_eff noetig bei L Jahren 2 1.758
+    SR_eff noetig bei L Jahren 3 1.436
+    
+    == C. K-4 C.10 vs gepoolt ==
+    gepoolt alpha 0,0025 Power bei C.10-MDE: 0.761
+    C.10 gemeinsame Power 0,80 -> je Fenster 0.8944  Datenfaktor 1.3558
+    gepoolt 0,0025/0,80 gegen C.10 0,80/0,80: 1.0766 ; C.10(0,894 je Fenster) gegen gepoolt 0,0025/0,80: 1.2593
+    DEC-52 H0-Rate z 2.3263: nur Vorzeichen 0.00991; mit Screens (je Fenster >= 0,5 z_krit SE_gepoolt, DEC-94 (6)) 0.00847
+    DEC-52 H0-Rate z 2.5287: nur Vorzeichen 0.00571; mit Screens (je Fenster >= 0,5 z_krit SE_gepoolt, DEC-94 (6)) 0.00500
+    K-0.6: Phi(1,4-1,6449)^2 = 0.1626  Retention-Faktor 5.2
+    
+    == D. K-5 Produkt vs exakt (Illustration K-5 (b)) ==
+    delta 20.0: Einzel [0.86  0.812 0.912], Produkt 0.637, exakt gemeinsam 0.755; Korrelationen [0.729 0.863 0.801]
+    delta 22.0: Einzel [0.912 0.872 0.951], Produkt 0.757, exakt gemeinsam 0.833; Korrelationen [0.729 0.863 0.801]
+    m 2: je Bedingung 0.8944, MDE x1.164, Daten x1.356
+    m 3: je Bedingung 0.9283, MDE x1.250, Daten x1.563
+    m 5: je Bedingung 0.9564, MDE x1.349, Daten x1.820
+    A2-Kette W2: 24,4 + Stress 2,8 = 27.2 + skal. Null 2,1 = 29.3 + Gate(4) 2,8 = 32.1
+    Datenfaktoren gegen 18,8: {19.7: 1.098, 23.1: 1.51, 23.77: 1.599, 24.4: 1.684, 27.2: 2.093, 29.3: 2.429, 32.1: 2.915}
+    zwei Bedingungen je Power 0,9, Korrelation 0.82: exakt 0.858 gegen Produkt 0,810
+    zwei Bedingungen je Power 0,9, Korrelation 0.91: exakt 0.870 gegen Produkt 0,810
+    zwei Bedingungen je Power 0,9, Korrelation 1.0: exakt 0.900 gegen Produkt 0,810
+    
+    == E. K-6 PPV / A2 gepoolt ==
+    C.10 [0.931, 0.966, 0.985]
+    gepoolt 0,01 [0.808, 0.899, 0.952]
+    ein Fenster [0.457, 0.64, 0.8]
+    A2 P2'' gepoolt alpha 0.01: MDE80 (inv.-var.) 16.70, (gleichgew.) 16.71; Power bei 16,5 0.788
+    A2 P2'' gepoolt alpha 0.0025: MDE80 (inv.-var.) 19.24, (gleichgew.) 19.25; Power bei 16,5 0.626
+    A3 Roh-IC measured: je Fenster MDE80 W1 0.0310 W2 0.0210; gepoolt alpha 0,01 0.0239
+    A3 Roh-IC stress: je Fenster MDE80 W1 0.0448 W2 0.0283; gepoolt alpha 0,01 0.0338
+    
+    == F. K-9 Pilot-Uebergabe A2 ==
+    mu 16.5: P(x_P >= 32,1 | SE 4,10) = 7.09e-05
+    mu 25.0: P(x_P >= 32,1 | SE 4,10) = 4.17e-02
+    mu 32.1: P(x_P >= 32,1 | SE 4,10) = 5.00e-01
+    Pilot-alpha bei c 32,1: 2.44e-15 ; bei c 24,36: 1.41e-09
+    
+    == G. Gruppensequentiell exakt (Gitterintegration, OBF auf B-Skala konstant) ==
+    OBF K=2 alpha=0.05:  {'c': 1.678, 'alpha': np.float64(0.0501), 'R': np.float64(1.0148), 'EN_H1': np.float64(0.876), 'EN_H0': np.float64(1.01), 'EN_2x': np.float64(0.569), 'power_at_fixed_MDE': np.float64(0.795), 'Einfo_at_fixed_MDE_noinfl': np.float64(0.865)}
+    OBF K=2 alpha=0.0025:  {'c': 2.808, 'alpha': np.float64(0.0025), 'R': np.float64(1.0008), 'EN_H1': np.float64(0.96), 'EN_H0': np.float64(1.001), 'EN_2x': np.float64(0.555), 'power_at_fixed_MDE': np.float64(0.8), 'Einfo_at_fixed_MDE_noinfl': np.float64(0.959)}
+    OBF K=4 alpha=0.05:  {'c': 1.734, 'alpha': np.float64(0.05001), 'R': np.float64(1.0346), 'EN_H1': np.float64(0.814), 'EN_H0': np.float64(1.026), 'EN_2x': np.float64(0.508), 'power_at_fixed_MDE': np.float64(0.788), 'Einfo_at_fixed_MDE_noinfl': np.float64(0.793)}
+    OBF K=4 alpha=0.0025:  {'c': 2.832, 'alpha': np.float64(0.00251), 'R': np.float64(1.0074), 'EN_H1': np.float64(0.871), 'EN_H0': np.float64(1.007), 'EN_2x': np.float64(0.528), 'power_at_fixed_MDE': np.float64(0.796), 'Einfo_at_fixed_MDE_noinfl': np.float64(0.866)}
+    OBF K=8 alpha=0.05:  {'c': 1.786, 'alpha': np.float64(0.04988), 'R': np.float64(1.0502), 'EN_H1': np.float64(0.782), 'EN_H0': np.float64(1.039), 'EN_2x': np.float64(0.453), 'power_at_fixed_MDE': np.float64(0.783), 'Einfo_at_fixed_MDE_noinfl': np.float64(0.755)}
+    OBF K=8 alpha=0.0025:  {'c': 2.868, 'alpha': np.float64(0.0025), 'R': np.float64(1.0167), 'EN_H1': np.float64(0.835), 'EN_H0': np.float64(1.016), 'EN_2x': np.float64(0.469), 'power_at_fixed_MDE': np.float64(0.791), 'Einfo_at_fixed_MDE_noinfl': np.float64(0.825)}
+    mit Futility Z<0 an Blicken 1..K-1 (KRITIK-Variante), Grenze ohne Futility kalibriert:
+      K=4 alpha=0.05:  {'c': 1.734, 'alpha': np.float64(0.05001), 'R': np.float64(1.1979), 'EN_H1': np.float64(0.83), 'EN_H0': np.float64(0.646), 'EN_2x': np.float64(0.554), 'power_at_fixed_MDE': np.float64(0.737), 'Einfo_at_fixed_MDE_noinfl': np.float64(0.71)}
+      K=4 alpha=0.0025:  {'c': 2.832, 'alpha': np.float64(0.00251), 'R': np.float64(1.0327), 'EN_H1': np.float64(0.863), 'EN_H0': np.float64(0.565), 'EN_2x': np.float64(0.537), 'power_at_fixed_MDE': np.float64(0.784), 'Einfo_at_fixed_MDE_noinfl': np.float64(0.84)}
+    mit Futility Z<0 ab halber Information (KONZEPT-Variante, Blicke 2,3 von 4):
+      K=4 alpha=0.05:  {'c': 1.734, 'alpha': np.float64(0.05001), 'R': np.float64(1.0519), 'EN_H1': np.float64(0.805), 'EN_H0': np.float64(0.755), 'EN_2x': np.float64(0.513), 'power_at_fixed_MDE': np.float64(0.782), 'Einfo_at_fixed_MDE_noinfl': np.float64(0.772)}
+      K=4 alpha=0.0025:  {'c': 2.832, 'alpha': np.float64(0.00251), 'R': np.float64(1.0079), 'EN_H1': np.float64(0.869), 'EN_H0': np.float64(0.731), 'EN_2x': np.float64(0.528), 'power_at_fixed_MDE': np.float64(0.796), 'Einfo_at_fixed_MDE_noinfl': np.float64(0.864)}
+    
+    == H. Vergleich KONZEPT T-12 'ein Drittel bei gleicher Fehlerrate' ==
+    Fixed-Einheiten (in N_0,05): C.10 0,80/0,80 je Fenster: 2,000; C.10 gemeinsam 0,80: 2.712 ; ein Fenster alpha 0,0025 Power 0,80: 2.153
+    
+    == I. ARCHITEKTUR Kohorten-Faktor (Bonferroni je Fenster) ==
+    1 1.0
+    2 1.27
+    4 1.537
+    8 1.804
+    12 1.959
+    
+    == J. KONZEPT T-9 / F1 ==
+    N 365: MDE80 TS 0.1301; C.10 je Haelfte 0.1841; 95%-Obergrenze bei IC 0 0.0861
+    N 480: MDE80 TS 0.1135; C.10 je Haelfte 0.1605; 95%-Obergrenze bei IC 0 0.0751
+    N 970: MDE80 TS 0.0798; C.10 je Haelfte 0.1129; 95%-Obergrenze bei IC 0 0.0528
+    N 2000: MDE80 TS 0.0556; C.10 je Haelfte 0.0786; 95%-Obergrenze bei IC 0 0.0368
+    N 2130: MDE80 TS 0.0539; C.10 je Haelfte 0.0762; 95%-Obergrenze bei IC 0 0.0356
+    N 2400: MDE80 TS 0.0508; C.10 je Haelfte 0.0718; 95%-Obergrenze bei IC 0 0.0336
+    phi 0.0: Vorzeichenwechsel/Tag 0.500; Taker-IC_min 0.0263; Maker 0.0096
+    phi 0.5: Vorzeichenwechsel/Tag 0.333; Taker-IC_min 0.0175; Maker 0.0064
+    phi 0.8: Vorzeichenwechsel/Tag 0.205; Taker-IC_min 0.0108; Maker 0.0039
+    K 300: SD 2,5xBoden 0.1446; W1 oder W2 je Fenster: MDE80 0.0188 (L/S brutto 24.4 bp/Tag)
+    K 300: SD 2,5xBoden 0.1446; C.10-Haelfte aller 2.130 Tage: MDE80 0.0110 (L/S brutto 14.3 bp/Tag)
+    K 300: SD 2,5xBoden 0.1446; alle 2.130 Tage: MDE80 0.0078 (L/S brutto 10.1 bp/Tag)
+    K 500: SD 2,5xBoden 0.1119; W1 oder W2 je Fenster: MDE80 0.0146 (L/S brutto 18.9 bp/Tag)
+    K 500: SD 2,5xBoden 0.1119; C.10-Haelfte aller 2.130 Tage: MDE80 0.0085 (L/S brutto 11.1 bp/Tag)
+    K 500: SD 2,5xBoden 0.1119; alle 2.130 Tage: MDE80 0.0060 (L/S brutto 7.8 bp/Tag)
+    K 600: SD 2,5xBoden 0.1021; W1 oder W2 je Fenster: MDE80 0.0133 (L/S brutto 17.3 bp/Tag)
+    K 600: SD 2,5xBoden 0.1021; C.10-Haelfte aller 2.130 Tage: MDE80 0.0078 (L/S brutto 10.1 bp/Tag)
+    K 600: SD 2,5xBoden 0.1021; alle 2.130 Tage: MDE80 0.0055 (L/S brutto 7.1 bp/Tag)
+    Bianchi Weg A: EW 0.0904  VW 0.0231 ; EW t ~ 15.8  VW t ~ 2.61
+    
+    == K. EDGE R-1 ==
+    mom1: Informationsrate 2.246/Jahr; Wochen je Fenster 63.7; Power je 52 Wochen 0.726
+       Anteil 0.75: 113.3 Wochen
+       Anteil 0.5: 254.9 Wochen
+    mom2: Informationsrate 2.772/Jahr; Wochen je Fenster 41.8; Power je 52 Wochen 0.870
+       Anteil 0.75: 74.4 Wochen
+       Anteil 0.5: 167.4 Wochen
+    mom4: Informationsrate 2.399/Jahr; Wochen je Fenster 55.9; Power je 52 Wochen 0.775
+       Anteil 0.75: 99.3 Wochen
+       Anteil 0.5: 223.4 Wochen
+    Literatur 0,014 mom1: 481.0 Wochen
+    Vergleich Literatur-IR: Ficura L&L 1W t 2,332 / 291 W -> 0.99 ; Ficura S/I -7,309 -> 3.09 ; LTW Terzil t 3,719 / 260 W -> 1.66 ; Bianchi VW taeglich -> 1.17  EW 7.07
+    2 x 41.8 Wochen ab 2026-10-05 -> 2028-05-11; ab 2026-07-06 -> 2028-02-10
+    2 x 63.7 Wochen ab 2026-10-05 -> 2029-03-14; ab 2026-07-06 -> 2028-12-13
+    
+    == L. K-10 SESOI ==
+    zweiseitig: MDE x 1.1267  Daten x 1.2695
+    A1 Jahre je Fenster bei SESOI 36: 12.76
+    A2 SESOI 22.0: Einzel 18,8 ok; exakt gemeinsam W2 22,3 nein; Produkt zentral 24,4 nein; stress 27,2 nein
+    A2 SESOI 10.8: Einzel 18,8 nein; exakt gemeinsam W2 22,3 nein; Produkt zentral 24,4 nein; stress 27,2 nein
+    
+    == M. K-3 Identitaet des Permutations-Bodens (Faktorwelt) ==
+    SD Spearman(perm, Rendite) ohne/mit starkem Faktor: [0.0722 0.0718]  Identitaet 1/sqrt(K-1) = 0.0709
+--- gsd_fut.py (sha256 d07914e8adbf2718..., rc 0)
+    alpha 0.05 nofut {'c': 1.733, 'Rmax': 1.038, 'power': np.float64(0.8), 'EN_H1': np.float64(0.816), 'alpha_eff': np.float64(0.05), 'EN_H0': np.float64(1.029)}
+    alpha 0.05 fut Z<0 {'c': 1.733, 'Rmax': 1.203, 'power': np.float64(0.8), 'EN_H1': np.float64(0.833), 'alpha_eff': np.float64(0.0446), 'EN_H0': np.float64(0.648)}
+    alpha 0.0025 nofut {'c': 2.842, 'Rmax': 1.016, 'power': np.float64(0.8), 'EN_H1': np.float64(0.879), 'alpha_eff': np.float64(0.0025), 'EN_H0': np.float64(1.016)}
+    alpha 0.0025 fut Z<0 {'c': 2.842, 'Rmax': 1.041, 'power': np.float64(0.8), 'EN_H1': np.float64(0.871), 'alpha_eff': np.float64(0.0024), 'EN_H0': np.float64(0.569)}
+
+================ (a) Entscheidungsregel P-2 (a) gegen C.10 und DEC-52 ================
+Reproduktion DEC-52-H0-Rate (Akte 0,00991/0,00847 bei z 2,3263; 0,00571/0,00500 bei 2,5287): {'z2.3263_nur_vorzeichen': 0.0099, 'z2.3263_mit_halbscreens': 0.00851, 'z2.5287_nur_vorzeichen': 0.00569, 'z2.5287_mit_halbscreens': 0.005}
+Reproduktion K-4: 1,0766 / 1,3558 / 1,2593 / 0,761 -> 1.0766 1.3558 1.2593 0.761
+Einheiten: Information in 1/theta^2; MDE = Effekt, bei dem P-2 (a) mit den gegebenen Daten Power 0,80 hat.
+     r  alpha_P2a     mu* Faktor/C10je  /C10gem  /gepoolt | Power bei 0/0,5/1/1,5 MDE: P2a | gepoolt | C.10(-artig) | DEC-52(2,5287)
+ 0.500   0.001933  3.9036       1.2324   0.9089    1.1446 | 0.0019 0.1622 0.8000 0.9930 | 0.0025 0.1962 0.8636 0.9988 | 0.0025 0.1565 0.7528 0.9875 | 0.0050 0.2578 0.8914 0.9985
+       alpha_eff C.10-artig 0.002500; DEC-52 z2,5287 0.005000, z2,3263 0.008509; Datenbedarf C.10-artig gem.0,80 / C10je 1.3558; DEC-52 / C10je 0.9851
+       Effekt nur im aelteren Teil (f x MDE): f 0.5: P2a 0.0154 gepoolt 0.0335 C10 0.0198 DEC52 0.0447; f 1.0: P2a 0.0394 gepoolt 0.1962 C10 0.0434 DEC52 0.1322; f 1.5: P2a 0.0492 gepoolt 0.5480 C10 0.0497 DEC52 0.1798; f 2.0: P2a 0.0500 gepoolt 0.8636 C10 0.0500 DEC52 0.1855; f 3.0: P2a 0.0500 gepoolt 0.9988 C10 0.0500 DEC52 0.1857; f 5.0: P2a 0.0500 gepoolt 1.0000 C10 0.0500 DEC52 0.1857
+       Grenzwert f->inf: P2a/C10 0,05; DEC-52 0.1857 ; gepoolt 1
+       juengster Teil halber Effekt: f 1.0: P2a 0.3333 gepoolt 0.5480 C10 0.3433 DEC52 0.5557; f 1.5: P2a 0.6595 gepoolt 0.9435 C10 0.6605 DEC52 0.8710
+ 0.333   0.001424  4.4321       1.5886   1.1717    1.4755 | 0.0014 0.1794 0.8000 0.9858 | 0.0025 0.2773 0.9479 0.9999 | 0.0025 0.2021 0.7998 0.9858 | 0.0048 0.3372 0.9444 0.9990
+       alpha_eff C.10-artig 0.002500; DEC-52 z2,5287 0.004845, z2,3263 0.008271; Datenbedarf C.10-artig gem.0,80 / C10je 1.5893; DEC-52 / C10je 1.0261
+       Effekt nur im aelteren Teil (f x MDE): f 0.5: P2a 0.0217 gepoolt 0.0918 C10 0.0283 DEC52 0.0847; f 1.0: P2a 0.0472 gepoolt 0.5587 C10 0.0488 DEC52 0.2132; f 1.5: P2a 0.0500 gepoolt 0.9479 C10 0.0500 DEC52 0.2325; f 2.0: P2a 0.0500 gepoolt 0.9990 C10 0.0500 DEC52 0.2327; f 3.0: P2a 0.0500 gepoolt 1.0000 C10 0.0500 DEC52 0.2327; f 5.0: P2a 0.0500 gepoolt 1.0000 C10 0.0500 DEC52 0.2327
+       Grenzwert f->inf: P2a/C10 0,05; DEC-52 0.2327 ; gepoolt 1
+       juengster Teil halber Effekt: f 1.0: P2a 0.3421 gepoolt 0.8123 C10 0.3487 DEC52 0.6698; f 1.5: P2a 0.6079 gepoolt 0.9969 C10 0.6080 DEC52 0.8826
+ 0.250   0.001144  5.0049       2.0258   1.4941    1.8816 | 0.0011 0.2073 0.8000 0.9825 | 0.0025 0.3803 0.9860 1.0000 | 0.0025 0.2426 0.8016 0.9825 | 0.0046 0.4244 0.9645 0.9991
+       alpha_eff C.10-artig 0.002500; DEC-52 z2,5287 0.004642, z2,3263 0.007950; Datenbedarf C.10-artig gem.0,80 / C10je 2.0171; DEC-52 / C10je 1.0890
+       Effekt nur im aelteren Teil (f x MDE): f 0.5: P2a 0.0272 gepoolt 0.1761 C10 0.0350 DEC52 0.1276; f 1.0: P2a 0.0494 gepoolt 0.8281 C10 0.0498 DEC52 0.2584; f 1.5: P2a 0.0500 gepoolt 0.9976 C10 0.0500 DEC52 0.2636; f 2.0: P2a 0.0500 gepoolt 1.0000 C10 0.0500 DEC52 0.2636; f 3.0: P2a 0.0500 gepoolt 1.0000 C10 0.0500 DEC52 0.2636; f 5.0: P2a 0.0500 gepoolt 1.0000 C10 0.0500 DEC52 0.2636
+       Grenzwert f->inf: P2a/C10 0,05; DEC-52 0.2636 ; gepoolt 1
+       juengster Teil halber Effekt: f 1.0: P2a 0.3436 gepoolt 0.9421 C10 0.3457 DEC52 0.7229; f 1.5: P2a 0.5917 gepoolt 0.9999 C10 0.5917 DEC52 0.8934
+Informationsanteil r_I des juengsten Fensters (Korrelation sqrt(r_I)): r_I 0.150: alpha 0.000792, Daten/gepoolt 3.0964, /C10je 3.3337; r_I 0.250: alpha 0.001144, Daten/gepoolt 1.8816, /C10je 2.0258; r_I 0.333: alpha 0.001424, Daten/gepoolt 1.4755, /C10je 1.5886; r_I 0.500: alpha 0.001933, Daten/gepoolt 1.1446, /C10je 1.2324; r_I 0.750: alpha 0.002434, Daten/gepoolt 1.0091, /C10je 1.0864
+MDE in SE_12-Einheiten (SE eines 12-Monats-Fensters): r1_2 2.7603; r1_3 2.5588; r1_4 2.5025; boden_T_unendlich 2.4865; C10_je080_in_SE12 2.4865; C10_gem080_in_SE12 2.8953
+Screen-Niveau alpha_s: Boden MDE/SE_12, und je r: alpha_eff, MDE/SE_12, Daten/gepoolt, PASS bei Effekt nur aelter (1/2 MDE): 
+   alpha_s 0.05: Boden 2.4865; r 0.500: 0.001933, 2.7603, 1.1446, 0.0394/0.0500; r 0.333: 0.001424, 2.5588, 1.4755, 0.0472/0.0500; r 0.250: 0.001144, 2.5025, 1.8816, 0.0494/0.0500
+   alpha_s 0.1: Boden 2.1232; r 0.500: 0.002235, 2.6533, 1.0576, 0.0654/0.0998; r 0.333: 0.001825, 2.3437, 1.2378, 0.0859/0.1000; r 0.250: 0.001552, 2.2133, 1.4719, 0.0941/0.1000
+   alpha_s 0.2: Boden 1.6832; r 0.500: 0.002421, 2.5992, 1.0149, 0.1009/0.1986; r 0.333: 0.002184, 2.1992, 1.0899, 0.1469/0.2000; r 0.250: 0.001978, 1.9953, 1.1962, 0.1677/0.2000
+   alpha_s 0.5: Boden 0.8416; r 0.500: 0.002497, 2.5806, 1.0005, 0.1497/0.4800; r 0.333: 0.002462, 2.1154, 1.0084, 0.2697/0.4991; r 0.250: 0.002405, 1.8477, 1.0258, 0.3262/0.4999
+P-6-Lesart (gepoolt 0,0025 + Stabilitaetstest Abfall einseitig 0,05; unabhaengig vom gepoolten Z): r0.500: alpha 0.002375, Daten/gepoolt 1.0905, /C10je 1.1741, MDE/SE12 2.6942, PASS nur aelter 1/2/3/5 MDE 0.0729/0.0128/0.0000/0.0000, halber Effekt juengst 0.3931; r0.333: alpha 0.002375, Daten/gepoolt 1.0905, /C10je 1.1741, MDE/SE12 2.1998, PASS nur aelter 1/2/3/5 MDE 0.1736/0.0254/0.0001/0.0000, halber Effekt juengst 0.4971; r0.250: alpha 0.002375, Daten/gepoolt 1.0905, /C10je 1.1741, MDE/SE12 1.9051, PASS nur aelter 1/2/3/5 MDE 0.2591/0.0489/0.0005/0.0000, halber Effekt juengst 0.5564
+MC-Gegenprobe (1e6, Seed 31001): {'0.500': {'0.0': {'P2a': 0.00191, 'DEC52': 0.00495, 'C10artig': 0.00252}, '1.0': {'P2a': 0.80082, 'DEC52': 0.89149, 'C10artig': 0.75349}}, '0.333': {'0.0': {'P2a': 0.0014, 'DEC52': 0.00484, 'C10artig': 0.0025}, '1.0': {'P2a': 0.8002, 'DEC52': 0.94445, 'C10artig': 0.79989}}, '0.250': {'0.0': {'P2a': 0.00114, 'DEC52': 0.00465, 'C10artig': 0.00253}, '1.0': {'P2a': 0.79996, 'DEC52': 0.96442, 'C10artig': 0.80151}}}
+[Zeit (a): 9.7 s CPU]
+
+================ (b) GSD O'Brien-Fleming, 4 Blicke ================
+Gitter alpha 0.05 ohne Futility: c 1.7340, alpha 0.05001, Max/fix 1.0346, E[N|H1] 0.8141, E[N|H0] 1.0261, E[N|0,5 MDE] 0.9691
+Gitter alpha 0.05 Futility Z<0 Blicke 1-3: c 1.7340, alpha 0.04457, Max/fix 1.1979, E[N|H1] 0.8303, E[N|H0] 0.6463, E[N|0,5 MDE] 0.8544
+Gitter alpha 0.0025 ohne Futility: c 2.8320, alpha 0.00251, Max/fix 1.0074, E[N|H1] 0.8712, E[N|H0] 1.0073, E[N|0,5 MDE] 0.9948
+Gitter alpha 0.0025 Futility Z<0 Blicke 1-3: c 2.8320, alpha 0.00242, Max/fix 1.0327, E[N|H1] 0.8627, E[N|H0] 0.5651, E[N|0,5 MDE] 0.8635
+MC 1e6 OBF ohne Screen ohne Futility: Max/fix 1.0078, Power 0.8000, alpha 0.00252, E[N|H1] 0.8717, E[N|H0] 1.0077; Effekt nur bis t0 0,5 (r 1/2) / 0,75 (r 1/4): P(PASS) 0.2053 / 0.5471, veraltet 0.0586 / 0.0853
+MC 1e6 OBF ohne Screen mit Futility: Max/fix 1.0334, Power 0.8000, alpha 0.00244, E[N|H1] 0.8630, E[N|H0] 0.5653; Effekt nur bis t0 0,5 (r 1/2) / 0,75 (r 1/4): P(PASS) 0.2129 / 0.5586, veraltet 0.0594 / 0.0827
+MC GSD+REZENZ-Screen (jeder Stopp), r 0.500, ohne Fut.: Max/fix 1.0695, alpha 0.00217, E[N|H1] 0.9125, E[N|H0] 1.0693, E[N|0,5MDE] 1.0549 (Power 0.157); Effekt nur bis t0 [P(PASS), davon veraltet]: t0.500_1MDE: 0.1786/0.0181; t0.500_2MDE: 0.9343/0.0010
+MC GSD+REZENZ-Screen (jeder Stopp), r 0.500, Futility: Max/fix 1.0957, alpha 0.00209, E[N|H1] 0.9054, E[N|H0] 0.5993, E[N|0,5MDE] 0.9216 (Power 0.158); Effekt nur bis t0 [P(PASS), davon veraltet]: t0.500_1MDE: 0.1856/0.0179; t0.500_2MDE: 0.9419/0.0009
+MC GSD+REZENZ-Screen (nur letzter Blick), r 0.500, ohne Fut.: Max/fix 1.0678, alpha 0.00218, E[N|H1] 0.9106, E[N|H0] 1.0677, E[N|0,5MDE] 1.0532 (Power 0.157); Effekt nur bis t0 [P(PASS), davon veraltet]: t0.500_1MDE: 0.1809/0.0179; t0.500_2MDE: 0.9352/0.0009
+MC GSD+REZENZ-Screen (nur letzter Blick), r 0.500, Futility: Max/fix 1.0940, alpha 0.00210, E[N|H1] 0.9034, E[N|H0] 0.5984, E[N|0,5MDE] 0.9199 (Power 0.158); Effekt nur bis t0 [P(PASS), davon veraltet]: t0.500_1MDE: 0.1880/0.0177; t0.500_2MDE: 0.9427/0.0008
+MC GSD+REZENZ-Screen (jeder Stopp), r 0.333, ohne Fut.: Max/fix 1.1646, alpha 0.00173, E[N|H1] 0.9808, E[N|H0] 1.1644, E[N|0,5MDE] 1.1481 (Power 0.153); Effekt nur bis t0 [P(PASS), davon veraltet]: t0.667_1MDE: 0.3799/0.0187; t0.667_2MDE: 0.9942/0.0001; t0.500_1MDE: 0.1809/0.0213; t0.500_2MDE: 0.9515/0.0019
+MC GSD+REZENZ-Screen (jeder Stopp), r 0.333, Futility: Max/fix 1.1898, alpha 0.00166, E[N|H1] 0.9751, E[N|H0] 0.6509, E[N|0,5MDE] 1.0110 (Power 0.153); Effekt nur bis t0 [P(PASS), davon veraltet]: t0.667_1MDE: 0.3903/0.0180; t0.667_2MDE: 0.9951/0.0001; t0.500_1MDE: 0.1876/0.0213; t0.500_2MDE: 0.9570/0.0017
+MC GSD+REZENZ-Screen (nur letzter Blick), r 0.333, ohne Fut.: Max/fix 1.1376, alpha 0.00181, E[N|H1] 0.9539, E[N|H0] 1.1374, E[N|0,5MDE] 1.1202 (Power 0.152); Effekt nur bis t0 [P(PASS), davon veraltet]: t0.667_1MDE: 0.4128/0.0171; t0.667_2MDE: 0.9969/0.0000; t0.500_1MDE: 0.2016/0.0190; t0.500_2MDE: 0.9544/0.0015
+MC GSD+REZENZ-Screen (nur letzter Blick), r 0.333, Futility: Max/fix 1.1625, alpha 0.00174, E[N|H1] 0.9471, E[N|H0] 0.6359, E[N|0,5MDE] 0.9834 (Power 0.152); Effekt nur bis t0 [P(PASS), davon veraltet]: t0.667_1MDE: 0.4241/0.0164; t0.667_2MDE: 0.9974/0.0000; t0.500_1MDE: 0.2087/0.0188; t0.500_2MDE: 0.9596/0.0013
+MC GSD+REZENZ-Screen (jeder Stopp), r 0.250, ohne Fut.: Max/fix 1.2378, alpha 0.00144, E[N|H1] 1.0375, E[N|H0] 1.2377, E[N|0,5MDE] 1.2206 (Power 0.148); Effekt nur bis t0 [P(PASS), davon veraltet]: t0.750_1MDE: 0.5418/0.0201; t0.750_2MDE: 0.9996/0.0000; t0.500_1MDE: 0.1733/0.0477; t0.500_2MDE: 0.9600/0.0042
+MC GSD+REZENZ-Screen (jeder Stopp), r 0.250, Futility: Max/fix 1.2609, alpha 0.00138, E[N|H1] 1.0318, E[N|H0] 0.6897, E[N|0,5MDE] 1.0799 (Power 0.147); Effekt nur bis t0 [P(PASS), davon veraltet]: t0.750_1MDE: 0.5516/0.0192; t0.750_2MDE: 0.9997/0.0000; t0.500_1MDE: 0.1791/0.0479; t0.500_2MDE: 0.9643/0.0037
+MC GSD+REZENZ-Screen (nur letzter Blick), r 0.250, ohne Fut.: Max/fix 1.1751, alpha 0.00160, E[N|H1] 0.9764, E[N|H0] 1.1750, E[N|0,5MDE] 1.1562 (Power 0.147); Effekt nur bis t0 [P(PASS), davon veraltet]: t0.750_1MDE: 0.5802/0.0173; t0.750_2MDE: 0.9998/0.0000; t0.500_1MDE: 0.2131/0.0997; t0.500_2MDE: 0.9624/0.0187
+MC GSD+REZENZ-Screen (nur letzter Blick), r 0.250, Futility: Max/fix 1.1981, alpha 0.00154, E[N|H1] 0.9692, E[N|H0] 0.6554, E[N|0,5MDE] 1.0165 (Power 0.146); Effekt nur bis t0 [P(PASS), davon veraltet]: t0.750_1MDE: 0.5905/0.0165; t0.750_2MDE: 0.9998/0.0000; t0.500_1MDE: 0.2198/0.1011; t0.500_2MDE: 0.9666/0.0169
+Umrechnung (N_0,05-Einheiten; Ersparnis gegen C.10): {'N_fix_gepoolt0025_in_C10je080': 1.0766, 'N_fix_gepoolt0025_in_N005': 2.1533, 'C10_je080_in_N005': 2.0, 'C10_gem080_in_N005': np.float64(2.7117), 'GSD_ohne_screen_EN_H1_in_N005': np.float64(1.8759), 'GSD_ohne_screen_EN_H1_vs_C10gem080': np.float64(0.6918), 'GSD_ohne_screen_EN_H1_vs_C10je080': np.float64(0.9379), 'GSD_screen_all_r0.5_EN_H1_in_N005': 1.9649, 'GSD_screen_all_r0.5_EN_H1_vs_C10gem080': np.float64(0.7246), 'GSD_screen_all_r0.5_EN_H1_vs_C10je080': 0.9824, 'GSD_screen_all_r0.333_EN_H1_in_N005': 2.112, 'GSD_screen_all_r0.333_EN_H1_vs_C10gem080': np.float64(0.7788), 'GSD_screen_all_r0.333_EN_H1_vs_C10je080': 1.056}
+[Zeit (b): 92.8 s CPU]
+
+================ (c) Selektion in Zone X ================
+Planung: Konfirmation mit P-2(a), r 1/2 (mu* 3.9036); Info so, dass Power 0,80 bei d_plan; X-SE = 1.
+  K    pi   d |   pi_K E[x_sel] E[th_sel] E[x|echt] P(med<=th) | G0 roh: reg/pi_K/Power_echt/Pass | G0 ber.: reg/pi_K/Power_echt/Pass | G1 (x>1,645) roh: reg/pi_K/Power_echt | ber.: Power_echt | alpha|null
+  4  0.00   1 | 0.0000   1.0292    0.0000       nan     0.5017 | 0.936/0.0000/nan/0.0019 | 0.498/0.0000/nan/0.0019 | 0.186/0.0000/nan | nan | 0.00196 (n 200000; X-Wiederverw. 0.0099); Info/Orakel med. roh nan ber. nan; P(Power<0,5) roh nan
+  4  0.10   1 | 0.2043   1.1804    0.2043    1.6155     0.5009 | 0.953/0.2117/0.423/0.0910 | 0.541/0.2671/0.473/0.1276 | 0.255/0.3757/0.139 | 0.256 | 0.00175 (n 159147; X-Wiederverw. 0.0114); Info/Orakel med. roh 0.394 ber. 0.436; P(Power<0,5) roh 0.649
+  4  0.10   2 | 0.2906   1.4288    0.5812    2.3100     0.5015 | 0.958/0.3030/0.642/0.1958 | 0.607/0.4161/0.666/0.2783 | 0.369/0.6080/0.541 | 0.602 | 0.00208 (n 141885; X-Wiederverw. 0.0121); Info/Orakel med. roh 0.770 ber. 0.834; P(Power<0,5) roh 0.354
+  4  0.10   3 | 0.3303   1.7456    0.9910    3.1593     0.4999 | 0.959/0.3443/0.718/0.2486 | 0.649/0.4834/0.735/0.3563 | 0.444/0.7052/0.703 | 0.725 | 0.00195 (n 133930; X-Wiederverw. 0.0119); Info/Orakel med. roh 0.908 ber. 0.958; P(Power<0,5) roh 0.211
+  4  0.25   1 | 0.4510   1.3821    0.4510    1.6795     0.4977 | 0.971/0.4603/0.397/0.1839 | 0.592/0.5348/0.465/0.2493 | 0.352/0.6427/0.137 | 0.270 | 0.00192 (n 109805; X-Wiederverw. 0.0131); Info/Orakel med. roh 0.365 ber. 0.425; P(Power<0,5) roh 0.681
+  4  0.25   2 | 0.5972   1.9081    1.1944    2.4224     0.5009 | 0.978/0.6098/0.606/0.3701 | 0.709/0.7156/0.654/0.4687 | 0.583/0.8340/0.519 | 0.604 | 0.00194 (n 80559; X-Wiederverw. 0.0178); Info/Orakel med. roh 0.692 ber. 0.799; P(Power<0,5) roh 0.405
+  4  0.25   3 | 0.6652   2.5505    1.9957    3.2908     0.5010 | 0.980/0.6785/0.686/0.4663 | 0.784/0.7866/0.725/0.5709 | 0.710/0.8997/0.673 | 0.717 | 0.00179 (n 66952; X-Wiederverw. 0.0154); Info/Orakel med. roh 0.828 ber. 0.932; P(Power<0,5) roh 0.254
+  4  0.50   1 | 0.7371   1.6563    0.7371    1.7972     0.5001 | 0.988/0.7420/0.349/0.2594 | 0.641/0.7968/0.453/0.3612 | 0.492/0.8485/0.134 | 0.296 | 0.00160 (n 52579; X-Wiederverw. 0.0180); Info/Orakel med. roh 0.319 ber. 0.403; P(Power<0,5) roh 0.740
+  4  0.50   2 | 0.8738   2.4635    1.7476    2.6257     0.5000 | 0.995/0.8775/0.539/0.4732 | 0.777/0.9185/0.631/0.5802 | 0.814/0.9473/0.480 | 0.603 | 0.00206 (n 25243; X-Wiederverw. 0.0309); Info/Orakel med. roh 0.586 ber. 0.744; P(Power<0,5) roh 0.500
+  4  0.50   3 | 0.9245   3.3734    2.7736    3.5518     0.5001 | 0.996/0.9283/0.622/0.5774 | 0.857/0.9557/0.705/0.6743 | 0.927/0.9784/0.615 | 0.701 | 0.00199 (n 15095; X-Wiederverw. 0.0321); Info/Orakel med. roh 0.708 ber. 0.882; P(Power<0,5) roh 0.340
+ 10  0.00   1 | 0.0000   1.5394    0.0000       nan     0.4980 | 0.999/0.0000/nan/0.0019 | 0.502/0.0000/nan/0.0019 | 0.402/0.0000/nan | nan | 0.00188 (n 200000; X-Wiederverw. 0.0249); Info/Orakel med. roh nan ber. nan; P(Power<0,5) roh nan
+ 10  0.10   1 | 0.2902   1.7263    0.2902    2.0058     0.5014 | 1.000/0.2904/0.256/0.0758 | 0.549/0.3537/0.428/0.1525 | 0.522/0.3837/0.131 | 0.344 | 0.00180 (n 141954; X-Wiederverw. 0.0304); Info/Orakel med. roh 0.262 ber. 0.360; P(Power<0,5) roh 0.860
+ 10  0.10   2 | 0.4981   2.1281    0.9963    2.6118     0.4998 | 1.000/0.4983/0.547/0.2738 | 0.657/0.6173/0.631/0.3900 | 0.687/0.6518/0.499 | 0.613 | 0.00200 (n 100374; X-Wiederverw. 0.0391); Info/Orakel med. roh 0.605 ber. 0.739; P(Power<0,5) roh 0.478
+ 10  0.10   3 | 0.6093   2.6840    1.8279    3.3759     0.5005 | 1.000/0.6094/0.669/0.4085 | 0.748/0.7383/0.718/0.5308 | 0.769/0.7754/0.662 | 0.715 | 0.00191 (n 78141; X-Wiederverw. 0.0378); Info/Orakel med. roh 0.796 ber. 0.913; P(Power<0,5) roh 0.270
+ 10  0.25   1 | 0.5786   1.9501    0.5786    2.1137     0.4985 | 1.000/0.5786/0.221/0.1285 | 0.595/0.6437/0.412/0.2660 | 0.661/0.6588/0.125 | 0.353 | 0.00192 (n 84285; X-Wiederverw. 0.0426); Info/Orakel med. roh 0.233 ber. 0.340; P(Power<0,5) roh 0.898
+ 10  0.25   2 | 0.8251   2.6673    1.6502    2.8388     0.4991 | 1.000/0.8251/0.470/0.3878 | 0.734/0.8810/0.605/0.5336 | 0.889/0.8797/0.441 | 0.597 | 0.00166 (n 34981; X-Wiederverw. 0.0787); Info/Orakel med. roh 0.505 ber. 0.685; P(Power<0,5) roh 0.606
+ 10  0.25   3 | 0.9191   3.5472    2.7573    3.7048     0.5010 | 1.000/0.9192/0.584/0.5366 | 0.831/0.9514/0.693/0.6596 | 0.955/0.9554/0.580 | 0.692 | 0.00161 (n 16177; X-Wiederverw. 0.0755); Info/Orakel med. roh 0.654 ber. 0.852; P(Power<0,5) roh 0.399
+ 10  0.50   1 | 0.8316   2.2170    0.8316    2.2781     0.5003 | 1.000/0.8316/0.171/0.1425 | 0.626/0.8658/0.395/0.3426 | 0.814/0.8620/0.116 | 0.365 | 0.00223 (n 33677; X-Wiederverw. 0.0668); Info/Orakel med. roh 0.200 ber. 0.314; P(Power<0,5) roh 0.949
+ 10  0.50   2 | 0.9682   3.1302    1.9364    3.1570     0.4989 | 1.000/0.9682/0.365/0.3535 | 0.744/0.9782/0.575/0.5621 | 0.985/0.9725/0.359 | 0.573 | 0.00142 (n 6356; X-Wiederverw. 0.2201); Info/Orakel med. roh 0.407 ber. 0.618; P(Power<0,5) roh 0.786
+ 10  0.50   3 | 0.9955   4.1187    2.9865    4.1265     0.5016 | 1.000/0.9955/0.472/0.4702 | 0.809/0.9972/0.661/0.6587 | 0.999/0.9964/0.472 | 0.661 | 0.00222 (n 902; X-Wiederverw. 0.3248); Info/Orakel med. roh 0.533 ber. 0.773; P(Power<0,5) roh 0.610
+ 25  0.00   1 | 0.0000   1.9660    0.0000       nan     0.4995 | 1.000/0.0000/nan/0.0019 | 0.501/0.0000/nan/0.0019 | 0.723/0.0000/nan | nan | 0.00188 (n 200000; X-Wiederverw. 0.0608); Info/Orakel med. roh nan ber. nan; P(Power<0,5) roh nan
+ 25  0.10   1 | 0.3832   2.1893    0.3832    2.3741     0.5010 | 1.000/0.3832/0.139/0.0545 | 0.555/0.4451/0.385/0.1727 | 0.841/0.4139/0.112 | 0.375 | 0.00191 (n 123356; X-Wiederverw. 0.0839); Info/Orakel med. roh 0.185 ber. 0.298; P(Power<0,5) roh 0.983
+ 25  0.10   2 | 0.7128   2.7482    1.4256    2.9680     0.5000 | 1.000/0.7128/0.424/0.3028 | 0.693/0.7921/0.592/0.4697 | 0.944/0.7423/0.415 | 0.591 | 0.00171 (n 57436; X-Wiederverw. 0.1381); Info/Orakel med. roh 0.467 ber. 0.654; P(Power<0,5) roh 0.676
+ 25  0.10   3 | 0.8760   3.5538    2.6279    3.7494     0.4999 | 1.000/0.8760/0.573/0.5024 | 0.809/0.9234/0.690/0.6372 | 0.974/0.8968/0.572 | 0.690 | 0.00157 (n 24806; X-Wiederverw. 0.1459); Info/Orakel med. roh 0.642 ber. 0.840; P(Power<0,5) roh 0.413
+ 25  0.25   1 | 0.6833   2.4297    0.6833    2.5212     0.5004 | 1.000/0.6833/0.113/0.0779 | 0.593/0.7334/0.370/0.2719 | 0.933/0.6986/0.100 | 0.366 | 0.00204 (n 63346; X-Wiederverw. 0.1287); Info/Orakel med. roh 0.164 ber. 0.279; P(Power<0,5) roh 0.994
+ 25  0.25   2 | 0.9413   3.2666    1.8827    3.3083     0.4995 | 1.000/0.9413/0.320/0.3011 | 0.724/0.9591/0.560/0.5367 | 0.996/0.9433/0.318 | 0.559 | 0.00188 (n 11731; X-Wiederverw. 0.3440); Info/Orakel med. roh 0.373 ber. 0.587; P(Power<0,5) roh 0.864
+ 25  0.25   3 | 0.9936   4.2432    2.9808    4.2524     0.5000 | 1.000/0.9936/0.440/0.4377 | 0.799/0.9961/0.651/0.6487 | 0.999/0.9940/0.440 | 0.651 | 0.00156 (n 1281; X-Wiederverw. 0.5152); Info/Orakel med. roh 0.501 ber. 0.751; P(Power<0,5) roh 0.686
+ 25  0.50   1 | 0.8882   2.6848    0.8882    2.7144     0.4986 | 1.000/0.8882/0.087/0.0773 | 0.615/0.9083/0.351/0.3188 | 0.985/0.8907/0.083 | 0.350 | 0.00197 (n 22350; X-Wiederverw. 0.2191); Info/Orakel med. roh 0.140 ber. 0.254; P(Power<0,5) roh 0.999
+ 25  0.50   2 | 0.9911   3.6388    1.9822    3.6437     0.5017 | 1.000/0.9911/0.237/0.2353 | 0.711/0.9939/0.529/0.5253 | 1.000/0.9911/0.237 | 0.529 | 0.00112 (n 1781; X-Wiederverw. 0.7249); Info/Orakel med. roh 0.308 ber. 0.528; P(Power<0,5) roh 0.976
+ 25  0.50   3 | 0.9997   4.6351    2.9992    4.6353     0.5004 | 1.000/0.9997/0.351/0.3505 | 0.769/0.9998/0.622/0.6217 | 1.000/0.9997/0.351 | 0.622 | 0.00000 (n 56; X-Wiederverw. 0.9821); Info/Orakel med. roh 0.425 ber. 0.689; P(Power<0,5) roh 0.904
+alpha bei Wiederverwendung der X-Daten (alle Null, analytisch 1-(1-0,0025)^K): {'K4': 0.00996, 'K10': 0.02472, 'K25': 0.06066} ; Konfirmation auf disjunkten Daten: alpha_eff P-2(a) r 1/2 = 0.001933
+[Zeit (c): 112.6 s CPU]
+
+================ (d) Programmebene je Jahr ================
+BY q 0,10: kleinste Schwelle q/(m c_m): {'4': 0.012, '8': 0.0046, '12': 0.00269, '13': 0.00242, '20': 0.00139} -> bei festem alpha 0,0025 ist BY fuer m <= 12 nie bindend
+                  Szenario   m   pi_K | fest 0,0025: E[V] E[S] PPV FDR P(V>=1) | BY allein: E[V] E[S] FDR | BY+fest: E[V] E[S] FDR
+                 fest_0.05   4 0.0500 | 0.0071 0.161 0.9581 0.0066 0.0070 | 0.0313 0.172 0.0274 | 0.0071 0.161 0.0066 (ident. True)
+                 fest_0.05   8 0.0500 | 0.0147 0.318 0.9558 0.0128 0.0146 | 0.0330 0.331 0.0253 | 0.0147 0.318 0.0128 (ident. True)
+                 fest_0.05  12 0.0500 | 0.0220 0.477 0.9558 0.0176 0.0218 | 0.0343 0.487 0.0235 | 0.0220 0.477 0.0176 (ident. True)
+                 fest_0.10   4 0.1000 | 0.0070 0.321 0.9786 0.0062 0.0070 | 0.0319 0.342 0.0257 | 0.0070 0.321 0.0062 (ident. True)
+                 fest_0.10   8 0.1000 | 0.0141 0.639 0.9784 0.0107 0.0141 | 0.0373 0.669 0.0239 | 0.0141 0.639 0.0107 (ident. True)
+                 fest_0.10  12 0.1000 | 0.0205 0.961 0.9791 0.0133 0.0203 | 0.0401 0.992 0.0211 | 0.0205 0.961 0.0133 (ident. True)
+                 fest_0.25   4 0.2500 | 0.0057 0.801 0.9929 0.0042 0.0057 | 0.0323 0.858 0.0204 | 0.0057 0.801 0.0042 (ident. True)
+                 fest_0.25   8 0.2500 | 0.0114 1.596 0.9929 0.0059 0.0113 | 0.0437 1.693 0.0183 | 0.0114 1.596 0.0059 (ident. True)
+                 fest_0.25  12 0.2500 | 0.0171 2.401 0.9929 0.0066 0.0170 | 0.0544 2.534 0.0169 | 0.0171 2.401 0.0066 (ident. True)
+       aus_c_K4_pi0.1_d2.0   4 0.2906 | 0.0054 0.747 0.9929 0.0041 0.0054 | 0.0316 0.847 0.0201 | 0.0054 0.747 0.0041 (ident. True)
+       aus_c_K4_pi0.1_d2.0   8 0.2906 | 0.0108 1.495 0.9928 0.0058 0.0108 | 0.0418 1.651 0.0177 | 0.0108 1.495 0.0058 (ident. True)
+       aus_c_K4_pi0.1_d2.0  12 0.2906 | 0.0164 2.241 0.9928 0.0066 0.0162 | 0.0516 2.444 0.0163 | 0.0164 2.241 0.0066 (ident. True)
+      aus_c_K10_pi0.1_d2.0   4 0.4981 | 0.0041 1.093 0.9963 0.0027 0.0041 | 0.0269 1.322 0.0144 | 0.0041 1.093 0.0027 (ident. True)
+      aus_c_K10_pi0.1_d2.0   8 0.4981 | 0.0076 2.180 0.9965 0.0032 0.0076 | 0.0378 2.574 0.0120 | 0.0076 2.180 0.0032 (ident. True)
+      aus_c_K10_pi0.1_d2.0  12 0.4981 | 0.0117 3.274 0.9964 0.0035 0.0116 | 0.0488 3.817 0.0113 | 0.0117 3.274 0.0035 (ident. True)
+      aus_c_K25_pi0.1_d2.0   4 0.7128 | 0.0022 1.207 0.9982 0.0014 0.0022 | 0.0169 1.628 0.0083 | 0.0022 1.207 0.0014 (ident. True)
+      aus_c_K25_pi0.1_d2.0   8 0.7128 | 0.0046 2.415 0.9981 0.0018 0.0046 | 0.0262 3.162 0.0073 | 0.0046 2.415 0.0018 (ident. True)
+      aus_c_K25_pi0.1_d2.0  12 0.7128 | 0.0068 3.627 0.9981 0.0018 0.0068 | 0.0333 4.673 0.0066 | 0.0068 3.627 0.0018 (ident. True)
+     aus_c_K10_pi0.25_d2.0   4 0.8251 | 0.0015 1.552 0.9990 0.0009 0.0015 | 0.0115 2.018 0.0050 | 0.0015 1.552 0.0009 (ident. True)
+     aus_c_K10_pi0.25_d2.0   8 0.8251 | 0.0027 3.096 0.9991 0.0008 0.0027 | 0.0174 3.951 0.0041 | 0.0027 3.096 0.0008 (ident. True)
+     aus_c_K10_pi0.25_d2.0  12 0.8251 | 0.0038 4.657 0.9992 0.0008 0.0038 | 0.0230 5.870 0.0037 | 0.0038 4.657 0.0008 (ident. True)
+      aus_c_K10_pi0.1_d1.0   4 0.2902 | 0.0056 0.298 0.9815 0.0050 0.0056 | 0.0283 0.426 0.0217 | 0.0056 0.298 0.0050 (ident. True)
+      aus_c_K10_pi0.1_d1.0   8 0.2902 | 0.0111 0.597 0.9817 0.0085 0.0111 | 0.0325 0.759 0.0194 | 0.0111 0.597 0.0085 (ident. True)
+      aus_c_K10_pi0.1_d1.0  12 0.2902 | 0.0163 0.894 0.9821 0.0110 0.0162 | 0.0365 1.058 0.0184 | 0.0163 0.894 0.0110 (ident. True)
+      aus_c_K10_pi0.1_d3.0   4 0.6093 | 0.0030 1.630 0.9981 0.0016 0.0030 | 0.0232 1.866 0.0103 | 0.0030 1.630 0.0016 (ident. True)
+      aus_c_K10_pi0.1_d3.0   8 0.6093 | 0.0058 3.265 0.9982 0.0018 0.0058 | 0.0359 3.698 0.0088 | 0.0058 3.265 0.0018 (ident. True)
+      aus_c_K10_pi0.1_d3.0  12 0.6093 | 0.0092 4.892 0.9981 0.0019 0.0092 | 0.0479 5.513 0.0081 | 0.0092 4.892 0.0019 (ident. True)
+      aus_c_K10_pi0.5_d2.0   4 0.9682 | 0.0002 1.413 0.9998 0.0001 0.0002 | 0.0020 2.052 0.0009 | 0.0002 1.413 0.0001 (ident. True)
+      aus_c_K10_pi0.5_d2.0   8 0.9682 | 0.0005 2.830 0.9998 0.0002 0.0005 | 0.0033 3.989 0.0008 | 0.0005 2.830 0.0002 (ident. True)
+      aus_c_K10_pi0.5_d2.0  12 0.9682 | 0.0009 4.243 0.9998 0.0002 0.0009 | 0.0047 5.895 0.0008 | 0.0009 4.243 0.0002 (ident. True)
+PPV analytisch (Basisrate 0,05/0,10/0,25): {'C10_heute_je080': [0.9309, 0.966, 0.9884], 'P2a_r1_2_power080': [0.9561, 0.9787, 0.9928], 'gepoolt0025_power080': [0.944, 0.9726, 0.9907], 'gepoolt001_power080': [0.8081, 0.8989, 0.9639], 'ein_fenster005': [0.4571, 0.64, 0.8421]}
+[Zeit (d): 7.7 s CPU]
+
+================ (e) Schwere Raender und kleine Clusterzahlen ================
+Gegenprobe ideale SB-SE (Formel) gegen SB-Simulation (power_p1-Konvention, 1e5 Replikate): [{'n': 52, 'phi': 0.0, 'se_formel': 0.12726007462557548, 'se_bootstrap_1e5': 0.12716262998806707}, {'n': 104, 'phi': 0.3, 'se_formel': 0.12496234748639003, 'se_bootstrap_1e5': 0.12488398873769732}]
+Schiefe der standardisierten Fernandez-Steel-t4 (gamma 1,5 / 1,2): {'skewt4_gamma1.5': 2.4075, 'skewt4_gamma1.2': 1.2391}
+  Vert.    n | wahres alpha nominal 0,0025: z-naiv  t-krit  SB-max(z) | nominal 0,05: z-naiv t-krit SB-max | Power bei Normal-MDE80 (0,0025): Normalnaeh. 0,80 -> z-naiv t-krit SB-max | 0,05: z t SB | untere Flanke 0,0025 SB
+    normal   40 | 0.00391 0.00241 0.00338 | 0.0539 0.0500 0.0505 | 0.7948 0.7454 0.7734 | 0.7990 0.7876 0.7865 | 0.00331
+    normal   52 | 0.00372 0.00260 0.00328 | 0.0529 0.0499 0.0495 | 0.7943 0.7576 0.7718 | 0.7994 0.7909 0.7865 | 0.00293
+    normal  104 | 0.00301 0.00254 0.00266 | 0.0514 0.0498 0.0477 | 0.7987 0.7812 0.7769 | 0.7975 0.7936 0.7850 | 0.00286
+        t5   40 | 0.00341 0.00214 0.00307 | 0.0528 0.0485 0.0495 | 0.7987 0.7546 0.7805 | 0.8059 0.7953 0.7950 | 0.00308
+        t5   52 | 0.00311 0.00220 0.00277 | 0.0532 0.0500 0.0497 | 0.8012 0.7674 0.7812 | 0.8061 0.7980 0.7942 | 0.00268
+        t5  104 | 0.00273 0.00228 0.00237 | 0.0509 0.0494 0.0472 | 0.7997 0.7832 0.7787 | 0.8030 0.7988 0.7916 | 0.00236
+        t4   40 | 0.00351 0.00226 0.00314 | 0.0536 0.0496 0.0502 | 0.8076 0.7677 0.7915 | 0.8139 0.8042 0.8037 | 0.00278
+        t4   52 | 0.00294 0.00200 0.00254 | 0.0526 0.0494 0.0493 | 0.8056 0.7743 0.7873 | 0.8104 0.8028 0.7998 | 0.00247
+        t4  104 | 0.00252 0.00209 0.00214 | 0.0517 0.0502 0.0481 | 0.8040 0.7884 0.7850 | 0.8060 0.8022 0.7951 | 0.00215
+        t3   40 | 0.00274 0.00168 0.00244 | 0.0523 0.0480 0.0491 | 0.8378 0.8066 0.8258 | 0.8396 0.8316 0.8317 | 0.00251
+        t3   52 | 0.00257 0.00170 0.00225 | 0.0515 0.0485 0.0480 | 0.8377 0.8131 0.8240 | 0.8379 0.8314 0.8293 | 0.00226
+        t3  104 | 0.00217 0.00175 0.00183 | 0.0510 0.0494 0.0473 | 0.8307 0.8179 0.8158 | 0.8290 0.8258 0.8197 | 0.00220
+    skewt4   40 | 0.00075 0.00038 0.00065 | 0.0319 0.0287 0.0295 | 0.8741 0.8299 0.8554 | 0.8605 0.8502 0.8499 | 0.01141
+    skewt4   52 | 0.00064 0.00038 0.00053 | 0.0340 0.0316 0.0316 | 0.8690 0.8358 0.8494 | 0.8536 0.8453 0.8421 | 0.00945
+    skewt4  104 | 0.00078 0.00061 0.00064 | 0.0356 0.0343 0.0327 | 0.8565 0.8397 0.8356 | 0.8383 0.8343 0.8271 | 0.00713
+skewt4g1.2   40 | 0.00150 0.00090 0.00129 | 0.0417 0.0377 0.0386 | 0.8353 0.7927 0.8176 | 0.8341 0.8238 0.8234 | 0.00599
+skewt4g1.2   52 | 0.00151 0.00097 0.00128 | 0.0424 0.0396 0.0394 | 0.8340 0.8010 0.8144 | 0.8294 0.8217 0.8173 | 0.00507
+skewt4g1.2  104 | 0.00143 0.00112 0.00122 | 0.0435 0.0419 0.0399 | 0.8270 0.8103 0.8065 | 0.8200 0.8159 0.8087 | 0.00405
+AR(1) phi 0,3 (c wahr 1,857): wahres alpha naiv / SB-max: {'normal_n52': {'0.0025': (0.02282, 0.01402), '0.05': (0.11713, 0.08875)}, 'normal_n104': {'0.0025': (0.02106, 0.00978), '0.05': (0.11581, 0.07838)}, 't4_n52': {'0.0025': (0.02223, 0.01308), '0.05': (0.12033, 0.09077)}, 't4_n104': {'0.0025': (0.02093, 0.0095), '0.05': (0.11651, 0.07885)}}
+GSD mit geschaetzter Varianz (OBF c 2,8321, 4 Blicke, nominal 0,0025): alpha_eff [z-Grenzen naiv | t-Grenzen naiv | z-Grenzen SB-max | t-Grenzen SB-max]; Power bei Design-Drift
+  normal n  40 (Blicke [10, 20, 30, 40]): H0 0.00444 | 0.00254 | 0.00412 | 0.00235; Power 0.7988 | 0.7437 | 0.7806 | 0.7216; t-Grenzen [18.926, 5.112, 3.632, 3.005]
+  normal n  52 (Blicke [13, 26, 39, 52]): H0 0.00394 | 0.00251 | 0.00363 | 0.00225; Power 0.7979 | 0.7573 | 0.7780 | 0.7337; t-Grenzen [13.338, 4.804, 3.54, 2.963]
+  normal n 104 (Blicke [26, 52, 78, 104]): H0 0.00308 | 0.00240 | 0.00265 | 0.00206; Power 0.7984 | 0.7792 | 0.7777 | 0.7572; t-Grenzen [8.205, 4.366, 3.399, 2.895]
+      t4 n  40 (Blicke [10, 20, 30, 40]): H0 0.00348 | 0.00186 | 0.00315 | 0.00162; Power 0.8222 | 0.7741 | 0.8082 | 0.7567; t-Grenzen [18.926, 5.112, 3.632, 3.005]
+      t4 n  52 (Blicke [13, 26, 39, 52]): H0 0.00312 | 0.00194 | 0.00280 | 0.00168; Power 0.8172 | 0.7816 | 0.8019 | 0.7634; t-Grenzen [13.338, 4.804, 3.54, 2.963]
+      t4 n 104 (Blicke [26, 52, 78, 104]): H0 0.00266 | 0.00216 | 0.00228 | 0.00183; Power 0.8116 | 0.7940 | 0.7946 | 0.7751; t-Grenzen [8.205, 4.366, 3.399, 2.895]
+      t3 n  40 (Blicke [10, 20, 30, 40]): H0 0.00307 | 0.00152 | 0.00278 | 0.00136; Power 0.8605 | 0.8206 | 0.8506 | 0.8078; t-Grenzen [18.926, 5.112, 3.632, 3.005]
+      t3 n  52 (Blicke [13, 26, 39, 52]): H0 0.00261 | 0.00171 | 0.00237 | 0.00153; Power 0.8535 | 0.8234 | 0.8418 | 0.8091; t-Grenzen [13.338, 4.804, 3.54, 2.963]
+      t3 n 104 (Blicke [26, 52, 78, 104]): H0 0.00233 | 0.00185 | 0.00208 | 0.00161; Power 0.8426 | 0.8273 | 0.8285 | 0.8119; t-Grenzen [8.205, 4.366, 3.399, 2.895]
+[Zeit (e): 249.8 s CPU]
+
+================ (f) Ueberlappung ================
+c analytisch (N 365):  {'h1': (1.0, 1, {'L0': (1, 1), 'L4': (1.0, 1.0), 'L2': (1.0, 1.0)}), 'h2': (1.9973, 1.4986, {'L1': (1.5, 1.25), 'L4': (1.8, 1.4)}), 'h3': (2.9927, 2.1075, {'L2': (2.1111, 1.6667), 'L4': (2.4667, 1.8444), 'L6': (2.619, 1.9206)})}
+MC TS h 2: c wahr 1.9973; E[c_hat] L=h-1 1.4945, L=4 1.7766, L=2h 1.7766; wahres alpha 0,0025/0,05: naiv 0.02431/0.1237, NW(h-1) 0.00832/0.0791, NW(4) 0.00492/0.0627, NW(2h) 0.00492/0.0627, SB-max 0.00577/0.0663
+MC TS h 3: c wahr 2.9927; E[c_hat] L=h-1 2.0962, L=4 2.4331, L=2h 2.5680; wahres alpha 0,0025/0,05: naiv 0.05337/0.1710, NW(h-1) 0.01038/0.0849, NW(4) 0.00675/0.0704, NW(2h) 0.00588/0.0657, SB-max 0.00813/0.0757
+MC XS h 2: c wahr 1.4986; E[c_hat] L=h-1 1.2451, L=4 1.3815, L=2h 1.3815; wahres alpha 0,0025/0,05: naiv 0.01141/0.0896, NW(h-1) 0.00560/0.0671, NW(4) 0.00407/0.0581, NW(2h) 0.00407/0.0581, SB-max 0.00458/0.0608
+MC XS h 3: c wahr 2.1075; E[c_hat] L=h-1 1.6530, L=4 1.8175, L=2h 1.8814; wahres alpha 0,0025/0,05: naiv 0.02821/0.1304, NW(h-1) 0.00737/0.0750, NW(4) 0.00554/0.0665, NW(2h) 0.00509/0.0638, SB-max 0.00647/0.0707
+F1 MDE80 je Fenster x sqrt(c): {'K600': {'MDE80_c1': 0.0133, 'h2_TS_persistent': 0.0188, 'h2_XS_formation_h': 0.0163, 'h3_TS_persistent': 0.023, 'h3_XS_formation_h': 0.0193}, 'K500': {'MDE80_c1': 0.0146, 'h2_TS_persistent': 0.0206, 'h2_XS_formation_h': 0.0179, 'h3_TS_persistent': 0.0253, 'h3_XS_formation_h': 0.0212}, 'K300': {'MDE80_c1': 0.0188, 'h2_TS_persistent': 0.0266, 'h2_XS_formation_h': 0.023, 'h3_TS_persistent': 0.0325, 'h3_XS_formation_h': 0.0273}}
+[Zeit (f): 85.1 s CPU]
+
+================ (g) Strenge-Quotient und A2 unter 3.1 ================
+Modell-Korrelationen: {'W1_zentral': {'SE_E': 6.516, 'Cov_E_P': {'P2': -0.004, 'P3fix': -1.342, 'P3all': -0.151}, 'corr_P2_P3fix': np.float64(0.752), 'corr_P2_P3all': np.float64(0.885), 'corr_null_P2': 0.913}, 'W1_stress': {'SE_E': 7.339, 'Cov_E_P': {'P2': 0.031, 'P3fix': -1.483, 'P3all': -0.195}, 'corr_P2_P3fix': np.float64(0.774), 'corr_P2_P3all': np.float64(0.886), 'corr_null_P2': 0.913}, 'W2_zentral': {'SE_E': 6.516, 'Cov_E_P': {'P2': -0.035, 'P3fix': -1.306, 'P3all': -0.15}, 'corr_P2_P3fix': np.float64(0.729), 'corr_P2_P3all': np.float64(0.857), 'corr_null_P2': 0.823}, 'W2_stress': {'SE_E': 7.339, 'Cov_E_P': {'P2': -0.035, 'P3fix': -1.533, 'P3all': -0.195}, 'corr_P2_P3fix': np.float64(0.75), 'corr_P2_P3all': np.float64(0.859), 'corr_null_P2': 0.823}}
+                                   Zeile |     W1     W2 | Akte W1/W2
+                 Grundfassung_P2_zentral |  18.25  18.85 | (18.25, 18.8)
+                   P3fix_einzeln_zentral |  19.72  19.72 | (19.7, 19.7)
+                  drei_z_produkt_zentral |  22.82  23.09 | (22.8, 23.1)
+                drei_z_gemeinsam_zentral |  21.00  21.34 | None
+     produkt_mit_null_zentral_unskaliert |  23.44  24.39 | (23.43, 24.36)
+             bivariat_zentral_unskaliert |  22.95  23.79 | (22.93, 23.77)
+            gemeinsam_zentral_unskaliert |  21.18  22.31 | (21.2, 22.3)
+               produkt_stress_unskaliert |  26.08  27.19 | (26.1, 27.2)
+              bivariat_stress_unskaliert |  25.49  26.48 | (25.5, 26.5)
+             gemeinsam_stress_unskaliert |  23.36  24.74 | None
+                 produkt_stress_skaliert |  26.63  29.31 | (26.6, 29.3)
+                bivariat_stress_skaliert |  25.40  28.43 | (25.4, 28.5)
+               gemeinsam_stress_skaliert |  23.20  27.01 | None
+           produkt_stress_skaliert_gate4 |  28.98  32.16 | (29.0, 32.1)
+          bivariat_stress_skaliert_gate4 |  27.88  31.48 | None
+         gemeinsam_stress_skaliert_gate4 |  26.19  30.55 | (26.2, 30.6)
+                produkt_zentral_skaliert |  23.92  26.25 | (23.9, 26.2)
+               bivariat_zentral_skaliert |  22.88  25.50 | (22.9, 25.5)
+          produkt_zentral_skaliert_gate4 |  26.05  28.79 | (26.0, 28.8)
+        gemeinsam_zentral_skaliert_gate4 |  23.76  27.37 | (23.7, 27.4)
+         bivariat_zentral_skaliert_gate4 |  25.13  28.22 | None
+Alternative Korrelation skaliert (nullSD/SE wie unskaliert): {'bivariat_stress_skaliert': (25.84, 28.57), 'gemeinsam_stress_skaliert': (23.81, 27.32), 'bivariat_stress_skaliert_gate4': (28.31, 31.59), 'gemeinsam_stress_skaliert_gate4': (26.76, 30.78), 'bivariat_zentral_skaliert': (23.25, 25.62), 'gemeinsam_zentral_skaliert_gate4': (24.22, 27.58), 'bivariat_zentral_skaliert_gate4': (25.49, 28.31)}
+Kette W2 heute_produkt: 18.85 -> 19.72 -> 23.09 -> 24.39 -> 27.19 -> 29.31 -> 32.16; Strenge-Quotient 1.707 (Daten x2.912)
+Kette W2 P7_minimal_bivariat: 18.85 -> 23.79 -> 26.48 -> 28.43 -> 31.48; Strenge-Quotient 1.670 (Daten x2.790)
+Kette W2 P7_voll_gemeinsam: 18.85 -> 21.34 -> 22.31 -> 24.74 -> 27.01 -> 30.55; Strenge-Quotient 1.621 (Daten x2.626)
+3.1 gepoolt W1+W2 (alpha 0,0025 je Bedingung, REZENZ-Screen P2'' W2 bei 0,05): {'Q0_P2_gepoolt_ohne_screen_zentral': 19.258, 'Q1_P2_gepoolt_mit_screen_zentral': 20.707, 'Q2_drei_z_gemeinsam_zentral': 22.239, 'Q3_plus_null_unskaliert_zentral': 22.433, 'Q4_stress': 24.875, 'Q5_skalierte_null': 25.708, 'Q6_gate4_09025': 28.058, 'Q6alt_gate4_bei_0025_09950': 25.8, 'Q5b_screen_alle_drei_z_W2': 28.779, 'analytisch_P2_gepoolt_zentral': 19.249, 'strenge_quotient_vs_Q1': 1.355, 'strenge_quotient_vs_Q0': 1.457, 'tau_9975_annahme': 2.825}
+MDE80 (bp) gegen Konfirmationslaenge T Monate [Q6 alle Festlegungen mit Screen, Q1 Grundfassung mit Screen, Q6 mit P-6-Stabilitaetstest statt Screen]:  {'24': (28.06, 20.71, 28.98), '30': (26.24, 19.79, 25.92), '36': (25.25, 19.31, 23.66), '42': (24.73, 19.07, 21.91), '48': (24.48, 18.95, 20.49), '60': (24.33, 18.87, 18.33), '72': (24.31, 18.86, 16.73), '84': (24.3, 18.86, 15.49), '96': (24.3, 18.86, 14.49), '120': (24.3, 18.86, 12.96)}
+Boden durch REZENZ-Screen (T -> inf): Q6 (z95 + Phi^-1(0,8/0,9025)) x SE_W2,stress = 24.304 ; Q1 2,4865 x SE_W2,zentral = 18.847
+Heute (C.10, Produktkette W2 32.16 bp bei 12 Monaten): Fensterlaenge fuer 22 bp 25.6 Monate je Fenster
+[Zeit (g): 212.4 s CPU]
+
+================ (h) Gegenueberstellung heute / 3.1 ================
+Klasse W (Wochen):  {'sd0.13_sesoi0.04': {'C10_wochen_je_fenster': 65.3033, 'C10_testbar_W1W2': False, 'C10_prospektiv_ab_2026_07_ende_monate': 30.14, 'P2a_MDE_boden_52W': 0.0448, 'P2a_fest_wochen': inf, 'r': 0.0, 'GSD_max_wochen': inf, 'GSD_EN_H1_wochen': inf, 'P6_stabilitaet_fest_wochen': 153.3409}, 'sd0.13_sesoi0.02': {'C10_wochen_je_fenster': 261.213, 'C10_testbar_W1W2': False, 'C10_prospektiv_ab_2026_07_ende_monate': 120.5599, 'P2a_MDE_boden_52W': 0.0448, 'P2a_fest_wochen': inf, 'r': 0.0, 'GSD_max_wochen': inf, 'GSD_EN_H1_wochen': inf, 'P6_stabilitaet_fest_wochen': 613.3637}, 'sd0.09_sesoi0.04': {'C10_wochen_je_fenster': 31.2992, 'C10_testbar_W1W2': True, 'C10_prospektiv_ab_2026_07_ende_monate': 14.4458, 'P2a_MDE_boden_52W': 0.031, 'P2a_fest_wochen': 67.8428, 'r': 0.7665, 'GSD_max_wochen': 72.556, 'GSD_EN_H1_wochen': 61.907, 'P6_stabilitaet_fest_wochen': 73.4948}, 'sd0.09_sesoi0.02': {'C10_wochen_je_fenster': 125.1968, 'C10_testbar_W1W2': False, 'C10_prospektiv_ab_2026_07_ende_monate': 57.7831, 'P2a_MDE_boden_52W': 0.031, 'P2a_fest_wochen': inf, 'r': 0.0, 'GSD_max_wochen': inf, 'GSD_EN_H1_wochen': inf, 'P6_stabilitaet_fest_wochen': 293.9791}}
+   sd0.13_sesoi0.04_fest {'monate': None, 'termin': 'nie (REZENZ-Screen-Boden ueber SESOI)'}
+   sd0.13_sesoi0.04_GSD_max {'monate': None, 'termin': 'nie (REZENZ-Screen-Boden ueber SESOI)'}
+   sd0.13_sesoi0.04_GSD_EN_H1 {'monate': None, 'termin': 'nie (REZENZ-Screen-Boden ueber SESOI)'}
+   sd0.13_sesoi0.04_P6_stabilitaet_fest {'monate': 35.38636934965355, 'lesart_B_ab_2024_07': '2027-07', 'lesart_A_ab_2026_01': '2029-01'}
+   sd0.13_sesoi0.04_heute_C10 {'wochen_je_fenster': 65.30326076320878, 'W1W2': 'nein (MDE > SESOI auf 12 Monaten)', 'prospektiv_2_Fenster_ab_2026_07': '2029-02', 'DEC96_E2_L_max_12': 'GL-012'}
+   sd0.13_sesoi0.02_fest {'monate': None, 'termin': 'nie (REZENZ-Screen-Boden ueber SESOI)'}
+   sd0.13_sesoi0.02_GSD_max {'monate': None, 'termin': 'nie (REZENZ-Screen-Boden ueber SESOI)'}
+   sd0.13_sesoi0.02_GSD_EN_H1 {'monate': None, 'termin': 'nie (REZENZ-Screen-Boden ueber SESOI)'}
+   sd0.13_sesoi0.02_P6_stabilitaet_fest {'monate': 141.5454773986142, 'lesart_B_ab_2024_07': '2036-05', 'lesart_A_ab_2026_01': '2037-11'}
+   sd0.13_sesoi0.02_heute_C10 {'wochen_je_fenster': 261.21304305283513, 'W1W2': 'nein (MDE > SESOI auf 12 Monaten)', 'prospektiv_2_Fenster_ab_2026_07': '2036-08', 'DEC96_E2_L_max_12': 'GL-012'}
+   sd0.09_sesoi0.04_fest {'monate': 15.65604121593822, 'lesart_B_ab_2024_07': '2027-01 (Registrierung, Daten liegen vor)', 'lesart_A_ab_2026_01': '2027-05'}
+   sd0.09_sesoi0.04_GSD_max {'monate': 16.743680789738836, 'lesart_B_ab_2024_07': '2027-01 (Registrierung, Daten liegen vor)', 'lesart_A_ab_2026_01': '2027-06'}
+   sd0.09_sesoi0.04_GSD_EN_H1 {'monate': 14.28623587575005, 'lesart_B_ab_2024_07': '2027-01 (Registrierung, Daten liegen vor)', 'lesart_A_ab_2026_01': '2027-04'}
+   sd0.09_sesoi0.04_P6_stabilitaet_fest {'monate': 16.96033087172743, 'lesart_B_ab_2024_07': '2027-01 (Registrierung, Daten liegen vor)', 'lesart_A_ab_2026_01': '2027-06'}
+   sd0.09_sesoi0.04_heute_C10 {'wochen_je_fenster': 31.299195987100063, 'W1W2': 'nach Registrierung (Fenster blind, liegen vor)', 'prospektiv_2_Fenster_ab_2026_07': '2027-10', 'DEC96_E2_L_max_12': 'zulaessig'}
+   sd0.09_sesoi0.02_fest {'monate': None, 'termin': 'nie (REZENZ-Screen-Boden ueber SESOI)'}
+   sd0.09_sesoi0.02_GSD_max {'monate': None, 'termin': 'nie (REZENZ-Screen-Boden ueber SESOI)'}
+   sd0.09_sesoi0.02_GSD_EN_H1 {'monate': None, 'termin': 'nie (REZENZ-Screen-Boden ueber SESOI)'}
+   sd0.09_sesoi0.02_P6_stabilitaet_fest {'monate': 67.84132348690972, 'lesart_B_ab_2024_07': '2030-03', 'lesart_A_ab_2026_01': '2031-09'}
+   sd0.09_sesoi0.02_heute_C10 {'wochen_je_fenster': 125.19678394840025, 'W1W2': 'nein (MDE > SESOI auf 12 Monaten)', 'prospektiv_2_Fenster_ab_2026_07': '2031-05', 'DEC96_E2_L_max_12': 'GL-012'}
+Klasse E (A2): {'sesoi22.0': {'T_fest_alle_festlegungen_monate': None, 'termin_3_1': 'nie (REZENZ-Screen-Boden ueber SESOI)', 'boden_Q6_T120': 24.3, 'T_fest_grundfassung_monate': 21.26, 'T_P6_stabilitaet_monate': 41.64, 'lesart_B_ende_P6_stabilitaet': '2028-01', 'heute_C10_fensterlaenge_monate': 25.65, 'heute_C10_prospektiv_ende': '2030-11'}, 'sesoi25.0': {'T_P6_stabilitaet_monate': 32.25, 'lesart_B_ende_P6_stabilitaet': '2027-04', 'T_fest_alle_festlegungen_monate': 38.78, 'T_fest_grundfassung_monate': 16.46, 'T_GSD_max_monate': 45.97, 'T_GSD_EN_H1_monate': 38.66, 'lesart_B_ende_fest': '2027-10', 'lesart_B_ende_GSD_max': '2028-05', 'lesart_B_EN_H1': '2027-10', 'lesart_A_ende_fest': '2029-04', 'lesart_A_ende_GSD_max': '2029-11', 'heute_C10_fensterlaenge_monate': 19.86, 'heute_C10_prospektiv_ende': '2029-11'}}
+   heute_C10_je080 {'alpha_je_test': 0.0025, 'entscheidungs_power': 0.64, 'EN_H1_in_Nfix0025': 0.92882, 'ppv': {'0.05': 0.9309, '0.1': 0.966, '0.25': 0.9884}, 'falsch_PASS_jahr_m8_basis0.10': 0.018, 'falsch_PASS_jahr_real_m0': 0.0, 'EN_H1_in_N005': 2.0}
+   3.1_fest_P2a_r1_2 {'alpha_je_test': 0.00193, 'entscheidungs_power': 0.8, 'EN_H1_in_Nfix0025': 1.14464, 'ppv': {'0.05': 0.9561, '0.1': 0.9787, '0.25': 0.9928}, 'falsch_PASS_jahr_m8_basis0.10': 0.01391, 'EN_H1_in_N005': 2.46471}
+   3.1_GSD_screen_all_r1_2 {'alpha_je_test': 0.00217, 'entscheidungs_power': 0.8, 'EN_H1_in_Nfix0025': 0.91251, 'R_max': 1.06947, 'ppv': {'0.05': 0.9511, '0.1': 0.9762, '0.25': 0.9919}, 'falsch_PASS_jahr_m8_basis0.10': 0.0156, 'EN_H1_in_N005': 1.96487, 'max_in_N005': 2.30285}
+   3.1_GSD_screen_all_r1_3_fut {'alpha_je_test': 0.00166, 'entscheidungs_power': 0.8, 'EN_H1_in_Nfix0025': 0.9751, 'EN_H0_in_Nfix0025': 0.65086, 'R_max': 1.18984, 'ppv': {'0.05': 0.962, '0.1': 0.9816, '0.25': 0.9938}, 'falsch_PASS_jahr_m8_basis0.10': 0.01197, 'EN_H1_in_N005': 2.09966, 'max_in_N005': 2.56204}
+   heute_C10_gemeinsam080_referenz {'alpha_je_test': 0.0025, 'entscheidungs_power': 0.8, 'EN_H1_in_N005': np.float64(2.7117)}
+   3.1_fest_P2a_r1_3 {'alpha_je_test': 0.00142, 'entscheidungs_power': 0.8, 'EN_H1_in_N005': 3.17718}
+   3.1_GSD_ohne_screen {'alpha_je_test': np.float64(0.00251), 'entscheidungs_power': 0.8, 'EN_H1_in_N005': np.float64(1.8759), 'max_in_N005': np.float64(2.16923)}
+[Zeit (h): 2.3 s CPU]
+
+================ (t) Abgeleitete Textzahlen ================
+a_datenfaktor_prozent_vs_C10je080: {'r1_2': 23.235, 'r1_3': 58.859, 'r1_4': 102.582}
+a_datenfaktor_prozent_vs_C10gem080: {'r1_2': -9.1083, 'r1_3': 17.166, 'r1_4': 49.413}
+a_datenfaktor_prozent_vs_gepoolt: {'r1_2': 14.464, 'r1_3': 47.552, 'r1_4': 88.162}
+a_alpha_P2a_relativ_0025: {'r1_2': 0.773, 'r1_3': 0.5696, 'r1_4': 0.4575}
+a_MDE_P2a_r1_2_vs_C10je_SE12: 1.1101
+b_prozent: {'GSD_ohne_screen_EN_H1_vs_C10gem080': -30.8221, 'GSD_ohne_screen_EN_H1_vs_C10je080': -6.2051, 'GSD_screen_all_r0.5_EN_H1_vs_C10gem080': -27.5411, 'GSD_screen_all_r0.5_EN_H1_vs_C10je080': -1.7566, 'GSD_screen_all_r0.333_EN_H1_vs_C10gem080': -22.1159, 'GSD_screen_all_r0.333_EN_H1_vs_C10je080': 5.599}
+b_OBF_grenzen: {'alpha0.0025_nofut': {'z_grenze_je_blick': [5.664, 4.0051, 3.2701, 2.832], 'nominales_p_je_blick': [0.0, 0.0, 0.0005, 0.0023]}, 'alpha0.05_nofut': {'z_grenze_je_blick': [3.468, 2.4522, 2.0023, 1.734], 'nominales_p_je_blick': [0.0003, 0.0071, 0.0226, 0.0415]}}
+b_futility_mehr_maximum: {'0.500': 0.0262, '0.333': 0.0253, '0.250': 0.0231}
+c_spannweiten: {'ratio_E_x_echt_zu_delta': [1.0531, 2.7144], 'power_echt_roh': [0.0868, 0.7184], 'power_echt_bereinigt': [0.3508, 0.735], 'anteil_power_unter_050_roh': [0.2107, 0.9993], 'anteil_registriert_bereinigt': [0.4983, 0.8567], 'alpha_null_gewaehlt_n_ab_1000': [0.0011, 0.0022], 'pi_K_bei_pi_0.1': [0.2043, 0.876], 'P_med_le_theta': [0.4977, 0.5017], 'alpha_wiederverwendung_bedingt': [0.0099, 0.7249]}
+d_verhaeltnis_EV_BYallein_zu_fest: {'fest_0.05_m4': 4.4341, 'fest_0.05_m8': 2.2419, 'fest_0.05_m12': 1.5575, 'fest_0.10_m4': 4.5633, 'fest_0.10_m8': 2.6403, 'fest_0.10_m12': 1.9575, 'fest_0.25_m4': 5.6643, 'fest_0.25_m8': 3.8336, 'fest_0.25_m12': 3.1871, 'aus_c_K4_pi0.1_d2.0_m4': 5.8791, 'aus_c_K4_pi0.1_d2.0_m8': 3.8692, 'aus_c_K4_pi0.1_d2.0_m12': 3.1529, 'aus_c_K10_pi0.1_d2.0_m4': 6.6029, 'aus_c_K10_pi0.1_d2.0_m8': 4.9554, 'aus_c_K10_pi0.1_d2.0_m12': 4.1737, 'aus_c_K25_pi0.1_d2.0_m4': 7.7471, 'aus_c_K25_pi0.1_d2.0_m8': 5.6873, 'aus_c_K25_pi0.1_d2.0_m12': 4.8698, 'aus_c_K10_pi0.25_d2.0_m4': 7.3903, 'aus_c_K10_pi0.25_d2.0_m8': 6.5328, 'aus_c_K10_pi0.25_d2.0_m12': 6.0157, 'aus_c_K10_pi0.1_d1.0_m4': 5.0357, 'aus_c_K10_pi0.1_d1.0_m8': 2.9182, 'aus_c_K10_pi0.1_d1.0_m12': 2.2413, 'aus_c_K10_pi0.1_d3.0_m4': 7.6474, 'aus_c_K10_pi0.1_d3.0_m8': 6.1952, 'aus_c_K10_pi0.1_d3.0_m12': 5.1813, 'aus_c_K10_pi0.5_d2.0_m4': 8.7609, 'aus_c_K10_pi0.5_d2.0_m8': 6.1604, 'aus_c_K10_pi0.5_d2.0_m12': 5.1803}
+d_spannweite_EV_m8: [0.0005, 0.0147]
+e_vielfache_nominal_0025: {'normal_n40': {'z_naiv': 1.564, 't_krit': 0.964, 'SB_max_z': 1.354, 'untere_flanke_SB': 1.322}, 'normal_n52': {'z_naiv': 1.488, 't_krit': 1.04, 'SB_max_z': 1.312, 'untere_flanke_SB': 1.172}, 'normal_n104': {'z_naiv': 1.206, 't_krit': 1.018, 'SB_max_z': 1.064, 'untere_flanke_SB': 1.146}, 't5_n40': {'z_naiv': 1.364, 't_krit': 0.856, 'SB_max_z': 1.226, 'untere_flanke_SB': 1.23}, 't5_n52': {'z_naiv': 1.244, 't_krit': 0.88, 'SB_max_z': 1.108, 'untere_flanke_SB': 1.074}, 't5_n104': {'z_naiv': 1.092, 't_krit': 0.912, 'SB_max_z': 0.948, 'untere_flanke_SB': 0.944}, 't4_n40': {'z_naiv': 1.404, 't_krit': 0.904, 'SB_max_z': 1.256, 'untere_flanke_SB': 1.112}, 't4_n52': {'z_naiv': 1.174, 't_krit': 0.8, 'SB_max_z': 1.018, 'untere_flanke_SB': 0.986}, 't4_n104': {'z_naiv': 1.01, 't_krit': 0.836, 'SB_max_z': 0.854, 'untere_flanke_SB': 0.858}, 't3_n40': {'z_naiv': 1.094, 't_krit': 0.67, 'SB_max_z': 0.976, 'untere_flanke_SB': 1.004}, 't3_n52': {'z_naiv': 1.026, 't_krit': 0.682, 'SB_max_z': 0.9, 'untere_flanke_SB': 0.902}, 't3_n104': {'z_naiv': 0.868, 't_krit': 0.7, 'SB_max_z': 0.732, 'untere_flanke_SB': 0.88}, 'skewt4_n40': {'z_naiv': 0.3, 't_krit': 0.152, 'SB_max_z': 0.262, 'untere_flanke_SB': 4.566}, 'skewt4_n52': {'z_naiv': 0.256, 't_krit': 0.152, 'SB_max_z': 0.214, 'untere_flanke_SB': 3.782}, 'skewt4_n104': {'z_naiv': 0.312, 't_krit': 0.246, 'SB_max_z': 0.258, 'untere_flanke_SB': 2.85}, 'skewt4g1.2_n40': {'z_naiv': 0.598, 't_krit': 0.36, 'SB_max_z': 0.518, 'untere_flanke_SB': 2.396}, 'skewt4g1.2_n52': {'z_naiv': 0.602, 't_krit': 0.388, 'SB_max_z': 0.51, 'untere_flanke_SB': 2.03}, 'skewt4g1.2_n104': {'z_naiv': 0.57, 't_krit': 0.45, 'SB_max_z': 0.49, 'untere_flanke_SB': 1.622}}
+e_vielfache_ar1: {'normal_n52': {'0.0025': {'z_naiv': 9.128, 'SB_max_z': 5.61}, '0.05': {'z_naiv': 2.3425, 'SB_max_z': 1.775}}, 'normal_n104': {'0.0025': {'z_naiv': 8.422, 'SB_max_z': 3.912}, '0.05': {'z_naiv': 2.3161, 'SB_max_z': 1.5676}}, 't4_n52': {'0.0025': {'z_naiv': 8.892, 'SB_max_z': 5.234}, '0.05': {'z_naiv': 2.4066, 'SB_max_z': 1.8155}}, 't4_n104': {'0.0025': {'z_naiv': 8.374, 'SB_max_z': 3.802}, '0.05': {'z_naiv': 2.3302, 'SB_max_z': 1.5771}}}
+e_vielfache_gsd: {'normal_n40': {'z_naiv': 1.776, 't_naiv': 1.018, 'z_sb': 1.648, 't_sb': 0.94}, 'normal_n52': {'z_naiv': 1.576, 't_naiv': 1.006, 'z_sb': 1.45, 't_sb': 0.898}, 'normal_n104': {'z_naiv': 1.232, 't_naiv': 0.96, 'z_sb': 1.06, 't_sb': 0.826}, 't4_n40': {'z_naiv': 1.392, 't_naiv': 0.746, 'z_sb': 1.262, 't_sb': 0.65}, 't4_n52': {'z_naiv': 1.248, 't_naiv': 0.778, 'z_sb': 1.12, 't_sb': 0.672}, 't4_n104': {'z_naiv': 1.066, 't_naiv': 0.864, 'z_sb': 0.912, 't_sb': 0.732}, 't3_n40': {'z_naiv': 1.226, 't_naiv': 0.608, 'z_sb': 1.112, 't_sb': 0.542}, 't3_n52': {'z_naiv': 1.042, 't_naiv': 0.684, 'z_sb': 0.95, 't_sb': 0.612}, 't3_n104': {'z_naiv': 0.932, 't_naiv': 0.74, 'z_sb': 0.83, 't_sb': 0.642}}
+f_vielfache_0025: {'TS_h2': {'naiv': 9.722, 'NW_Lh-1': 3.328, 'NW_L4': 1.968, 'NW_L2h': 1.968, 'SB_max': 2.306}, 'TS_h3': {'naiv': 21.35, 'NW_Lh-1': 4.152, 'NW_L4': 2.702, 'NW_L2h': 2.352, 'SB_max': 3.25}, 'XS_h2': {'naiv': 4.566, 'NW_Lh-1': 2.238, 'NW_L4': 1.626, 'NW_L2h': 1.626, 'SB_max': 1.834}, 'XS_h3': {'naiv': 11.282, 'NW_Lh-1': 2.948, 'NW_L4': 2.216, 'NW_L2h': 2.038, 'SB_max': 2.588}}
+g_ketten_zuwachs: {'heute_produkt': [{'schritt': 'P3fix bindend', 'zuwachs_bp': 0.8702}, {'schritt': 'Produkt drei z', 'zuwachs_bp': 3.3718}, {'schritt': '+ Null-Faktor (Produkt)', 'zuwachs_bp': 1.3024}, {'schritt': '+ Stress bindend', 'zuwachs_bp': 2.7943}, {'schritt': '+ skalierte Null', 'zuwachs_bp': 2.1279}, {'schritt': '+ Gate-(4)-Faktor 0,9025', 'zuwachs_bp': 2.8492}], 'P7_minimal_bivariat': [{'schritt': "exakte P2''-Bedingung (bivariat), zentral", 'zuwachs_bp': 4.9461}, {'schritt': '+ Stress bindend', 'zuwachs_bp': 2.6861}, {'schritt': '+ skalierte Null', 'zuwachs_bp': 1.9512}, {'schritt': '+ Gate-(4)-Faktor 0,9025', 'zuwachs_bp': 3.0492}], 'P7_voll_gemeinsam': [{'schritt': 'drei z exakt gemeinsam, zentral', 'zuwachs_bp': 2.4941}, {'schritt': '+ Null exakt gemeinsam, zentral', 'zuwachs_bp': 0.9707}, {'schritt': '+ Stress bindend', 'zuwachs_bp': 2.4246}, {'schritt': '+ skalierte Null', 'zuwachs_bp': 2.2708}, {'schritt': '+ Gate-(4)-Faktor 0,9025', 'zuwachs_bp': 3.5374}]}
+g_P7_effekt_bp: {'minimal': 0.6832, 'voll': 1.6182}
+g_gepoolt_zuwachs: {'screen': 1.4486, 'placebos': 1.5327, 'null': 0.1936, 'stress': 2.4418, 'skalierte_null': 0.8334, 'gate4': 2.3493, 'festlegungen_Q3_bis_Q6': 5.6245}
+g_SQ_datenfaktor_gepoolt: {'vs_Q1': 1.836, 'vs_Q0': 2.1226}
+CPU inkl. Reproduktions-Kindprozesse: 817.2 s
+
+Gesamt-CPU: 761.9 s; oc_results.json geschrieben.

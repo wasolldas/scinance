@@ -1,0 +1,19 @@
+z_0.0025 2.807 C.10 je 0,80: MDE = 2.4865 SE_12
+screen 0.05 r 0.500: alpha_eff 0.001933; MDE 2.7603 SE_12; Daten vs C.10 je 0,80 1.2324; vs gepoolt ohne Screen 1.1446; Boden 2.4865
+screen 0.05 r 0.333: alpha_eff 0.001424; MDE 2.5588 SE_12; Daten vs C.10 je 0,80 1.0591; vs gepoolt ohne Screen 1.4755; Boden 2.4865
+screen 0.05 r 0.250: alpha_eff 0.001144; MDE 2.5025 SE_12; Daten vs C.10 je 0,80 1.0129; vs gepoolt ohne Screen 1.8816; Boden 2.4865
+screen 0.10 r 0.500: alpha_eff 0.002235; MDE 2.6533 SE_12; Daten vs C.10 je 0,80 1.1387; vs gepoolt ohne Screen 1.0576; Boden 2.1232
+screen 0.10 r 0.333: alpha_eff 0.001825; MDE 2.3437 SE_12; Daten vs C.10 je 0,80 0.8885; vs gepoolt ohne Screen 1.2378; Boden 2.1232
+screen 0.10 r 0.250: alpha_eff 0.001552; MDE 2.2133 SE_12; Daten vs C.10 je 0,80 0.7924; vs gepoolt ohne Screen 1.4719; Boden 2.1232
+screen 0.20 r 0.500: alpha_eff 0.002421; MDE 2.5992 SE_12; Daten vs C.10 je 0,80 1.0927; vs gepoolt ohne Screen 1.0149; Boden 1.6832
+screen 0.20 r 0.333: alpha_eff 0.002184; MDE 2.1992 SE_12; Daten vs C.10 je 0,80 0.7823; vs gepoolt ohne Screen 1.0899; Boden 1.6832
+screen 0.20 r 0.250: alpha_eff 0.001978; MDE 1.9953 SE_12; Daten vs C.10 je 0,80 0.6440; vs gepoolt ohne Screen 1.1962; Boden 1.6832
+screen 0.50 r 0.500: alpha_eff 0.002497; MDE 2.5806 SE_12; Daten vs C.10 je 0,80 1.0772; vs gepoolt ohne Screen 1.0005; Boden 0.8416
+screen 0.50 r 0.333: alpha_eff 0.002462; MDE 2.1154 SE_12; Daten vs C.10 je 0,80 0.7238; vs gepoolt ohne Screen 1.0084; Boden 0.8416
+screen 0.50 r 0.250: alpha_eff 0.002405; MDE 1.8477 SE_12; Daten vs C.10 je 0,80 0.5522; vs gepoolt ohne Screen 1.0258; Boden 0.8416
+P-6-Lesart r 0.500: MDE 2.6942 SE_12, Daten vs gepoolt 1.0905, vs C.10 je 0,80 1.1741, alpha 0.002375
+P-6-Lesart r 0.333: MDE 2.1998 SE_12, Daten vs gepoolt 1.0905, vs C.10 je 0,80 0.7827, alpha 0.002375
+P-6-Lesart r 0.250: MDE 1.9051 SE_12, Daten vs gepoolt 1.0905, vs C.10 je 0,80 0.5870, alpha 0.002375
+A2 Boden (1,6449 + Phi^-1(0,8/0,9025)) x 8,52 = 24.304
+Klasse W SD 0.13: Boden 0.0448; Wochen bis SESOI 0,040 gepoolt 0,0025: 140.6
+Klasse W SD 0.09: Boden 0.0310; Wochen bis SESOI 0,040 gepoolt 0,0025: 67.4

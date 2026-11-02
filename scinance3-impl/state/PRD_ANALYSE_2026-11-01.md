@@ -704,3 +704,17 @@ Reihenfolge der naechsten Orchestrator-Schritte daraus: (1) Gesamt-OC (laeuft) m
 IK-05 und IK-04 auf dem Tages-Panel (Konto-Eintraege 1 und 2); (3) IK-01-Stichprobe (Trades 2020..2024-06) als erste
 Kostenkurve; (4) Feasibility-Rechner (F3) mit SESOI-Kurve in beiden Rahmen (Dezil-L/S fuer Klasse W, Einzelposition fuer
 Klasse E/P).
+
+## Nachtrag 2 (2026-11-02): Gesamt-Operationscharakteristik des Pakets 3.1 - Korrektur an Abschnitt 1 (K-4), 6 und 9.1 (P-2)
+
+Die OC (`prd_analyse_2026-11-01/OC_VERFASSUNG31_2026-11-02.md`, vom Orchestrator nachgerechnet, DEC-104 Nachtrag 2) bestaetigt
+die Fehlerseite des Pakets (alpha_eff 0,0019 bei zwei Fenstern, PPV 0,98 bei Basisrate 0,10) und korrigiert zwei Aussagen
+dieser Synthese: (1) der Datenfaktor der Regel "gepoolt 0,0025 + REZENZ-Screen" gegen C.10 je 0,80 ist **+23 %** (zwei
+Fenster), nicht +8 % - die Synthese hatte den Screen weggelassen; (2) der Screen auf einem festen 12-Monats-Fenster bei 0,05
+setzt einen **Boden von 2,4865 SE_12**: die Regel macht keinen Effekt testbar, den ein einzelnes 12-Monats-Fenster nicht sieht,
+und schliesst A2 (Boden 24,3 bp gegen SESOI 22) sowie Klasse W bei Wochen-IC-SD 0,13 (Boden 0,0448 gegen 0,040) dauerhaft
+aus. Die in Abschnitt 6 beschriebene Lockerung "Interimsblicke statt zwei Vollfenster" wirkt daher nur in der Zeit, nicht in
+der Aufloesung. Die P-6-Lesart (gepoolt + registrierter Stabilitaetstest, kein Boden, +9 % Daten) ist als neuer Default
+fuer P-2 vorgelegt (DEC-104 N2 (4)); bis zum Entscheid gilt die beschlossene Variante. Alle uebrigen Zahlen der Synthese
+bleiben; die Aussagen zu Selektion (Power-Planung nur gegen SESOI) und schweren Raendern (t-Grenzen Pflicht) sind als
+Verschaerfungen festgehalten.
