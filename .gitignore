@@ -7,3 +7,7 @@ data/
 logs/
 .pytest_cache/
 *.egg-info/
+
+# F0 (DEC-104 E9): Laufausgaben der Herleitungs- und Pruefskripte nie ins Repo (DEC-103 N1 (2c))
+scinance3-impl/derivations/**/work/
+scinance3-impl/verify/**/work/

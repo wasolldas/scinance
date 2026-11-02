@@ -1,0 +1,68 @@
+{
+ "warm_settlements_errors": [
+  "(datetime.date(2017, 5, 25), datetime.date(2017, 5, 31)): ComputeError",
+  "(datetime.date(2017, 8, 1), datetime.date(2017, 8, 31)): FileNotFoundError",
+  "(datetime.date(2017, 11, 1), datetime.date(2017, 11, 30)): FileNotFoundError"
+ ],
+ "warm_funding_errors": [],
+ "settle_warnings": [
+  "harvest_data: 659 (symbol, day) without data, e.g. [('ETH', '2017-05-25'), ('ETH', '2017-05-26'), ('ETH', '2017-05-27'), ('ETH', '2017-05-28'), ('ETH', '2017-05-29')] \u2014 see gaps()"
+ ],
+ "settlements_rows_loaded_vs_catalog": [
+  212735,
+  212735
+ ],
+ "settlements": {
+  "rows": 212735,
+  "types": [
+   [
+    "delivery",
+    175657
+   ],
+   [
+    "settlement",
+    37078
+   ]
+  ],
+  "sha256": "b1a9fc2285358ef22f78262343b562f2ff28e755676d198af99b6e94d67981a8"
+ },
+ "funding_warnings": [],
+ "funding": {
+  "rows": 2178,
+  "per_symbol": [
+   [
+    "BTCUSDT",
+    1089
+   ],
+   [
+    "ETHUSDT",
+    1089
+   ]
+  ],
+  "sha256": "ba6eb8de325ca274b317e247009e866754b599284538f8a31712c633006e0903"
+ },
+ "kline": {
+  "sha256": "c18a06bdd96174b4f2d794269d3d64daa1e206a8417b355e450a28e92e28ded5",
+  "note": "written by extract_a2.py; verified 1165 days x 1440 rows per symbol, 2021-03-24..2024-05-31"
+ },
+ "funding_pre_w1": {
+  "rows": 9360,
+  "per_symbol": [
+   [
+    "BTCUSDT",
+    4680
+   ],
+   [
+    "ETHUSDT",
+    4680
+   ]
+  ],
+  "sha256": "d8cfdfb829df985e552cc490643f47ff8b91f7152f6ea26b936b067576598f9b",
+  "warm_errors": [
+   "(datetime.date(2021, 6, 1), datetime.date(2021, 6, 30)): FileNotFoundError: [Errno 2] No such file or directory: '/home/user/scinance_work/hcache/catalog/pa",
+   "(datetime.date(2021, 8, 1), datetime.date(2021, 8, 31)): FileNotFoundError: [Errno 2] No such file or directory: '/home/user/scinance_work/hcache/catalog/pa",
+   "(datetime.date(2021, 9, 1), datetime.date(2021, 9, 30)): ComputeError: parquet: File out of specification: The file must end with PAR1"
+  ],
+  "warnings": []
+ }
+}
