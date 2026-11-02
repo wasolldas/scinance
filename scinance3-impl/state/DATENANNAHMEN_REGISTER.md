@@ -25,3 +25,9 @@
 | 15 | Datendienst-Verfuegbarkeit | Endpunkt ~2 MB/s, geteilt; am 2026-11-02 vormittags nicht erreichbar, Arbeit mit dem Katalog-Cache vom 2026-11-01 18:46 UTC [F] | Stromcheck monatlich (PRD_ANALYSE 9.2 Nr. 10); Katalog-Cache als Rueckfall fuer S0 | diese Datei |
 | 16 | `rest.deliveryPrice ALL` | 2 Partitionen in 92 Tagen (2026-06-26..09-25) [F]; Stromcharakter unklar | Inhaltsprobe (C.8) vor jeder Nutzung | Lueckenliste Abschnitt 2 |
 | 17 | Marktkapitalisierung / Spot-Volumen je Coin fuer Universums-Zuordnung von Literatur-Priors | nicht im Archiv | Datenauftrag 1 (PRD_ANALYSE Abschnitt 8) | H-33-Lehre (GL-036) |
+
+## Nachtraege (datiert, append-only)
+
+| Datum | Nr. | Stand | Folge |
+|---|---|---|---|
+| 2026-11-02 13:48 UTC | 15 | Datendienst seit 2026-11-02 vormittags durchgehend nicht erreichbar (fuenf Pruefungen 11:00..13:48 UTC, Katalog-Refresh wirft RuntimeError); gearbeitet wird mit dem Katalog-Cache vom 2026-11-01 18:46 UTC [F] | Zone-X-Programm 1 (Konto 1/2) und Inhaltsproben warten; naechste automatische Pruefung in 2 Stunden; Ursache beim Data-Harvest-Betreiber zu klaeren (Nutzer) |
