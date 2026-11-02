@@ -84,3 +84,15 @@ nicht tragfaehig: Horizont unter der Wand, Daten im Siegel oder zu grob, Zahlen 
 liegt in einer neuen Messkarte (IK-12 Liquidations-Kaskaden), in Praezisierungen bestehender Karten (IK-01, IK-02, IK-04) und in
 der Methodik von Dok 5 fuer den Lauf-Rahmen. Nichts davon aendert ein GL, eine Regel oder die Reihenfolge der naechsten Schritte
 (OC-Nachentscheid P-2, Kohorte 1, Zone-X-Programme).
+
+## Nachtrag (2026-11-02, spaet): siebte Eingabe "SCINANCE-PHYSICS-EDGE v2.1: Kausalitaet, Herleitung & Edge" (step-3.pdf, 4 Seiten)
+
+Inhalt: "Invarianz-Prinzip" (drei Axiome: absorbierende Randbedingung durch Liquidation, Erhaltung durch Matching, Latenz als
+Transportgrenze -> "das Orderbuch gehorcht denselben PDEs wie Fluide, seismische und erregbare Medien") und eine Tabelle
+Kausalmechanismus / Herleitung / Edge je Saeule mit denselben Behauptungen wie v2.0 (80..260 ms Lead-Lag, 120..400 ms Chirp,
+94 % Iceberg-Erkennung, Exhaustion-Sniping bei n < 0,20, Momentum-Short bei n > 0,45, exakte Haltekante per Rankine-Hugoniot).
+Urteil: keine neuen Inhalte gegenueber Dok 1; das Urteil oben gilt unveraendert. Zur Begruendung "keine blosse Metapher": die drei
+Axiome sind richtig, aber aus ihnen folgt keine bestimmte PDE - jede Analogie (Reaktions-Diffusion, Burgers, FitzHugh-Nagumo,
+Lindblad) ist eine zusaetzliche Modellannahme, die auf unseren Daten getestet werden muesste, und zwar auf Horizonten, die
+die Mission nur als Messung zulaesst. Die Schwellen n < 0,20 / n > 0,45 sind UNBELEGT und widersprechen D.2 (Branching-Schwellen).
+Die Datei bleibt ausserhalb des Repos (sha256-Praefix 86e95c9c; keine Siegelwerte enthalten).
