@@ -392,3 +392,28 @@ Tests: 1.992 passed / 3 failed (Legacy `test_execution_live.py`, Sandbox-bedingt
 - **Naechste Schritte (Orchestrator):** Gesamt-OC abnehmen -> DEC-104 Nachtrag 2 -> A2-Feasibility unter 3.1 (E7 (d)) ->
   Feasibility-Rechner F3 bauen -> Zone-X-Laeufe (IK-05/IK-04, danach IK-01-Trade-Stichprobe) -> Inhaltsproben (tardis <= 2026-06-01,
   deribit/publicTrade) -> PRD v3 Entwurf -> Kohorte 1 vorbereiten.
+
+## 16. Nachtrag 2026-11-02 (abends): Gesamt-OC des Pakets 3.1 (DEC-104 N2), Feasibility-Rechner F3, PRD v3 als Entwurf, Datendienst-Ausfall
+
+- **Gesamt-OC (DEC-104 Nachtrag 2; `state/prd_analyse_2026-11-01/OC_VERFASSUNG31_2026-11-02.md`, vom Orchestrator nachgerechnet):**
+  Fehlerseite haelt (alpha_eff 0,0019, PPV 0,98 bei Basisrate 0,10, 0,014 Falsch-PASS je Jahr bei m 8). **Korrektur der
+  Synthese:** die Regel gepoolt 0,0025 + REZENZ-Screen kostet +23 % Daten gegen C.10 je 0,80 (nicht +8 %; Screen vergessen).
+  **Struktureller Boden:** der Screen auf dem juengsten 12-Monats-Fenster bei 0,05 erzwingt MDE >= 2,4865 SE_12 - A2 (Boden
+  24,3 bp > SESOI 22) und Klasse W bei Wochen-IC-SD 0,13 (Boden 0,045 > 0,040) waeren nie testbar. Vorlage an den Nutzer
+  (P-2 Varianten): (a) wie beschlossen, (a') Screen 0,20, (c) P-6-Lesart gepoolt + registrierter Stabilitaetstest (kein
+  Boden, +9 % Daten, Vorschlag des Orchestrators). Bis zum Entscheid gilt (a). Verschaerfungen sofort: Fallzahl nur gegen
+  SESOI, t-artige Grenzen, Blocklaenge aus gemessener Autokorrelation. A2 haengt an P-2 (unter (a) GL-012 strukturell;
+  unter (c) Lesart B ~2028-01 bei 22 bp).
+- **Feasibility-Rechner F3** (`src/bybit_edge/research/feasibility31/`, 126 Tests; Regressionsfaelle `state/feasibility/`):
+  Regeln R1..R6 nebeneinander, zwei SESOI-Rahmen, Strenge-Quotient, OC-Zeile, DEC-105-Berichtsfelder. Praezisierung
+  (PRD_ANALYSE Nachtrag 3): Dezil-SESOI 0,0169 gilt bei vollem Umschlag; persistenzbereinigt 0,0085 -> IK-10 auf W1/W2 nicht
+  testbar.
+- **PRD v3 (ENTWURF, nicht beschlossen):** `PRD_SCINANCE3_v3_ENTWURF.md` - 117 Regeln VR-a01..VR-h09 mit Herkunft, Etikett,
+  Geltung; 30 Pflichtzeilen mit YAML-Template 3.1; eine bindende Fassung je Kandidat; 16 offene Widersprueche WD-01..WD-16
+  (zitiert, nicht entschieden; u. a. C.2 gegen SESOI-Feasibility, bindendes Vorfenster DEC-94 (5) gegen E6, Geltungsbeginn
+  Kohorte 1, A4-Fensterlaenge, H-26-Entsperrpfad); Errata- und Konkordanz-Anhang (100 Zeilen); Pruefliste BE-01..BE-14 fuer den
+  Beschluss durch den Nutzer. Bis zum Beschluss gelten PRD v2 und decisions.md unveraendert.
+- **Datendienst** seit 2026-11-02 vormittags nicht erreichbar (Pruefungen bis 13:48 UTC); Zone-X-Lauf (Konto 1/2) und
+  Inhaltsproben warten; automatische Wiederholung 15:50 UTC, danach taeglich. Monatlicher Stromcheck geplant (2026-12-02).
+- **Offen beim Nutzer:** P-2 Variante (Vorlage N2 (4)); P-11; P-13; PRD v3 Beschluss (BE-01..BE-14); Datenauftraege weiterleiten;
+  Ursache des Datendienst-Ausfalls beim Data-Harvest-Betrieb.
