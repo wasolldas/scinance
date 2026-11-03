@@ -96,3 +96,51 @@ Axiome sind richtig, aber aus ihnen folgt keine bestimmte PDE - jede Analogie (R
 Lindblad) ist eine zusaetzliche Modellannahme, die auf unseren Daten getestet werden muesste, und zwar auf Horizonten, die
 die Mission nur als Messung zulaesst. Die Schwellen n < 0,20 / n > 0,45 sind UNBELEGT und widersprechen D.2 (Branching-Schwellen).
 Die Datei bleibt ausserhalb des Repos (sha256-Praefix 86e95c9c; keine Siegelwerte enthalten).
+
+## Nachtrag 2 (2026-11-03): achte Eingabe "PRD: Projekt Cross-Science Alpha" (4 Seiten, sha256-Praefix 46a999d0)
+
+**Inhalt.** Minutenhorizont (1 bis 15 min) statt Millisekunden; drei Ansaetze: (A) Signatur-Methoden (Rough Paths) auf
+L2-Deltas und Trades, 1..5-min-Fenster, iterierte Integrale 2. bis 4. Ordnung als Features fuer XGBoost, Ziel 5-min-Rendite;
+(B) zeitliches Graph-Netz (TGNN) auf der Bybit-Optionskette plus Perp, Vorhersage der Perp-Bewegung im Minutenbereich;
+(C) persistente Homologie (TDA) auf Funding, OI, Liquidationen als Regime-Fruehwarnung mit 15..30 min Vorlauf. Pipeline auf
+dem GPU-PC (Spiegelung per LAN), rollierendes Training ueber 30 Tage, Maker-Ausfuehrung, pessimistisches Slippage-Modell,
+Luecken-Fail-Safe, Paper-Trading ab Woche 8.
+
+**Staerken [U].** Nuechterner als die Vorgaenger: Minuten- statt Millisekundenhorizont, Maker bevorzugt, pessimistisches
+Fill-Modell aus den L2-Daten, Fail-Safe bei Datenluecken, keine erfundenen Kennzahlen. Das pessimistische Orderbuch-Modell
+ist inhaltlich IK-02 (Maker-Kostenkurve) und wird dort ohnehin gebaut.
+
+**Kostenwand auf Minutenhorizont [R, sigma_d 262 bp, Kante 0,798 sigma x IC]:**
+
+| Horizont | perfektes Orakel | noetiger IC fuer Maker 4 bp | noetiger IC fuer Taker 11 bp | Kante bei IC 0,05 |
+|---|---|---|---|---|
+| 1 min | 5,5 bp | 0,73 | 2,0 (unmoeglich) | 0,28 bp |
+| 5 min | 12,3 bp | 0,32 | 0,89 | 0,62 bp |
+| 15 min | 21,3 bp | 0,19 | 0,52 | 1,07 bp |
+
+Selbst mit reiner Maker-Ausfuehrung braucht das Ziel "5-min-Rendite" einen IC von 0,32; die besten bekannten Minuten-Signale
+liegen um 0,05 und sind Faktor 6..15 darunter. Maker-Fills sind zudem adversely selected (WP-10(B)): gefuellt wird bevorzugt,
+wenn der Preis gegen die Position laeuft. Der Minutenhorizont verschiebt die Wand, hebt sie nicht auf (CLAUDE.md K-0.1; DEC-105 (1)).
+
+**Abgleich mit der Akte.**
+- (A) Signaturen sind eine legitime Merkmalsmethode (Lyons; Sweep M01 fuehrt den Signaturplot). Die Inhalte, die sie hier
+  kodieren sollen, sind aber exakt die toten Richtungen: Lead-Lag von Volumen auf Preis (D.11, H-04/H-14), OFI-Folge (D.5,
+  H-05) und Minuten-Netto-Fluss (D.14, H-24: ueber zehn Halbjahre stabil **negativer** Forward-IC). Ein XGBoost auf 30 Tagen mit
+  hunderten Signaturtermen ohne Vorregistrierung ist ein Mehrfachtest ohne Nenner. Status: unter der Wand, B (C.1-Nachweis fehlt).
+- (B) Die Bybit-Optionskette liegt erst seit 2026-06-16 vor (116 Tage, 13.682 Instrumente) und damit vollstaendig in Zone K
+  (versiegelt; vor Kohorte 1 nur Zaehlungen). Lernen auf diesen Daten verbraucht das einzige Blindfenster der Optionsfamilie.
+  Kompendium D.16 (schwere Modell-Infrastruktur vor validiertem Basissignal) und D.17 (Options-Ketten-Kandidaten) gelten.
+  Status: Siegelkonflikt, unter der Wand.
+- (C) TDA steht in der Negativliste des Sweeps (N-20: kein Mechanismus, keine Nullverteilung mit bekannter Erreichbarkeit).
+  Liquidationen liegen in Zone K, OI nur fuer 5 Symbole ab 2024-03. Als Risikoschalter ("Orders abziehen") ist es kein
+  Alpha und braucht Ausfuehrungslogik. Status: E, Messwert ohne Abnehmer. Die Frage "zerfaellt die Funding-Verteilung ueber
+  Assets vor Kaskaden?" ist als einfache Streuungsstatistik (Querschnitts-SD und Totzonen-Anteil des Fundings, Zone X) prueffaehig
+  und liegt nahe an IK-11/F2; dafuer braucht es keine Topologie.
+- **Governance:** GPU-PC-Pipeline und Spiegelung auf den PC widersprechen DEC-57 (GPU 0) und DEC-106 (keine Auftraege mehr
+  an den Nutzer-PC); Paper-Trading ueber die Boersen-API ist Ausfuehrungsinfrastruktur und braucht eine Nutzerentscheidung
+  (PRD 8.1). 30-Tage-Rolling-Training ohne Konfirmationsfenster widerspricht DEC-104 (Vorregistrierung, Zonen).
+
+**Urteil.** Ablehnen als Programm; zwei Bausteine sind schon im Plan (pessimistisches Fill-Modell = IK-02; Signatur-Plot als
+Skalengesetz-Werkzeug in IK-04). Neu aufgenommen als Zone-X-Kandidat (kein Alpha): Querschnitts-Streuung des Fundings vor
+Kaskaden-Tagen, nur Streuung, als Teil von IK-11. Die Datei bleibt ausserhalb des Repos; sie enthaelt eine LAN-Portangabe
+des Datendienstes und keine Siegelwerte.
