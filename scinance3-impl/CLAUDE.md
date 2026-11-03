@@ -28,8 +28,11 @@
 - Data-Harvest-Baum `data/harvest` read-only; nie hineinschreiben, nie
   cachen. Manifest-Wahrheit ist `harvest_manifest.backup.sqlite`
   (`bar_cache.resolve_manifest_path`).
-- Recorder C-36 (`src/bybit_edge/recorder/`, Scheduled Task) laeuft weiter,
-  bis die Sunset-Review (PRD Par. 8.3) entschieden ist.
+- Recorder C-36 (`src/bybit_edge/recorder/`, Scheduled Task): **seit 2026-11-03 vom
+  Nutzer angehalten, Sunset-Review damit vollzogen (DEC-106)**; die lokal geschriebenen
+  Dateien unter `data/parquet/recording_f0/` bleiben erhalten (einzige RPI-Historie).
+- Autopilot (Scheduled Task "Scinance Autopilot"): seit 2026-11-03 angehalten (DEC-106);
+  keine Auftraege mehr an den Nutzer-PC, Laeufe nur in der Cloud-Sitzung.
 - Test-Suite (1.495 Tests, Baseline in `survey/BASELINE_TESTS.txt`) wird
   erweitert, nie reduziert; die vier Forensik-Tests bleiben byteidentisch;
   `_legacy_v1/` wird nicht importiert ausser von seinen eigenen Tests.
