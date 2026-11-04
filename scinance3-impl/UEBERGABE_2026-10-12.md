@@ -439,3 +439,23 @@ Tests: 1.992 passed / 3 failed (Legacy `test_execution_live.py`, Sandbox-bedingt
   Praediktor sind damit die entscheidenden Messungen vor Kohorte 1.
 - Naechste Schritte (PLAN_2026-11-02 Phase 0/1): Zone-X-Lauf, Inhaltsproben, IK-12-SK0, Kostenkurven, F2 Register als Code,
   DEC-104 N5 (WD-06/08/13/16), F3-Korrektur (q unter 12 Monaten).
+
+## 19. Nachtrag 2026-11-04: Nutzerentscheide DEC-107 - Stabilitaetstest (c), PRD v3 bindend, Rollen, P-10..P-13
+
+- Alle offenen Programmfragen sind entschieden (DEC-107): **Konfirmationsregel = gepoolt 0,0025 + registrierter Stabilitaetstest**
+  (Variante (c), kein Boden; Welch-t einseitig 0,05 gegen Abfall des juengsten Teils, an jedem Wirksamkeits-Stopp, entfaellt bei
+  <= 12 Monaten; Pflicht-Schutzzeile in der OC). `scinance3-impl/PRD_SCINANCE3_v3.md` ist die **bindende Lesefassung** (Kopf 0.1
+  listet die Nachfuehrungen); der Entwurf bleibt Akte. BE-03 ja (SESOI = Mess-Massstab, GL-012 statt Kill), BE-04 juengstes
+  Vorfenster bindend (Stress Sensitivitaetszeile, auch A2), BE-06 ja (vor dem Stichtag fuer Kohorte 1 registriert = 3.1),
+  BE-12 Rollen statt Modellnamen (CLAUDE.md umgestellt). P-11: Netzfreigabe ja, kein Token-/CPU-Deckel, privater Speicher fuer
+  versiegelte Zwischenstaende ja (Bereitstellung durch den Nutzer offen; bis dahin `/home/user/scinance_work/` + sha256-Pin).
+  P-13 ja: Mikrostruktur-Zaehlgroessen BTC/ETH 2024-07..2026-06 mit A2-Maske als Zone X (FENSTERREGISTER Abschnitt 9).
+  P-10: Klasse P bekommt eine Kapitalregel - Herleitungsauftrag (kein Live-Kapital). P-12: Regelaenderungs-Protokoll ist Regel
+  (CLAUDE.md Autonomie 3). Physik-Urteil bestaetigt, IK-12 offizielle Messkarte.
+- **Code:** `registry31` `DECIDED_VARIANT = "c"`, `stability_test`-Pflichtfelder (statistik, alpha 0,05, kostenquote_q <= 0,95,
+  entfaellt_wenn, an_blicken, ref), `oc_line.p_pass_nur_aelter_1mde`; Template 3.1 nachgefuehrt; F3 R5 mit q = 1 unter 12 Monaten.
+  Tests registry31 + feasibility31: 481 bestanden (+8); Regressionsfaelle `state/feasibility/*.yaml --check-expected` gruen.
+- **Fuer eine neue Sitzung:** zuerst `PRD_SCINANCE3_v3.md` Kopf 0.1 und Abschnitt 2, dann `state/decisions.md` ab DEC-104; Rollen
+  (Orchestrator / Herleitung / Review / Bau / Kartierung) statt Modellnamen in allen Repo-Texten.
+- **Offen beim Nutzer:** Datenauftraege an Data-Harvest weiterleiten; privaten Speicher bereitstellen (Repo oder Bucket, Zugang
+  nur ueber Umgebungs-Secrets); Bandbreitendeckel optional.

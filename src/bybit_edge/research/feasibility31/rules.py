@@ -1,6 +1,7 @@
 """Decision-rule menu of the feasibility calculator (Constitution 3.1, DEC-104 E2/E6, OC derivation 2026-11-02).
 
-No rule in this menu is "the" rule until the user decides programme item P-2; all rules are evaluated side by side:
+Since DEC-107 (2026-11-04) the decided rule for 3.1 registrations is ``R5`` (variant (c)); the other rules stay in the
+menu for the side-by-side report (DEC-104 E5 design menu, OC comparisons):
 
 * ``R1``  C.10 per window: two windows, one-sided 0.05 each, power 0.80 per window (joint 0.64 at the MDE).
 * ``R2``  C.10 joint: same decision, power 0.80 for the JOINT decision (per window sqrt(0.80)).
@@ -8,8 +9,10 @@ No rule in this menu is "the" rule until the user decides programme item P-2; al
 * ``R4``  pooled 0.0025 plus RECENCY screen on the youngest 12-month window at alpha_s (0.05 / 0.10 / 0.20 / 0.50);
           correlation pooled/screen is ``sqrt(r)`` with ``r`` the data share of the youngest window; joint power 0.80;
           structural FLOOR ``(z_s + Phi^-1(0.8 / g)) SE_12``.
-* ``R5``  P-6 reading: pooled 0.0025 plus an INDEPENDENT stability test (pass probability 0.95 without a drop), joint
-          power 0.80, hence pooled power 0.80/0.95; no floor.
+* ``R5``  DECIDED (DEC-107 (1), user 2026-11-04; derivation DEC-104 N4): pooled 0.0025 plus the registered STABILITY
+          test "youngest part does not drop" (Welch-t, one-sided 0.05, independent of the pooled mean at equal
+          variances); joint power 0.80, hence pooled power 0.80/q with the cost ratio q = 1 - alpha_stab = 0.95; the
+          test is VOID with at most 12 months of confirmation data (q = 1 there); no floor.
 * ``R6``  group-sequential O'Brien-Fleming, K looks, alpha 0.0025, power 0.80, with and without screen.
 
 Units: every ``d`` is an effect in units of ``SE_12`` (the standard error of one 12-month confirmation window,
@@ -210,27 +213,50 @@ class PooledScreen(Rule):
 
 @dataclass(frozen=True)
 class PooledStability(Rule):
-    """R5: pooled 0.0025 plus independent stability test; passing probability ``1 - alpha_stab`` without a drop."""
+    """R5 (decided, DEC-107 (1)): pooled 0.0025 plus the registered stability test (DEC-104 N4).
+
+    Without a drop the stability test passes with probability ``q = 1 - alpha_stab`` (cost ratio, not a "power"), and
+    at equal variances its statistic is independent of the pooled mean, so the joint power is ``q`` times the pooled
+    power.  With at most ``void_below_months`` (12) months of confirmation data the test is void (no older part), so
+    ``q = 1`` there and R5 equals R3 (DEC-104 N4 (1), DEC-107 (1) (b)).
+    """
 
     alpha_stab: float = 0.05
     key: str = "R5"
-    label: str = "pooled 0.0025 + independent stability test (P-6 reading)"
+    label: str = "pooled 0.0025 + registered stability test (variant c, decided DEC-107)"
+    void_below_months: float = 12.0
 
     @property
     def p_stab(self) -> float:
         return 1.0 - self.alpha_stab
 
+    def q(self, t: float) -> float:
+        """Cost ratio of the stability test at ``t`` months of confirmation data (1 while the test is void)."""
+        return 1.0 if t <= self.void_below_months else self.p_stab
+
     def power(self, d: float, t: float, gate: float = 1.0) -> float:
-        return gate * self.p_stab * float(norm.sf(Z_POOL - d * math.sqrt(t / _MONTHS)))
+        return gate * self.q(t) * float(norm.sf(Z_POOL - d * math.sqrt(t / _MONTHS)))
 
     def mde80(self, t: float, gate: float = 1.0) -> float:
-        return (Z_POOL + target_quantile(POWER, gate * self.p_stab)) * math.sqrt(_MONTHS / t)
+        return (Z_POOL + target_quantile(POWER, gate * self.q(t))) * math.sqrt(_MONTHS / t)
 
     def t_required(self, d: float, gate: float = 1.0) -> float:
-        c = Z_POOL + target_quantile(POWER, gate * self.p_stab)
-        if not math.isfinite(c) or not d > 0.0:
+        if not d > 0.0:
             return math.inf
-        return _capped(_MONTHS * (c / d) ** 2)
+        c_void = Z_POOL + target_quantile(POWER, gate)              # test void: pooled alone
+        if math.isfinite(c_void):
+            t_void = _MONTHS * (c_void / d) ** 2
+            if t_void <= self.void_below_months:
+                return t_void
+        c = Z_POOL + target_quantile(POWER, gate * self.p_stab)      # beyond 12 months the test costs q
+        if not math.isfinite(c):
+            return math.inf
+        return _capped(max(_MONTHS * (c / d) ** 2, self.void_below_months * (1.0 + 1e-12)))
+
+    def describe(self) -> dict:
+        return {"key": self.key, "label": self.label, "alpha_pool": ALPHA_POOL, "alpha_stab": self.alpha_stab,
+                "cost_ratio_q": self.p_stab, "void_below_months": self.void_below_months,
+                "decided": "DEC-107 (1); derivation DEC-104 N4"}
 
 
 @dataclass(frozen=True)
@@ -289,7 +315,7 @@ def build_menu(screen_alphas: tuple[float, ...] = (0.05, 0.10, 0.20, 0.50), look
     ]
     for a in screen_alphas:
         menu.append(PooledScreen(a, f"R4_a{int(round(a * 100)):02d}", f"pooled 0.0025 + recency screen alpha_s {a:.2f}, joint power 0.80"))
-    menu.append(PooledStability(alpha_stab, "R5", "pooled 0.0025 + independent stability test, joint power 0.80 (P-6)"))
+    menu.append(PooledStability(alpha_stab, "R5", "pooled 0.0025 + registered stability test (variant c, decided DEC-107), joint power 0.80"))
     kmax = max(looks)
     for k in sorted(set(looks)):
         if k >= 2:

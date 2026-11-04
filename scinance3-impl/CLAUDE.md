@@ -5,8 +5,10 @@
 > Tages- bis Wochen-Horizont mit breitem Universum (Klasse W), kalendarisch
 > exogene Ereignisse (Klasse E) - und das VORHER misst, ob eine Klasse
 > ueberhaupt testbar ist. Massgebliche Dokumente: `PRD_SCINANCE3.md`
-> (Verfassungstext, Welle 1, Kandidaten), `state/decisions.md` (DEC-51+),
-> `state/hypothesis_registry.md` (H-27+), `state/gate_log.md` (GL-032+).
+> (Verfassungstext v2, Welle 1, Kandidaten), **`PRD_SCINANCE3_v3.md` (konsolidierte
+> Lesefassung, angenommen 2026-11-04, DEC-107; bei Widerspruch gilt die juengere DEC)**,
+> `state/decisions.md` (DEC-51+), `state/hypothesis_registry.md` (H-27+),
+> `state/gate_log.md` (GL-032+).
 > Die 2.0-Akte (`../scinance2-impl/`) ist append-only abgeschlossen und
 > wird nur zitiert, nie geaendert.
 
@@ -18,7 +20,12 @@
 2. Bestehende Repo-Konventionen schlagen Praeferenz; bei Stille entscheidet
    der Orchestrator fuer die reversibelste Option und protokolliert DEC-xx.
 3. **Niemals den Nutzer fragen**, ausser: fehlende Zugriffsrechte/Secrets,
-   Aktionen mit Geldeinsatz, destruktive Operationen auf bestehenden Daten.
+   Aktionen mit Geldeinsatz, destruktive Operationen auf bestehenden Daten,
+   und die Vorlagen des Regelaenderungs-Protokolls (DEC-107 (6), P-12):
+   jede Lockerung (nur mit Nutzer, ab naechster Kohorte), Strenge-Quotient
+   >= 1,3 (DEC-104 E8 (b)), Jahresbuch >= 0,10 (E4 (g)), Review-Patt nach
+   zwei Fassungen (E8 (c)). Verschaerfungen beschliesst der Orchestrator
+   sofort mit Strenge-Quotient-Ausweis; Klarstellungen als neutraler Nachtrag.
    Offene Nutzer-Entscheidungen (PRD Par. 8) werden mit dokumentiertem
    Default weiterbearbeitet, nie still entschieden.
 4. **Kein Live-Order-Code.** Keine Keys, keine privaten Endpunkte, keine
@@ -77,19 +84,29 @@
   Pilotlauf, Panel-Waechter, Doppelausweis; F-WEEK zaehlt nur getestete
   Hypothesen; W2 endet 2026-06-28. Etikett "Lockerung".
 - **Seit 2026-11-02 (DEC-104, Verfassung 3.1, Nutzerentscheid; prospektiv ab
-  Kohorte 1 = 2027-01-01, Verschaerfungen sofort):** Messinstitution (jeder Lauf
+  Kohorte 1 = 2027-01-01, Verschaerfungen sofort; gilt auch fuer vor dem Stichtag
+  fuer Kohorte 1 registrierte Hypothesen, DEC-107 BE-06):** Messinstitution (jeder Lauf
   gibt Schaetzer, 95-%-CI, obere Ausschlussgrenze aus, auch GL-012); Konfirmation =
-  gepoolter Test alpha 0,0025 plus REZENZ-Screen (juengstes Fenster 0,05), Power
-  0,80 fuer die gemeinsame Regel, alpha je Test fest; SESOI (Kostenkurve, Default
+  gepoolter Test alpha 0,0025 **plus registrierter Stabilitaetstest** (DEC-107 (1),
+  Variante (c): D = Mittel juengster Teil (12 Monate / vier Quartale) minus aelterer
+  Teil, Welch-t einseitig 0,05 gegen Abfall, an jedem Wirksamkeits-Stopp, entfaellt
+  bei <= 12 Monaten, Kostenquote q 0,95, kein Boden; Pflicht-Schutzzeile P(PASS bei
+  Effekt nur im aelteren Teil) in der OC; der REZENZ-Screen 0,05 aus E2 ist ersetzt),
+  Power 0,80 fuer die gemeinsame Regel, alpha je Test fest; SESOI (Kostenkurve, Default
   Taker, etikettiert) statt Literatur-Punktprior, Literatur als Etikett, UNBELEGT
   symmetrisch; Drei Zonen: X = vor 2024-07-01 (Exploration nur mit Konto
   `state/KONTO_ZONE_X.md`, nie Verdikt), V = W1/W2 (blind, ein Blick je Familie),
   K = ab 2026-07-01 (versiegelt, gruppensequentielle Blicke O'Brien-Fleming, Futility);
   Kohorten-Stichtage je Quartal mit BY q 0,10, Jahresbuch erwarteter Falsch-PASS;
-  Vorwissens-Klasse je Datenfamilie (BTC/ETH-Aggregate nur prospektiv); nuisance-
-  adaptive Designwahl ohne Nutzerfrage; REZENZ als Screen und Stabilitaetstest; A2:
-  exakte Konjunktion statt Produkt, Assurance-Uebergabe. Ersetzt fuer 3.1-
-  Registrierungen C.10/DEC-52/DEC-94 (6). Etikett je Zeile in DEC-104.
+  Vorwissens-Klasse je Datenfamilie (BTC/ETH-Aggregate nur prospektiv; Ausnahme
+  DEC-107 (4): Nicht-Rendite-Mikrostruktur-Zaehlgroessen der BTC/ETH-Trades und
+  -Orderbuecher 2024-07..2026-06 mit A2-Maske als Zone X mit Konto); nuisance-
+  adaptive Designwahl ohne Nutzerfrage; bindende Nuisance aus dem juengsten
+  Vorfenster, Stress als Sensitivitaetszeile (DEC-107 BE-04); REZENZ als
+  Stabilitaetstest (Gate und Bericht); A2: exakte Konjunktion statt Produkt,
+  Assurance-Uebergabe. Ersetzt fuer 3.1-Registrierungen C.10/DEC-52/DEC-94 (6).
+  Etikett je Zeile in DEC-104 und DEC-107. Klasse P: Kapitalregel beauftragt
+  (DEC-107 (5)), bis zur Vorlage gilt PRD 3.6 (PARK).
 - **Zwoelf Pflichtzeilen jeder Registrierung** (PRD Par. 3.3): Power,
   Entscheidungsrelevanz (mit oekonomischer Mindestmagnitude als ETIKETT),
   Cluster-Einheit, Selektions-Deflation, adversariales Fixture,
@@ -103,20 +120,23 @@
 ## ZUSTANDSMASCHINE
 ```
 ZENSUS(WP-7,WP-9,WP-10,V-1..V-5) -> FEASIBILITY-BEFUND (binaer, Konsequenz vorab)
-  -> REGISTRIERUNG (Orchestrator, nach Opus-Herleitung + Opus-Review)
+  -> REGISTRIERUNG (Orchestrator, nach Herleitung + adversarischem Review)
   -> [BUILD -> VERIFY(T0-T7)]* -> POSITIVKONTROLLE (allein, zuerst)
-  -> LAUF (Nutzer-PC, T3-Runner) -> GATE_CHECK (nur gegen registriertes Gate)
+  -> LAUF (Cloud-Sitzung, DEC-106) -> GATE_CHECK (nur gegen registriertes Gate)
   -> GL-Eintrag -> Portfolio-Sicht (Konstante aus WP-10) -> naechste Welle
 ```
 
-## MODELL- UND TEAMPOLITIK (Token-Effizienz, bindend)
-| Rolle | Modell |
-|---|---|
-| Orchestrator (Entscheidungen, Registrierung, Gate-Urteile, Verfassung) | **Fable 5.1, immer** |
-| Bau von Zensus/Backfill/Treibern nach Spezifikation | Sonnet |
-| Gate-Design, Rauschboden-/Power-Herleitungen, PRD-Text | Opus + zweiter Opus als adversarischer Reviewer |
-| Kartierung, Inventur, Dokumentpflege, Listen | Sonnet (Haiku fuer reine Listen) |
-| Fable 5.1 als Subagent | nur bei Widerspruch zwischen Herleitung und Review, den der Orchestrator nicht selbst entscheiden kann |
+## ROLLEN- UND TEAMPOLITIK (Token-Effizienz, bindend; Rollen statt Modellnamen, DEC-107 BE-12)
+| Rolle | Auftrag | Besetzung |
+|---|---|---|
+| **Orchestrator** | Entscheidungen, Registrierung, Gate-Urteile, DEC-Eintraege, Verfassung; jede Abnahme selbst | die Sitzung selbst, immer; nie delegiert |
+| **Herleitung** | Gate-Design, Rauschboden-/Power-Herleitungen, PRD-Text, OC | staerkste verfuegbare Herleitungsrolle |
+| **Review** | adversarischer Review jeder Herleitung, symmetrisches Mandat, unabhaengig von der Herleitung | zweite, unabhaengige Instanz derselben Staerke |
+| **Bau** | Zensus/Backfill/Treiber nach Spezifikation mit Test-Abnahme (T1, T2, T7) | effiziente Baurolle |
+| **Kartierung** | Inventur, Dokumentpflege, Listen | effiziente Rolle (einfachste fuer reine Listen) |
+| Orchestrator-Rolle als Subagent | nur bei Widerspruch zwischen Herleitung und Review, den der Orchestrator nicht selbst entscheiden kann | - |
+Modellbezeichnungen stehen nicht in Repo-Artefakten (DEC-105 Hygiene; die Zuordnung Rolle -> Modell
+ist Sitzungskonfiguration).
 Regeln: Subagenten schreiben Volltexte in Dateien, an den Orchestrator gehen
 Kurzfassungen (<= 10 Zeilen); jede Abnahme (Tests, Fingerprints, Diff-
 Grenzen) vollzieht der Orchestrator selbst nach, nie auf Zuruf.

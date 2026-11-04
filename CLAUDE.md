@@ -3,7 +3,8 @@
 Neue Sitzung? Zuerst lesen:
 1. `scinance3-impl/UEBERGABE_2026-10-12.md` - aktueller Stand (Cloud-first, Panel via Thin Client, naechste Schritte);
    dazu `scinance3-impl/UEBERGABE_2026-10-09.md` - Rollen, Regeln, Fallen, Datenzugang.
-2. `scinance3-impl/CLAUDE.md` - Verfassung von Scinance 3.0 (bindend).
+2. `scinance3-impl/CLAUDE.md` - Verfassung von Scinance 3.0/3.1 (bindend, Kurzfassung);
+   `scinance3-impl/PRD_SCINANCE3_v3.md` - konsolidierte Lesefassung (angenommen 2026-11-04, DEC-107).
 
 Harte Regeln, auch bevor du weiterliest:
 - Das Repository ist oeffentlich: nie Zugangsdaten, nie den Hostnamen des Heim-Datendienstes ins Repo, in Commits oder Logs.

@@ -7,6 +7,13 @@
 > (Power, Entscheidungsrelevanz, Cluster-Einheit, Selektions-K,
 > adversariales Fixture, Kostenmodell-Bindung, Nachladbarkeits-Probe,
 > Positivkontroll-Vorschaltung, Kapital/Steuer/Venue, Stress-Definition).
+>
+> **Nachtrag 2026-11-04 (DEC-107 (2), WD-14; append-only):** "zehn Pflichtzeilen" ist historisch; PRD v2 3.3 nennt zwoelf.
+> Fuer Registrierungen ab Kohorte 1 (2027-01-01) und fuer vor dem Stichtag fuer Kohorte 1 registrierte Hypothesen gelten die
+> **dreissig Pflichtzeilen PZ-01..PZ-30** und das **YAML-Template 3.1** aus `scinance3-impl/PRD_SCINANCE3_v3.md` Abschnitt 3
+> (`state/registered/TEMPLATE_3_1.yaml`; Linter `src/bybit_edge/research/registry31/`). Konfirmationsregel: Variante (c)
+> (gepoolt 0,0025 + registrierter Stabilitaetstest, DEC-107 (1)); nur diese Variante ist registrierbar. Bestehende Eintraege
+> (H-27..H-33) bleiben unveraendert unter ihrer Registrierungsfassung.
 
 
 

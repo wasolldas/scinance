@@ -41,11 +41,17 @@ windows:                                       # DEC-99 (1); DEC-104 E4 (d)/(e);
 decision_rule:                                 # PZ-15, PZ-16, PZ-01
   alpha_test: 0.0025                           # fest je Test (DEC-104 E2)
   z_krit: 2.8070                               # gepoolt einseitig (VR-b14)
-  variante: "a"                                # a (beschlossen) | a' | c; bis zum Nutzerentscheid P-2 ist nur "a" registrierbar
-  screen: {fenster: "juengste_12_monate_bzw_4_quartale", alpha: 0.05, z_krit: 1.6449}   # Variante a; a': alpha 0.20, z_krit 0.8416; c: null
-  stability_test: null                         # nur Variante c: {statistik, alpha, power, ref}; als Bericht immer (DEC-104 E6)
+  variante: "c"                                # beschlossen DEC-107 (1) (P-2, 2026-11-04); a / a' nicht mehr registrierbar
+  screen: null                                 # unter (c) kein REZENZ-Screen (DEC-104 N4 (1); DEC-107 (1))
+  stability_test:                              # DEC-104 N4 (1)-(3); DEC-107 (1); Bericht D, SE(D), CI95, Z_D, df, verworfen
+    statistik: "D = Mittel(juengster Teil: letzte 12 Monate bzw. vier Quartale vor dem Blick) - Mittel(aelterer Teil), registrierte Richtung; Welch-t einseitig gegen Abfall"
+    alpha: 0.05
+    kostenquote_q: 0.95                        # ein Blick; bei Quartalsblicken Wert je Blickplan aus der Herleitung (stab_results.json s4/s4b)
+    entfaellt_wenn: "Konfirmationsdaten am Blick <= 12 Monate"
+    an_blicken: "jeder Wirksamkeits-Stopp mit aelterem Teil; verworfen -> FAIL (terminal)"
+    ref: "scinance3-impl/state/herleitung_stabilitaetstest/HERLEITUNG_STABILITAETSTEST.md#7"
   power_target_gemeinsam: 0.80                 # DEC-104 E2 (>= 0,80)
-  mde_faktor: "<Zahl>"                         # nie Schwelle (DEC-94 (1))
+  mde_faktor: "<Zahl>"                         # nie Schwelle (DEC-94 (1)); unter (c) z_krit + Phi^-1(0.80/q) = 3.8102 bei q 0.95, 3.6486 wenn der Test entfaellt
 
 looks:                                         # PZ-17; Zone V genau ein Blick, Zone K bis 4 Blicke
   zone_v: {anzahl: 1}                          # nur wenn ein urteilstragendes V-Fenster existiert
@@ -54,7 +60,7 @@ looks:                                         # PZ-17; Zone V genau ein Blick, 
     plan: obrien_fleming
     spending: "<Spending-Plan>"
     zeitpunkte: ["<YYYY-MM-DD>"]               # genau "anzahl" Daten, aufsteigend, nicht vor cohort
-    screen_an_jedem_stopp: true
+    screen_an_jedem_stopp: true                # unter (c) gelesen als: Stabilitaetstest an jedem Wirksamkeits-Stopp (DEC-107 (1) (c))
     futility: "Z < 0 an Blicken 1-3"
     grenzen: t_artig
 
@@ -99,7 +105,7 @@ selection: {K: "<ganze Zahl >= 1>", K_kumuliert_familie: "<ganze Zahl >= K>", z_
 design_menu: {optionen: ["<...>"], auswahlregel: "<mechanisch, nur Vorperioden-Nuisance + SESOI/Prior>", gewaehlt: "<eine der optionen>"}   # PZ-26
 reachability:                                  # PZ-27
   - {parameter: "<...>", beobachtungen_in_urteilsfenstern: "<ganze Zahl>"}
-oc_line: {p_pass_0: "<0..1>", p_pass_sesoi: "<0..1>", p_pass_prior_median: "<0..1>", seeds: "<ganze Zahl >= 1000>", ref: "<pfad#test_id>"}   # PZ-21
+oc_line: {p_pass_0: "<0..1>", p_pass_sesoi: "<0..1>", p_pass_prior_median: "<0..1>", p_pass_nur_aelter_1mde: "<0..1>", seeds: "<ganze Zahl >= 1000>", ref: "<pfad#test_id>"}   # PZ-21; Schutzzeile P(PASS bei Effekt nur im aelteren Teil, 1 MDE) Pflicht unter (c) (DEC-107 (1) (d))
 strictness_ratio: {wert: "<Zahl>", zerlegung: ["<Festlegung>"], gabelungsregister_ref: "<pfad>"}   # PZ-22; ab 1,3 Nutzer-Vorlage
 annual_book: {jahr: "<YYYY>", erwartete_falsch_pass_vorher: "<Zahl>", mit_dieser_registrierung: "<Zahl>"}   # PZ-28; ab 0,10 Nutzer-Vorlage
 economic_minimum: {wert: "<Zahl>", ref: "<pfad>", label: "<ueber_wand|unter_wand>"}   # PZ-02, Etikett nie Gate

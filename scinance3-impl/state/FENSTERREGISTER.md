@@ -90,3 +90,23 @@ Renditefamilie Panel-Querschnitt kumuliert: 4 Outcome-gerechnete Varianten (Pilo
 | O-981 | 2026-11-02 | Anzahl/Mittel/Maximum/Quantil/b-Wert der BTCUSDT-Liquidationen eines Tages; Payload-Beispiele mit Zeitstempeln und BTC-Preisniveaus | ein Tag August 2026 (K); ein Tag Ende W2 (V) | K, V | SK2-nah (Fremdquelle, Echtheit [V]) | Nutzer-Eingabe research_seismology.md (nicht im Repo); `state/PRUEFUNG_PHYSIK_KONZEPTE_2026-11-02.md` Abschnitt 4 | Oeffnung durch Fremdquelle (Praezedenz DEC-97 A-3); Tag auf C.17-Liste von IK-12 und BTC-Renditestatistiken; keine Rohwerte im Repo |
 | O-982 | 2026-11-02 | Namenssuche (grep -l) ueber `state/runs/*_L_window_sealed.json` | - | - | keine Oeffnung (0 Treffer, kein Inhalt) | Review-Agent, Offenlegung | dokumentiert; Suchen kuenftig mit `--exclude-dir=runs` |
 | O-983 | 2026-11-03 | Zeilenzahlen je Tag (Quantile ueber Tage) der `allLiquidation`-Partitionen, 5 Symbole; Parquet-Metadaten (Zeilenzahl, Schema) je eines Stichtags tardis/options_chain (2026-06-01), deribit/publicTrade (2026-06-30), allLiquidation BTCUSDT (2026-10-31), rest.deliveryPrice (2026-09-25) | 2026-06-16..2026-10-31 (K) | K | SK0 (Zaehlung) | Orchestrator, `scripts/sk0_probe.py` | Aktivitaets-Stellvertreter in Zone K (DEC-97 A-3): Tagesquantile nicht veroeffentlicht (nur Scratchpad); keine Werte, keine Vorzeichen |
+
+## Nachtrag 2026-11-04 (DEC-107): P-13 Lockerung, Zonen-Ausnahme fuer Mikrostruktur-Zaehlgroessen; Stabilitaetstest statt Screen
+
+### 9. Zonen-Ausnahme P-13 (DEC-107 (4); Etikett Lockerung, Entscheider N, Richtung Testbarkeit)
+
+| Datenfamilie | Zeitraum | Statistiken (erlaubt) | Zone | Auflagen |
+|---|---|---|---|---|
+| BTC/ETH-Mikrostruktur (`bybit/publicTrade`, `bybit/orderbook`, Tardis-Trades/-Buecher) | 2024-07-01..2026-06-30 (W1/W2) | **Nicht-Rendite-Zaehl- und Formgroessen:** Tradezahlen je Intervall, Groessenverteilungen (Clauset-Protokoll), Queue-Intensitaeten, Wartezeiten zwischen Trades/Orders, Zeitstempel-Statistiken, Tiefe in Stueck je Preisstufe relativ (ohne Preisniveau) | **X** (Exploration mit Konto, nie Verdikt) | **A2-Maske:** Freitags-Slots 07:30-08:00 UTC ausgeschlossen (PRD_ANALYSE Nachtrag 1 (10)); Statistikklasse nur SK0/SK1; Konto-Eintrag `KONTO_ZONE_X.md` je Statistik mit Code-Hash; C.17-Eintrag; **verboten:** jede Groesse mit Rendite, Preisniveau, Vol oder Vorzeichen einer Preisaenderung als Eingang (bleibt Zone V blind, Abschnitt 1/6) |
+
+Zweck: Kostenkurven IK-01 (Taker-Impact) und IK-02 (Maker-Queue) auf dem der Konfirmation naechsten Fenster. Preis
+(offengelegt): weiteres Agentenwissen ueber W1/W2-Aktivitaet (Schutzzweck schwach, weil die W1/W2-Vol bekannt ist, DEC-95 E2).
+Abschnitt 6 (Zone K rein je Familie) bleibt unveraendert; Abschnitt 2 (Vorwissens-Klasse BTC/ETH-Aggregate "nur prospektiv")
+gilt fuer Renditegroessen fort.
+
+### 10. Konfirmationsregel an den Blicken (DEC-107 (1))
+
+Der REZENZ-Screen (DEC-104 E2) ist durch den registrierten Stabilitaetstest ersetzt: an jedem Wirksamkeits-Stopp mit aelterem
+Teil wird "juengster Teil (12 Monate / vier Quartale) faellt nicht ab" einseitig bei 0,05 (Welch-t) geprueft; Verwerfung =
+FAIL (terminal). Bei <= 12 Monaten Konfirmationsdaten entfaellt der Test. Pflicht-OC-Zeile je Registrierung: P(PASS bei Effekt
+nur im aelteren Teil, 1 MDE). Herleitung: `state/herleitung_stabilitaetstest/`.

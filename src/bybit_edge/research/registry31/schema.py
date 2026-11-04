@@ -27,7 +27,8 @@ from typing import Any
 __all__ = [
     "SCHEMA_VERSION", "Spec", "Issue", "RegistrationSchemaError", "SPEC", "PZ_FIELDS", "ALIASES",
     "ALPHA_TEST", "Z_KRIT", "Z_SCREEN", "COHORT_FIRST", "ZONE_X_END", "ZONE_V_START", "ZONE_V_END", "ZONE_K_START_ALL",
-    "FAMILIES", "DATA_FAMILIES", "ZONE_K_START", "Family", "SCREEN_VARIANTS", "DECIDED_VARIANT", "REPORT_LINE_FIELDS",
+    "FAMILIES", "DATA_FAMILIES", "ZONE_K_START", "Family", "SCREEN_VARIANTS", "DECIDED_VARIANT", "ALPHA_STAB",
+    "STAB_VOID_MONTHS", "REPORT_LINE_FIELDS",
     "validate", "load_registration", "json_schema", "parse_abschnitt", "required_paths", "pz_of_path", "get_path",
 ]
 
@@ -39,8 +40,10 @@ SCHEMA_VERSION = "3.1.0"
 ALPHA_TEST = 0.0025                      # DEC-104 E2 (fixed per test); z_krit one-sided pooled 2.8070 (VR-b14)
 Z_KRIT = 2.8070
 Z_SCREEN = {"a": 1.6449, "a'": 0.8416}   # DEC-104 E2 (screen 0.05); DEC-104 N2 (4) variant (a') screen 0.20
-SCREEN_VARIANTS = ("a", "a'", "c")       # DEC-104 N2 (4): (a) decided, (a') and (c) alternatives awaiting the user
-DECIDED_VARIANT = "a"                    # change here once the user decides P-2 (DEC-104 N2 (4))
+SCREEN_VARIANTS = ("a", "a'", "c")       # DEC-104 N2 (4): (a) screen 0.05, (a') screen 0.20, (c) stability test
+DECIDED_VARIANT = "c"                    # DEC-107 (1) (user decision P-2, 2026-11-04): registered stability test
+ALPHA_STAB = 0.05                        # DEC-104 N4 (1) / DEC-107 (1): one-sided Welch-t against a drop
+STAB_VOID_MONTHS = 12                    # DEC-107 (1) (b): test void with <= 12 months of confirmation data
 COHORT_FIRST = _dt.date(2027, 1, 1)      # DEC-104 E4 (f)
 ZONE_X_END = _dt.date(2024, 6, 30)       # DEC-104 E4 (a): zone X = everything before 2024-07-01
 ZONE_V_START = _dt.date(2024, 7, 1)      # DEC-104 E4 (a): W1/W2
@@ -218,8 +221,8 @@ SPEC: Spec = _o(
        _o("screen", _t("fenster"), _n("alpha", lo=0.0, hi=1.0, lo_open=True, hi_open=True),
           _n("z_krit", lo=0.0, lo_open=True), nullable=True, pz="PZ-16", src="DEC-104 E2, E6"),
        _o("stability_test", _t("statistik"), _n("alpha", lo=0.0, hi=1.0, lo_open=True, hi_open=True),
-          _n("power", lo=0.0, hi=1.0, lo_open=True, hi_open=True), _r("ref"),
-          nullable=True, pz="PZ-16", src="DEC-104 E6, N2 (4) (c)"),
+          _n("kostenquote_q", lo=0.0, hi=1.0, lo_open=True), _t("entfaellt_wenn"), _t("an_blicken"), _r("ref"),
+          nullable=True, pz="PZ-16", src="DEC-104 E6, N4 (1)-(3); DEC-107 (1)"),
        _n("power_target_gemeinsam", lo=0.80, hi=1.0, hi_open=True, pz="PZ-01", src="DEC-104 E2"),
        _n("mde_faktor", lo=0.0, lo_open=True, src="DEC-94 (1); never a threshold"),
        src="PZ-15, PZ-16"),
@@ -289,8 +292,8 @@ SPEC: Spec = _o(
        min_items=1, pz="PZ-27", src="DEC-104 E8 (d); VR-f07"),
     _o("oc_line",
        _n("p_pass_0", lo=0.0, hi=1.0), _n("p_pass_sesoi", lo=0.0, hi=1.0), _n("p_pass_prior_median", lo=0.0, hi=1.0),
-       _i("seeds", lo=1), _r("ref"),
-       pz="PZ-21", src="DEC-104 E8 (a); VR-f04"),
+       _n("p_pass_nur_aelter_1mde", lo=0.0, hi=1.0), _i("seeds", lo=1), _r("ref"),
+       pz="PZ-21", src="DEC-104 E8 (a); VR-f04; DEC-107 (1) (d) protection line"),
     _o("strictness_ratio", _n("wert", lo=0.0, lo_open=True), _l("zerlegung", _t("festlegung"), min_items=1),
        _r("gabelungsregister_ref", strict=False),
        pz="PZ-22", src="DEC-104 E8 (b); N1 (9); VR-f05"),

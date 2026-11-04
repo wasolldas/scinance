@@ -191,8 +191,8 @@ def r_screen(c: Ctx) -> list[tuple[str, str]]:
     scr, stab = c.g("decision_rule.screen"), c.g("decision_rule.stability_test")
     out = []
     if v != S.DECIDED_VARIANT:
-        out.append((STATUS_ERR, f"variante '{v}' is not decided; until the user decision (P-2) only "
-                                f"'{S.DECIDED_VARIANT}' is registrable"))
+        out.append((STATUS_ERR, f"variante '{v}' is not the decided confirmation rule; DEC-107 (1) (P-2) makes only "
+                                f"'{S.DECIDED_VARIANT}' registrable"))
     if v in S.Z_SCREEN:
         if scr is None:
             out.append((STATUS_ERR, f"variante '{v}' needs a non-null screen"))
@@ -204,9 +204,15 @@ def r_screen(c: Ctx) -> list[tuple[str, str]]:
                                         f"got alpha {scr['alpha']}, z_krit {scr['z_krit']}"))
         if stab is not None:
             out.append((STATUS_ERR, f"stability_test as a gate only in variante 'c' (found with variante '{v}')"))
-    else:  # variant c
+    else:  # variant c (decided, DEC-107 (1))
         if stab is None:
             out.append((STATUS_ERR, "variante 'c' needs a non-null stability_test"))
+        else:
+            if not _close(stab["alpha"], S.ALPHA_STAB, 1e-12):
+                out.append((STATUS_ERR, f"stability_test.alpha must be {S.ALPHA_STAB} (DEC-107 (1)); got {stab['alpha']}"))
+            if stab["kostenquote_q"] > 1.0 - S.ALPHA_STAB + 1e-12:
+                out.append((STATUS_ERR, f"stability_test.kostenquote_q {stab['kostenquote_q']} exceeds 1 - alpha_stab = "
+                                        f"{1.0 - S.ALPHA_STAB} (q is a cost ratio, never above the pass probability)"))
         if scr is not None:
             out.append((STATUS_ERR, "variante 'c' has no screen: screen must be null"))
     if scr is not None and not _close(scr["z_krit"], _zscore(scr["alpha"]), Z_TOL):

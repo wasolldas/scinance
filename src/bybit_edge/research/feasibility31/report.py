@@ -708,7 +708,7 @@ def to_markdown(rep: dict) -> str:
         out.append(f"Der Gate-Faktor {_f(inp['gate_factor'], 4)} ist in alle Zeilen und beide Linien eingerechnet (Power je Entscheidung mal g).")
         out.append("")
     out.append("Regeln: R1 C.10 je Fenster 0,05/0,80; R2 C.10 gemeinsam 0,80; R3 gepoolt 0,0025; R4_aXX gepoolt 0,0025 + REZENZ-Screen alpha_s 0,XX "
-               "(Korrelation sqrt(r)); R5 P-6-Lesart (Stabilitaetstest unabhaengig, Power 0,95); R6 GSD O'Brien-Fleming (mit/ohne Screen).")
+               "(Korrelation sqrt(r)); R5 gepoolt 0,0025 + registrierter Stabilitaetstest (Variante c, beschlossen DEC-107; Kostenquote q 0,95, entfaellt <= 12 Monate); R6 GSD O'Brien-Fleming (mit/ohne Screen).")
     out.append("")
     # table 2: exploration vs confirmation
     out.append("## 2. Exploration (Zone X) und Konfirmation (Zone V / Zone K)")

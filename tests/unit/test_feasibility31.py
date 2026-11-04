@@ -171,6 +171,26 @@ def test_r5_p6_reading(k, mde, vs_c10):
     assert rule.t_required(rule.mde80(t)) == pytest.approx(t, rel=1e-9)
 
 
+def test_r5_void_below_twelve_months_equals_pooled():
+    """DEC-107 (1) (b) / DEC-104 N4 (1): with <= 12 months of confirmation data the stability test is void (q = 1),
+    so R5 equals R3 there; beyond 12 months it costs q = 0.95 and never reaches an effect below the 12-month MDE of R3
+    before month 12."""
+    r5, r3 = R.PooledStability(), R.Pooled()
+    for t in (6.0, 12.0):
+        assert r5.q(t) == 1.0 and r5.mde80(t) == pytest.approx(r3.mde80(t), rel=1e-12)
+        assert r5.power(2.0, t) == pytest.approx(r3.power(2.0, t), rel=1e-12)
+    assert r5.q(12.0001) == 0.95 and r5.mde80(24.0) > r3.mde80(24.0)
+    assert close(r5.mde80(24.0) / r3.mde80(24.0), 3.8102 / 3.6486, 0.001)
+    d_small_t = r3.mde80(9.0)                       # reachable at 9 months by the pooled test alone
+    assert r5.t_required(d_small_t) == pytest.approx(9.0, rel=1e-9)
+    d_big_t = r5.mde80(30.0)
+    assert r5.t_required(d_big_t) == pytest.approx(30.0, rel=1e-9)
+    d_edge = r3.mde80(12.5)                        # just beyond 12 months: the test kicks in and costs extra data
+    t_edge = r5.t_required(d_edge)
+    assert 12.0 < t_edge and r5.mde80(t_edge) == pytest.approx(d_edge, rel=1e-9)
+    assert r5.describe()["decided"].startswith("DEC-107")
+
+
 def test_r4_floor_makes_sesoi_unreachable():
     rule = R.PooledScreen(0.05)
     assert rule.t_required(rule.floor() * (1 - 1e-6)) == math.inf     # below the floor: never
