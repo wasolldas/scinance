@@ -463,5 +463,13 @@ Tests: 1.992 passed / 3 failed (Legacy `test_execution_live.py`, Sandbox-bedingt
   Antwort Data-Harvest 2026-11-04 verbucht (Tardis-Kette gefiltert lesbar, Index/Mark-Kerzen, Negativ-Panel erledigt;
   Erratum: Deribit-Trades gemischt); Rueckantwort mit 46 L2-Stichtagen in `state/ANTWORT_AN_DATA_HARVEST_2026-11-04.md`.
   P-10-Herleitung liegt vor, Review laeuft.
-- **Offen beim Nutzer:** `state/ANTWORT_AN_DATA_HARVEST_2026-11-04.md` an Data-Harvest weiterleiten (Marktkap-Bezahlquelle:
-  Default nein); privaten Speicher bereitstellen (Repo oder Bucket, Zugang nur ueber Umgebungs-Secrets); Bandbreitendeckel optional.
+- **Abend (DEC-107 N2/N3):** Kapitalregel Klasse P hergeleitet und reviewt (0 Veto, 5 Auflagen; `state/herleitung_kapitalregel_p/`),
+  Vorlage mit acht Risikopraeferenz-Fragen (Defaults) an den Nutzer. A2-Registrierungsentwurf 3.1 (Linter gruen) und Review
+  (1 VETO aufloesbar: Placebo P2'' hat in Zone K seit 2026-04-04 null Tage) in `state/herleitung_a2/registrierung/`; Vorlage
+  G-02 (Empfehlung (c): P2' nur in Zone K, Verduennung f als Sensitivitaet). Gesamt-Testlauf 2.920 bestanden / 11 uebersprungen.
+- **Offen beim Nutzer:** G-02 (A2-Placebo in Zone K: (c) empfohlen); P-10-Defaults (DEC-107 N2 (3), ein Satz "Defaults annehmen");
+  `state/ANTWORT_AN_DATA_HARVEST_2026-11-04.md` an Data-Harvest weiterleiten (Marktkap-Bezahlquelle: Default nein); privaten
+  Speicher bereitstellen (Repo oder Bucket, Zugang nur ueber Umgebungs-Secrets); Bandbreitendeckel optional.
+- **Naechste Orchestrator-Schritte:** Vorfenster-SE A2 2023-07..2024-06 (Extrakt um Juni 2024 erweitern, SK1, Konto); nach G-02
+  Zweitfassung A2 (Auflagen B-2..B-7) -> Review -> Registrierung vor 2027-01-01 -> Positivkontroll-Fixture; nach P-10-Entscheid
+  DEC-108 (VR-f13 neu, PZ-31); IK-01-Stichprobe auf W1/W2 mit A2-Maske (P-13); DEC-104 N5 (WD-06/08/13/16).
