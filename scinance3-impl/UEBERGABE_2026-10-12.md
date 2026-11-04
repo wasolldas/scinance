@@ -457,5 +457,11 @@ Tests: 1.992 passed / 3 failed (Legacy `test_execution_live.py`, Sandbox-bedingt
   Tests registry31 + feasibility31: 481 bestanden (+8); Regressionsfaelle `state/feasibility/*.yaml --check-expected` gruen.
 - **Fuer eine neue Sitzung:** zuerst `PRD_SCINANCE3_v3.md` Kopf 0.1 und Abschnitt 2, dann `state/decisions.md` ab DEC-104; Rollen
   (Orchestrator / Herleitung / Review / Bau / Kartierung) statt Modellnamen in allen Repo-Texten.
-- **Offen beim Nutzer:** Datenauftraege an Data-Harvest weiterleiten; privaten Speicher bereitstellen (Repo oder Bucket, Zugang
-  nur ueber Umgebungs-Secrets); Bandbreitendeckel optional.
+- **Nachmittag (DEC-107 N1):** A2 ist unter (c)+BE-04 am ersten K-Blick 2027-04-01 testbar (MDE80 20,6 bp bei 30 Monaten gegen
+  22 bp; Schwelle t-artig nach N2 (7), damit alpha unter Stress-Nuisance 0,0025 statt 0,0063) -> A2 geht als erster Kandidat
+  der Kohorte 1 in die Zustandsmaschine (Herleitungs-Nachtrag Registrierungsentwurf, Review, Registrierung vor 2027-01-01).
+  Antwort Data-Harvest 2026-11-04 verbucht (Tardis-Kette gefiltert lesbar, Index/Mark-Kerzen, Negativ-Panel erledigt;
+  Erratum: Deribit-Trades gemischt); Rueckantwort mit 46 L2-Stichtagen in `state/ANTWORT_AN_DATA_HARVEST_2026-11-04.md`.
+  P-10-Herleitung liegt vor, Review laeuft.
+- **Offen beim Nutzer:** `state/ANTWORT_AN_DATA_HARVEST_2026-11-04.md` an Data-Harvest weiterleiten (Marktkap-Bezahlquelle:
+  Default nein); privaten Speicher bereitstellen (Repo oder Bucket, Zugang nur ueber Umgebungs-Secrets); Bandbreitendeckel optional.
