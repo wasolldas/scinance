@@ -1,0 +1,113 @@
+A2 registration draft 3.1 - operating characteristic (variant (c) + BE-04), seed 20261104, paths 300000
+
+(0) Kalender
+  K-Quartal 2026-10-01..2026-12-31: Freitage 13, Mo-Do 53, P3fix 63, P3all 66, P2'' (Mo-Do ohne Futures-Delivery) = 0 bei taeglichen Futures seit 2026-04-04
+  K-Quartal 2027-01-01..2027-03-31: Freitage 13, Mo-Do 51, P3fix 61, P3all 64, P2'' (Mo-Do ohne Futures-Delivery) = 0 bei taeglichen Futures seit 2026-04-04
+  K-Quartal 2027-04-01..2027-06-30: Freitage 13, Mo-Do 52, P3fix 62, P3all 65, P2'' (Mo-Do ohne Futures-Delivery) = 0 bei taeglichen Futures seit 2026-04-04
+  K-Quartal 2027-07-01..2027-09-30: Freitage 13, Mo-Do 53, P3fix 63, P3all 66, P2'' (Mo-Do ohne Futures-Delivery) = 0 bei taeglichen Futures seit 2026-04-04
+  K-Quartal 2027-10-01..2027-12-31: Freitage 14, Mo-Do 52, P3fix 63, P3all 66, P2'' (Mo-Do ohne Futures-Delivery) = 0 bei taeglichen Futures seit 2026-04-04
+  STRESS_ABS-Tage in W1: 2 [('2024-08-05', 'Mo'), ('2025-02-03', 'Mo')]
+  STRESS_ABS-Tage in W2: 1 [('2025-10-10', 'Fr')]
+  STRESS_ABS-Tage in K_registriert: 0 []
+  STRESS_ABS-Tage in K_Luecke_2026-07..09: 1 [('2026-08-19', 'Mi')]
+  STRESS_ABS-Tage in Vorfenster_2023-07..2024-06: 1 [('2023-08-17', 'Do')]
+  STRESS_ABS-Tage in den Urteilsfenstern (W1+W2+K registriert): 3; Datei sha256 b8008257e963eaa2bd81882d1169503ca8f4c38d7860d65c357b8db3308fc11e
+
+(1) MDE80 der festen Ein-Blick-Regel (c), (z_krit + Phi^-1(0,80/(q g))) SE_12 sqrt(12/T), g 0,9025
+  zentral_7.58: T24 23.08, T27 21.76, T30 20.64, T33 19.68, T36 18.85, T39 18.11; 22 bp ab 26.42 Monaten; T30 x sqrt(1,03) = 20.95
+  W1_7.34: T24 22.35, T27 21.07, T30 19.99, T33 19.06, T36 18.25, T39 17.53; 22 bp ab 24.77 Monaten; T30 x sqrt(1,03) = 20.29
+  stress_8.52: T24 25.94, T27 24.46, T30 23.20, T33 22.12, T36 21.18, T39 20.35; 22 bp ab 33.37 Monaten; T30 x sqrt(1,03) = 23.55
+  MDE-Faktor: q 0,95 ohne Gate 3.8102; mit Gate 0,9025 4.3062; q_plan 0,9639 mit Gate 4.2099
+
+(2) Gesamtregel (Plan V24 + K-Blicke 30/33/36/39 Monate, OBF C_B 2,886, Stabilitaetstest each_term, Futility Z<0 Blicke 1-3, Konjunktion P2''/P3fix/P3all + skalierte Null, Gate 0,9025 als Faktor)
+  Blick 1 (2027-04-01): N_E 130, N_P2 471, SE P2'' 4.694, P3fix 5.015, P3all 4.149 bp; OBF z-Grenze 3.3003
+  Blick 2 (2027-07-01): N_E 143, N_P2 523, SE P2'' 4.471, P3fix 4.782, P3all 3.956 bp; OBF z-Grenze 3.1467
+  Blick 3 (2027-10-01): N_E 156, N_P2 576, SE P2'' 4.276, P3fix 4.577, P3all 3.787 bp; OBF z-Grenze 3.0127
+  Blick 4 (2028-01-01): N_E 170, N_P2 628, SE P2'' 4.096, P3fix 4.388, P3all 3.628 bp; OBF z-Grenze 2.8860
+  alpha_eff der Regel (ohne Gate) 0.00037; mit Gate x0,9025 0.00033; je Blick [6e-05, 7e-05, 0.00012, 0.00011]; Futility-Stopp unter H0 0.5803
+  Kontrolle Primaerstatistik allein: alpha_eff mit Stabilitaetstest+Futility 0.00246, OBF-Plan ohne alles 0.00251 (stab_results s4b: 0,00249 / 0,00254)
+  MDE80 Gesamtplan (P(PASS bis Blick 4) = 0,80 inkl. Gate): 19.50 bp
+  MDE80 je Blick (P(PASS bis Blick k) = 0,80 inkl. Gate): Blick 1 24.56, Blick 2 22.60, Blick 3 20.96, Blick 4 19.50
+  P(PASS | 22 bp) gesamt 0.8421 (ohne Gate 0.9331); kumuliert je Blick [0.7125, 0.7841, 0.8223, 0.8421]; Stabilitaets-FAIL 0.0494; Futility 0.0000
+  P(PASS | 5.0 bp) 0.0166
+  P(PASS | 16.5 bp) 0.6687
+  P(PASS | 25.0 bp) 0.8554
+  Schutzzeile nur_V_1MDE: P(PASS) 0.2832; je Blick kumuliert [0.227, 0.2553, 0.2703, 0.2832]; veraltet (Blicke 3-4, juengste 12 Monate effektfrei) 0.0279; Stabilitaets-FAIL 0.2420
+  Schutzzeile nur_V_2MDE: P(PASS) 0.3188; je Blick kumuliert [0.3187, 0.3188, 0.3188, 0.3188]; veraltet (Blicke 3-4, juengste 12 Monate effektfrei) 0.0000; Stabilitaets-FAIL 0.6465
+  Schutzzeile nur_W1_1MDE: P(PASS) 0.0260; je Blick kumuliert [0.0098, 0.0149, 0.0203, 0.026]; veraltet (Blicke 3-4, juengste 12 Monate effektfrei) 0.0111; Stabilitaets-FAIL 0.0339
+  Vergleich ohne Stabilitaetstest, nur V 1 MDE: P(PASS) 0.4051
+
+(3) Strenge-Quotient (Grundfassung: P2''-Kontrast allein, zentrale Nuisance, dieselbe Regel (c) + Blickplan, kein Gate)
+  Grundfassung P2'' allein, (c), Plan: 15.54 bp
+  + P3fix (exakt gemeinsam): 17.43 bp (x1.1216)
+  + P3all (drei Placebos, exakt gemeinsam): 17.44 bp (x1.0006)
+  + skalierte Null-Bedingung (kappa, feste Freitage W2): 17.44 bp (x1.0000)
+  + Gate-(4)-Faktor 0,9025: 19.50 bp (x1.1181)
+  Strenge-Quotient 1.2548 (< 1,3)
+  Doppelausweis am Blick 1 (feste Regel, 30 Monate, q 0,95, OBF-Grenze Blick 1): Produkt der Einzel-Powers gegen exakt
+  Blick 1: Produkt 25.10 bp, exakt gemeinsam (MC, P(PASS bis Blick 1) = 0,80) 24.56 bp; z-Grenze 3.3003; kappa 0.908
+
+(4) Sensitivitaet
+  Stress-Linie (SE P2'' 8,52): alpha_eff 0.00048, MDE80 Plan 21.46 bp, P(PASS | 22 bp) 0.8122, kumuliert [0.599, 0.7033, 0.7698, 0.8122]
+  E7 (c): feste SE 7,58 in der Schwelle bei Stress 8,52: z_eff 2.497, alpha_eff 0.0063 (> 0,0025); t-artige Schwelle aus der Konfirmations-SE: alpha 0,0025
+  Vorfenster-Hinweis [R]: T2-Zeile V3 (2023-06..2024-05) P2'' SE 5,31 (eigene N) / 5.51 (W2-N 52/159) gegen Platzhalter 7,58; feste Regel T30 damit 15.01 bp (nur Hinweis, Konto-Eintrag ausstehend)
+
+(5) Jahresbuch, n_eff, Positivkontrolle
+  Jahresbuch 2027: vorher 0 (keine registrierte Hypothese mit Blick 2027, FENSTERREGISTER 8); mit A2: Summe alpha 0,0025 (MC-Anteil Blicke 1-3 in 2027 0.00023, Blick 4 am 2028-01-01 0.00010)
+  n_eff (Ereignis-Cluster): V_allein: N_E 104 (N_E/c 1,3177 = 78.9), N_P2 367; Blick_1: N_E 130 (N_E/c 1,3177 = 98.7), N_P2 471; Blick_2: N_E 143 (N_E/c 1,3177 = 108.5), N_P2 523; Blick_3: N_E 156 (N_E/c 1,3177 = 118.4), N_P2 576; Blick_4: N_E 170 (N_E/c 1,3177 = 129.0), N_P2 628
+  Positivkontrolle: Injektion 19.50 bp (MDE80 des Plans), erwartete PASS-Quote 0,80, Kriterium 0,80 - 2,3263 x 0.0283 = 0.7342 bei 200 Seeds
+  t-artige Grenze am Blick 1: df 129 (Ereignis-Cluster - 1), t_0,0025 2.8561 gegen z 2,8070
+
+(6) sha256-Pins
+  3ae17fa1eac4292857763478511ac724466d5bc0e71caf06bdf03fc566c743cc  scinance3-impl/state/herleitung_a2/NULL_SIMULATION_A2.md
+  4a4a1fbcf22ea7a77b99e431f451148b6192d7d3a0f6b8aef132f3a3ba9a67ff  scinance3-impl/state/herleitung_stabilitaetstest/stab_results.json
+  d7a4c9a81d1fadd2499d95e00e18d347bc8c556a7eef699067eea9d6f0b87ed2  scinance3-impl/state/herleitung_stabilitaetstest/stab_sim.py
+  106b68679f2717e0078d9a8758f4d27619cf197bc9a0a47b69e915dda34f84af  scinance3-impl/state/feasibility/A2.yaml
+  21e8b98e344638fe79260d2ad308b9e2483bc04c6377d6406b5eee5b4bcdea6f  src/bybit_edge/research/feasibility31/rules.py
+  b8008257e963eaa2bd81882d1169503ca8f4c38d7860d65c357b8db3308fc11e  scinance3-impl/state/runs/stress_abs.json
+  8c198d01ed98f06765e78c8c0379f94c7f50c20e43b53272ea27f568b56249b9  scinance3-impl/state/prd_analyse_2026-11-01/KRITIK_PRD.md
+  f370c2972f789fab95f238c0edf51cf4a4eb06c1923cbe4a0b5b52f220d39bcd  scinance3-impl/state/FENSTERREGISTER.md
+  a98ae048c0c39637bd94917f01bb268a2b0eb770d3e9e8d9294e02fae2a356fb  scinance3-impl/state/KONTO_INVENTAR_2026-11-02.md
+  46a3329b889330868dec277a60f819bc77e8d9544dab3bc38acc28a3f8ec4f73  scinance3-impl/state/registered/TEMPLATE_3_1.yaml
+  295775466fe286bdd6cbd61ad84597763f79cf79d2f5616ef36bc0f7f2ce8391  calc/a2_reg_calc.py
+
+Laufzeit 62.8 s
+
+(7) Linter-Aufruf (Repo-Wurzel): PYTHONPATH=src python3 -m bybit_edge.research.registry31.lint <Pfad>/a2_registration_3_1.yaml
+    YAML sha256: 211d05d00aa2fa162994b718f8866dcf7aef7d691c1239d4c5c295f865f6665e
+[OK] R01-SCHEMA (PRD v3 3.1 (a)/(b); 3.2 PZ-01..PZ-30; DEC-104 E9): all mandatory lines PZ-01..PZ-30 present and well-formed
+[OK] R02-PLATZHALTER (PRD v3 3.3; PRD 3.1 (b)): no placeholders left
+[OK] R03-ALPHA (DEC-104 E2; VR-b14; PZ-15): alpha_test 0.0025, z_krit 2.8070
+[OK] R04-SCREEN (DEC-104 E2, E6, N2 (4); PZ-16): decided variant with consistent screen / stability_test
+[OK] R05-KOHORTE (DEC-104 E4 (f); PZ-14): cohort date valid
+[OK] R06-FENSTER-ZONE (DEC-104 E4 (a), (d), (e); FENSTERREGISTER 1; PZ-13): all windows in their zone
+[OK] R07-ZONE-X (DEC-104 E4 (a), (c); KONTO_ZONE_X): no judging window uses zone X
+[OK] R08-FAMILIE (DEC-104 E4 (i); FENSTERREGISTER 2, 6; VR-d16; PZ-13, PZ-30): windows respect the knowledge class and K start of their families
+[OK] R09-ZONENEINTRAG (FENSTERREGISTER 1, 6; PZ-13): zone entries consistent
+[OK] R10-BLICKE (DEC-104 E4 (d), (e), N2 (7); PZ-17; VR-d11, VR-d12): look plan consistent with the zones used
+[OK] R11-SESOI (DEC-104 E3 (a), N3 (1); DEC-105 (1), (8); PZ-18): SESOI curve consistent
+[OK] R12-TESTBARKEIT (DEC-104 E3 (a); VR-c01; PZ-01): MDE80 <= SESOI: testbar
+[OK] R13-PRIOR (DEC-104 E3 (b), (c), (d); VR-c05, VR-c06; PZ-19): prior label complete
+[OK] R14-LITERATUR (DEC-104 E3 (b); VR-c05): literatur label 'UNBELEGT' is a label, never a block
+[OK] R15-SELEKTION-K (DEC-104 E9, N1 (9); VR-b17; PZ-04, PZ-20): selection K valid
+[OK] R16-OC-ZEILE (DEC-104 E8 (a); VR-f04; PZ-21): oc_line complete
+[OK] R17-STRENGE (DEC-104 E8 (b); VR-f05; PZ-22): strictness ratio below 1.3
+[OK] R18-NEFF-C (DEC-51 (3), (5); DEC-104 N2 (7); VR-b03, VR-b05; PZ-23, PZ-24): n_eff and c_overlap valid
+[OK] R19-C17 (DEC-104 N1 (1); VR-d18; PZ-29): c17_refs valid
+[OK] R20-JAHRESBUCH (DEC-104 E4 (g); VR-d14; PZ-28): annual book within the limit
+[OK] R21-BERICHTSZEILE (DEC-105; VR-f02; PZ-11): report line complete
+[OK] R22-ARTEFAKTE (DEC-53; VR-f03; PZ-11): artifact obligations named
+[OK] R23-KONSTANTEN (PRD 3.3.6; VR-g14; PZ-06): constants hash consistent
+[OK] R24-CODE-HASH (PRD_ANALYSE 7 (versioned script)): code hashes valid
+[OK] R25-STEUER (PRD 3.3.9; PRD 8.2; PZ-09): tax reservation present
+[OK] R26-TEXT-HYGIENE (project hard rules; public repository): no model names, hosts or credentials
+[OK] R27-REFS (project hard rules; PRD 3.1 (b)): references safe
+[OK] R28-LESESTATUS (DEC-104 N1 (6); VR-g07; PZ-25): reading status valid
+[OK] R29-DESIGN-MENUE (DEC-104 E5; VR-e01; PZ-26): design choice inside the menu
+[HINWEIS] R30-ERREICHBARKEIT (DEC-104 E8 (d); VR-f07; PZ-27): reachability: parameter 'P2-Tage nach DEC-103 E3 woertlich in Zone K (taegliche Futures-Deliveries seit 2026-04-04)' reaches 0 observations in the judging windows
+[HINWEIS] R30-ERREICHBARKEIT (DEC-104 E8 (d); VR-f07; PZ-27): reachability: parameter 'Tage der Schutzregel G-C8 (kein 08:00-Funding oder Termin in [07:30, 08:00)) W1 + W2' reaches 0 observations in the judging windows
+[OK] R31-FDR (DEC-104 E4 (f); VR-b16, VR-b17, VR-d13): FDR parameters fixed
+[OK] R32-VORWISSEN (DEC-104 E4 (i); VR-d16; PZ-30): prior-knowledge class names all families
+[OK] R33-POSITIVKONTROLLE (PRD 3.3.8; VR-f12; PZ-08): positive control scheduled
+SUMMARY: 0 FEHLER, 2 HINWEIS, 32 OK
+rc=0

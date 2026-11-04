@@ -1,0 +1,661 @@
+{
+ "alpha_check": {
+  "primaer_allein_ohne_alles": 0.002513333333333333,
+  "primaer_allein_stab_futility": 0.0024633333333333334,
+  "quelle_vergleich": "stab_results.json s4b each_term alpha_eff 0,00249; none 0,002536"
+ },
+ "annual_book": {
+  "alpha_test": 0.0025,
+  "jahr": 2027,
+  "mit_dieser_registrierung_summe_alpha": 0.0025,
+  "p_falsch_pass_2027_blicke_1_3": 0.00023164166666666665,
+  "p_falsch_pass_2028_blick_4": 0.00010228333333333333,
+  "vorher": 0.0
+ },
+ "blocks_central": [
+  {
+   "E": 13,
+   "P2": 52,
+   "P3all": 65,
+   "P3fix": 62,
+   "fixedE": 0,
+   "name": "W1Q1",
+   "var_e_day": 2207.5002729899998,
+   "zone": "V"
+  },
+  {
+   "E": 13,
+   "P2": 52,
+   "P3all": 65,
+   "P3fix": 62,
+   "fixedE": 0,
+   "name": "W1Q2",
+   "var_e_day": 2207.5002729899998,
+   "zone": "V"
+  },
+  {
+   "E": 13,
+   "P2": 52,
+   "P3all": 65,
+   "P3fix": 62,
+   "fixedE": 0,
+   "name": "W1Q3",
+   "var_e_day": 2207.5002729899998,
+   "zone": "V"
+  },
+  {
+   "E": 13,
+   "P2": 52,
+   "P3all": 65,
+   "P3fix": 62,
+   "fixedE": 0,
+   "name": "W1Q4",
+   "var_e_day": 2207.5002729899998,
+   "zone": "V"
+  },
+  {
+   "E": 13,
+   "P2": 53,
+   "P3all": 65,
+   "P3fix": 62,
+   "fixedE": 0,
+   "name": "W2Q1",
+   "var_e_day": 2207.5002729899998,
+   "zone": "V"
+  },
+  {
+   "E": 13,
+   "P2": 53,
+   "P3all": 65,
+   "P3fix": 62,
+   "fixedE": 0,
+   "name": "W2Q2",
+   "var_e_day": 2207.5002729899998,
+   "zone": "V"
+  },
+  {
+   "E": 14,
+   "P2": 53,
+   "P3all": 65,
+   "P3fix": 62,
+   "fixedE": 0,
+   "name": "W2Q3",
+   "var_e_day": 2207.5002729899998,
+   "zone": "V"
+  },
+  {
+   "E": 12,
+   "P2": 0,
+   "P3all": 64,
+   "P3fix": 61,
+   "fixedE": 12,
+   "name": "W2Q4",
+   "var_e_day": 2207.5002729899998,
+   "zone": "V"
+  },
+  {
+   "E": 13,
+   "P2": 53,
+   "P3all": 66,
+   "P3fix": 63,
+   "bis": "2026-12-31",
+   "fixedE": 0,
+   "name": "KQ1",
+   "var_e_day": 2207.5002729899998,
+   "von": "2026-10-01",
+   "zone": "K"
+  },
+  {
+   "E": 13,
+   "P2": 51,
+   "P3all": 64,
+   "P3fix": 61,
+   "bis": "2027-03-31",
+   "fixedE": 0,
+   "name": "KQ2",
+   "var_e_day": 2207.5002729899998,
+   "von": "2027-01-01",
+   "zone": "K"
+  },
+  {
+   "E": 13,
+   "P2": 52,
+   "P3all": 65,
+   "P3fix": 62,
+   "bis": "2027-06-30",
+   "fixedE": 0,
+   "name": "KQ3",
+   "var_e_day": 2207.5002729899998,
+   "von": "2027-04-01",
+   "zone": "K"
+  },
+  {
+   "E": 13,
+   "P2": 53,
+   "P3all": 66,
+   "P3fix": 63,
+   "bis": "2027-09-30",
+   "fixedE": 0,
+   "name": "KQ4",
+   "var_e_day": 2207.5002729899998,
+   "von": "2027-07-01",
+   "zone": "K"
+  },
+  {
+   "E": 14,
+   "P2": 52,
+   "P3all": 66,
+   "P3fix": 63,
+   "bis": "2027-12-31",
+   "fixedE": 0,
+   "name": "KQ5",
+   "var_e_day": 2207.5002729899998,
+   "von": "2027-10-01",
+   "zone": "K"
+  }
+ ],
+ "e7c_vorbehalt": {
+  "alpha_eff_feste_SE": 0.006256489075155998,
+  "lesart": "t-artig aus Konfirmations-SE -> alpha bleibt 0,0025 (DEC-107 N1 (2))",
+  "z_eff": 2.4973375544654974
+ },
+ "fixed_rule": {
+  "W1_7.34": {
+   "12": 29.46844847241401,
+   "24": 22.349718371755035,
+   "27": 21.071516557703397,
+   "30": 19.99019582288807,
+   "30_mit_GSD_x1.03_daten": 20.287832977145044,
+   "33": 19.059903868817283,
+   "36": 18.248468635235568,
+   "39": 17.53256155398186,
+   "T_fuer_22bp": 24.76908651058336
+  },
+  "mde_faktor_q095": 3.8101817360063386,
+  "mde_faktor_q095_g": 4.306168233863092,
+  "mde_faktor_qplan_g": 4.209901174346599,
+  "stress_8.52": {
+   "12": 34.20588296797921,
+   "24": 25.94272486748677,
+   "27": 24.45903556834236,
+   "30": 23.203878530109858,
+   "30_mit_GSD_x1.03_daten": 23.549364709165637,
+   "33": 22.124030103858754,
+   "36": 21.18214615425164,
+   "39": 20.351147743859052,
+   "T_fuer_22bp": 33.3731391843033
+  },
+  "zentral_7.58": {
+   "12": 30.431994471512017,
+   "24": 23.08049935393776,
+   "27": 21.76050347512149,
+   "30": 20.643826204017923,
+   "30_mit_GSD_x1.03_daten": 20.951195363318725,
+   "33": 19.683115984418937,
+   "36": 18.845148808594768,
+   "39": 18.105833321414508,
+   "T_fuer_22bp": 26.415344649278744
+  }
+ },
+ "inputs": {
+  "R_max_plan_each_term": {
+   "source": "stab_results.json s4b 'V24+K_30_33_36_39'.each_term.R_max",
+   "value": 1.08418
+  },
+  "V3_prewindow": {
+   "source": "NULL_SIMULATION_A2.md T2 Zeile V3_2023-06..2024-05 P2ss (einzige veroeffentlichte 12-Monats-Vorfensterzeile nahe 2023-07..2024-06)",
+   "value": {
+    "E_sd": 32.26,
+    "P_sd": 29.83,
+    "n_E": 53,
+    "n_P": 209,
+    "null_sd": 4.51,
+    "se_analytic": 5.31
+   }
+  },
+  "alpha_stab": {
+   "source": "DEC-107 (1) (a): Welch-t einseitig 0,05 gegen Abfall",
+   "value": 0.05
+  },
+  "c_overlap": {
+   "source": "NULL_SIMULATION_A2.md T2 Kopf: c_bind Mo-Do 1,3177",
+   "value": 1.3177
+  },
+  "counts_W1": {
+   "source": "NULL_SIMULATION_A2.md T3 W1",
+   "value": {
+    "E": 52,
+    "P2": 208,
+    "P3all": 260,
+    "P3fix": 248
+   }
+  },
+  "counts_W2": {
+   "source": "NULL_SIMULATION_A2.md T3 W2; 5.3 Befund 2 (12 feste Freitage 2026-04-10..06-26)",
+   "value": {
+    "E": 52,
+    "P2": 159,
+    "P3all": 259,
+    "P3fix": 247,
+    "fixed_fridays": 12
+   }
+  },
+  "daily_futures_from": {
+   "source": "DATENANNAHMEN_REGISTER Nr. 10; KONTO_INVENTAR O-052",
+   "value": "2026-04-04"
+  },
+  "event_sd_c": {
+   "source": "NULL_SIMULATION_A2.md T2 VP / V1 P2ss: SD Klasse E 43,83 / 49,37; c_bind Freitag 1,1491 (Teil B Reproduktion)",
+   "value": {
+    "central": [
+     43.83,
+     1.1491
+    ],
+    "stress": [
+     49.37,
+     1.1491
+    ]
+   }
+  },
+  "gate4": {
+   "source": "NULL_SIMULATION_A2.md 5.2: Gate (4) als Faktor 0,95^2 (vorlaeufig, UNBELEGT); VR-e07",
+   "value": 0.9025
+  },
+  "null_W1": {
+   "source": "NULL_SIMULATION_A2.md T3 W1: Null-SD, SD Null-Verschiebung",
+   "value": {
+    "central": {
+     "centre_sd": 0.23,
+     "sd": 6.7
+    },
+    "stress": {
+     "centre_sd": 0.26,
+     "sd": 7.53
+    }
+   }
+  },
+  "null_W2": {
+   "source": "NULL_SIMULATION_A2.md T3 W2: Null-SD, SD Null-Verschiebung",
+   "value": {
+    "central": {
+     "centre_sd": 2.97,
+     "sd": 6.24
+    },
+    "stress": {
+     "centre_sd": 3.34,
+     "sd": 7.01
+    }
+   }
+  },
+  "nur_V_1MDE_plan": {
+   "source": "stab_results.json s4b 'V24+K_30_33_36_39'.each_term.nur_V_teil_1MDE (ohne Konjunktion, ohne Gate)",
+   "value": {
+    "P_PASS": 0.298684,
+    "veraltet": 0.04952
+   }
+  },
+  "obf_C_B": {
+   "source": "stab_results.json s4b_blickplaene 'V24+K_30_33_36_39'.C_B_skala (exakte Gitterintegration)",
+   "value": 2.886
+  },
+  "oc_s0_r05": {
+   "source": "stab_results.json s0_reproduktion_oc r0.500 (ein Blick, Primaerstatistik allein)",
+   "value": {
+    "PASS_nur_aelter_1MDE": 0.0729293,
+    "PASS_nur_aelter_2MDE": 0.0127842
+   }
+  },
+  "outlier_days": {
+   "source": "DEC-103 E1: Options-Delivery > 60 s",
+   "value": [
+    "2020-08-27",
+    "2024-08-19"
+   ]
+  },
+  "prior_nominal_bp": {
+   "source": "NULL_SIMULATION_A2.md T6 Referenzzeile 16,5 bp [sek]; UNBELEGT",
+   "value": 16.5
+  },
+  "prior_span_bp": {
+   "source": "NULL_SIMULATION_A2.md T6 Prior-Gitter 5,0..25,0 bp; feasibility/A2.yaml prior.sensitivity_span",
+   "value": [
+    5.0,
+    25.0
+   ]
+  },
+  "q_one_look": {
+   "source": "DEC-107 (1) (d): Kostenquote q = 1 - alpha_stab bei einem Blick",
+   "value": 0.95
+  },
+  "q_plan_each_term": {
+   "source": "stab_results.json s4b_blickplaene 'V24+K_30_33_36_39'.each_term.q",
+   "value": 0.963851
+  },
+  "se12_central_W1": {
+   "source": "NULL_SIMULATION_A2.md T3 'W1 zentral': SE_bind P2'' 7,34 (Sensitivitaet)",
+   "value": 7.34
+  },
+  "se12_central_W2": {
+   "source": "NULL_SIMULATION_A2.md T3 'W2 zentral': SE_bind P2'' 7,58 (Platzhalter fuer das Vorfenster, DEC-107 N1 (2))",
+   "value": 7.58
+  },
+  "se12_stress_W2": {
+   "source": "NULL_SIMULATION_A2.md T3 'W2 stress': SE_bind P2'' 8,52 (Sensitivitaet, BE-04)",
+   "value": 8.52
+  },
+  "se_W1": {
+   "source": "NULL_SIMULATION_A2.md T3 W1 zentral / stress",
+   "value": {
+    "central": {
+     "P2": 7.34,
+     "P3all": 6.56,
+     "P3fix": 7.93
+    },
+    "stress": {
+     "P2": 8.25,
+     "P3all": 7.39,
+     "P3fix": 8.66
+    }
+   }
+  },
+  "se_W2": {
+   "source": "NULL_SIMULATION_A2.md T3 W2 zentral / stress",
+   "value": {
+    "central": {
+     "P2": 7.58,
+     "P3all": 6.56,
+     "P3fix": 7.93
+    },
+    "stress": {
+     "P2": 8.52,
+     "P3all": 7.39,
+     "P3fix": 8.67
+    }
+   }
+  },
+  "sesoi_bp": {
+   "source": "KRITIK_PRD.md K-10 Tabelle Zeile A2: 2 x 11 bp Taker = 22 bp (Maker 2 x 5,4 = 10,8 bp)",
+   "value": 22.0
+  },
+  "tau95": {
+   "source": "NULL_SIMULATION_A2.md 5 (Transfer): tau95 = 1,6553 (MC-Maximum; exakt 1,6533)",
+   "value": 1.6553
+  },
+  "z_pool": {
+   "source": "DEC-104 E2 / VR-b14: alpha 0,0025 einseitig, z_krit 2,8070",
+   "value": 2.8070337683438042
+  }
+ },
+ "k_quarters": [
+  {
+   "E": 13,
+   "MoDo": 53,
+   "P3all": 66,
+   "P3fix": 63,
+   "bis": "2026-12-31",
+   "von": "2026-10-01"
+  },
+  {
+   "E": 13,
+   "MoDo": 51,
+   "P3all": 64,
+   "P3fix": 61,
+   "bis": "2027-03-31",
+   "von": "2027-01-01"
+  },
+  {
+   "E": 13,
+   "MoDo": 52,
+   "P3all": 65,
+   "P3fix": 62,
+   "bis": "2027-06-30",
+   "von": "2027-04-01"
+  },
+  {
+   "E": 13,
+   "MoDo": 53,
+   "P3all": 66,
+   "P3fix": 63,
+   "bis": "2027-09-30",
+   "von": "2027-07-01"
+  },
+  {
+   "E": 14,
+   "MoDo": 52,
+   "P3all": 66,
+   "P3fix": 63,
+   "bis": "2027-12-31",
+   "von": "2027-10-01"
+  }
+ ],
+ "meta": {
+  "cpu_seconds": 62.75383901596069,
+  "date": "2026-11-04",
+  "numpy": "2.5.3",
+  "paths": 300000,
+  "role": "Herleitung",
+  "script": "a2_reg_calc.py",
+  "seed": 20261104
+ },
+ "n_eff": {
+  "Blick_1": {
+   "N_E": 130,
+   "N_E_div_c_modo": 98.65675039842148,
+   "N_P2": 471
+  },
+  "Blick_2": {
+   "N_E": 143,
+   "N_E_div_c_modo": 108.52242543826364,
+   "N_P2": 523
+  },
+  "Blick_3": {
+   "N_E": 156,
+   "N_E_div_c_modo": 118.38810047810578,
+   "N_P2": 576
+  },
+  "Blick_4": {
+   "N_E": 170,
+   "N_E_div_c_modo": 129.0126735979358,
+   "N_P2": 628
+  },
+  "V_allein": {
+   "N_E": 104,
+   "N_E_div_c_modo": 78.92540031873719,
+   "N_P2": 367
+  }
+ },
+ "oc_central": {
+  "mde80_by_look": [
+   24.5635986328125,
+   22.6007080078125,
+   20.9564208984375,
+   19.5025634765625
+  ],
+  "mde80_plan": 19.50439453125,
+  "nur_V_1MDE": {
+   "p_fail_stab": 0.24204333333333333,
+   "p_pass": 0.2831984833333333,
+   "p_pass_by_look": [
+    0.22700281666666666,
+    0.2552600916666667,
+    0.2702807,
+    0.2831984833333333
+   ],
+   "veraltet_blicke_3_4": 0.027938391666666666
+  },
+  "nur_V_1MDE_ohne_stabtest": 0.40507509166666666,
+  "nur_V_2MDE": {
+   "p_fail_stab": 0.64652,
+   "p_pass": 0.31878405833333334,
+   "p_pass_by_look": [
+    0.318699825,
+    0.318772025,
+    0.3187750333333333,
+    0.31878405833333334
+   ],
+   "veraltet_blicke_3_4": 1.2033333333333332e-05
+  },
+  "nur_W1_1MDE": {
+   "p_fail_stab": 0.03386,
+   "p_pass": 0.026016066666666667,
+   "p_pass_by_look": [
+    0.009795133333333332,
+    0.014876208333333332,
+    0.020258116666666666,
+    0.026016066666666667
+   ],
+   "veraltet_blicke_3_4": 0.011139858333333334
+  },
+  "p_fail_stab_sesoi": 0.049436666666666663,
+  "p_futility_0": 0.58025,
+  "p_pass_0": 0.000333925,
+  "p_pass_0_at_look": [
+   5.715833333333333e-05,
+   6.317499999999999e-05,
+   0.00011130833333333333,
+   0.00010228333333333333
+  ],
+  "p_pass_0_ohne_gate": 0.00037,
+  "p_pass_16.5": 0.66873445,
+  "p_pass_25.0": 0.8554015333333332,
+  "p_pass_5.0": 0.01657290833333333,
+  "p_pass_sesoi": 0.8421317749999999,
+  "p_pass_sesoi_by_look": [
+   0.7125387916666667,
+   0.7841220833333333,
+   0.8223399499999999,
+   0.8421317749999999
+  ]
+ },
+ "oc_stress": {
+  "mde80_plan": 21.45751953125,
+  "p_pass_0": 0.00048133333333333334,
+  "p_pass_sesoi": 0.8122439833333333,
+  "p_pass_sesoi_by_look": [
+   0.5989742083333333,
+   0.7032610916666666,
+   0.769841525,
+   0.8122439833333333
+  ]
+ },
+ "positive_control": {
+  "binomial_se": 0.028284271247461905,
+  "injektion_bp": 19.50439453125,
+  "kriterium": 0.7342022997970294,
+  "sd_grenze": "SD der Kontrollwelt <= 1,10 x SD der Power-Zeile (VR-b10, VR-f12)",
+  "seeds": 200,
+  "ziel_pass_quote": 0.8
+ },
+ "q_sensitivity_k": {
+  "k_0.7": 0.943,
+  "k_1.5": 0.966,
+  "source": "HERLEITUNG_STABILITAETSTEST 2.3: k 0,7..1,5 -> q 0,943..0,966, realisierte Power 0,794..0,813 bei Planung mit q 0,95"
+ },
+ "sha256": {
+  "calc/a2_reg_calc.py": "295775466fe286bdd6cbd61ad84597763f79cf79d2f5616ef36bc0f7f2ce8391",
+  "scinance3-impl/state/FENSTERREGISTER.md": "f370c2972f789fab95f238c0edf51cf4a4eb06c1923cbe4a0b5b52f220d39bcd",
+  "scinance3-impl/state/KONTO_INVENTAR_2026-11-02.md": "a98ae048c0c39637bd94917f01bb268a2b0eb770d3e9e8d9294e02fae2a356fb",
+  "scinance3-impl/state/feasibility/A2.yaml": "106b68679f2717e0078d9a8758f4d27619cf197bc9a0a47b69e915dda34f84af",
+  "scinance3-impl/state/herleitung_a2/NULL_SIMULATION_A2.md": "3ae17fa1eac4292857763478511ac724466d5bc0e71caf06bdf03fc566c743cc",
+  "scinance3-impl/state/herleitung_stabilitaetstest/stab_results.json": "4a4a1fbcf22ea7a77b99e431f451148b6192d7d3a0f6b8aef132f3a3ba9a67ff",
+  "scinance3-impl/state/herleitung_stabilitaetstest/stab_sim.py": "d7a4c9a81d1fadd2499d95e00e18d347bc8c556a7eef699067eea9d6f0b87ed2",
+  "scinance3-impl/state/prd_analyse_2026-11-01/KRITIK_PRD.md": "8c198d01ed98f06765e78c8c0379f94c7f50c20e43b53272ea27f568b56249b9",
+  "scinance3-impl/state/registered/TEMPLATE_3_1.yaml": "46a3329b889330868dec277a60f819bc77e8d9544dab3bc38acc28a3f8ec4f73",
+  "scinance3-impl/state/runs/stress_abs.json": "b8008257e963eaa2bd81882d1169503ca8f4c38d7860d65c357b8db3308fc11e",
+  "src/bybit_edge/research/feasibility31/rules.py": "21e8b98e344638fe79260d2ad308b9e2483bc04c6377d6406b5eee5b4bcdea6f"
+ },
+ "sigma2_placebo_day_central": {
+  "P2": 2380.917352044905,
+  "P3all": 150.94379921336443,
+  "P3fix": 5057.160489134134
+ },
+ "stress_abs": {
+  "K_Luecke_2026-07..09": [
+   [
+    "2026-08-19",
+    "Mi"
+   ]
+  ],
+  "K_registriert": [],
+  "Vorfenster_2023-07..2024-06": [
+   [
+    "2023-08-17",
+    "Do"
+   ]
+  ],
+  "W1": [
+   [
+    "2024-08-05",
+    "Mo"
+   ],
+   [
+    "2025-02-03",
+    "Mo"
+   ]
+  ],
+  "W2": [
+   [
+    "2025-10-10",
+    "Fr"
+   ]
+  ],
+  "file_sha256": "b8008257e963eaa2bd81882d1169503ca8f4c38d7860d65c357b8db3308fc11e",
+  "fixture_sha256_field": "b75fb7a08a6d590363f62828de99f23359c1c63fe1f385d0e4f37ba09bccf794",
+  "n_days_total": 30,
+  "tage_in_urteilsfenstern": 3
+ },
+ "strictness": {
+  "doppelausweis_blick1": {
+   "exakt_gemeinsam": 24.5635986328125,
+   "kappa_blick1": 0.9076923076923077,
+   "produkt": 25.103047640554244,
+   "se_blick1": {
+    "P2": 4.694230241034277,
+    "P3all": 4.148897488992029,
+    "P3fix": 5.01504327351927
+   },
+   "z_grenze_blick1": 3.3002672619047084
+  },
+  "grundfassung": 15.54443359375,
+  "quotient": 1.2547510601539187,
+  "steps": [
+   {
+    "faktor": 1.0,
+    "mde80": 15.54443359375,
+    "schritt": "Grundfassung P2'' allein, (c), Plan"
+   },
+   {
+    "faktor": 1.1215643160043978,
+    "mde80": 17.43408203125,
+    "schritt": "+ P3fix (exakt gemeinsam)"
+   },
+   {
+    "faktor": 1.0005601456378659,
+    "mde80": 17.44384765625,
+    "schritt": "+ P3all (drei Placebos, exakt gemeinsam)"
+   },
+   {
+    "faktor": 1.0,
+    "mde80": 17.44384765625,
+    "schritt": "+ skalierte Null-Bedingung (kappa, feste Freitage W2)"
+   },
+   {
+    "faktor": 1.1181245626312106,
+    "mde80": 19.50439453125,
+    "schritt": "+ Gate-(4)-Faktor 0,9025"
+   }
+  ]
+ },
+ "t_grenze_blick1": {
+  "df": 129,
+  "t_0.0025": 2.8561195547739753,
+  "z": 2.8070337683438042
+ },
+ "vorfenster_hinweis": {
+  "V3_null_sd": 4.51,
+  "V3_se_analytic_T2": 5.31,
+  "V3_se_with_W2_counts": 5.511081894952984,
+  "fixed_rule_mde_T30_with_V3_se": 15.00921066431651,
+  "hinweis": "Reine Arithmetik aus T2 (Zeile V3 2023-06..2024-05); das bindende Vorfenster 2023-07-01..2024-06-30 ist vom Orchestrator per Konto-Eintrag nachzuliefern (VR-b10 (i), DEC-107 N1 (2)); kein Mittel, kein Vorzeichen."
+ }
+}

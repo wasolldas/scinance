@@ -1,0 +1,36 @@
+[OK] R01-SCHEMA (PRD v3 3.1 (a)/(b); 3.2 PZ-01..PZ-30; DEC-104 E9): all mandatory lines PZ-01..PZ-30 present and well-formed
+[OK] R02-PLATZHALTER (PRD v3 3.3; PRD 3.1 (b)): no placeholders left
+[OK] R03-ALPHA (DEC-104 E2; VR-b14; PZ-15): alpha_test 0.0025, z_krit 2.8070
+[OK] R04-SCREEN (DEC-104 E2, E6, N2 (4); PZ-16): decided variant with consistent screen / stability_test
+[OK] R05-KOHORTE (DEC-104 E4 (f); PZ-14): cohort date valid
+[OK] R06-FENSTER-ZONE (DEC-104 E4 (a), (d), (e); FENSTERREGISTER 1; PZ-13): all windows in their zone
+[OK] R07-ZONE-X (DEC-104 E4 (a), (c); KONTO_ZONE_X): no judging window uses zone X
+[OK] R08-FAMILIE (DEC-104 E4 (i); FENSTERREGISTER 2, 6; VR-d16; PZ-13, PZ-30): windows respect the knowledge class and K start of their families
+[OK] R09-ZONENEINTRAG (FENSTERREGISTER 1, 6; PZ-13): zone entries consistent
+[OK] R10-BLICKE (DEC-104 E4 (d), (e), N2 (7); PZ-17; VR-d11, VR-d12): look plan consistent with the zones used
+[OK] R11-SESOI (DEC-104 E3 (a), N3 (1); DEC-105 (1), (8); PZ-18): SESOI curve consistent
+[OK] R12-TESTBARKEIT (DEC-104 E3 (a); VR-c01; PZ-01): MDE80 <= SESOI: testbar
+[OK] R13-PRIOR (DEC-104 E3 (b), (c), (d); VR-c05, VR-c06; PZ-19): prior label complete
+[OK] R14-LITERATUR (DEC-104 E3 (b); VR-c05): literatur label 'UNBELEGT' is a label, never a block
+[OK] R15-SELEKTION-K (DEC-104 E9, N1 (9); VR-b17; PZ-04, PZ-20): selection K valid
+[OK] R16-OC-ZEILE (DEC-104 E8 (a); VR-f04; PZ-21): oc_line complete
+[OK] R17-STRENGE (DEC-104 E8 (b); VR-f05; PZ-22): strictness ratio below 1.3
+[OK] R18-NEFF-C (DEC-51 (3), (5); DEC-104 N2 (7); VR-b03, VR-b05; PZ-23, PZ-24): n_eff and c_overlap valid
+[OK] R19-C17 (DEC-104 N1 (1); VR-d18; PZ-29): c17_refs valid
+[OK] R20-JAHRESBUCH (DEC-104 E4 (g); VR-d14; PZ-28): annual book within the limit
+[OK] R21-BERICHTSZEILE (DEC-105; VR-f02; PZ-11): report line complete
+[OK] R22-ARTEFAKTE (DEC-53; VR-f03; PZ-11): artifact obligations named
+[OK] R23-KONSTANTEN (PRD 3.3.6; VR-g14; PZ-06): constants hash consistent
+[OK] R24-CODE-HASH (PRD_ANALYSE 7 (versioned script)): code hashes valid
+[OK] R25-STEUER (PRD 3.3.9; PRD 8.2; PZ-09): tax reservation present
+[OK] R26-TEXT-HYGIENE (project hard rules; public repository): no model names, hosts or credentials
+[OK] R27-REFS (project hard rules; PRD 3.1 (b)): references safe
+[OK] R28-LESESTATUS (DEC-104 N1 (6); VR-g07; PZ-25): reading status valid
+[OK] R29-DESIGN-MENUE (DEC-104 E5; VR-e01; PZ-26): design choice inside the menu
+[HINWEIS] R30-ERREICHBARKEIT (DEC-104 E8 (d); VR-f07; PZ-27): reachability: parameter 'P2-Tage nach DEC-103 E3 woertlich in Zone K (taegliche Futures-Deliveries seit 2026-04-04)' reaches 0 observations in the judging windows
+[HINWEIS] R30-ERREICHBARKEIT (DEC-104 E8 (d); VR-f07; PZ-27): reachability: parameter 'Tage der Schutzregel G-C8 (kein 08:00-Funding oder Termin in [07:30, 08:00)) W1 + W2' reaches 0 observations in the judging windows
+[OK] R31-FDR (DEC-104 E4 (f); VR-b16, VR-b17, VR-d13): FDR parameters fixed
+[OK] R32-VORWISSEN (DEC-104 E4 (i); VR-d16; PZ-30): prior-knowledge class names all families
+[OK] R33-POSITIVKONTROLLE (PRD 3.3.8; VR-f12; PZ-08): positive control scheduled
+SUMMARY: 0 FEHLER, 2 HINWEIS, 32 OK
+rc=0

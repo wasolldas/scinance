@@ -1,0 +1,68 @@
+Review A2-Registrierungsentwurf 3.1 - eigene Gegenrechnung, Seed 7, 400000 Pfade
+(1) Kalender (eigene Zaehlung, Ausreisser 2024-08-19 ausgeschlossen)
+  K 2026-10-01..2026-12-31: Fr 13, Mo-Do 53, P3fix 63, P3all 66
+  K 2027-01-01..2027-03-31: Fr 13, Mo-Do 51, P3fix 61, P3all 64
+  K 2027-04-01..2027-06-30: Fr 13, Mo-Do 52, P3fix 62, P3all 65
+  K 2027-07-01..2027-09-30: Fr 13, Mo-Do 53, P3fix 63, P3all 66
+  K 2027-10-01..2027-12-31: Fr 14, Mo-Do 52, P3fix 63, P3all 66
+  K gesamt: Fr 66, Mo-Do 261, P3fix 312, P3all 327  (Entwurf: 66 / 261 / 312 / 327)
+  W1: Fr 52, Mo-Do 208, P3fix 248, P3all 260  (T3: 52 / 208 / 248 / 260)
+  W2: Fr 52, Mo-Do 207 (davon Futures-Tage 2026-04-04..06-28 Mo-Do 48, Fr 12), P3fix 247, P3all 259  (T3: 52 / 159+48 / 247 / 259)
+  P2'' woertlich (Mo-Do ohne Futures-Delivery) in W2: 159 (T3: 159); in Zone K: 0 (taegliche Futures seit 2026-04-04, DATENANNAHMEN 10) -> K-Kontrast nach DEC-103 E3 nicht definiert
+  STRESS_ABS in W1: 2 ['2024-08-05', '2025-02-03']
+  STRESS_ABS in W2: 1 ['2025-10-10']
+  STRESS_ABS in K_reg: 0 []
+  STRESS_ABS in gap_2026Q3: 1 ['2026-08-19']
+  STRESS_ABS in Vorfenster_2023-07..2024-06: 1 ['2023-08-17']
+  STRESS_ABS in den Urteilsfenstern: 3 (Entwurf 3); Ereignis-Freitage darunter: ['2025-10-10']
+
+(2) O'Brien-Fleming: exaktes alpha der registrierten Grenze (rekursive Integration)
+  ereignisse_130_143_156_170: t [0.7647, 0.8412, 0.9176, 1.0], z-Grenzen [3.3003, 3.1467, 3.0127, 2.886], alpha exakt 0.002486
+  monate_30_33_36_39: t [0.7692, 0.8462, 0.9231, 1.0], z-Grenzen [3.2905, 3.1374, 3.0038, 2.886], alpha exakt 0.002497
+  C_B fuer alpha 0,0025 bei Ereignis-Anteilen: 2.8845 (registriert 2,886 aus Monats-Anteilen)
+  t-artige Grenzen (df = N_E - 1, gleiches alpha je Blick): Blick 1 z 3.300 -> t 3.378 (x1.0235); Blick 2 z 3.147 -> t 3.208 (x1.0195); Blick 3 z 3.013 -> t 3.062 (x1.0165); Blick 4 z 2.886 -> t 2.926 (x1.0140)
+
+(3) Monte Carlo der Gesamtregel (eigene Implementierung, Seed 7, 400.000 Pfade)
+  Placebo-Tagesvarianz aus W1 / W2 (Uebereinstimmung W1/W2): P2 2381 (W1/W2 0.996), P3fix 5057 (W1/W2 1.004), P3all 151 (W1/W2 1.004)
+  Blick 1 2027-04-01: N_E 130, N_P2 471, SE P2 4.694, P3fix 5.015, P3all 4.149
+  Blick 2 2027-07-01: N_E 143, N_P2 523, SE P2 4.471, P3fix 4.782, P3all 3.956
+  Blick 3 2027-10-01: N_E 156, N_P2 576, SE P2 4.276, P3fix 4.577, P3all 3.787
+  Blick 4 2028-01-01: N_E 170, N_P2 628, SE P2 4.096, P3fix 4.388, P3all 3.628
+  alpha: OBF-Plan allein 0.00244; + Stabilitaetstest + Futility 0.00240; + P3fix (OBF-Grenze) 0.00048; + P3all 0.00033; + Null 0.00033; x Gate 0.00030  (Entwurf: 0,00251 / 0,00246 / - / - / 0,00037 / 0,00033)
+  Futility-Stopp unter H0 0.5818 (Entwurf 0,580)
+  P(PASS | 22 bp) 0.8421, kumuliert [0.713, 0.785, 0.822, 0.842], Stabilitaets-FAIL 0.0493  (Entwurf 0,8421; 0,713/0,784/0,822/0,842)
+  MDE80 Plan 19.49 bp (Entwurf 19,50); je Blick kumuliert [24.56, 22.57, 20.96, 19.49] (Entwurf 24,56 / 22,60 / 20,96 / 19,50); Kontrolle P(PASS | MDE) 0.8000
+  P(PASS | 5.0 bp) 0.0159
+  P(PASS | 16.5 bp) 0.6685
+  P(PASS | 25.0 bp) 0.8555
+  Schutzzeile nur_V_1MDE: P(PASS) 0.2814, kumuliert [0.225, 0.253, 0.268, 0.281], veraltet (Blicke 3-4) 0.0281, Stab-FAIL 0.2418
+  Schutzzeile nur_V_2MDE: P(PASS) 0.3183, kumuliert [0.318, 0.318, 0.318, 0.318], veraltet (Blicke 3-4) 0.0000, Stab-FAIL 0.6470
+  Schutzzeile nur_W1_1MDE: P(PASS) 0.0253, kumuliert [0.009, 0.014, 0.02, 0.025], veraltet (Blicke 3-4) 0.0109, Stab-FAIL 0.0333
+  Schutzzeile nur_aelterer_Teil_Blick1_1MDE: P(PASS) 0.0678, kumuliert [0.033, 0.045, 0.056, 0.068], veraltet (Blicke 3-4) 0.0227, Stab-FAIL 0.1776
+  Schutzzeile nur_aelterer_Teil_Blick1_2MDE: P(PASS) 0.0095, kumuliert [0.007, 0.007, 0.008, 0.009], veraltet (Blicke 3-4) 0.0020, Stab-FAIL 0.9598
+  nur V 1 MDE ohne Stabilitaetstest: 0.4025 (Entwurf 0,405)
+  Strenge-Kette (Entwurfs-Grundfassung): 15.54 -> 17.44 (x1.1221) -> 17.45 (x1.0006) -> 17.45 (x1.0000) -> 19.49 (x1.1169); Quotient 1.2541 (Entwurf 1,2548)
+  Alternative Grundfassungen: fester Ein-Blick-Test 39 Monate, Primaer allein, ohne Stabilitaetstest: 14.94 bp -> Quotient 1.3044; mit q 0,95: 15.61 -> 1.2491; Plan Primaer allein ohne Stabilitaetstest/Futility: 15.10 -> 1.2913; am Blick 1 gegen festen Test 30 Monate (17.13): 1.4339
+  Doppelausweis Blick 1: Produkt 25.10 gegen exakt 24.56 (Entwurf 25,10 / 24,56)
+
+(4) Sonden
+  (a) G-03 Nebenbedingungen fest 2,8070: alpha_eff 0.00049, MDE80 18.99 bp, P(PASS | 22) 0.8471  (Plan: 0,00033 / 19,50 / 0,842)
+  (a2) nur Vergleich, nicht beschlossen - Nebenbedingungen bei 1,6449: alpha_eff 0.00185, MDE80 17.56 bp
+  (b) t-artige Grenzen (df N_E - 1) statt z: alpha_eff 0.00024, MDE80 19.69 bp (+1.0 %), P(PASS | 22) 0.8403
+  (c) juengster Teil = letzte 12 Kalendermonate (Blick 1: W2Q4 + KQ1 + KQ2, 39 Freitage) statt vier Datenquartale: alpha_eff 0.00030, MDE80 19.46 bp, P(PASS | 22) 0.8425 (Stab-FAIL 0.0488), Schutzzeile nur V 0.2494 gegen 0.2814
+  (d) Verduennung des K-Kontrasts (P2' traegt Anteil f 0.00 des Effekts): P(PASS | 22 in V) 0.8421, Stabilitaets-FAIL 0.0493, kumuliert [0.713, 0.785, 0.822, 0.842]
+  (d) Verduennung des K-Kontrasts (P2' traegt Anteil f 0.25 des Effekts): P(PASS | 22 in V) 0.7763, Stabilitaets-FAIL 0.0913, kumuliert [0.63, 0.703, 0.748, 0.776]
+  (d) Verduennung des K-Kontrasts (P2' traegt Anteil f 0.50 des Effekts): P(PASS | 22 in V) 0.6653, Stabilitaets-FAIL 0.1584, kumuliert [0.533, 0.594, 0.635, 0.665]
+  (d) Verduennung des K-Kontrasts (P2' traegt Anteil f 0.75 des Effekts): P(PASS | 22 in V) 0.5168, Stabilitaets-FAIL 0.2438, kumuliert [0.424, 0.469, 0.495, 0.517]
+  (e) P2'' woertlich in K: P2-Tage in K 0, feste Freitage K 66, kappa am Endblick 0.541 -> K liefert keinen Placebo-Kontrast; Stabilitaetstest (juengster Teil ohne Placebo) nicht definierbar
+  (f) Stress (SE 8,52): alpha_eff 0.00034, MDE80 21.49 bp (Entwurf 21,46), P(PASS | 22) 0.8113 (Entwurf 0,812), kumuliert [0.599, 0.704, 0.77, 0.811]
+  (g) Vorfenster-Hinweis: bei SE 5,51 (V3 mit W2-N) skaliert die Plan-MDE80 auf 14.17 bp (nur Planungsgroesse; alpha unveraendert)
+  (h) PK-Kriterium 0,80 - 2,3263 x 0.0283 = 0.7342; P(NICHT BESTANDEN | wahre Quote 0,80) 0.010; bei wahrer Quote 0,75: 0.303
+
+(5) Feste Ein-Blick-Regel (c): MDE80 = (z_krit + Phi^-1(0,80/(q g))) SE_12 sqrt(12/T)
+  SE 7.58: T24 23.08, T27 21.76, T30 20.64, T33 19.68, T36 18.85, T39 18.11; 22 bp ab 26.42 Monaten; T30 x sqrt(1,03) 20.95; T30 x sqrt(R_max 1,084) 21.50
+  SE 7.34: T24 22.35, T27 21.07, T30 19.99, T33 19.06, T36 18.25, T39 17.53; 22 bp ab 24.77 Monaten; T30 x sqrt(1,03) 20.29; T30 x sqrt(R_max 1,084) 20.81
+  SE 8.52: T24 25.94, T27 24.46, T30 23.20, T33 22.12, T36 21.18, T39 20.35; 22 bp ab 33.37 Monaten; T30 x sqrt(1,03) 23.55; T30 x sqrt(R_max 1,084) 24.16
+  MDE-Faktor 4.3062 (Entwurf 4,3062); DEC-107 N1 (1): 23,08 / 21,76 / 20,64 / 26,4 Monate / 20,95
+
+Laufzeit 146.5 s

@@ -1,0 +1,196 @@
+# ENTWURF (Rolle Herleitung, 2026-11-04) - NICHT REGISTRIERT. Registriert nur der Orchestrator nach Review (VR-h03).
+# A2 EXP-CLOCK unter Verfassung 3.1: Variante (c) (DEC-107 (1)), Nuisance nach BE-04 (juengstes Vorfenster bindend,
+# Stress Sensitivitaet), Lesart B (Zone V ein Blick + Zone K Quartalsblicke; VR-d17), exakte Konjunktion (VR-e04).
+# Herleitung je Pflichtzeile: A2_REGISTRIERUNGSENTWURF_3_1.md (gleiches Verzeichnis); Zahlen: calc/a2_reg_calc.py
+# (Seed 20261104, 300.000 Pfade) -> calc/a2_reg_calc.json / .out. Platzhalter-SE 7,58 (Null-Simulation W2 zentral):
+# die bindende SE des Vorfensters 2023-07-01..2024-06-30 ist durch den Orchestrator per Konto-Eintrag nachzuliefern
+# (DEC-107 N1 (2)); sie dient nur der Planung (MDE80, OC, PK-Injektion), die Schwelle ist t-artig aus der Konfirmations-SE.
+# Kein Mittel, kein Vorzeichen eines r_pre-Kontrasts; keine Marktdaten; keine Siegeldatei.
+
+id: "H-34"
+klasse: "E"
+capital_free: true
+hypothese: "An Deribit-Optionsverfalls-Freitagen (08:00 UTC; Woche, Monat, Quartal) ist die mittlere BTC/ETH-Vorlaufrendite r_pre = ln(C[07:59]/C[07:29]) (x = (r_BTC + r_ETH)/2, Bybit-1-min-Kerzen) im gepoolten Konfirmationsfenster (W1, W2, Zone K ab 2026-10-01) um mindestens die SESOI 22 bp kleiner als an den Placebo-Tagen P2 (Mo-Do, [07:30, 08:00)), und dieser Groessen-Kontrast besteht zugleich gegen P3fix ([15:30, 16:00) ohne Monatsend-Freitage), gegen P3all (uebrige Halbstunden) und gegen die skalierte Label-Permutations-Null J-(i); der juengste Teil faellt dabei nicht ab (Stabilitaetstest)."
+ertragsquelle: "Ereignis (Verfallskalender als exogener Takt) + Zahler: Inhaber von Optionspositionen und deren Hedger, die in den Liefer-TWAP [07:30, 08:00) hinein handeln (Mechanismus [sek], Zahler-Bestand UNBELEGT)"
+metric: "Delta = Mittel r_pre(Ereignis-Freitage) - Mittel r_pre(Placebo P2), bp, Cluster = Kalendertag (Ereignis), gepoolt ueber alle Konfirmationsdaten; Konjunktion mit P3fix, P3all und Null-Bedingung; r_post nur Bericht"
+richtung: "negativ"
+
+cohort: 2027-01-01
+zone:
+  - abschnitt: "2021-03-24..2024-06-30"
+    zone: "X"
+    datenfamilie: "F1"
+    rein_ab: 2021-03-24
+  - abschnitt: "2024-07-01..2026-06-30"
+    zone: "V"
+    datenfamilie: "F1"
+    rein_ab: 2024-07-01
+    ausnahme: a2_r_pre
+  - abschnitt: "2026-10-01..2027-12-31"
+    zone: "K"
+    datenfamilie: "F1"
+    rein_ab: 2026-10-01
+vorwissens_klasse: "F1 BTC/ETH-Aggregate: nur prospektiv in Zone K konfirmierbar; einzige Ausnahme A2 r_pre an Freitagen auf W1/W2 als registrierte Statistik mit Disziplinsetikett (DEC-104 E4 (i)); Traeger der Statistik sind die 1-min-Kerzen (F6-Strom bybit/rest.kline1m, Tagesaggregat nach F1-Regel); Verfallskalender (F4) nur als Zaehlung SK0; Zone X 2021-03-24..2024-06-30 nur Nuisance (Streuung, c, Null-Simulation), kein Mittel, kein Vorzeichen (VR-g06)"
+lesestatus:
+  - datei: "scinance3-impl/state/herleitung_a2/NULL_SIMULATION_A2.md"
+    status: "gelesen"
+  - datei: "scinance3-impl/state/herleitung_a2/a2_vorarbeit.json"
+    status: "gelesen"
+  - datei: "scinance3-impl/state/herleitung_stabilitaetstest/stab_results.json"
+    status: "gelesen"
+  - datei: "scinance3-impl/state/feasibility/A2.yaml"
+    status: "gelesen"
+  - datei: "scinance3-impl/state/runs/stress_abs.json"
+    status: "gelesen"
+  - datei: "arbeitsverzeichnis/a2_teilC/a2_teilC.json#Fassung2_sha256_8c01d72ece18e1c607b7ef585a88bef2ea19bca87c422c9e229780354bd17687_nicht_im_Repo_nur_Streuung"
+    status: "gelesen"
+  - datei: "scinance3-impl/state/runs/a2_LAUFID/cluster_series_r_pre_contrast_W1_W2.csv#nie_gebildet_DEC-103_N1_7"
+    status: "nie_berechnet"
+  - datei: "scinance3-impl/state/runs/a2_LAUFID/cluster_series_r_pre_contrast_K.csv#nie_gebildet_Siegel_DEC-96_E3"
+    status: "nie_berechnet"
+c17_refs: ["O-051", "O-052", "O-053", "O-054", "O-009", "O-902"]
+windows:
+  - id: "W1"
+    von: 2024-07-01
+    bis: 2025-06-30
+    zone: "V"
+    rolle: "urteilstragend"
+  - id: "W2"
+    von: 2025-07-01
+    bis: 2026-06-28
+    zone: "V"
+    rolle: "urteilstragend"
+  - id: "K1"
+    von: 2026-10-01
+    bis: 2027-12-31
+    zone: "K"
+    rolle: "urteilstragend"
+
+decision_rule:
+  alpha_test: 0.0025
+  z_krit: 2.8070
+  variante: "c"
+  screen: null
+  stability_test:
+    statistik: "D = Mittel(juengster Teil: letzte 12 Monate bzw. vier Quartale vor dem Blick, Lesart B einschliesslich V-Ende) - Mittel(aelterer Teil: alle uebrigen Konfirmationsdaten) des P2-Kontrasts in registrierter Richtung (negativ -> mit -1 multipliziert); SE(D) = sqrt(SE_J^2 + SE_A^2), je Teil nach VR-b09; Welch-t einseitig gegen Abfall, H0 mu_J >= mu_A"
+    alpha: 0.05
+    kostenquote_q: 0.95
+    entfaellt_wenn: "Konfirmationsdaten am Blick <= 12 Monate (tritt in diesem Plan nie ein: erster Blick bei 30 Monaten)"
+    an_blicken: "jeder Wirksamkeits-Stopp mit aelterem Teil (alle vier K-Blicke); verworfen -> FAIL (terminal, kein spaeterer Blick); Kostenquote je Blickplan q 0,9639 (stab_results.json s4b V24+K_30_33_36_39 each_term), Planung konservativ mit q 0,95; Sensitivitaet SD-Verhaeltnis juengst/aelter k 0,7..1,5 -> q 0,943..0,966, bei k < 0,7 exaktes q"
+    ref: "scinance3-impl/state/herleitung_stabilitaetstest/HERLEITUNG_STABILITAETSTEST.md#7"
+  power_target_gemeinsam: 0.80
+  mde_faktor: 4.3062
+
+looks:
+  zone_v: {anzahl: 1}
+  zone_k:
+    anzahl: 4
+    plan: obrien_fleming
+    spending: "O'Brien-Fleming, alpha 0,0025 gesamt, Grenze auf der B-Skala C 2,886 (exakte Gitterintegration, stab_results.json s4b V24+K_30_33_36_39); Informationsanteile nach Ereigniszahl 130/143/156/170 = 0,765/0,841/0,918/1,0; z-Grenzen 3,300 / 3,147 / 3,013 / 2,886; dieselbe Grenze fuer jede z-Bedingung der Konjunktion (P2, P3fix, P3all); Null-Bedingung als Boden tau95 x SE; der eine Zone-V-Blick ist der erste K-Blick (V-Quartale werden am 2027-04-01 einmalig und gemeinsam mit K geoeffnet; kein V-Blick allein: MDE80 V allein 23,08 bp > SESOI)"
+    zeitpunkte: [2027-04-01, 2027-07-01, 2027-10-01, 2028-01-01]
+    screen_an_jedem_stopp: true
+    futility: "Z < 0 an Blicken 1-3"
+    grenzen: t_artig
+
+sesoi_curve:
+  kostenmodell_constants_hash: "8c198d01ed98f06765e78c8c0379f94c7f50c20e43b53272ea27f568b56249b9"
+  rahmen: "einzelposition"
+  kostenbasis: "taker_vip0"
+  gabelung_etikett: "Gabelung Richtung Testbarkeit gegen Maker (Maker gemessen 2 x 5,4 = 10,8 bp, DEC-71/DEC-78; Taker-Wand 2 x 11 bp = 22 bp; kein registriertes Kostenmodell tradability3, WD-08: Hash = Quelle KRITIK_PRD.md K-10)"
+  persistenz_phi: 0.0
+  persistenz_herkunft: "default_0_etikett"
+  persistenz_ref: null
+  horizont_tage: 1
+  punkte:
+    - {horizont_tage: 1, phi: 0.0, sesoi: 22.0}
+    - {horizont_tage: 1, phi: 0.5, sesoi: 22.0}
+    - {horizont_tage: 2, phi: 0.0, sesoi: 22.0}
+  ref: "scinance3-impl/state/prd_analyse_2026-11-01/KRITIK_PRD.md#K-10"
+
+prior_label:
+  literatur: "UNBELEGT"
+  prior_verteilung_ref: null
+  selektionsbereinigt: true
+  sensitivitaetsspanne: {groesse: "Kontrast Ereignis minus P2 (bp, Betrag in registrierter Richtung)", nominal: 16.5, untere: 5.0, obere: 25.0}
+
+threshold: {regel: "Statistik in Richtung >= max(oberes 95-%-Quantil der skalierten Null J-(i) (q95_eff = max(0, m) + k (q95 - m), k = max(1, SE_Lauf/Null-SD)); t_krit(df = Ereignis-Cluster - 1, alpha des Blicks nach OBF) x SE_Konfirmation) je Bedingung und Blick; SE aus den Konfirmationsdaten (DEC-107 N1 (2)), nie die registrierte Planungs-SE", ref: "scinance3-impl/state/herleitung_a2/NULL_SIMULATION_A2.md#T3"}
+structural_null: {komponenten: ["Label-Permutation Freitag gegen Mo-Do innerhalb derselben ISO-Woche (J-(i)), >= 1000 Replikate, Seed registriert, Labelmatrix nur intern aus dem Seed (A-8)", "skalierte Null k = max(1, SE_Lauf / Null-SD) (DEC-101 E2, VR-e06)", "feste Freitage in Wochen ohne P2-Partner bleiben Ereignis (F-1 woertlich; W2 12 Wochen, kappa 0,815)", "P3-Null-Bedingung identisch mit der P2-Null-Bedingung (Identitaet N3-1)", "Wochentagseffekt nicht trennbar (Grenze DEC-103 E4) - dagegen P3fix und Negativ-Panel Gate (4)"], skalierung: "k = max(1, Ist/Null)", ref: "scinance3-impl/state/herleitung_a2/NULL_SIMULATION_A2.md#T1"}
+nuisance:
+  quellen: [vorperiode_nur_streuung, null_simulation]
+  bindend: "juengstes_vorfenster"
+  stress_zeile: "Stress-Kalibrierung V1 2021-06..2022-05 (SE P2 8,52 / 8,25, P3fix 8,67 / 8,66, P3all 7,39) nur Sensitivitaet (BE-04): MDE80 des Plans 21,46 bp (<= 22), P(PASS bei 22 bp) 0,812, erster Blick 0,599; feste Regel 30 Monate 23,20 bp. Bindendes Vorfenster 2023-07-01..2024-06-30 (VR-b10 (i), groessere SE aus Vorfenster und Null-Simulation dieses Fensters): nachzuliefern durch den Orchestrator (Konto-Eintrag); Planungs-Platzhalter 7,58 (Null-Simulation W2 zentral), Sensitivitaet 7,34 (W1) / 8,52 (stress); Hinweis [R]: T2-Zeile V3 2023-06..2024-05 ergibt mit W2-Zaehlungen 5,51 bp"
+power:
+  se_regel: "SE_W = max(SD(x)/sqrt(W), SE_stat) mit SE_stat aus dem stationaeren Bootstrap der Ereignis-Cluster-Serie (>= 1000 Replikate, Seed registriert), c = max(1, c_hat), Blocklaenge aus der gemessenen Autokorrelation; je Bedingung dieselbe Regel; fuer den Stabilitaetstest je Teil getrennt; identisch mit dem Lauf"
+  sd_teststatistik: {wert: 7.58, ref: "scinance3-impl/state/herleitung_a2/NULL_SIMULATION_A2.md"}
+  c: "max(1, c_hat)"
+  blocklaenge: "aus gemessener Autokorrelation der Cluster-Serie im Lauf (Vorperiode: c_bind Freitag 1,1491 / Mo-Do 1,3177, Batch-Means; der Default 4 ist abgeloest, VR-b09)"
+  mde80: {wert: 19.50, ref: "scinance3-impl/state/herleitung_a2/registrierung/calc/a2_reg_calc.py#oc_central"}
+  sesoi: 22.0
+  testbar: true
+cluster_unit: "ereignis"
+n_eff: {wert: 130, ref: "scinance3-impl/state/herleitung_a2/registrierung/calc/a2_reg_calc.py#n_eff"}
+c_overlap: 1.3177
+selection: {K: 1, K_kumuliert_familie: 1, z_max: 2.8070, ceiling_ref: "scinance3-impl/state/KONTO_INVENTAR_2026-11-02.md#Abschnitt_3_A2_EXP-CLOCK"}
+design_menu: {optionen: ["D1_P2ss_ueberall_V24_plus_K_K4", "D2_P2ss_W1W2_P2strich_K_V24_plus_K_K4", "D3_K_allein_K4_ab_2027-10-01", "D4_V24_plus_K_ein_Endblick_2028-01-01", "D5_V24_allein_ein_Blick_2027-01-01"], auswahlregel: "mechanisch, nur Kalenderzaehlung (SK0), Vorperioden-Nuisance und SESOI: Placebo je Fenster = P2 (Mo-Do ohne Futures-Delivery) wenn N_P2 >= 0,5 x N_MoDo im Fenster, sonst P2strich (alle Mo-Do); Blickplan und Fenster = kleinste MDE80 des Plans (P(PASS) 0,80 inkl. Gate) unter den Optionen mit MDE80 <= SESOI, bei Gleichstand der fruehere erste Blick", gewaehlt: "D2_P2ss_W1W2_P2strich_K_V24_plus_K_K4"}
+reachability:
+  - {parameter: "Ereignis-Freitage in den Urteilsfenstern (W1 52, W2 52, K 66)", beobachtungen_in_urteilsfenstern: 170}
+  - {parameter: "P2-Tage (Mo-Do ohne Futures-Delivery) W1 + W2", beobachtungen_in_urteilsfenstern: 367}
+  - {parameter: "P2-Tage nach DEC-103 E3 woertlich in Zone K (taegliche Futures-Deliveries seit 2026-04-04)", beobachtungen_in_urteilsfenstern: 0}
+  - {parameter: "P2strich-Tage (alle Mo-Do) in Zone K", beobachtungen_in_urteilsfenstern: 261}
+  - {parameter: "P3fix-Tage (Mo-Fr ohne Monatsend-Freitage) W1 + W2 + K", beobachtungen_in_urteilsfenstern: 807}
+  - {parameter: "P3all-Tage (Mo-Fr) W1 + W2 + K", beobachtungen_in_urteilsfenstern: 846}
+  - {parameter: "Ereignis-Cluster am ersten Blick 2027-04-01 (Schwelle >= 26, OC (e))", beobachtungen_in_urteilsfenstern: 130}
+  - {parameter: "STRESS_ABS-Tage in den Urteilsfenstern (W1 2, W2 1, K 0 bis 2026-11-04)", beobachtungen_in_urteilsfenstern: 3}
+  - {parameter: "Ereignis-Freitage, die STRESS_ABS-Tage sind (2025-10-10)", beobachtungen_in_urteilsfenstern: 1}
+  - {parameter: "Tage der Schutzregel G-C8 (kein 08:00-Funding oder Termin in [07:30, 08:00)) W1 + W2", beobachtungen_in_urteilsfenstern: 0}
+oc_line: {p_pass_0: 0.00033, p_pass_sesoi: 0.8421, p_pass_prior_median: 0.6687, p_pass_nur_aelter_1mde: 0.2832, seeds: 300000, ref: "scinance3-impl/state/herleitung_a2/registrierung/calc/a2_reg_calc.py#oc_central"}
+strictness_ratio: {wert: 1.2548, zerlegung: ["Grundfassung: P2-Kontrast allein, zentrale Nuisance 7,58, Regel (c) mit Blickplan, kein Gate: 15,54 bp", "+ P3fix exakt gemeinsam: 17,43 bp (x1,1216)", "+ P3all exakt gemeinsam: 17,44 bp (x1,0006)", "+ skalierte Null-Bedingung (kappa, feste Freitage W2): 17,44 bp (x1,0000)", "+ Gate-(4)-Faktor 0,9025 (UNBELEGT): 19,50 bp (x1,1181)", "Sensitivitaet, nicht im Quotienten: Stress-Nuisance 21,46 bp (x1,1005 gegen zentral; gegen Grundfassung 1,381)", "Doppelausweis Blick 1: Produkt 25,10 bp gegen exakt gemeinsam 24,56 bp"], gabelungsregister_ref: "scinance3-impl/state/herleitung_a2/registrierung/A2_REGISTRIERUNGSENTWURF_3_1.md"}
+annual_book: {jahr: 2027, erwartete_falsch_pass_vorher: 0.0, mit_dieser_registrierung: 0.0025}
+economic_minimum: {wert: 22.0, ref: "scinance3-impl/state/prd_analyse_2026-11-01/KRITIK_PRD.md", label: "ueber_wand"}
+decision_relevance: {on_pass: "Mess-PASS (Praemien-Existenz eines Verfallstag-Effekts, Kontrast <= -22 bp gegen alle Placebos); naechster Schritt: Pflicht-Bestaetigung auf neuen Daten (naechster K-Blick bzw. Kohorte 2, VR-b15), danach getrennt registriertes Tradability-Gate mit Quote-Schatten-Messung (kapitalfrei, C.2; Kosten-Etikett Taker 22 bp / Maker 10,8 bp); kein Kapitalschritt, kein Live-Order-Code", on_drop: "Konfirmation beendet mit FAIL (gepoolte Grenze erreicht, Stabilitaetstest verworfen) oder DROP am Endblick 2028-01-01 (Grenze nicht erreicht): A2 auf BTC/ETH geschlossen fuer Kontraste der Groessenordnung >= Ausschlussgrenze; Familie F-EXPCLOCK ohne weitere Varianten; GL-Eintrag mit Pflicht-Berichtszeile", on_gl012: "kein Verdikt: Futility (Z < 0 an Blicken 1-3) -> GL-012 (Futility) mit Schaetzer, CI95 und oberer Ausschlussgrenze; Wiedervorlage nur bei veraenderter Nuisance, laengerem Horizont oder neuem Kostenmodell (VR-c08)"}
+capital_tax_venue: {kapitalbasis: "kapitalfrei (Messung); Rendite auf gebundenes Kapital bei einer Umsetzung: Kapital-Multiplikator m UNGEMESSEN, Pflicht-Sensitivitaet m in [1, 3] nur als Etikett; Ruin-Kapital u(eps) nur Bericht", steuer: "UNBELEGT - PRD 8.2", venue_event: "Deribit-Verfallskalender 08:00 UTC (seit 2020-03-25 taeglich Optionsverfall, seit 2026-04-04 taegliche Futures-Deliveries; Liefer-Ausreisser 2020-08-27, 2024-08-19 ausgeschlossen); Handelsvenue Bybit lineare Perps; CME-Referenzfenster an Monatsend-Freitagen in P3all-Kontaminationsliste [sek]", zahler_post_2024: "Inhaber/Hedger von Deribit-Optionen mit Lieferung in den TWAP; Bestand nach 2024: Kontraktzahlen Freitag ~13x Mo-Do (O-052, OI-Proportionalitaet UNBELEGT, Faktor 0,84..0,92 nur Etikett)"}
+stress_episode: {liste_ref: "STRESS_ABS sha256:b8008257e963eaa2bd81882d1169503ca8f4c38d7860d65c357b8db3308fc11e", rolle: abdeckungsnachweis, tage_in_fenstern: 3}
+irreversibility_probe: {ergebnis: "nachladbar", ref: "scinance3-impl/state/DATENANNAHMEN_REGISTER.md"}
+positive_control: {vorgeschaltet: true, produktionskonfiguration: true, welt: "kalibrierte Null-Welt des registrierten Tests: J-(i)-Permutations-Null mit der Kalenderstruktur der Konfirmationsfenster (W1/W2/K, feste Freitage W2), Klassen-Streuung der Vorperiode (zentral; SD der Kontrollwelt <= 1,10 x SD der Power-Zeile), komplette Gate-Kette mit skalierter Null, drei Placebos, Stabilitaetstest, OBF-Blicken, Futility und Gate (4) auf dem Negativ-Panel", kriterium: "vorab: Injektion des Kontrasts 19,50 bp (MDE80 des Plans) in registrierter Richtung an allen Ereignis-Tagen; PASS der Positivkontrolle, wenn die PASS-Quote ueber 200 Seeds >= 0,80 - 2,3263 x sqrt(0,80 x 0,20 / 200) = 0,7342 (DEC-103 N1 (8e)) UND die SD der Kontrollwelt <= 1,10 x 7,58 bp UND Gate (4) in der Kette; sonst NICHT BESTANDEN: kein Lauf, Ursachenanalyse, neue DEC", ref: "scinance3-impl/state/herleitung_a2/registrierung/calc/a2_reg_calc.py"}
+fixtures: {positive: "injizierter Kontrast 19,50 bp in registrierter Richtung an allen Ereignis-Tagen der Null-Welt (Produktionskonfiguration); Gate (4) mit effektfreiem Negativ-Panel", "null": "J-(i)-permutierte Labels auf der Null-Welt und synthetischer Random Walk mit realem Kalender (keine Ereignis-Lage): PASS-Quote <= alpha", adversarial: "Klasse E (PZ-05): Ereignismenge nachtraeglich aus vergangenen Renditen selektiert (die 52 Tage je Jahr mit der groessten Vorlaufrendite in registrierter Richtung) auf einem Random Walk mit realem Kalender; das Gate MUSS durchfallen (Placebos P3fix/P3all und Negativ-Panel schlagen an); zusaetzlich reiner Wochentagseffekt (Freitags-Drift in BTC/ETH und XRP/BNB/SOL): Gate (4) muss FAIL geben"}
+test_pflichten:
+  T0: "tests/unit/test_a2_expclock.py#test_t0_unit_contrast_and_threshold"
+  T1: "tests/unit/test_a2_expclock.py#test_t1_fixtures_positive_null_adversarial"
+  T2: "tests/unit/test_a2_expclock.py#test_t2_determinism_n3_fingerprint"
+  T3: "tests/unit/test_a2_expclock.py#test_t3_checkpoint_roundtrip"
+  T4: "tests/unit/test_a2_expclock.py#test_t4_gate_arithmetic_conserved_payload"
+  T5: "tests/unit/test_a2_expclock.py#test_t5_constants_pin"
+  T6: "tests/unit/test_a2_expclock.py#test_t6_legacy_import_block"
+  T7: "tests/unit/test_a2_expclock.py#test_t7_artifact_roundtrip"
+artifacts:
+  cluster_series_ref: "scinance3-impl/state/runs/a2_LAUFID/cluster_series_r_pre_contrast.csv (je Ereignis-Tag: x_E, Placebo-Mittel der Woche je Bedingung, Kontrast) + sha256 im Lauf; Siegel: Zone-K-Quartale nach jedem Blick fuer diese Statistik nie mehr geoeffnet"
+  bootstrap_replicates_ref: "seed 20261104 + generator_fingerprint im Lauf (stationaerer Bootstrap >= 1000 Replikate je Bedingung und Teil; J-(i)-Replikate >= 1000, Seed 103 + Fensterindex) + sha256 der Replikatdatei"
+report_line: [estimate, se, ci95, upper_limit95, n_eff, c_overlap, selection_k, shrinkage_note, zone]
+fdr: {family: "F-EXPCLOCK", bh_alpha: 0.10, p: "p des gepoolten P2-Tests am Stopp-Blick (ein Konfirmationsfenster, gepoolt; Methode WD-16), Konjunktion und Stabilitaetstest als zusaetzliche PASS-Bedingungen (p nicht verkleinernd)", over_family: "KOHORTE-1 (Benjamini-Yekutieli q 0,10, nur getestete Hypothesen)", kohorte_by_q: 0.10}
+constants_hash: "n/a - kapitalfrei ohne Kostenmodell"
+code_sha256:
+  - {pfad: "scinance3-impl/state/herleitung_a2/registrierung/calc/a2_reg_calc.py", sha256: "295775466fe286bdd6cbd61ad84597763f79cf79d2f5616ef36bc0f7f2ce8391"}
+  - {pfad: "scinance3-impl/state/herleitung_stabilitaetstest/stab_sim.py", sha256: "d7a4c9a81d1fadd2499d95e00e18d347bc8c556a7eef699067eea9d6f0b87ed2"}
+  - {pfad: "src/bybit_edge/research/feasibility31/rules.py", sha256: "21e8b98e344638fe79260d2ad308b9e2483bc04c6377d6406b5eee5b4bcdea6f"}
+data_fingerprints:
+  - "Nuisance: scinance3-impl/state/herleitung_a2/NULL_SIMULATION_A2.md sha256 3ae17fa1eac4292857763478511ac724466d5bc0e71caf06bdf03fc566c743cc; a2_teilC.json Fassung 2 sha256 8c01d72ece18e1c607b7ef585a88bef2ea19bca87c422c9e229780354bd17687 (Arbeitsverzeichnis)"
+  - "Vorperioden-Extrakte (nur Streuung): Kerzen sha256 c18a06bdd96174b4f2d794269d3d64daa1e206a8417b355e450a28e92e28ded5, Kalender b1a9fc2285358ef22f78262343b562f2ff28e755676d198af99b6e94d67981a8 (NULL_SIMULATION_A2.md Abschnitt 9)"
+  - "Stabilitaetstest: scinance3-impl/state/herleitung_stabilitaetstest/stab_results.json sha256 4a4a1fbcf22ea7a77b99e431f451148b6192d7d3a0f6b8aef132f3a3ba9a67ff"
+  - "Feasibility: scinance3-impl/state/feasibility/A2.yaml sha256 106b68679f2717e0078d9a8758f4d27619cf197bc9a0a47b69e915dda34f84af"
+  - "Stress-Kanon: scinance3-impl/state/runs/stress_abs.json sha256 b8008257e963eaa2bd81882d1169503ca8f4c38d7860d65c357b8db3308fc11e (Fixture-Feld sha256 b75fb7a08a6d590363f62828de99f23359c1c63fe1f385d0e4f37ba09bccf794)"
+  - "Register: scinance3-impl/state/FENSTERREGISTER.md sha256 f370c2972f789fab95f238c0edf51cf4a4eb06c1923cbe4a0b5b52f220d39bcd; KONTO_INVENTAR_2026-11-02.md sha256 a98ae048c0c39637bd94917f01bb268a2b0eb770d3e9e8d9294e02fae2a356fb"
+  - "Code-Commit: a874fa75d5d32f3fd0dc34aa77afbf3c697a640f (Repo-Stand 2026-11-04); registrierte YAML: sha256 bei Registrierung durch den Orchestrator"
+  - "Panel W1/W2/K (1-min-Kerzen BTCUSDT/ETHUSDT, Negativ-Panel XRP/BNB/SOL): Fingerprint vor dem Lauf, nach der Registrierung (P-0)"
+feasibility_verdict: "testbar"
+etiketten:
+  - "ENTWURF der Herleitung; Registrierung nur durch den Orchestrator nach Review (VR-h03)"
+  - "C.17: A2-Vorperiode blind durch Disziplin (B-2-Kanal, O-053); W1/W2 fuer A2 r_pre blind durch Disziplin; Zone-K-Luecke 2026-07..09 nicht urteilstragend (N1 (2))"
+  - "zugelassen nur durch DEC-104 E4 (i) (Ausnahme a2_r_pre auf Zone V) und DEC-107 (1) (c) / BE-04 (Lockerungen, N)"
+  - "Gabelung Richtung Testbarkeit: Taker-SESOI 22 bp statt Maker 10,8 bp; exakte Konjunktion statt Produkt (VR-e04); Stress Sensitivitaet statt bindend (BE-04)"
+  - "Gabelung Richtung Testbarkeit (Festlegung dieses Entwurfs, Entscheid O/N): Placebo in Zone K = P2strich (alle Mo-Do), weil P2 nach DEC-103 E3 dort 0 Tage erreicht (taegliche Futures-Deliveries seit 2026-04-04)"
+  - "Gabelung Richtung Strenge: jede z-Bedingung der Konjunktion mit derselben OBF-Grenze je Blick (Alternative: Nebenbedingungen fest 2,8070)"
+  - "Gate-(4)-Faktor 0,9025 UNBELEGT bis zur Negativ-Panel-Probe (Daten seit 2026-11-04 bei Data-Harvest)"
+  - "Planungs-SE 7,58 ist Platzhalter: bindendes Vorfenster 2023-07-01..2024-06-30 nachzuliefern (Konto-Eintrag, DEC-107 N1 (2))"
+  - "Literatur: Richtung [sek] (Weiss et al. 2026; Ni/Pearson/Poteshman 2005), Groesse UNBELEGT (V-5b)"
+  - "Strenge-Quotient 1,2548 (< 1,3); OC-Schutzzeile 0,2832 (Preis der Variante (c) bei langem aelterem Teil, DEC-107 (1) (f))"
+  - "Kein Code-Bau vor der Registrierung (P-0); Test-IDs T0-T7 sind die verbindlichen Namen fuer den Bau"
