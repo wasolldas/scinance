@@ -1,0 +1,74 @@
+====================================================================================================
+R0  closed-form checks
+  kappa(eps 0.01) 0.4343; eps(kappa 1/4) 3.35e-04; eps(kappa 1/2) 0.0183
+  geometric exponent kappa 0.5: derived 3.000 = 2/kappa-1 3.000
+  E[mu_L | PASS, null] = phi(z)/alpha - z = 0.2973 SE (Herleitung 0.2973)
+  MDE80 factor stab 3.8101 (Herleitung 3.8101); P(L*>0 | mu = k) = 0.002375 (= alpha x 0.95)
+  E[MaxDD]/sqrt(T) MC: T 250: 1.1792, T 1000: 1.2110, T 4000: 1.2394; extrapolated T->inf 1.2553 vs sqrt(pi/2) 1.2533
+  MaxDD/(sigma sqrt T) quantiles (T 1000): {'q50': 1.107441839309186, 'q75': 1.4873516350657388, 'q90': 1.9233964469880909, 'q95': 2.1991101696537254}; P(MaxDD > E[MaxDD]) 0.420
+  A1: sigma_ann 0.2556, Kelly(prior) 11.75x, SR 3.00, L_dd 0.937, L_str 1.411, SE104 34.8 bp, MDE80 132.4 bp, Kap-MDE80 168.4 bp, P(L*>0|0,k) 5.8e-05, cap-power prior 0.624, SQ 1.272, Datenfaktor 1.749
+  H-27: SE12 5.17 VP, MDE80 19.7 VP, months Mess 0.80 91, months Kap 0.80 146, u(true mu-k) 141 VP/vega, ratio 1.603
+====================================================================================================
+R1  null rate with different seed (z-level, SE known), 2e6 draws; relevant null mu = k
+  null_k0   : P(PASS) 0.002416, P(L*>0) 0.002416, mu_L|PASS mean 0.293 SE median 0.214 SE
+  null_k1   : P(PASS) 0.002301, P(L*>0) 0.000056, mu_L|PASS mean 0.289 SE median 0.211 SE
+  mu_eq_k   : P(PASS) 0.033505, P(L*>0) 0.002390, mu_L|PASS mean 0.396 SE median 0.296 SE
+  mde80_k0  : P(PASS) 0.800144, P(L*>0) 0.800144, mu_L|PASS mean 1.290 SE median 1.203 SE
+====================================================================================================
+R2  series level n 104, estimated SE, t-crit, Welch stability test (different seed), 3e5 series
+  iid null: P(t >= z 2.8070) 0.00307 (analytic t103 0.00299); P(t >= t_crit 2.8688) 0.00257; full 0.00247
+====================================================================================================
+R3  NEW: O'Brien-Fleming 4 looks (VR-d12), one-sided alpha 0.0025: capital rule at an early efficacy stop
+  OBF boundaries (z at looks 1..4): [5.665, 4.006, 3.271, 2.833]; P(PASS | null) 0.002500
+  share of null-PASS stops by look: [0.0, 0.014, 0.201, 0.785]
+  jump of mu_L at the boundary with fixed z_ci 2.8070 (in SE_k units): [2.858, 1.199, 0.464, 0.026]
+  E[mu_L | PASS, null] in SE_final units: fixed z 0.414 vs look-specific z 0.263 (single-look reference 0.297); min mu_L fixed z 0.026 (> 0: not continuous)
+  E[mu_L fixed z | stop at look j]: [None, 2.013, 0.822, 0.282]
+  H1 at MDE80: P(PASS) 0.839; E[mu_hat/mu | stop at look j] [3.09, 1.66, 1.19, 0.92]; E[mu_L(fixed z)/mu | look j] [1.62, 0.62, 0.34, 0.18]
+====================================================================================================
+R4  NEW: heavy tails - additive ruin with t(4) innovations (same mu, sigma) at kappa 0.4343 (eps 0.01) and 0.5
+  gauss kappa 0.4343: ruin MC 0.0088 (MC SE 0.0005) vs Gaussian theory 0.0100 -> factor 0.88
+  gauss kappa 0.5000: ruin MC 0.0171 (MC SE 0.0006) vs Gaussian theory 0.0183 -> factor 0.94
+  t4    kappa 0.4343: ruin MC 0.0097 (MC SE 0.0005) vs Gaussian theory 0.0100 -> factor 0.97
+  t4    kappa 0.5000: ruin MC 0.0178 (MC SE 0.0007) vs Gaussian theory 0.0183 -> factor 0.97
+  t3    kappa 0.4343: ruin MC 0.0115 (MC SE 0.0005) vs Gaussian theory 0.0100 -> factor 1.15
+  t3    kappa 0.5000: ruin MC 0.0188 (MC SE 0.0007) vs Gaussian theory 0.0183 -> factor 1.03
+====================================================================================================
+R5  NEW: MaxDD leg - realised MaxDD when L = L_dd (dd_tol 0.30, T 1y, A1 sigma_ann 0.2556), driftless and with the A1 prior drift
+  driftless   : E[MaxDD] 0.263 (budget 0.30), q50 0.237, q90 0.434, q95 0.503, P(MaxDD > 0.30) 0.319, P(> 0.45) 0.086
+  prior_theta1: E[MaxDD] 0.106 (budget 0.30), q50 0.097, q90 0.163, q95 0.190, P(MaxDD > 0.30) 0.003, P(> 0.45) 0.000
+  sesoi       : E[MaxDD] 0.202 (budget 0.30), q50 0.181, q90 0.329, q95 0.385, P(MaxDD > 0.30) 0.141, P(> 0.45) 0.021
+====================================================================================================
+R6  NEW: Peso world with NON-informative market stress days (N_stress 10 in window, strategy loss in them small)
+  s_up 1 sigma_calm: P(L*>0) 0.1395; L* median 2.45x (q90 3.32); L_str 20.0, L_dd 3.32; a -35 % jump costs 86 % of capital at the median L*
+  s_up 2 sigma_calm: P(L*>0) 0.1395; L* median 2.45x (q90 3.32); L_str 10.0, L_dd 3.32; a -35 % jump costs 86 % of capital at the median L*
+  s_up 4 sigma_calm: P(L*>0) 0.1395; L* median 2.45x (q90 3.32); L_str 5.0, L_dd 3.32; a -35 % jump costs 86 % of capital at the median L*
+  with a registered scenario floor s_scen 0.35 (PZ-05 fixture): L_str <= 0.571x -> jump costs <= 20 % by construction
+====================================================================================================
+R7  NEW: waiting time until N_stress >= stress_n_min (Poisson episodes from 2026-07-01)
+  n_min  5 rate 3.65/a (construction_1pct_days  ): median   1.3 a (-> 2028), q10  0.7 a; P(by 2029) 0.95, 2031 1.00, 2033 1.00
+  n_min  5 rate 3.02/a (fixture_all_episodes    ): median   1.5 a (-> 2028), q10  0.8 a; P(by 2029) 0.87, 2031 1.00, 2033 1.00
+  n_min  5 rate 1.36/a (fixture_2023plus_days   ): median   3.4 a (-> 2030), q10  1.8 a; P(by 2029) 0.26, 2031 0.73, 2033 0.94
+  n_min  5 rate 1.50/a (W1W2_days               ): median   3.1 a (-> 2030), q10  1.6 a; P(by 2029) 0.32, 2031 0.80, 2033 0.97
+  n_min 10 rate 3.65/a (construction_1pct_days  ): median   2.6 a (-> 2029), q10  1.7 a; P(by 2029) 0.43, 2031 0.96, 2033 1.00
+  n_min 10 rate 3.02/a (fixture_all_episodes    ): median   3.2 a (-> 2030), q10  2.1 a; P(by 2029) 0.23, 2031 0.87, 2033 0.99
+  n_min 10 rate 1.36/a (fixture_2023plus_days   ): median   7.1 a (-> 2034), q10  4.6 a; P(by 2029) 0.00, 2031 0.09, 2033 0.39
+  n_min 10 rate 1.50/a (W1W2_days               ): median   6.4 a (-> 2033), q10  4.1 a; P(by 2029) 0.01, 2031 0.15, 2033 0.51
+  n_min 19 rate 3.65/a (construction_1pct_days  ): median   5.1 a (-> 2032), q10  3.7 a; P(by 2029) 0.00, 2031 0.29, 2033 0.86
+  n_min 19 rate 3.02/a (fixture_all_episodes    ): median   6.2 a (-> 2033), q10  4.5 a; P(by 2029) 0.00, 2031 0.10, 2033 0.58
+  n_min 19 rate 1.36/a (fixture_2023plus_days   ): median  13.7 a (-> 2040), q10 10.0 a; P(by 2029) 0.00, 2031 0.00, 2033 0.00
+  n_min 19 rate 1.50/a (W1W2_days               ): median  12.4 a (-> 2039), q10  9.1 a; P(by 2029) 0.00, 2031 0.00, 2033 0.01
+====================================================================================================
+R8  s_up <= 0 (strategy gained in every stress episode) in the Herleitung's capital_rule semantics
+  N_stress 12 >= 10, s_up = -0.5 (gain): L* = 0.000; s_up = 1e-6: L* = 0.952 (L_str = 2e5, non-binding)
+  -> a tiny observed stress loss removes the stress leg entirely; a stress GAIN removes all capital. Both are artefacts of 'max observed loss' without a scenario floor.
+====================================================================================================
+R9  Peso fixture (PZ-05: Mess-Gate MUST fail) - pass rate of the pooled t-test as a function of n (no stability test, 1e5 series)
+  n  52 weeks: P(no jump) 0.716; P(PASS) 0.076; P(PASS | no jump) 0.106
+  n 104 weeks: P(no jump) 0.512; P(PASS) 0.146; P(PASS | no jump) 0.285
+  n 260 weeks: P(no jump) 0.188; P(PASS) 0.146; P(PASS | no jump) 0.780
+  n 520 weeks: P(no jump) 0.035; P(PASS) 0.041; P(PASS | no jump) 0.990
+  -> the pass rate on the Peso fixture is ~0.08..0.15 for n 52..260 weeks and falls only once jumps are almost surely in sample (n 520):
+     PZ-05 (gate MUST fail) is not satisfied by the pooled test on 2-5-year windows; Peso protection of the capital step cannot be delegated to it.
+====================================================================================================
+written <herleitung_kapitalregel_p>/review_results.json; runtime 138.7 s

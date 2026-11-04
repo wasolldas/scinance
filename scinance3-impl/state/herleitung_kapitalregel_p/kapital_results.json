@@ -1,0 +1,1540 @@
+{
+ "seed": 20261104,
+ "sections": {
+  "S0_identities": {
+   "kappa_to_eps": {
+    "0.25": 0.00033546262790251185,
+    "0.3333333333333333": 0.0024787521766663585,
+    "0.5": 0.01831563888873418,
+    "1.0": 0.1353352832366127
+   },
+   "eps_to_kappa": {
+    "0.05": 0.6676164013906681,
+    "0.02": 0.5112444372706629,
+    "0.01": 0.43429448190325176,
+    "0.001": 0.2895296546021679
+   },
+   "mde_factor_no_stab": 3.6486,
+   "mde_factor_stab": 3.8101479676625343,
+   "E_muL_given_pass_SEunits": {
+    "null": 0.2973261950866881,
+    "mde80_no_stab": 1.191561254849422,
+    "mde80_stab": 1.289583668245482
+   },
+   "ci95_jump_at_boundary_SEunits": 1.1621,
+   "E_muL95_given_pass_null_SEunits": 1.459426195086688,
+   "p_next_worse_than_max": {
+    "1": 0.5,
+    "3": 0.25,
+    "5": 0.16666666666666666,
+    "9": 0.1,
+    "10": 0.09090909090909091,
+    "19": 0.05
+   },
+   "capital_power_at_mu_eq_sesoi_when_mde80_eq_sesoi": 0.002500262084937951,
+   "capital_power_at_mu_eq_2sesoi_when_mde80_eq_sesoi": 0.7999940553550331
+  },
+  "S1_zlevel": {
+   "n_draws": 2000000,
+   "scenarios": {
+    "mu_se_0.0000": {
+     "mu_over_se": 0.0,
+     "p_pass_pooled_only": 0.002525,
+     "p_pass_with_stab": 0.0024055,
+     "p_pass_pooled_analytic": 0.002500262084937921,
+     "muL_given_pass_SEunits": {
+      "0.05": 0.016292425409120792,
+      "0.25": 0.08758956453550604,
+      "0.5": 0.2048036730073517,
+      "0.75": 0.4046928036334718,
+      "0.95": 0.8515208052102132
+     },
+     "mean_muL_given_pass": 0.28973074932597953,
+     "mean_muL95_given_pass": 1.4518307493259794,
+     "share_of_true_mu_in_muL_median": null
+    },
+    "mu_se_1.0000": {
+     "mu_over_se": 1.0,
+     "p_pass_pooled_only": 0.035289,
+     "p_pass_with_stab": 0.0335065,
+     "p_pass_pooled_analytic": 0.03538113960044731,
+     "muL_given_pass_SEunits": {
+      "0.05": 0.022913439416719594,
+      "0.25": 0.12684747699092913,
+      "0.5": 0.2960248730051753,
+      "0.75": 0.5636722677727812,
+      "0.95": 1.1057374988301594
+     },
+     "mean_muL_given_pass": 0.3954822296588192,
+     "mean_muL95_given_pass": 1.557582229658819,
+     "share_of_true_mu_in_muL_median": 0.2960248730051753
+    },
+    "mu_se_2.0000": {
+     "mu_over_se": 2.0,
+     "p_pass_pooled_only": 0.210164,
+     "p_pass_with_stab": 0.1996615,
+     "p_pass_pooled_analytic": 0.20983324157565386,
+     "muL_given_pass_SEunits": {
+      "0.05": 0.036480612121859185,
+      "0.25": 0.19724056351903352,
+      "0.5": 0.44575373351762204,
+      "0.75": 0.8122677321634628,
+      "0.95": 1.4992782295721352
+     },
+     "mean_muL_given_pass": 0.5644715061704634,
+     "mean_muL95_given_pass": 1.7265715061704632,
+     "share_of_true_mu_in_muL_median": 0.22287686675881102
+    },
+    "mu_se_3.6486": {
+     "mu_over_se": 3.6486,
+     "p_pass_pooled_only": 0.800262,
+     "p_pass_with_stab": 0.7602385,
+     "p_pass_pooled_analytic": 0.7999940553550331,
+     "muL_given_pass_SEunits": {
+      "0.05": 0.13508764051077432,
+      "0.25": 0.5882118203334712,
+      "0.5": 1.0946331283493156,
+      "0.75": 1.6824343315303607,
+      "0.95": 2.592292694456842
+     },
+     "mean_muL_given_pass": 1.191259265378144,
+     "mean_muL95_given_pass": 2.3533592653781437,
+     "share_of_true_mu_in_muL_median": 0.30001456129729637
+    },
+    "mu_se_3.8101": {
+     "mu_over_se": 3.8101479676625343,
+     "p_pass_pooled_only": 0.841809,
+     "p_pass_with_stab": 0.7997295,
+     "p_pass_pooled_analytic": 0.8421052631578948,
+     "muL_given_pass_SEunits": {
+      "0.05": 0.16134460850833926,
+      "0.25": 0.6665952426182711,
+      "0.5": 1.2021105889024546,
+      "0.75": 1.8069552982669101,
+      "0.95": 2.7285960632040664
+     },
+     "mean_muL_given_pass": 1.289099346336871,
+     "mean_muL95_given_pass": 2.451199346336871,
+     "share_of_true_mu_in_muL_median": 0.3155023372071113
+    },
+    "mu_se_5.0000": {
+     "mu_over_se": 5.0,
+     "p_pass_pooled_only": 0.9857645,
+     "p_pass_with_stab": 0.936214,
+     "p_pass_pooled_analytic": 0.9858463104542877,
+     "muL_given_pass_SEunits": {
+      "0.05": 0.6651341335567992,
+      "0.25": 1.5514286394463355,
+      "0.5": 2.2120529712314183,
+      "0.75": 2.879968932482292,
+      "0.95": 3.8438623072463507
+     },
+     "mean_muL_given_pass": 2.229769117323936,
+     "mean_muL95_given_pass": 3.391869117323937,
+     "share_of_true_mu_in_muL_median": 0.44241059424628365
+    }
+   },
+   "p_capital_positive_given_null": 0.0024055,
+   "p_capital_positive_given_null_le_alpha": true,
+   "mc_se_of_p": 3.531111722956384e-05
+  },
+  "S2_A1": {
+   "inputs": {
+    "sigma_week": 0.03544,
+    "rho1": -0.28,
+    "cost_week": 0.0036,
+    "prior_theta1_week": 0.01476,
+    "theta_min": 0.766,
+    "periods_per_year": 52,
+    "eps": 0.01,
+    "z_ci": 2.807,
+    "dd_tol": 0.3,
+    "dd_T_years": 1.0,
+    "stress_n_min": 10,
+    "stress_loss_tol": 0.2,
+    "s_up_mult_sigma": 4.0,
+    "n_draws": 300000
+   },
+   "rows": [
+    {
+     "n_weeks": 104,
+     "c": 1.0,
+     "se_week": 0.003475177914648621,
+     "mde80_week": 0.013240942068764167,
+     "mu_true_week": 0.0,
+     "mu_name": "null",
+     "n_stress": 3,
+     "p_pass": 0.00226,
+     "p_capital_pos": 0.0,
+     "L_given_pos": {
+      "0.05": null,
+      "0.25": null,
+      "0.5": null,
+      "0.75": null,
+      "0.95": null
+     },
+     "u_median_given_pos": null,
+     "binding_share_dd": null,
+     "binding_share_stress": null
+    },
+    {
+     "n_weeks": 104,
+     "c": 1.0,
+     "se_week": 0.003475177914648621,
+     "mde80_week": 0.013240942068764167,
+     "mu_true_week": 0.0,
+     "mu_name": "null",
+     "n_stress": 10,
+     "p_pass": 0.00226,
+     "p_capital_pos": 4.3333333333333334e-05,
+     "L_given_pos": {
+      "0.05": 0.013665654682662145,
+      "0.25": 0.11716801406477691,
+      "0.5": 0.26721589392238887,
+      "0.75": 0.41984317100350316,
+      "0.95": 0.7122561841452957
+     },
+     "u_median_given_pos": 3.742292366375645,
+     "binding_share_dd": 0.0,
+     "binding_share_stress": 0.0
+    },
+    {
+     "n_weeks": 104,
+     "c": 1.0,
+     "se_week": 0.003475177914648621,
+     "mde80_week": 0.013240942068764167,
+     "mu_true_week": 0.0036,
+     "mu_name": "sesoi",
+     "n_stress": 3,
+     "p_pass": 0.03663333333333333,
+     "p_capital_pos": 0.0,
+     "L_given_pos": {
+      "0.05": null,
+      "0.25": null,
+      "0.5": null,
+      "0.75": null,
+      "0.95": null
+     },
+     "u_median_given_pos": null,
+     "binding_share_dd": null,
+     "binding_share_stress": null
+    },
+    {
+     "n_weeks": 104,
+     "c": 1.0,
+     "se_week": 0.003475177914648621,
+     "mde80_week": 0.013240942068764167,
+     "mu_true_week": 0.0036,
+     "mu_name": "sesoi",
+     "n_stress": 10,
+     "p_pass": 0.03663333333333333,
+     "p_capital_pos": 0.0023866666666666667,
+     "L_given_pos": {
+      "0.05": 0.017751232489182832,
+      "0.25": 0.10632555687013473,
+      "0.5": 0.2820749571364699,
+      "0.75": 0.5438684671450632,
+      "0.95": 0.93662540020266
+     },
+     "u_median_given_pos": 3.545156968742152,
+     "binding_share_dd": 0.0712290502793296,
+     "binding_share_stress": 0.0
+    },
+    {
+     "n_weeks": 104,
+     "c": 1.0,
+     "se_week": 0.003475177914648621,
+     "mde80_week": 0.013240942068764167,
+     "mu_true_week": 0.01130616,
+     "mu_name": "prior_theta_min",
+     "n_stress": 3,
+     "p_pass": 0.63929,
+     "p_capital_pos": 0.0,
+     "L_given_pos": {
+      "0.05": null,
+      "0.25": null,
+      "0.5": null,
+      "0.75": null,
+      "0.95": null
+     },
+     "u_median_given_pos": null,
+     "binding_share_dd": null,
+     "binding_share_stress": null
+    },
+    {
+     "n_weeks": 104,
+     "c": 1.0,
+     "se_week": 0.003475177914648621,
+     "mde80_week": 0.013240942068764167,
+     "mu_true_week": 0.01130616,
+     "mu_name": "prior_theta_min",
+     "n_stress": 10,
+     "p_pass": 0.63929,
+     "p_capital_pos": 0.2638933333333333,
+     "L_given_pos": {
+      "0.05": 0.049562252373342434,
+      "0.25": 0.2676372710966817,
+      "0.5": 0.5910895382869926,
+      "0.75": 0.93662540020266,
+      "0.95": 0.93662540020266
+     },
+     "u_median_given_pos": 1.6917910658646582,
+     "binding_share_dd": 0.3069800929668553,
+     "binding_share_stress": 0.0
+    },
+    {
+     "n_weeks": 104,
+     "c": 1.0,
+     "se_week": 0.003475177914648621,
+     "mde80_week": 0.013240942068764167,
+     "mu_true_week": 0.01476,
+     "mu_name": "prior_theta1",
+     "n_stress": 3,
+     "p_pass": 0.8781633333333333,
+     "p_capital_pos": 0.0,
+     "L_given_pos": {
+      "0.05": null,
+      "0.25": null,
+      "0.5": null,
+      "0.75": null,
+      "0.95": null
+     },
+     "u_median_given_pos": null,
+     "binding_share_dd": null,
+     "binding_share_stress": null
+    },
+    {
+     "n_weeks": 104,
+     "c": 1.0,
+     "se_week": 0.003475177914648621,
+     "mde80_week": 0.013240942068764167,
+     "mu_true_week": 0.01476,
+     "mu_name": "prior_theta1",
+     "n_stress": 10,
+     "p_pass": 0.8781633333333333,
+     "p_capital_pos": 0.6241833333333333,
+     "L_given_pos": {
+      "0.05": 0.1064068288459123,
+      "0.25": 0.5079164817338635,
+      "0.5": 0.93662540020266,
+      "0.75": 0.93662540020266,
+      "0.95": 0.93662540020266
+     },
+     "u_median_given_pos": 1.0676626960827962,
+     "binding_share_dd": 0.53993217804598,
+     "binding_share_stress": 0.0
+    },
+    {
+     "n_weeks": 104,
+     "c": 2.439,
+     "se_week": 0.0054273160816287625,
+     "mde80_week": 0.020678877338280017,
+     "mu_true_week": 0.0,
+     "mu_name": "null",
+     "n_stress": 3,
+     "p_pass": 0.00227,
+     "p_capital_pos": 0.0,
+     "L_given_pos": {
+      "0.05": null,
+      "0.25": null,
+      "0.5": null,
+      "0.75": null,
+      "0.95": null
+     },
+     "u_median_given_pos": null,
+     "binding_share_dd": null,
+     "binding_share_stress": null
+    },
+    {
+     "n_weeks": 104,
+     "c": 2.439,
+     "se_week": 0.0054273160816287625,
+     "mde80_week": 0.020678877338280017,
+     "mu_true_week": 0.0,
+     "mu_name": "null",
+     "n_stress": 10,
+     "p_pass": 0.00227,
+     "p_capital_pos": 0.00024,
+     "L_given_pos": {
+      "0.05": 0.028017015549579336,
+      "0.25": 0.16159588485653642,
+      "0.5": 0.3548103618082187,
+      "0.75": 0.6873626149687133,
+      "0.95": 0.93662540020266
+     },
+     "u_median_given_pos": 2.818406979164035,
+     "binding_share_dd": 0.18055555555555555,
+     "binding_share_stress": 0.0
+    },
+    {
+     "n_weeks": 104,
+     "c": 2.439,
+     "se_week": 0.0054273160816287625,
+     "mde80_week": 0.020678877338280017,
+     "mu_true_week": 0.0036,
+     "mu_name": "sesoi",
+     "n_stress": 3,
+     "p_pass": 0.015176666666666666,
+     "p_capital_pos": 0.0,
+     "L_given_pos": {
+      "0.05": null,
+      "0.25": null,
+      "0.5": null,
+      "0.75": null,
+      "0.95": null
+     },
+     "u_median_given_pos": null,
+     "binding_share_dd": null,
+     "binding_share_stress": null
+    },
+    {
+     "n_weeks": 104,
+     "c": 2.439,
+     "se_week": 0.0054273160816287625,
+     "mde80_week": 0.020678877338280017,
+     "mu_true_week": 0.0036,
+     "mu_name": "sesoi",
+     "n_stress": 10,
+     "p_pass": 0.015176666666666666,
+     "p_capital_pos": 0.00236,
+     "L_given_pos": {
+      "0.05": 0.03253627717001452,
+      "0.25": 0.19475383140832916,
+      "0.5": 0.41644339586527124,
+      "0.75": 0.7660355029672912,
+      "0.95": 0.93662540020266
+     },
+     "u_median_given_pos": 2.40128672930984,
+     "binding_share_dd": 0.17796610169491525,
+     "binding_share_stress": 0.0
+    },
+    {
+     "n_weeks": 104,
+     "c": 2.439,
+     "se_week": 0.0054273160816287625,
+     "mde80_week": 0.020678877338280017,
+     "mu_true_week": 0.01130616,
+     "mu_name": "prior_theta_min",
+     "n_stress": 3,
+     "p_pass": 0.22365333333333334,
+     "p_capital_pos": 0.0,
+     "L_given_pos": {
+      "0.05": null,
+      "0.25": null,
+      "0.5": null,
+      "0.75": null,
+      "0.95": null
+     },
+     "u_median_given_pos": null,
+     "binding_share_dd": null,
+     "binding_share_stress": null
+    },
+    {
+     "n_weeks": 104,
+     "c": 2.439,
+     "se_week": 0.0054273160816287625,
+     "mde80_week": 0.020678877338280017,
+     "mu_true_week": 0.01130616,
+     "mu_name": "prior_theta_min",
+     "n_stress": 10,
+     "p_pass": 0.22365333333333334,
+     "p_capital_pos": 0.07903333333333333,
+     "L_given_pos": {
+      "0.05": 0.05353656048645725,
+      "0.25": 0.2899276776790115,
+      "0.5": 0.662354822920931,
+      "0.75": 0.93662540020266,
+      "0.95": 0.93662540020266
+     },
+     "u_median_given_pos": 1.5097648048972925,
+     "binding_share_dd": 0.36140868831716577,
+     "binding_share_stress": 0.0
+    },
+    {
+     "n_weeks": 104,
+     "c": 2.439,
+     "se_week": 0.0054273160816287625,
+     "mde80_week": 0.020678877338280017,
+     "mu_true_week": 0.01476,
+     "mu_name": "prior_theta1",
+     "n_stress": 3,
+     "p_pass": 0.44188333333333335,
+     "p_capital_pos": 0.0,
+     "L_given_pos": {
+      "0.05": null,
+      "0.25": null,
+      "0.5": null,
+      "0.75": null,
+      "0.95": null
+     },
+     "u_median_given_pos": null,
+     "binding_share_dd": null,
+     "binding_share_stress": null
+    },
+    {
+     "n_weeks": 104,
+     "c": 2.439,
+     "se_week": 0.0054273160816287625,
+     "mde80_week": 0.020678877338280017,
+     "mu_true_week": 0.01476,
+     "mu_name": "prior_theta1",
+     "n_stress": 10,
+     "p_pass": 0.44188333333333335,
+     "p_capital_pos": 0.21467666666666665,
+     "L_given_pos": {
+      "0.05": 0.06872082603897738,
+      "0.25": 0.37658658031287007,
+      "0.5": 0.8585943393146186,
+      "0.75": 0.93662540020266,
+      "0.95": 0.93662540020266
+     },
+     "u_median_given_pos": 1.1646943780205445,
+     "binding_share_dd": 0.4660962998618077,
+     "binding_share_stress": 0.0
+    },
+    {
+     "n_weeks": 260,
+     "c": 1.0,
+     "se_week": 0.0021978954969207737,
+     "mde80_week": 0.008374307060727322,
+     "mu_true_week": 0.0,
+     "mu_name": "null",
+     "n_stress": 3,
+     "p_pass": 0.0024866666666666665,
+     "p_capital_pos": 0.0,
+     "L_given_pos": {
+      "0.05": null,
+      "0.25": null,
+      "0.5": null,
+      "0.75": null,
+      "0.95": null
+     },
+     "u_median_given_pos": null,
+     "binding_share_dd": null,
+     "binding_share_stress": null
+    },
+    {
+     "n_weeks": 260,
+     "c": 1.0,
+     "se_week": 0.0021978954969207737,
+     "mde80_week": 0.008374307060727322,
+     "mu_true_week": 0.0,
+     "mu_name": "null",
+     "n_stress": 10,
+     "p_pass": 0.0024866666666666665,
+     "p_capital_pos": 0.0,
+     "L_given_pos": {
+      "0.05": null,
+      "0.25": null,
+      "0.5": null,
+      "0.75": null,
+      "0.95": null
+     },
+     "u_median_given_pos": null,
+     "binding_share_dd": null,
+     "binding_share_stress": null
+    },
+    {
+     "n_weeks": 260,
+     "c": 1.0,
+     "se_week": 0.0021978954969207737,
+     "mde80_week": 0.008374307060727322,
+     "mu_true_week": 0.0036,
+     "mu_name": "sesoi",
+     "n_stress": 3,
+     "p_pass": 0.11618666666666666,
+     "p_capital_pos": 0.0,
+     "L_given_pos": {
+      "0.05": null,
+      "0.25": null,
+      "0.5": null,
+      "0.75": null,
+      "0.95": null
+     },
+     "u_median_given_pos": null,
+     "binding_share_dd": null,
+     "binding_share_stress": null
+    },
+    {
+     "n_weeks": 260,
+     "c": 1.0,
+     "se_week": 0.0021978954969207737,
+     "mde80_week": 0.008374307060727322,
+     "mu_true_week": 0.0036,
+     "mu_name": "sesoi",
+     "n_stress": 10,
+     "p_pass": 0.11618666666666666,
+     "p_capital_pos": 0.002513333333333333,
+     "L_given_pos": {
+      "0.05": 0.014052896305120017,
+      "0.25": 0.07798703899386991,
+      "0.5": 0.17387268244691412,
+      "0.75": 0.31963793708806615,
+      "0.95": 0.6943747359609986
+     },
+     "u_median_given_pos": 5.7513347463614055,
+     "binding_share_dd": 0.013262599469496022,
+     "binding_share_stress": 0.0
+    },
+    {
+     "n_weeks": 260,
+     "c": 1.0,
+     "se_week": 0.0021978954969207737,
+     "mde80_week": 0.008374307060727322,
+     "mu_true_week": 0.01130616,
+     "mu_name": "prior_theta_min",
+     "n_stress": 3,
+     "p_pass": 0.9406266666666667,
+     "p_capital_pos": 0.0,
+     "L_given_pos": {
+      "0.05": null,
+      "0.25": null,
+      "0.5": null,
+      "0.75": null,
+      "0.95": null
+     },
+     "u_median_given_pos": null,
+     "binding_share_dd": null,
+     "binding_share_stress": null
+    },
+    {
+     "n_weeks": 260,
+     "c": 1.0,
+     "se_week": 0.0021978954969207737,
+     "mde80_week": 0.008374307060727322,
+     "mu_true_week": 0.01130616,
+     "mu_name": "prior_theta_min",
+     "n_stress": 10,
+     "p_pass": 0.9406266666666667,
+     "p_capital_pos": 0.7198333333333333,
+     "L_given_pos": {
+      "0.05": 0.08836139707260494,
+      "0.25": 0.39985344774893933,
+      "0.5": 0.7643068691793367,
+      "0.75": 0.93662540020266,
+      "0.95": 0.93662540020266
+     },
+     "u_median_given_pos": 1.308375000049045,
+     "binding_share_dd": 0.39082658022690436,
+     "binding_share_stress": 0.0
+    },
+    {
+     "n_weeks": 260,
+     "c": 1.0,
+     "se_week": 0.0021978954969207737,
+     "mde80_week": 0.008374307060727322,
+     "mu_true_week": 0.01476,
+     "mu_name": "prior_theta1",
+     "n_stress": 3,
+     "p_pass": 0.94973,
+     "p_capital_pos": 0.0,
+     "L_given_pos": {
+      "0.05": null,
+      "0.25": null,
+      "0.5": null,
+      "0.75": null,
+      "0.95": null
+     },
+     "u_median_given_pos": null,
+     "binding_share_dd": null,
+     "binding_share_stress": null
+    },
+    {
+     "n_weeks": 260,
+     "c": 1.0,
+     "se_week": 0.0021978954969207737,
+     "mde80_week": 0.008374307060727322,
+     "mu_true_week": 0.01476,
+     "mu_name": "prior_theta1",
+     "n_stress": 10,
+     "p_pass": 0.94973,
+     "p_capital_pos": 0.9388133333333334,
+     "L_given_pos": {
+      "0.05": 0.5536446338417065,
+      "0.25": 0.93662540020266,
+      "0.5": 0.93662540020266,
+      "0.75": 0.93662540020266,
+      "0.95": 0.93662540020266
+     },
+     "u_median_given_pos": 1.0676626960827962,
+     "binding_share_dd": 0.8600857820511,
+     "binding_share_stress": 0.0
+    },
+    {
+     "n_weeks": 260,
+     "c": 2.439,
+     "se_week": 0.003432536079921444,
+     "mde80_week": 0.013078470368841012,
+     "mu_true_week": 0.0,
+     "mu_name": "null",
+     "n_stress": 3,
+     "p_pass": 0.002436666666666667,
+     "p_capital_pos": 0.0,
+     "L_given_pos": {
+      "0.05": null,
+      "0.25": null,
+      "0.5": null,
+      "0.75": null,
+      "0.95": null
+     },
+     "u_median_given_pos": null,
+     "binding_share_dd": null,
+     "binding_share_stress": null
+    },
+    {
+     "n_weeks": 260,
+     "c": 2.439,
+     "se_week": 0.003432536079921444,
+     "mde80_week": 0.013078470368841012,
+     "mu_true_week": 0.0,
+     "mu_name": "null",
+     "n_stress": 10,
+     "p_pass": 0.002436666666666667,
+     "p_capital_pos": 6e-05,
+     "L_given_pos": {
+      "0.05": 0.03185276883801068,
+      "0.25": 0.08261073576654784,
+      "0.5": 0.19992447810607772,
+      "0.75": 0.3655860539286346,
+      "0.95": 0.6548973478029321
+     },
+     "u_median_given_pos": 5.001888760561931,
+     "binding_share_dd": 0.0,
+     "binding_share_stress": 0.0
+    },
+    {
+     "n_weeks": 260,
+     "c": 2.439,
+     "se_week": 0.003432536079921444,
+     "mde80_week": 0.013078470368841012,
+     "mu_true_week": 0.0036,
+     "mu_name": "sesoi",
+     "n_stress": 3,
+     "p_pass": 0.03758333333333334,
+     "p_capital_pos": 0.0,
+     "L_given_pos": {
+      "0.05": null,
+      "0.25": null,
+      "0.5": null,
+      "0.75": null,
+      "0.95": null
+     },
+     "u_median_given_pos": null,
+     "binding_share_dd": null,
+     "binding_share_stress": null
+    },
+    {
+     "n_weeks": 260,
+     "c": 2.439,
+     "se_week": 0.003432536079921444,
+     "mde80_week": 0.013078470368841012,
+     "mu_true_week": 0.0036,
+     "mu_name": "sesoi",
+     "n_stress": 10,
+     "p_pass": 0.03758333333333334,
+     "p_capital_pos": 0.0023933333333333333,
+     "L_given_pos": {
+      "0.05": 0.0173822587568584,
+      "0.25": 0.1056123575574254,
+      "0.5": 0.24829549209664706,
+      "0.75": 0.4631803076814739,
+      "0.95": 0.93662540020266
+     },
+     "u_median_given_pos": 4.027459345136874,
+     "binding_share_dd": 0.054317548746518104,
+     "binding_share_stress": 0.0
+    },
+    {
+     "n_weeks": 260,
+     "c": 2.439,
+     "se_week": 0.003432536079921444,
+     "mde80_week": 0.013078470368841012,
+     "mu_true_week": 0.01130616,
+     "mu_name": "prior_theta_min",
+     "n_stress": 3,
+     "p_pass": 0.65218,
+     "p_capital_pos": 0.0,
+     "L_given_pos": {
+      "0.05": null,
+      "0.25": null,
+      "0.5": null,
+      "0.75": null,
+      "0.95": null
+     },
+     "u_median_given_pos": null,
+     "binding_share_dd": null,
+     "binding_share_stress": null
+    },
+    {
+     "n_weeks": 260,
+     "c": 2.439,
+     "se_week": 0.003432536079921444,
+     "mde80_week": 0.013078470368841012,
+     "mu_true_week": 0.01130616,
+     "mu_name": "prior_theta_min",
+     "n_stress": 10,
+     "p_pass": 0.65218,
+     "p_capital_pos": 0.2709933333333333,
+     "L_given_pos": {
+      "0.05": 0.048555444072374096,
+      "0.25": 0.2686526581308209,
+      "0.5": 0.5948845569108692,
+      "0.75": 0.93662540020266,
+      "0.95": 0.93662540020266
+     },
+     "u_median_given_pos": 1.6809984195804712,
+     "binding_share_dd": 0.3072523309306502,
+     "binding_share_stress": 0.0
+    },
+    {
+     "n_weeks": 260,
+     "c": 2.439,
+     "se_week": 0.003432536079921444,
+     "mde80_week": 0.013078470368841012,
+     "mu_true_week": 0.01476,
+     "mu_name": "prior_theta1",
+     "n_stress": 3,
+     "p_pass": 0.8864066666666667,
+     "p_capital_pos": 0.0,
+     "L_given_pos": {
+      "0.05": null,
+      "0.25": null,
+      "0.5": null,
+      "0.75": null,
+      "0.95": null
+     },
+     "u_median_given_pos": null,
+     "binding_share_dd": null,
+     "binding_share_stress": null
+    },
+    {
+     "n_weeks": 260,
+     "c": 2.439,
+     "se_week": 0.003432536079921444,
+     "mde80_week": 0.013078470368841012,
+     "mu_true_week": 0.01476,
+     "mu_name": "prior_theta1",
+     "n_stress": 10,
+     "p_pass": 0.8864066666666667,
+     "p_capital_pos": 0.6382833333333333,
+     "L_given_pos": {
+      "0.05": 0.10621701201798762,
+      "0.25": 0.5174501025086415,
+      "0.5": 0.93662540020266,
+      "0.75": 0.93662540020266,
+      "0.95": 0.93662540020266
+     },
+     "u_median_given_pos": 1.0676626960827962,
+     "binding_share_dd": 0.5431287045982715,
+     "binding_share_stress": 0.0
+    },
+    {
+     "n_weeks": 665,
+     "c": 1.0,
+     "se_week": 0.001374304253231841,
+     "mde80_week": 0.005236302557401275,
+     "mu_true_week": 0.0,
+     "mu_name": "null",
+     "n_stress": 3,
+     "p_pass": 0.00245,
+     "p_capital_pos": 0.0,
+     "L_given_pos": {
+      "0.05": null,
+      "0.25": null,
+      "0.5": null,
+      "0.75": null,
+      "0.95": null
+     },
+     "u_median_given_pos": null,
+     "binding_share_dd": null,
+     "binding_share_stress": null
+    },
+    {
+     "n_weeks": 665,
+     "c": 1.0,
+     "se_week": 0.001374304253231841,
+     "mde80_week": 0.005236302557401275,
+     "mu_true_week": 0.0,
+     "mu_name": "null",
+     "n_stress": 10,
+     "p_pass": 0.00245,
+     "p_capital_pos": 0.0,
+     "L_given_pos": {
+      "0.05": null,
+      "0.25": null,
+      "0.5": null,
+      "0.75": null,
+      "0.95": null
+     },
+     "u_median_given_pos": null,
+     "binding_share_dd": null,
+     "binding_share_stress": null
+    },
+    {
+     "n_weeks": 665,
+     "c": 1.0,
+     "se_week": 0.001374304253231841,
+     "mde80_week": 0.005236302557401275,
+     "mu_true_week": 0.0036,
+     "mu_name": "sesoi",
+     "n_stress": 3,
+     "p_pass": 0.4044466666666667,
+     "p_capital_pos": 0.0,
+     "L_given_pos": {
+      "0.05": null,
+      "0.25": null,
+      "0.5": null,
+      "0.75": null,
+      "0.95": null
+     },
+     "u_median_given_pos": null,
+     "binding_share_dd": null,
+     "binding_share_stress": null
+    },
+    {
+     "n_weeks": 665,
+     "c": 1.0,
+     "se_week": 0.001374304253231841,
+     "mde80_week": 0.005236302557401275,
+     "mu_true_week": 0.0036,
+     "mu_name": "sesoi",
+     "n_stress": 10,
+     "p_pass": 0.4044466666666667,
+     "p_capital_pos": 0.0023233333333333335,
+     "L_given_pos": {
+      "0.05": 0.006813601461583655,
+      "0.25": 0.04294271725447021,
+      "0.5": 0.09983351080279693,
+      "0.75": 0.1911141182368499,
+      "0.95": 0.4525188499435282
+     },
+     "u_median_given_pos": 10.016676684598616,
+     "binding_share_dd": 0.0,
+     "binding_share_stress": 0.0
+    },
+    {
+     "n_weeks": 665,
+     "c": 1.0,
+     "se_week": 0.001374304253231841,
+     "mde80_week": 0.005236302557401275,
+     "mu_true_week": 0.01130616,
+     "mu_name": "prior_theta_min",
+     "n_stress": 3,
+     "p_pass": 0.9495233333333334,
+     "p_capital_pos": 0.0,
+     "L_given_pos": {
+      "0.05": null,
+      "0.25": null,
+      "0.5": null,
+      "0.75": null,
+      "0.95": null
+     },
+     "u_median_given_pos": null,
+     "binding_share_dd": null,
+     "binding_share_stress": null
+    },
+    {
+     "n_weeks": 665,
+     "c": 1.0,
+     "se_week": 0.001374304253231841,
+     "mde80_week": 0.005236302557401275,
+     "mu_true_week": 0.01130616,
+     "mu_name": "prior_theta_min",
+     "n_stress": 10,
+     "p_pass": 0.9495233333333334,
+     "p_capital_pos": 0.9471766666666667,
+     "L_given_pos": {
+      "0.05": 0.5604811472345818,
+      "0.25": 0.93662540020266,
+      "0.5": 0.93662540020266,
+      "0.75": 0.93662540020266,
+      "0.95": 0.93662540020266
+     },
+     "u_median_given_pos": 1.0676626960827962,
+     "binding_share_dd": 0.7992243615235454,
+     "binding_share_stress": 0.0
+    },
+    {
+     "n_weeks": 665,
+     "c": 1.0,
+     "se_week": 0.001374304253231841,
+     "mde80_week": 0.005236302557401275,
+     "mu_true_week": 0.01476,
+     "mu_name": "prior_theta1",
+     "n_stress": 3,
+     "p_pass": 0.9503233333333333,
+     "p_capital_pos": 0.0,
+     "L_given_pos": {
+      "0.05": null,
+      "0.25": null,
+      "0.5": null,
+      "0.75": null,
+      "0.95": null
+     },
+     "u_median_given_pos": null,
+     "binding_share_dd": null,
+     "binding_share_stress": null
+    },
+    {
+     "n_weeks": 665,
+     "c": 1.0,
+     "se_week": 0.001374304253231841,
+     "mde80_week": 0.005236302557401275,
+     "mu_true_week": 0.01476,
+     "mu_name": "prior_theta1",
+     "n_stress": 10,
+     "p_pass": 0.9503233333333333,
+     "p_capital_pos": 0.9503233333333333,
+     "L_given_pos": {
+      "0.05": 0.93662540020266,
+      "0.25": 0.93662540020266,
+      "0.5": 0.93662540020266,
+      "0.75": 0.93662540020266,
+      "0.95": 0.93662540020266
+     },
+     "u_median_given_pos": 1.0676626960827962,
+     "binding_share_dd": 0.9996246891408889,
+     "binding_share_stress": 0.0
+    },
+    {
+     "n_weeks": 665,
+     "c": 2.439,
+     "se_week": 0.002146302652067281,
+     "mde80_week": 0.008177730687762858,
+     "mu_true_week": 0.0,
+     "mu_name": "null",
+     "n_stress": 3,
+     "p_pass": 0.0022366666666666668,
+     "p_capital_pos": 0.0,
+     "L_given_pos": {
+      "0.05": null,
+      "0.25": null,
+      "0.5": null,
+      "0.75": null,
+      "0.95": null
+     },
+     "u_median_given_pos": null,
+     "binding_share_dd": null,
+     "binding_share_stress": null
+    },
+    {
+     "n_weeks": 665,
+     "c": 2.439,
+     "se_week": 0.002146302652067281,
+     "mde80_week": 0.008177730687762858,
+     "mu_true_week": 0.0,
+     "mu_name": "null",
+     "n_stress": 10,
+     "p_pass": 0.0022366666666666668,
+     "p_capital_pos": 0.0,
+     "L_given_pos": {
+      "0.05": null,
+      "0.25": null,
+      "0.5": null,
+      "0.75": null,
+      "0.95": null
+     },
+     "u_median_given_pos": null,
+     "binding_share_dd": null,
+     "binding_share_stress": null
+    },
+    {
+     "n_weeks": 665,
+     "c": 2.439,
+     "se_week": 0.002146302652067281,
+     "mde80_week": 0.008177730687762858,
+     "mu_true_week": 0.0036,
+     "mu_name": "sesoi",
+     "n_stress": 3,
+     "p_pass": 0.12221333333333333,
+     "p_capital_pos": 0.0,
+     "L_given_pos": {
+      "0.05": null,
+      "0.25": null,
+      "0.5": null,
+      "0.75": null,
+      "0.95": null
+     },
+     "u_median_given_pos": null,
+     "binding_share_dd": null,
+     "binding_share_stress": null
+    },
+    {
+     "n_weeks": 665,
+     "c": 2.439,
+     "se_week": 0.002146302652067281,
+     "mde80_week": 0.008177730687762858,
+     "mu_true_week": 0.0036,
+     "mu_name": "sesoi",
+     "n_stress": 10,
+     "p_pass": 0.12221333333333333,
+     "p_capital_pos": 0.00244,
+     "L_given_pos": {
+      "0.05": 0.014691320315587588,
+      "0.25": 0.07264887195981586,
+      "0.5": 0.16980981256185515,
+      "0.75": 0.3111335459255987,
+      "0.95": 0.6265076024031538
+     },
+     "u_median_given_pos": 5.8889411919922985,
+     "binding_share_dd": 0.009562841530054645,
+     "binding_share_stress": 0.0
+    },
+    {
+     "n_weeks": 665,
+     "c": 2.439,
+     "se_week": 0.002146302652067281,
+     "mde80_week": 0.008177730687762858,
+     "mu_true_week": 0.01130616,
+     "mu_name": "prior_theta_min",
+     "n_stress": 3,
+     "p_pass": 0.94382,
+     "p_capital_pos": 0.0,
+     "L_given_pos": {
+      "0.05": null,
+      "0.25": null,
+      "0.5": null,
+      "0.75": null,
+      "0.95": null
+     },
+     "u_median_given_pos": null,
+     "binding_share_dd": null,
+     "binding_share_stress": null
+    },
+    {
+     "n_weeks": 665,
+     "c": 2.439,
+     "se_week": 0.002146302652067281,
+     "mde80_week": 0.008177730687762858,
+     "mu_true_week": 0.01130616,
+     "mu_name": "prior_theta_min",
+     "n_stress": 10,
+     "p_pass": 0.94382,
+     "p_capital_pos": 0.7449333333333333,
+     "L_given_pos": {
+      "0.05": 0.09574018138630981,
+      "0.25": 0.41847068756643113,
+      "0.5": 0.7852158899493713,
+      "0.75": 0.93662540020266,
+      "0.95": 0.93662540020266
+     },
+     "u_median_given_pos": 1.2735351039119667,
+     "binding_share_dd": 0.4037632002863791,
+     "binding_share_stress": 0.0
+    },
+    {
+     "n_weeks": 665,
+     "c": 2.439,
+     "se_week": 0.002146302652067281,
+     "mde80_week": 0.008177730687762858,
+     "mu_true_week": 0.01476,
+     "mu_name": "prior_theta1",
+     "n_stress": 3,
+     "p_pass": 0.94976,
+     "p_capital_pos": 0.0,
+     "L_given_pos": {
+      "0.05": null,
+      "0.25": null,
+      "0.5": null,
+      "0.75": null,
+      "0.95": null
+     },
+     "u_median_given_pos": null,
+     "binding_share_dd": null,
+     "binding_share_stress": null
+    },
+    {
+     "n_weeks": 665,
+     "c": 2.439,
+     "se_week": 0.002146302652067281,
+     "mde80_week": 0.008177730687762858,
+     "mu_true_week": 0.01476,
+     "mu_name": "prior_theta1",
+     "n_stress": 10,
+     "p_pass": 0.94976,
+     "p_capital_pos": 0.9416933333333334,
+     "L_given_pos": {
+      "0.05": 0.6083925994916378,
+      "0.25": 0.93662540020266,
+      "0.5": 0.93662540020266,
+      "0.75": 0.93662540020266,
+      "0.95": 0.93662540020266
+     },
+     "u_median_given_pos": 1.0676626960827962,
+     "binding_share_dd": 0.8789768785308735,
+     "binding_share_stress": 0.0
+    }
+   ],
+   "sigma_ann": 0.2555614744048875,
+   "full_kelly_at_prior_theta1": 11.75165223771841,
+   "implied_annual_sr_at_prior_theta1": 3.0032695725648133,
+   "L_dd_1y": 0.93662540020266,
+   "L_dd_3y": 0.5407609269368467,
+   "L_stress_if_n_ok": 1.4108352144469527,
+   "capital_mde80_week": {
+    "104": 0.01684094206876417,
+    "260": 0.011974307060727322,
+    "665": 0.008836302557401275
+   }
+  },
+  "S3_H27": {
+   "inputs": {
+    "sd_premium_VP": 18.6,
+    "c": 28.2,
+    "prior_center_VP": 7.14,
+    "prior_band_VP": [
+     3.2,
+     10.5
+    ],
+    "cost_VP": 1.5,
+    "periods_per_year": 12.943262411347519
+   },
+   "rows": [
+    {
+     "months": 12,
+     "se_VP": 5.170006226646313,
+     "mde80_VP": 19.698488717259096,
+     "mu_true_VP": 0.0,
+     "mu_name": "null",
+     "p_pass": 0.0023266666666666666,
+     "p_capital_pos": 0.00092,
+     "u_eps_VP_per_vega_given_pos": {
+      "0.05": 195.30596626953735,
+      "0.25": 431.81467428473474,
+      "0.5": 848.1574013130773,
+      "0.75": 1932.6849968500767,
+      "0.95": 8959.86838586419
+     },
+     "u_eps_at_true_mu_minus_cost_VP": null
+    },
+    {
+     "months": 12,
+     "se_VP": 5.170006226646313,
+     "mde80_VP": 19.698488717259096,
+     "mu_true_VP": 1.5,
+     "mu_name": "sesoi",
+     "p_pass": 0.005713333333333333,
+     "p_capital_pos": 0.0023066666666666665,
+     "u_eps_VP_per_vega_given_pos": {
+      "0.05": 183.01110194138874,
+      "0.25": 391.6824504524385,
+      "0.5": 767.3795755702079,
+      "0.75": 1685.9292657669562,
+      "0.95": 10060.106111730036
+     },
+     "u_eps_at_true_mu_minus_cost_VP": null
+    },
+    {
+     "months": 12,
+     "se_VP": 5.170006226646313,
+     "mde80_VP": 19.698488717259096,
+     "mu_true_VP": 3.2,
+     "mu_name": "prior_low",
+     "p_pass": 0.01343,
+     "p_capital_pos": 0.006066666666666666,
+     "u_eps_VP_per_vega_given_pos": {
+      "0.05": 167.11921895739025,
+      "0.25": 335.0987456826076,
+      "0.5": 657.923356561645,
+      "0.75": 1598.2606568547703,
+      "0.95": 10445.205050944747
+     },
+     "u_eps_at_true_mu_minus_cost_VP": 468.58961104248243
+    },
+    {
+     "months": 12,
+     "se_VP": 5.170006226646313,
+     "mde80_VP": 19.698488717259096,
+     "mu_true_VP": 7.14,
+     "mu_name": "prior_center",
+     "p_pass": 0.07303,
+     "p_capital_pos": 0.04045666666666667,
+     "u_eps_VP_per_vega_given_pos": {
+      "0.05": 134.30723452997995,
+      "0.25": 262.2864287827562,
+      "0.5": 499.61105063346514,
+      "0.75": 1161.2949267044764,
+      "0.95": 6467.783810441825
+     },
+     "u_eps_at_true_mu_minus_cost_VP": 141.24154942769863
+    },
+    {
+     "months": 12,
+     "se_VP": 5.170006226646313,
+     "mde80_VP": 19.698488717259096,
+     "mu_true_VP": 10.5,
+     "mu_name": "prior_high",
+     "p_pass": 0.20721333333333333,
+     "p_capital_pos": 0.13587333333333335,
+     "u_eps_VP_per_vega_given_pos": {
+      "0.05": 111.24766470500253,
+      "0.25": 207.3993303464248,
+      "0.5": 385.2976112595708,
+      "0.75": 882.5280690422192,
+      "0.95": 4710.240957548113
+     },
+     "u_eps_at_true_mu_minus_cost_VP": 88.51137097469113
+    },
+    {
+     "months": 36,
+     "se_VP": 2.98490448666629,
+     "mde80_VP": 11.372927763538346,
+     "mu_true_VP": 0.0,
+     "mu_name": "null",
+     "p_pass": 0.0023333333333333335,
+     "p_capital_pos": 0.00040666666666666667,
+     "u_eps_VP_per_vega_given_pos": {
+      "0.05": 372.8349916713179,
+      "0.25": 624.533142481556,
+      "0.5": 1133.9042631168513,
+      "0.75": 2224.3096236281795,
+      "0.95": 9773.404369629085
+     },
+     "u_eps_at_true_mu_minus_cost_VP": null
+    },
+    {
+     "months": 36,
+     "se_VP": 2.98490448666629,
+     "mde80_VP": 11.372927763538346,
+     "mu_true_VP": 1.5,
+     "mu_name": "sesoi",
+     "p_pass": 0.01015,
+     "p_capital_pos": 0.0023266666666666666,
+     "u_eps_VP_per_vega_given_pos": {
+      "0.05": 324.2026876026737,
+      "0.25": 629.7658578473012,
+      "0.5": 1195.4045418373098,
+      "0.75": 2927.815243638038,
+      "0.95": 20062.106715296864
+     },
+     "u_eps_at_true_mu_minus_cost_VP": null
+    },
+    {
+     "months": 36,
+     "se_VP": 2.98490448666629,
+     "mde80_VP": 11.372927763538346,
+     "mu_true_VP": 3.2,
+     "mu_name": "prior_low",
+     "p_pass": 0.03963666666666667,
+     "p_capital_pos": 0.011863333333333333,
+     "u_eps_VP_per_vega_given_pos": {
+      "0.05": 266.056907677781,
+      "0.25": 538.6411438701818,
+      "0.5": 1048.5482252706126,
+      "0.75": 2366.303017692729,
+      "0.95": 12684.0174356709
+     },
+     "u_eps_at_true_mu_minus_cost_VP": 468.58961104248243
+    },
+    {
+     "months": 36,
+     "se_VP": 2.98490448666629,
+     "mde80_VP": 11.372927763538346,
+     "mu_true_VP": 7.14,
+     "mu_name": "prior_center",
+     "p_pass": 0.32263,
+     "p_capital_pos": 0.17084666666666667,
+     "u_eps_VP_per_vega_given_pos": {
+      "0.05": 185.19350771760287,
+      "0.25": 340.1127955841212,
+      "0.5": 629.0712018644213,
+      "0.75": 1410.393957556665,
+      "0.95": 7692.4011115034955
+     },
+     "u_eps_at_true_mu_minus_cost_VP": 141.24154942769863
+    },
+    {
+     "months": 36,
+     "se_VP": 2.98490448666629,
+     "mde80_VP": 11.372927763538346,
+     "mu_true_VP": 10.5,
+     "mu_name": "prior_high",
+     "p_pass": 0.7240266666666667,
+     "p_capital_pos": 0.5550733333333333,
+     "u_eps_VP_per_vega_given_pos": {
+      "0.05": 126.59618044170195,
+      "0.25": 210.0770501902071,
+      "0.5": 350.52422735293896,
+      "0.75": 723.3634057281042,
+      "0.95": 3620.8747018167196
+     },
+     "u_eps_at_true_mu_minus_cost_VP": 88.51137097469113
+    },
+    {
+     "months": 90,
+     "se_VP": 1.8878193551842348,
+     "mde80_VP": 7.192871079469208,
+     "mu_true_VP": 0.0,
+     "mu_name": "null",
+     "p_pass": 0.0023366666666666666,
+     "p_capital_pos": 0.00018666666666666666,
+     "u_eps_VP_per_vega_given_pos": {
+      "0.05": 700.5464336880846,
+      "0.25": 1391.4951940766937,
+      "0.5": 2667.080238806743,
+      "0.75": 6779.312442362637,
+      "0.95": 22083.32898491491
+     },
+     "u_eps_at_true_mu_minus_cost_VP": null
+    },
+    {
+     "months": 90,
+     "se_VP": 1.8878193551842348,
+     "mde80_VP": 7.192871079469208,
+     "mu_true_VP": 1.5,
+     "mu_name": "sesoi",
+     "p_pass": 0.0211,
+     "p_capital_pos": 0.00253,
+     "u_eps_VP_per_vega_given_pos": {
+      "0.05": 489.8231595871664,
+      "0.25": 1036.7918323414797,
+      "0.5": 2010.3209343916571,
+      "0.75": 4862.1834884521895,
+      "0.95": 26277.85991084757
+     },
+     "u_eps_at_true_mu_minus_cost_VP": null
+    },
+    {
+     "months": 90,
+     "se_VP": 1.8878193551842348,
+     "mde80_VP": 7.192871079469208,
+     "mu_true_VP": 3.2,
+     "mu_name": "prior_low",
+     "p_pass": 0.12619333333333332,
+     "p_capital_pos": 0.026336666666666668,
+     "u_eps_VP_per_vega_given_pos": {
+      "0.05": 378.3921545722951,
+      "0.25": 760.4437016047402,
+      "0.5": 1457.1117240714552,
+      "0.75": 3461.213521613741,
+      "0.95": 19624.28477536429
+     },
+     "u_eps_at_true_mu_minus_cost_VP": 468.58961104248243
+    },
+    {
+     "months": 90,
+     "se_VP": 1.8878193551842348,
+     "mde80_VP": 7.192871079469208,
+     "mu_true_VP": 7.14,
+     "mu_name": "prior_center",
+     "p_pass": 0.7945833333333333,
+     "p_capital_pos": 0.5437033333333333,
+     "u_eps_VP_per_vega_given_pos": {
+      "0.05": 202.53751205753625,
+      "0.25": 337.6244543863807,
+      "0.5": 564.6720873854936,
+      "0.75": 1166.593460018607,
+      "0.95": 5718.838739681874
+     },
+     "u_eps_at_true_mu_minus_cost_VP": 141.24154942769863
+    },
+    {
+     "months": 90,
+     "se_VP": 1.8878193551842348,
+     "mde80_VP": 7.192871079469208,
+     "mu_true_VP": 10.5,
+     "mu_name": "prior_high",
+     "p_pass": 0.9476933333333334,
+     "p_capital_pos": 0.9266933333333334,
+     "u_eps_VP_per_vega_given_pos": {
+      "0.05": 116.7313526141205,
+      "0.25": 158.7980422868579,
+      "0.5": 211.77294599107285,
+      "0.75": 313.4885397067143,
+      "0.95": 818.1521431311206
+     },
+     "u_eps_at_true_mu_minus_cost_VP": 88.51137097469113
+    }
+   ],
+   "months_for_capital_power_080_at_prior_center": 146.38239691564203,
+   "months_for_mess_power_080_at_prior_center": 91.33781930277614,
+   "stress_n_in_judgement_windows": "UNBELEGT (WD-13; reachability VR-f07 / DEC-104 E8 (d) outstanding)"
+  },
+  "S4_series": {
+   "n_series": 300000,
+   "n_weeks": 104,
+   "t_crit_0025_df103": 2.86876109361855,
+   "rows": [
+    {
+     "label": "iid_null",
+     "rho": 0.0,
+     "mu_in_SE_units": 0.0,
+     "p_pass_pooled_zcrit": 0.0029933333333333335,
+     "p_pass_pooled_tcrit": 0.00248,
+     "p_stab_reject": 0.04918666666666671,
+     "p_pass_full": 0.002353333333333333,
+     "p_capital_pos": 0.002353333333333333,
+     "mc_se": 8.846459094944063e-05
+    },
+    {
+     "label": "ar1_neg_null",
+     "rho": -0.28,
+     "mu_in_SE_units": 0.0,
+     "p_pass_pooled_zcrit": 0.00013,
+     "p_pass_pooled_tcrit": 0.00010666666666666667,
+     "p_stab_reject": 0.015086666666666693,
+     "p_pass_full": 0.00010333333333333333,
+     "p_capital_pos": 0.00010333333333333333,
+     "mc_se": 1.8558255625242688e-05
+    },
+    {
+     "label": "iid_mde80_stab",
+     "rho": 0.0,
+     "mu_in_SE_units": 3.8101479676625343,
+     "p_pass_pooled_zcrit": 0.8387333333333333,
+     "p_pass_pooled_tcrit": 0.8233666666666667,
+     "p_stab_reject": 0.05023333333333335,
+     "p_pass_full": 0.7816766666666667,
+     "p_capital_pos": 0.7816766666666667,
+     "mc_se": 0.000754228646710345
+    }
+   ]
+  },
+  "S5_peso": {
+   "n_series": 300000,
+   "lambda_per_week": 0.00641025641025641,
+   "jump": -0.35,
+   "calm_sigma": 0.01,
+   "calm_drift": 0.0022435897435897434,
+   "p_no_jump_in_sample": 0.5125633333333334,
+   "p_no_jump_analytic": 0.5123165443228738,
+   "p_pass_full": 0.14034333333333332,
+   "p_pass_given_no_jump": 0.2738068141172798,
+   "p_pass_given_jump": 0.0,
+   "p_capital_pos_stress_n_min_0": 0.14034333333333332,
+   "L_median_given_pos_stress_n_min_0": 2.461516288336418,
+   "p_capital_pos_stress_n_min_1": 0.0,
+   "L_median_given_pos_stress_n_min_1": null,
+   "p_capital_pos_stress_n_min_10": 0.0,
+   "L_median_given_pos_stress_n_min_10": null
+  },
+  "S6_checks": {
+   "kappa_0.25": {
+    "ruin_mc": 0.000125,
+    "ruin_theory_exp(-2/kappa)": 0.00033546262790251185,
+    "ruin_theory_discrete_corrected": 0.0002985658638671324,
+    "p_halve_theory_discrete_corrected": 0.007055235850883052,
+    "p_halve_wealth_mc_geometric": 0.006625,
+    "p_halve_theory_0.5^(2/kappa-1)": 0.0078125,
+    "mc_se_ruin": 9.156283262435045e-05
+   },
+   "kappa_0.5": {
+    "ruin_mc": 0.0166,
+    "ruin_theory_exp(-2/kappa)": 0.01831563888873418,
+    "ruin_theory_discrete_corrected": 0.016301143830192998,
+    "p_halve_theory_discrete_corrected": 0.11453995765876074,
+    "p_halve_wealth_mc_geometric": 0.114775,
+    "p_halve_theory_0.5^(2/kappa-1)": 0.125,
+    "mc_se_ruin": 0.000670450897919297
+   },
+   "maxdd": {
+    "T": 1000,
+    "mc_mean": 38.36331120289673,
+    "theory_1.2533_sqrtT": 39.633272976060105,
+    "ratio": 0.967957181484091
+   },
+   "maxdd_with_drift_0.05sigma": 24.037827579699997
+  }
+ },
+ "runtime_s": 49.03834128379822
+}
