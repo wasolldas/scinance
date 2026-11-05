@@ -105,8 +105,10 @@
   Vorfenster, Stress als Sensitivitaetszeile (DEC-107 BE-04); REZENZ als
   Stabilitaetstest (Gate und Bericht); A2: exakte Konjunktion statt Produkt,
   Assurance-Uebergabe. Ersetzt fuer 3.1-Registrierungen C.10/DEC-52/DEC-94 (6).
-  Etikett je Zeile in DEC-104 und DEC-107. Klasse P: Kapitalregel beauftragt
-  (DEC-107 (5)), bis zur Vorlage gilt PRD 3.6 (PARK).
+  Etikett je Zeile in DEC-104 und DEC-107. Klasse P: Kapitalregel (DEC-108 (2),
+  VR-f13 3.1, PZ-31): Kapitalschritt nur ueber L* = 1[PASS] min(Ruin-, MaxDD-,
+  Stress-Bein) am Bestaetigungsblick plus getrenntes Tradability-Gate; kein
+  Live-Kapital. A2-Placebo je Fenster (DEC-108 (1)): P2'' auf W1/W2, P2' in Zone K.
 - **Zwoelf Pflichtzeilen jeder Registrierung** (PRD Par. 3.3): Power,
   Entscheidungsrelevanz (mit oekonomischer Mindestmagnitude als ETIKETT),
   Cluster-Einheit, Selektions-Deflation, adversariales Fixture,

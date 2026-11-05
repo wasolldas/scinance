@@ -39,7 +39,7 @@ Falls das Volumen zu gross ist: zuerst (a) und (b), dann (c) in Monatsschritten.
 
 | Auftrag | Entscheidung Scinance |
 |---|---|
-| PRD 1 Marktkapitalisierung je Coin | **Taeglicher PIT-Schnappschuss ab sofort: ja** (Top-Coins, Quelle und Zeitstempel je Zeile). Historische Bezahlquelle: **vorerst nein** (Entscheidung beim Nutzer offen); wir arbeiten mit Umsatz-Dezilen als Groessenproxy (bereits registriert in H-28..H-33). |
+| PRD 1 Marktkapitalisierung je Coin | **Taeglicher PIT-Schnappschuss ab sofort: ja** (Top-Coins, Quelle und Zeitstempel je Zeile). Historische Bezahlquelle: **nein** (Nutzerentscheid 2026-11-04, DEC-108 (3)); wir arbeiten mit Umsatz-Dezilen als Groessenproxy (bereits registriert in H-28..H-33). |
 | PRD 4 OI aller Perps | **Ja:** taeglicher Strom + Backfill ab 2021-06-15, so weit die API reicht; Luecken (lange Delistete) als Liste benennen, nicht fuellen. |
 | PRD 5 Stablecoin-Angebot | **Ja**, Tagesstrom ab 2017-11-29 (DefiLlama), 435 Stablecoins, Quelle je Zeile. |
 | PRD 6 Deribit-Futures-Historie, Perp-Funding | **Ja**, beide als Stroeme; Funding-Beginn BTC-PERPETUAL bitte proben und als Datum melden. |
