@@ -1,0 +1,269 @@
+{
+ "c_bind_pooled_pre_period_to_2024-05-31": {
+  "E": 1.14909048381,
+  "P2ss": 1.31773930367,
+  "P3all": 1.0,
+  "P3fix": 1.1675915748
+ },
+ "calendar_meta": {
+  "ccy_equals_instrument_name_rows": 212735,
+  "currency_source": "Namenspraefix BTC-/ETH- (Spalte ccy = Instrumentname, nicht benutzt)",
+  "first_day": "2017-05-26",
+  "future_deliveries": 726,
+  "last_day": "2026-06-30",
+  "name_date_mismatch": 0,
+  "option_deliveries": 174931,
+  "rows": 212735,
+  "rows_by_type": {
+   "delivery": 175657,
+   "settlement": 37078
+  }
+ },
+ "inputs_sha256": {
+  "deribit_settlements_CALENDAR_fields4_2017-05-25_2026-06-30.parquet": {
+   "abgleich": "gleich",
+   "extract_log_key": "settlements",
+   "rows_log": 212735,
+   "sha256": "b1a9fc2285358ef22f78262343b562f2ff28e755676d198af99b6e94d67981a8"
+  },
+  "kline_2021-03-24_2024-05-31": "c18a06bdd96174b4f2d794269d3d64daa1e206a8417b355e450a28e92e28ded5",
+  "kline_2024-06-01_2024-06-30": "a0d1fdf1ad9d43b2688d1509b09a497a91c5090b4fccc1b645c3e9b52fb9cf6d",
+  "kline_combined": "55f538afbcb972b0c8ad15892a12b7a66bb612428f41d242655cfbbeaecec697"
+ },
+ "kline_meta": {
+  "first_day": "2021-03-24",
+  "last_day": "2024-06-30",
+  "per_symbol": {
+   "BTCUSDT": {
+    "days": 1195,
+    "rows": 1720800
+   },
+   "ETHUSDT": {
+    "days": 1195,
+    "rows": 1720800
+   }
+  },
+  "rows": 3441600
+ },
+ "label": "A2 Vorfenster-Nuisance (DEC-107 BE-04 / DEC-108; VR-b10 (i)): nur Streuung, Zaehlung, c, SE, Null-SD, Quantil-Abstaende; kein Mittel, kein Vorzeichen (R-C6)",
+ "n_rep_null": 20000,
+ "same_day_rho": {
+  "E|P2ss": 0.0,
+  "E|P3all": -0.109606686951,
+  "E|P3fix": -0.159375705383,
+  "P2ss|P3all": 0.0180438702908,
+  "P2ss|P3fix": 0.0334136779978,
+  "P3fix|P3all": 0.161566330329
+ },
+ "windows": {
+  "V3_2023-06..2024-05": {
+   "binding": {
+    "P2ss": {
+     "null_sd": 4.46396504718,
+     "se_analytic": 5.30775223909,
+     "se_bind": 5.30775223909,
+     "se_bind_source": "analytisch"
+    },
+    "P3all": {
+     "null_sd": 3.56094921702,
+     "se_analytic": 4.78047266248,
+     "se_bind": 4.78047266248,
+     "se_bind_source": "analytisch"
+    },
+    "P3fix": {
+     "null_sd": 3.56094921702,
+     "se_analytic": 6.05736398403,
+     "se_bind": 6.05736398403,
+     "se_bind_source": "analytisch"
+    }
+   },
+   "c_bind_window": {
+    "E": 1.99892307894,
+    "P2ss": 1.5978888422,
+    "P3all": 1.02758682385,
+    "P3fix": 1.1260772167
+   },
+   "class_sd": {
+    "E": 32.258165171,
+    "P2ss": 29.8324493934,
+    "P3all": 5.89790159426,
+    "P3fix": 51.7046171123
+   },
+   "counts": {
+    "E": 53,
+    "P2ss": 209,
+    "P3all": 262,
+    "P3fix": 250
+   },
+   "null_P2ss": {
+    "d95_other": 7.38438607937,
+    "d95_reg": 7.27334203904,
+    "d95_reg_ci95_mc": [
+     7.16650541483,
+     7.40098840736
+    ],
+    "d99_other": 10.3916788642,
+    "d99_reg": 10.2026854433,
+    "d99_reg_ci95_mc": [
+     9.95018878623,
+     10.4371783891
+    ],
+    "excess_kurtosis_exact": -0.0316092204525,
+    "excess_kurtosis_mc": -0.0654314250412,
+    "label_check": "alle Replikat-Zeilen gegen den Hash des realen Label-Vektors geprueft (R-C6)",
+    "n_rep": 20000,
+    "sd_exact": 4.49405001429,
+    "sd_mc": 4.46396504718,
+    "seed": 114,
+    "skew_exact": 0.0647283250268,
+    "skew_mc": 0.04971643404,
+    "tail_factor_95_reg": 1.62934565172,
+    "tail_factor_99_reg": 2.28556571019
+   },
+   "range": [
+    "2023-06-01",
+    "2024-05-31"
+   ],
+   "se_analytic_c1": {
+    "P2ss": 4.8879456458,
+    "P3all": 4.46382260709,
+    "P3fix": 5.65440681194
+   },
+   "se_analytic_c_pooled": {
+    "P2ss": 5.30775223909,
+    "P3all": 4.78047266248,
+    "P3fix": 6.05736398403
+   },
+   "se_analytic_c_window": {
+    "P2ss": 6.78605849611,
+    "P3all": 6.2882421853,
+    "P3fix": 7.275516075
+   },
+   "se_with_W2_counts": {
+    "P2ss": 5.51095711724,
+    "P3all": 4.82598853056,
+    "P3fix": 6.10637201103
+   },
+   "structure": {
+    "N_P2ss": 209,
+    "W_event": 53,
+    "a_weight": 0.0236526135235,
+    "f_p3_over_p2": 0.797709923664,
+    "kappa_efficiency": 0.99577502934,
+    "n_U": 262,
+    "n_w_hist": {
+     "2": 1,
+     "5": 52
+    },
+    "placebo_days_in_weeks_without_event_friday": 0,
+    "sum_within_dof": 42.1,
+    "weeks_fixed_event_only_friday": 0,
+    "weeks_permutable": 53
+   }
+  },
+  "VF_2023-07..2024-06": {
+   "binding": {
+    "P2ss": {
+     "null_sd": 4.65097322785,
+     "se_analytic": 5.55587829396,
+     "se_bind": 5.55587829396,
+     "se_bind_source": "analytisch"
+    },
+    "P3all": {
+     "null_sd": 3.72077858228,
+     "se_analytic": 5.04775157327,
+     "se_bind": 5.04775157327,
+     "se_bind_source": "analytisch"
+    },
+    "P3fix": {
+     "null_sd": 3.72077858228,
+     "se_analytic": 6.23032384969,
+     "se_bind": 6.23032384969,
+     "se_bind_source": "analytisch"
+    }
+   },
+   "c_bind_window": {
+    "E": 2.07008419077,
+    "P2ss": 1.49943671252,
+    "P3all": 1.00336440865,
+    "P3fix": 1.0
+   },
+   "class_sd": {
+    "E": 33.76085122,
+    "P2ss": 29.9445878741,
+    "P3all": 5.7759579863,
+    "P3fix": 50.3772038679
+   },
+   "counts": {
+    "E": 52,
+    "P2ss": 208,
+    "P3all": 260,
+    "P3fix": 248
+   },
+   "null_P2ss": {
+    "d95_other": 7.61824451551,
+    "d95_reg": 7.59575451448,
+    "d95_reg_ci95_mc": [
+     7.44213255661,
+     7.74565785797
+    ],
+    "d99_other": 11.0861167733,
+    "d99_reg": 10.610856393,
+    "d99_reg_ci95_mc": [
+     10.4426490189,
+     10.7950191751
+    ],
+    "excess_kurtosis_exact": -0.0295094664358,
+    "excess_kurtosis_mc": -0.0283722045825,
+    "label_check": "alle Replikat-Zeilen gegen den Hash des realen Label-Vektors geprueft (R-C6)",
+    "n_rep": 20000,
+    "sd_exact": 4.64923948361,
+    "sd_mc": 4.65097322785,
+    "seed": 113,
+    "skew_exact": 0.0501096286421,
+    "skew_mc": 0.0578290287903,
+    "tail_factor_95_reg": 1.63315378145,
+    "tail_factor_99_reg": 2.28142710636
+   },
+   "range": [
+    "2023-07-01",
+    "2024-06-30"
+   ],
+   "se_analytic_c1": {
+    "P2ss": 5.12153196138,
+    "P3all": 4.71294614288,
+    "P3fix": 5.81669862762
+   },
+   "se_analytic_c_pooled": {
+    "P2ss": 5.55587829396,
+    "P3all": 5.04775157327,
+    "P3fix": 6.23032384969
+   },
+   "se_analytic_c_window": {
+    "P2ss": 7.19989299114,
+    "P3all": 6.75778173809,
+    "P3fix": 7.56896980422
+   },
+   "se_with_W2_counts": {
+    "P2ss": 5.71125586762,
+    "P3all": 5.0478635242,
+    "P3fix": 6.23475074964
+   },
+   "structure": {
+    "N_P2ss": 208,
+    "W_event": 52,
+    "a_weight": 0.0240384615385,
+    "f_p3_over_p2": 0.8,
+    "kappa_efficiency": 1.0,
+    "n_U": 260,
+    "n_w_hist": {
+     "5": 52
+    },
+    "placebo_days_in_weeks_without_event_friday": 0,
+    "sum_within_dof": 41.6,
+    "weeks_fixed_event_only_friday": 0,
+    "weeks_permutable": 52
+   }
+  }
+ }
+}

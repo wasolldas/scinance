@@ -470,6 +470,10 @@ Tests: 1.992 passed / 3 failed (Legacy `test_execution_live.py`, Sandbox-bedingt
 - **Offen beim Nutzer:** G-02 (A2-Placebo in Zone K: (c) empfohlen); P-10-Defaults (DEC-107 N2 (3), ein Satz "Defaults annehmen");
   `state/ANTWORT_AN_DATA_HARVEST_2026-11-04.md` an Data-Harvest weiterleiten (Marktkap-Bezahlquelle: Default nein); privaten
   Speicher bereitstellen (Repo oder Bucket, Zugang nur ueber Umgebungs-Secrets); Bandbreitendeckel optional.
-- **Naechste Orchestrator-Schritte:** Vorfenster-SE A2 2023-07..2024-06 (Extrakt um Juni 2024 erweitern, SK1, Konto); nach G-02
+- **2026-11-05 frueh (DEC-108, N1):** Nutzer: G-02 (c), P-10 Defaults, Marktkap nein -> DEC-108. Vorfenster-SE A2 gerechnet
+  (Konto Nr. 3, O-984): bindend **7,34 bp** (Fenster-SD, Fenster-c, W2-Zaehlungen), Plan-MDE80 19,07 bp; A2-Zweitfassung liegt
+  vor (Linter gruen), Review laeuft.
+- **Naechste Orchestrator-Schritte:** nach dem Review der Zweitfassung Registrierung A2 (YAML mit SE 7,34, Hash-Pins,
+  Registry-Eintrag, FENSTERREGISTER V-Oeffnung 2027-04-01) und PK-Fixture; Registry-Schema PZ-31 `capital_rule` (Code + Tests); nach G-02
   Zweitfassung A2 (Auflagen B-2..B-7) -> Review -> Registrierung vor 2027-01-01 -> Positivkontroll-Fixture; nach P-10-Entscheid
   DEC-108 (VR-f13 neu, PZ-31); IK-01-Stichprobe auf W1/W2 mit A2-Maske (P-13); DEC-104 N5 (WD-06/08/13/16).

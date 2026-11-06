@@ -110,3 +110,9 @@ Der REZENZ-Screen (DEC-104 E2) ist durch den registrierten Stabilitaetstest erse
 Teil wird "juengster Teil (12 Monate / vier Quartale) faellt nicht ab" einseitig bei 0,05 (Welch-t) geprueft; Verwerfung =
 FAIL (terminal). Bei <= 12 Monaten Konfirmationsdaten entfaellt der Test. Pflicht-OC-Zeile je Registrierung: P(PASS bei Effekt
 nur im aelteren Teil, 1 MDE). Herleitung: `state/herleitung_stabilitaetstest/`.
+
+## Nachtrag 2026-11-05: Oeffnung Zone X fuer die A2-Vorfenster-Nuisance
+
+| Nr | Datum | Statistik | Fenster | Zone | Art | Quelle | Bemerkung |
+|---|---|---|---|---|---|---|---|
+| O-984 | 2026-11-05 | Klassen-SD, c_bind, analytische SE, Permutations-Null-SD und Quantil-Abstand der A2-Kontraste (r_pre BTC/ETH-Mittel, Slots [07:30, 08:00), [15:30, 16:00), P3all); Zaehlungen | 2023-07-01..2024-06-30 (VF) und 2023-06-01..2024-05-31 (V3, Gegenprobe) | X | SK1 (kein Mittel, kein Vorzeichen) | Orchestrator, `state/herleitung_a2/registrierung/vorfenster/`; Konto Nr. 3 | bindende Nuisance der A2-Registrierung nach DEC-107 BE-04; Juni 2024 (Zone X, letzter Monat vor W1) neu geladen; keine W1/W2-Werte beruehrt |
